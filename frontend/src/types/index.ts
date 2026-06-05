@@ -161,3 +161,13 @@ export interface CreateAPIKeyResult {
   plaintext: string
   key: APIKey
 }
+
+// --- 日历组件 ---
+
+export interface CalendarResult {
+  date: string
+  calendar: ReminderCalendar
+  lunar?: { year: number; month: number; day: number }
+  hour: number
+  minute: number
+}

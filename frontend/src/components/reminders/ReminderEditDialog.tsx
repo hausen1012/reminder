@@ -15,7 +15,6 @@ import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/switch'
 import { useToast } from '@/components/ui/use-toast'
 import { ScheduleForm, type ScheduleValue } from './ScheduleForm'
-import { NextFirePreview } from './NextFirePreview'
 import { createReminder, listChannels, updateReminder } from '@/lib/api'
 import type { Channel, Reminder, ReminderInput } from '@/types'
 
@@ -171,17 +170,10 @@ export function ReminderEditDialog({ reminder, open, onClose, onSaved }: Props) 
             />
           </div>
 
-          <NextFirePreview
-            calendar={input.calendar}
-            scheduleType={input.schedule_type}
-            spec={input.schedule_spec}
-            timezone={input.timezone}
-          />
-
           <div className="space-y-2">
             <Label>通道</Label>
             {channels.length === 0 ? (
-              <p className="text-xs text-muted-foreground">还没有通道，先到「通知通道」页面创建一个。</p>
+              <p className="text-xs text-muted-foreground">还没有通道，先到「通知」页面创建一个。</p>
             ) : (
               <div className="grid grid-cols-2 gap-2">
                 {channels.map((ch) => {

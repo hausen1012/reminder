@@ -1,8 +1,8 @@
-// ScheduleForm 把 (calendar, schedule_type, schedule_spec) 三元组的编辑界面
-// 集中放在一处。公历三型 + 农历两型。
-import { useEffect } from 'react'
+// ScheduleForm 使用 Select 下拉框选择提醒类型 + CalendarPopover 选择日期时间
+import { useState } from 'react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Button } from '@/components/ui/button'
 import {
   Select,
   SelectContent,
@@ -10,12 +10,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
-import { LunarPicker } from './LunarPicker'
+import { CalendarPopover } from './CalendarPopover'
 import type { ReminderCalendar, ReminderScheduleType } from '@/types'
-
-type SolarType = 'once' | 'interval' | 'cron'
-type LunarType = 'once' | 'interval'
+import type { CalendarResult } from '@/types'
 
 export interface ScheduleValue {
   calendar: ReminderCalendar
@@ -42,105 +39,139 @@ const LUNAR_INTERVAL_UNITS = [
   { value: 'year', label: '年' },
 ]
 
-function toDatetimeLocal(v: string | undefined): string {
-  if (!v) return ''
-  return v.slice(0, 16)
-}
-
 export function ScheduleForm({ value, onChange }: Props) {
-  function setCalendar(next: ReminderCalendar) {
-    if (next === 'lunar') {
-      onChange({
-        calendar: 'lunar',
-        schedule_type: 'once',
-        schedule_spec: {
-          lunar: { year: 2026, month: 1, day: 1 },
-          hour: 9,
-          minute: 0,
-        },
-      })
-    } else {
-      onChange({ calendar: 'solar', schedule_type: 'once', schedule_spec: { at: '' } })
-    }
-  }
+  const [calendarOpen, setCalendarOpen] = useState(false)
+  const spec = value.schedule_spec ?? {}
 
-  function setSolarType(t: SolarType) {
+  function handleTypeChange(t: ReminderScheduleType) {
     let defaults: Record<string, unknown> = {}
-    if (t === 'once') defaults = { at: '' }
-    if (t === 'interval') defaults = { start_at: '', every: 1, unit: 'day' }
-    if (t === 'cron') defaults = { expr: '0 9 * * *' }
-    onChange({ calendar: 'solar', schedule_type: t, schedule_spec: defaults })
-  }
-
-  function setLunarType(t: LunarType) {
     if (t === 'once') {
-      onChange({
-        calendar: 'lunar',
-        schedule_type: 'once',
-        schedule_spec: { lunar: { year: 2026, month: 1, day: 1 }, hour: 9, minute: 0 },
-      })
+      if (value.calendar === 'lunar') {
+        defaults = { lunar: { year: 2026, month: 1, day: 1 }, hour: 9, minute: 0 }
+      } else {
+        defaults = { at: '' }
+      }
+    } else if (t === 'interval') {
+      if (value.calendar === 'lunar') {
+        defaults = { start_lunar: { year: 2026, month: 1, day: 1 }, every: 1, unit: 'month', hour: 9, minute: 0 }
+      } else {
+        defaults = { start_at: '', every: 1, unit: 'day' }
+      }
     } else {
-      onChange({
-        calendar: 'lunar',
-        schedule_type: 'interval',
-        schedule_spec: { start_lunar: { year: 2026, month: 1, day: 1 }, every: 1, unit: 'month', hour: 9, minute: 0 },
-      })
+      defaults = { expr: '0 9 * * *' }
     }
+    onChange({ ...value, schedule_type: t, schedule_spec: defaults })
   }
 
   function patchSpec(patch: Record<string, unknown>) {
-    onChange({ ...value, schedule_spec: { ...value.schedule_spec, ...patch } })
+    onChange({ ...value, schedule_spec: { ...spec, ...patch } })
   }
 
-  // 初次挂载时若 spec 为空，按 schedule_type 填默认
-  useEffect(() => {
-    if (Object.keys(value.schedule_spec ?? {}).length === 0) {
-      setSolarType((value.schedule_type as SolarType) || 'once')
+  function handleCalendarSelect(result: CalendarResult) {
+    if (result.calendar === 'lunar' && result.lunar) {
+      if (value.schedule_type === 'interval') {
+        onChange({
+          ...value,
+          calendar: 'lunar',
+          schedule_spec: {
+            ...spec,
+            start_lunar: result.lunar,
+            hour: result.hour,
+            minute: result.minute,
+          },
+        })
+      } else {
+        onChange({
+          ...value,
+          calendar: 'lunar',
+          schedule_spec: {
+            ...spec,
+            lunar: result.lunar,
+            hour: result.hour,
+            minute: result.minute,
+          },
+        })
+      }
+    } else if (result.calendar === 'solar') {
+      const key = value.schedule_type === 'interval' ? 'start_at' : 'at'
+      onChange({
+        ...value,
+        calendar: 'solar',
+        schedule_spec: {
+          ...spec,
+          [key]: result.date,
+        },
+      })
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  const spec = value.schedule_spec ?? {}
+  }
 
   return (
     <div className="space-y-3">
-      <Tabs value={value.calendar} onValueChange={(v) => setCalendar(v as ReminderCalendar)}>
-        <TabsList>
-          <TabsTrigger value="solar">公历</TabsTrigger>
-          <TabsTrigger value="lunar">农历</TabsTrigger>
-        </TabsList>
+      <div className="space-y-2">
+        <Label>提醒类型</Label>
+        <Select value={value.schedule_type} onValueChange={handleTypeChange}>
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="once">一次性</SelectItem>
+            <SelectItem value="interval">周期</SelectItem>
+            <SelectItem value="cron">Cron</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
 
-        <TabsContent value="solar" className="space-y-3 pt-3">
-          <Tabs value={value.schedule_type} onValueChange={(v) => setSolarType(v as SolarType)}>
-            <TabsList>
-              <TabsTrigger value="once">一次性</TabsTrigger>
-              <TabsTrigger value="interval">周期</TabsTrigger>
-              <TabsTrigger value="cron">Cron</TabsTrigger>
-            </TabsList>
+      {value.schedule_type === 'cron' && (
+        <div className="space-y-2">
+          <Label htmlFor="spec-expr">Cron 表达式</Label>
+          <Input
+            id="spec-expr"
+            value={(spec.expr as string) ?? ''}
+            onChange={(e) => patchSpec({ expr: e.target.value })}
+            placeholder="例如：0 9 * * 1-5"
+          />
+          <p className="text-xs text-muted-foreground">
+            5 字段标准 cron。例：每天 09:00 → <code>0 9 * * *</code>；工作日早 9 点 → <code>0 9 * * 1-5</code>。
+          </p>
+        </div>
+      )}
 
-            <TabsContent value="once" className="pt-3 space-y-2">
-              <Label htmlFor="spec-at">触发时间</Label>
+      {(value.schedule_type === 'once' || value.schedule_type === 'interval') && (
+        <>
+          <div className="space-y-2">
+            <Label>
+              {value.schedule_type === 'once' ? '触发时间' : '起始时间'}
+              {value.calendar === 'lunar' && (
+                <span className="text-xs text-muted-foreground ml-2">（农历）</span>
+              )}
+            </Label>
+            <div className="flex gap-2">
               <Input
-                id="spec-at"
-                type="datetime-local"
-                value={toDatetimeLocal(spec.at as string)}
-                onChange={(e) => patchSpec({ at: e.target.value })}
+                readOnly
+                value={formatScheduleDate(spec, value.calendar)}
+                placeholder="点击选择日期"
+                onClick={() => setCalendarOpen(true)}
+                className="cursor-pointer"
               />
-              <p className="text-xs text-muted-foreground">
-                按下方"提醒时区"解读；时间到达后会立即通过通道发送。
-              </p>
-            </TabsContent>
+              <Button type="button" variant="outline" onClick={() => setCalendarOpen(true)}>
+                选择
+              </Button>
+            </div>
+          </div>
 
-            <TabsContent value="interval" className="pt-3 space-y-3">
-              <div className="space-y-2">
-                <Label htmlFor="spec-start">起始时间</Label>
-                <Input
-                  id="spec-start"
-                  type="datetime-local"
-                  value={toDatetimeLocal(spec.start_at as string)}
-                  onChange={(e) => patchSpec({ start_at: e.target.value })}
-                />
-              </div>
+          <CalendarPopover
+            open={calendarOpen}
+            calendar={value.calendar}
+            date={value.calendar === 'solar' ? ((spec.at ?? spec.start_at) as string | undefined) : undefined}
+            lunarDate={value.calendar === 'lunar' ? ((spec.lunar ?? spec.start_lunar) as { year: number; month: number; day: number } | undefined) : undefined}
+            hour={(spec.hour as number) ?? 9}
+            minute={(spec.minute as number) ?? 0}
+            onSelect={handleCalendarSelect}
+            onClose={() => setCalendarOpen(false)}
+          />
+
+          {value.schedule_type === 'interval' && (
+            <>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
                   <Label htmlFor="spec-every">每</Label>
@@ -154,12 +185,15 @@ export function ScheduleForm({ value, onChange }: Props) {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="spec-unit">单位</Label>
-                  <Select value={(spec.unit as string) ?? 'day'} onValueChange={(v) => patchSpec({ unit: v })}>
+                  <Select
+                    value={(spec.unit as string) ?? (value.calendar === 'lunar' ? 'month' : 'day')}
+                    onValueChange={(v) => patchSpec({ unit: v })}
+                  >
                     <SelectTrigger id="spec-unit">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {INTERVAL_UNITS.map((u) => (
+                      {(value.calendar === 'lunar' ? LUNAR_INTERVAL_UNITS : INTERVAL_UNITS).map((u) => (
                         <SelectItem key={u.value} value={u.value}>
                           {u.label}
                         </SelectItem>
@@ -169,107 +203,38 @@ export function ScheduleForm({ value, onChange }: Props) {
                 </div>
               </div>
               <p className="text-xs text-muted-foreground">
-                月 / 年单位使用日历语义：1 月 31 日 + 1 月 = 2 月 28 日（自动归一）。
+                {value.calendar === 'lunar'
+                  ? '闰月跳过（按公历年份安排）。日数超出该月天数时自动顺延至月末。'
+                  : '月 / 年单位使用日历语义：1 月 31 日 + 1 月 = 2 月 28 日（自动归一）。'}
               </p>
-            </TabsContent>
-
-            <TabsContent value="cron" className="pt-3 space-y-2">
-              <Label htmlFor="spec-expr">Cron 表达式</Label>
-              <Input
-                id="spec-expr"
-                value={(spec.expr as string) ?? ''}
-                onChange={(e) => patchSpec({ expr: e.target.value })}
-                placeholder="例如：0 9 * * 1-5"
-              />
-              <p className="text-xs text-muted-foreground">
-                5 字段标准 cron。例：每天 09:00 → <code>0 9 * * *</code>；工作日早 9 点 → <code>0 9 * * 1-5</code>。
-              </p>
-            </TabsContent>
-          </Tabs>
-        </TabsContent>
-
-        <TabsContent value="lunar" className="space-y-3 pt-3">
-          <Tabs value={value.schedule_type} onValueChange={(v) => setLunarType(v as LunarType)}>
-            <TabsList>
-              <TabsTrigger value="once">一次性</TabsTrigger>
-              <TabsTrigger value="interval">周期</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="once" className="pt-3 space-y-3">
-              <LunarPicker
-                value={(spec.lunar as { year: number; month: number; day: number }) ?? { year: 2026, month: 1, day: 1 }}
-                onChange={(v) =>
-                  onChange({
-                    ...value,
-                    schedule_spec: { ...value.schedule_spec, lunar: v, hour: spec.hour ?? 9, minute: spec.minute ?? 0 },
-                  })
-                }
-                hour={(spec.hour as number) ?? 9}
-                minute={(spec.minute as number) ?? 0}
-                onHourChange={(h) => patchSpec({ hour: h })}
-                onMinuteChange={(m) => patchSpec({ minute: m })}
-              />
-            </TabsContent>
-
-            <TabsContent value="interval" className="pt-3 space-y-3">
-              <LunarPicker
-                value={
-                  (spec.start_lunar as { year: number; month: number; day: number }) ?? {
-                    year: 2026,
-                    month: 1,
-                    day: 1,
-                  }
-                }
-                onChange={(v) =>
-                  onChange({
-                    ...value,
-                    schedule_spec: {
-                      ...value.schedule_spec,
-                      start_lunar: v,
-                      hour: spec.hour ?? 9,
-                      minute: spec.minute ?? 0,
-                    },
-                  })
-                }
-                hour={(spec.hour as number) ?? 9}
-                minute={(spec.minute as number) ?? 0}
-                onHourChange={(h) => patchSpec({ hour: h })}
-                onMinuteChange={(m) => patchSpec({ minute: m })}
-              />
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <Label htmlFor="lunar-every">每</Label>
-                  <Input
-                    id="lunar-every"
-                    type="number"
-                    min={1}
-                    value={(spec.every as number) ?? 1}
-                    onChange={(e) => patchSpec({ every: Number(e.target.value) || 1 })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="lunar-unit">单位</Label>
-                  <Select value={(spec.unit as string) ?? 'month'} onValueChange={(v) => patchSpec({ unit: v })}>
-                    <SelectTrigger id="lunar-unit">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {LUNAR_INTERVAL_UNITS.map((u) => (
-                        <SelectItem key={u.value} value={u.value}>
-                          {u.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                闰月跳过（按公历年份安排）。日数超出该月天数时自动顺延至月末。
-              </p>
-            </TabsContent>
-          </Tabs>
-        </TabsContent>
-      </Tabs>
+            </>
+          )}
+        </>
+      )}
     </div>
   )
+}
+
+const LUNAR_MONTHS_DISP = [
+  '正月','二月','三月','四月','五月','六月',
+  '七月','八月','九月','十月','十一月','腊月',
+]
+
+const LUNAR_DAYS_DISP = [
+  '初一','初二','初三','初四','初五','初六','初七','初八','初九','初十',
+  '十一','十二','十三','十四','十五','十六','十七','十八','十九','二十',
+  '廿一','廿二','廿三','廿四','廿五','廿六','廿七','廿八','廿九','三十',
+]
+
+function formatScheduleDate(spec: Record<string, unknown>, calendar: ReminderCalendar): string {
+  if (calendar === 'lunar') {
+    const lunar = (spec.lunar ?? spec.start_lunar) as { year: number; month: number; day: number } | undefined
+    if (lunar) {
+      return `${lunar.year}年 ${LUNAR_MONTHS_DISP[lunar.month - 1] ?? ''} ${LUNAR_DAYS_DISP[lunar.day - 1] ?? ''} ${String(spec.hour ?? 9).padStart(2, '0')}:${String(spec.minute ?? 0).padStart(2, '0')}`
+    }
+    return '选择农历日期'
+  }
+  const at = (spec.at ?? spec.start_at) as string | undefined
+  if (at) return at.slice(0, 16)
+  return '选择日期'
 }

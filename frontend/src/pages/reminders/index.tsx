@@ -1,5 +1,5 @@
 // 提醒列表页：toolbar（来源筛选/状态/搜索/新建）+ 表格 + 编辑/试发/删除。
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { Plus, Pencil, Trash2, TestTube } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -18,12 +18,13 @@ import { ReminderEditDialog } from '@/components/reminders/ReminderEditDialog'
 import { ConfirmDialog } from '@/components/channels/ConfirmDialog'
 import {
   deleteReminder,
+  listChannels,
   listReminders,
   testReminder,
   toggleReminder,
   type ListRemindersQuery,
 } from '@/lib/api'
-import type { Reminder } from '@/types'
+import type { Channel, Reminder } from '@/types'
 
 const SOURCE_LABEL: Record<string, string> = {
   manual: '手动',
@@ -49,6 +50,8 @@ export default function RemindersPage() {
   const [enabled, setEnabled] = useState<string>('all')
   const [search, setSearch] = useState('')
 
+  const [channels, setChannels] = useState<Channel[]>([])
+
   const { toast } = useToast()
 
   async function refresh() {
@@ -67,6 +70,10 @@ export default function RemindersPage() {
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    listChannels().then(setChannels).catch(() => setChannels([]))
+  }, [])
 
   useEffect(() => {
     refresh()
@@ -107,6 +114,12 @@ export default function RemindersPage() {
       setTestingId(null)
     }
   }
+
+  const channelMap = useMemo(() => {
+    const map = new Map<number, string>()
+    channels.forEach((ch) => map.set(ch.id, ch.name))
+    return map
+  }, [channels])
 
   return (
     <div className="space-y-6">
@@ -180,6 +193,7 @@ export default function RemindersPage() {
                 <tr>
                   <th className="px-4 py-3">标题</th>
                   <th className="px-4 py-3">调度</th>
+                  <th className="px-4 py-3">通道</th>
                   <th className="px-4 py-3">下次触发</th>
                   <th className="px-4 py-3">来源</th>
                   <th className="px-4 py-3 text-center">启用</th>
@@ -203,6 +217,19 @@ export default function RemindersPage() {
                       <Badge variant="outline">
                         {r.calendar === 'lunar' ? '农历' : '公历'} · {TYPE_LABEL[r.schedule_type] ?? r.schedule_type}
                       </Badge>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex flex-wrap gap-1">
+                        {r.channel_ids.length === 0 ? (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        ) : (
+                          r.channel_ids.map((cid) => (
+                            <Badge key={cid} variant="secondary" className="text-xs">
+                              {channelMap.get(cid) || `#${cid}`}
+                            </Badge>
+                          ))
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-xs">
                       {r.next_fire_at ? new Date(r.next_fire_at).toLocaleString() : '—'}
