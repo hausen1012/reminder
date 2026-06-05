@@ -90,7 +90,7 @@ export function ScheduleForm({ value, onChange }: Props) {
         <div className="space-y-2">
           <Label>提醒类型</Label>
           <Select value={value.schedule_type} onValueChange={handleTypeChange}>
-            <SelectTrigger>
+            <SelectTrigger className="flex-1">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -99,6 +99,35 @@ export function ScheduleForm({ value, onChange }: Props) {
               <SelectItem value="cron">Cron</SelectItem>
             </SelectContent>
           </Select>
+          {value.schedule_type === 'interval' && (
+            <div className="space-y-2 pt-2">
+              <Label>重复间隔</Label>
+              <div className="flex gap-2">
+                <Input
+                  type="number"
+                  min={1}
+                  value={(spec.every as number) ?? 1}
+                  onChange={(e) => patchSpec({ every: Number(e.target.value) || 1 })}
+                  className="flex-1"
+                />
+                <Select
+                  value={(spec.unit as string) ?? (value.calendar === 'lunar' ? 'month' : 'day')}
+                  onValueChange={(v) => patchSpec({ unit: v })}
+                >
+                  <SelectTrigger className="flex-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(value.calendar === 'lunar' ? LUNAR_INTERVAL_UNITS : INTERVAL_UNITS).map((u) => (
+                      <SelectItem key={u.value} value={u.value}>
+                        {u.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
         </div>
 
         {value.schedule_type === 'cron' && (
@@ -113,7 +142,7 @@ export function ScheduleForm({ value, onChange }: Props) {
           </div>
         )}
 
-        {value.schedule_type === 'once' && (
+        {value.schedule_type !== 'cron' && (
           <div className="relative space-y-2">
             <Label>
               触发时间
@@ -140,65 +169,6 @@ export function ScheduleForm({ value, onChange }: Props) {
           </div>
         )}
       </div>
-
-      {value.schedule_type === 'interval' && (
-        <div className="grid grid-cols-2 gap-3">
-          <div className="relative space-y-2">
-            <Label>
-              起始时间
-              {value.calendar === 'lunar' && (
-                <span className="text-xs text-muted-foreground ml-2">（农历）</span>
-              )}
-            </Label>
-            <Input
-              readOnly
-              value={formatScheduleDate(spec, value.calendar)}
-              placeholder="点击选择日期"
-              onClick={() => setCalendarOpen(true)}
-              className="cursor-pointer"
-            />
-            {calendarOpen && (
-              <CalendarPopover
-                date={value.calendar === 'solar' ? ((spec.at ?? spec.start_at) as string | undefined) : undefined}
-                hour={(spec.hour as number) ?? 9}
-                minute={(spec.minute as number) ?? 0}
-                onSelect={handleCalendarSelect}
-                onClose={() => setCalendarOpen(false)}
-              />
-            )}
-          </div>
-          <div className="flex gap-2 items-end">
-            <div className="space-y-2 flex-1">
-              <Label htmlFor="spec-every">每</Label>
-              <Input
-                id="spec-every"
-                type="number"
-                min={1}
-                value={(spec.every as number) ?? 1}
-                onChange={(e) => patchSpec({ every: Number(e.target.value) || 1 })}
-              />
-            </div>
-            <div className="space-y-2 flex-1">
-              <Label htmlFor="spec-unit">单位</Label>
-              <Select
-                value={(spec.unit as string) ?? (value.calendar === 'lunar' ? 'month' : 'day')}
-                onValueChange={(v) => patchSpec({ unit: v })}
-              >
-                <SelectTrigger id="spec-unit">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {(value.calendar === 'lunar' ? LUNAR_INTERVAL_UNITS : INTERVAL_UNITS).map((u) => (
-                    <SelectItem key={u.value} value={u.value}>
-                      {u.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </div>
-      )}
 
       {value.schedule_type === 'cron' && (
         <p className="text-xs text-muted-foreground">
