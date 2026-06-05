@@ -16,6 +16,7 @@ import (
 
 	"github.com/bedrock/backend/internal/models"
 	"github.com/bedrock/backend/internal/notifier"
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -24,6 +25,9 @@ type DispatchService struct {
 	DB         *gorm.DB
 	ChannelSvc *ChannelService
 	Loc        *time.Location
+
+	// 确认机制（可选）；为空时跳过确认逻辑
+	ConfirmMgr *ConfirmRetryManager
 
 	// 单通道串行重试间隔；空时使用默认 [0, 10s, 30s]
 	RetryDelays []time.Duration
@@ -67,6 +71,22 @@ func (d *DispatchService) Run(ctx context.Context, r *models.Reminder, deliveryL
 		planned = ptrTime(time.Now())
 	}
 	vars := buildVars(r, time.Now(), *planned, d.Loc)
+
+	// 需要确认时，生成 chain_id + token 并注入 confirm_url
+	var confirmChainID string
+	if r.RequireConfirm && d.ConfirmMgr != nil {
+		confirmChainID = uuid.New().String()
+		ttl := 72 * time.Hour // 充足有效期
+		token, err := d.ConfirmMgr.ConfirmSvc.CreateToken(deliveryLogID, ttl)
+		if err == nil {
+			vars["confirm_url"] = d.ConfirmMgr.ConfirmSvc.BuildURL(token)
+			d.DB.Model(&models.DeliveryLog{}).Where("id = ?", deliveryLogID).
+				Update("confirm_chain_id", confirmChainID)
+		} else {
+			log.Printf("[dispatch] 创建确认 token 失败 log=%d: %v", deliveryLogID, err)
+		}
+	}
+
 	rendered := notifier.Message{
 		Subject: notifier.Render(r.Title, vars),
 		Body:    notifier.Render(r.Content, vars),
@@ -115,6 +135,15 @@ func (d *DispatchService) Run(ctx context.Context, r *models.Reminder, deliveryL
 		status = "partial"
 	}
 	d.finalize(deliveryLogID, status, rendered.Subject, rendered.Body)
+
+	// 需要确认时调度重发链
+	if confirmChainID != "" && d.ConfirmMgr != nil {
+		// 重新读取最新 reminder（确保后续重发时字段是最新的）
+		var refreshed models.Reminder
+		if err := d.DB.First(&refreshed, r.ID); err == nil {
+			d.ConfirmMgr.Schedule(&refreshed, confirmChainID, 0)
+		}
+	}
 }
 
 // sendWithRetry 在单个通道上按 RetryDelays 串行重试，写入 DeliveryAttempt。

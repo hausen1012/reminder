@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/bedrock/backend/internal/middleware"
 	"github.com/bedrock/backend/internal/services"
@@ -128,6 +129,21 @@ func (h *ChannelHandler) Toggle(c *gin.Context) {
 		return
 	}
 	successJSON(c, v)
+}
+
+// Stats GET /api/channels/stats?window=24h
+func (h *ChannelHandler) Stats(c *gin.Context) {
+	windowStr := c.DefaultQuery("window", "24h")
+	window, err := time.ParseDuration(windowStr)
+	if err != nil {
+		window = 24 * time.Hour
+	}
+	stats, err := h.Svc.Stats(window)
+	if err != nil {
+		abortErr(c, err)
+		return
+	}
+	successJSON(c, stats)
 }
 
 // Test POST /api/channels/:id/test

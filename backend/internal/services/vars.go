@@ -17,6 +17,8 @@ import (
 	"github.com/bedrock/backend/internal/models"
 )
 
+var weekdays = []string{"周日", "周一", "周二", "周三", "周四", "周五", "周六"}
+
 // buildVars 构造一次触发渲染用的变量 map。
 //
 // firedAt 是真实开始执行 dispatch 的时间；planned 是计划触发时间。
@@ -29,16 +31,21 @@ func buildVars(r *models.Reminder, firedAt, planned time.Time, loc *time.Locatio
 	fireAt := planned.In(loc)
 	lunarStr := formatLunar(now)
 
-	vars := map[string]string{
+	var vars = map[string]string{
 		"now":             now.Format("2006-01-02 15:04:05"),
 		"now_date":        now.Format("2006-01-02"),
 		"now_time":        now.Format("15:04:05"),
 		"fire_at":         fireAt.Format("2006-01-02 15:04:05"),
+		"trigger_at":      fireAt.Format("2006-01-02 15:04:05"),
+		"trigger_date":    fireAt.Format("2006-01-02"),
+		"trigger_time":    fireAt.Format("15:04"),
+		"weekday":         weekdays[fireAt.Weekday()],
 		"title":           r.Title,
 		"content":         r.Content,
 		"lunar_date":      lunarStr,
 		"reminder_id":     fmt.Sprintf("%d", r.ID),
 		"reminder_source": r.Source,
+		"source":          r.Source,
 	}
 	return vars
 }

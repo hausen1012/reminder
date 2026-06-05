@@ -66,6 +66,11 @@ func (s *Sweeper) Start() {
 	go s.loop(ctx)
 }
 
+// IsRunning 返回 sweeper 是否在运行。
+func (s *Sweeper) IsRunning() bool {
+	return s.cancel != nil
+}
+
 // Stop 通知 sweeper 退出，并等待清理完成。
 func (s *Sweeper) Stop() {
 	if s.cancel == nil {

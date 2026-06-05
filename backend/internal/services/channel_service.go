@@ -231,6 +231,70 @@ func (s *ChannelService) DecryptedConfig(ch *models.Channel) ([]byte, error) {
 	return json.Marshal(dec)
 }
 
+// --- stats ---
+
+// ChannelStats 是单个通道的发送统计。
+type ChannelStats struct {
+	ID          uint    `json:"id"`
+	Name        string  `json:"name"`
+	Type        string  `json:"type"`
+	Total       int64   `json:"total"`
+	Success     int64   `json:"success"`
+	Failed      int64   `json:"failed"`
+	SuccessRate float64 `json:"success_rate"`
+}
+
+// Stats 返回指定时间窗口内各通道的发送统计。
+//
+// 没有发送记录的通道也包含在结果中（total=0）。
+func (s *ChannelService) Stats(window time.Duration) ([]*ChannelStats, error) {
+	cutoff := time.Now().Add(-window)
+
+	type aggRow struct {
+		ChannelID   uint
+		ChannelName string
+		ChannelType string
+		Total       int64
+		Success     int64
+	}
+	var rows []aggRow
+	s.DB.Model(&models.DeliveryAttempt{}).
+		Select("channel_id, channel_name, channel_type, COUNT(*) AS total, SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END) AS success").
+		Where("created_at >= ?", cutoff).
+		Group("channel_id").
+		Scan(&rows)
+
+	// 按 channel_id 建索引
+	aggMap := make(map[uint]*aggRow, len(rows))
+	for i := range rows {
+		aggMap[rows[i].ChannelID] = &rows[i]
+	}
+
+	// 拉所有通道，确保无发送记录的通道也出现在结果中
+	var channels []models.Channel
+	s.DB.Find(&channels)
+
+	out := make([]*ChannelStats, 0, len(channels))
+	for i := range channels {
+		ch := &channels[i]
+		item := &ChannelStats{
+			ID:   ch.ID,
+			Name: ch.Name,
+			Type: ch.Type,
+		}
+		if a, ok := aggMap[ch.ID]; ok {
+			item.Total = a.Total
+			item.Success = a.Success
+			item.Failed = a.Total - a.Success
+			if a.Total > 0 {
+				item.SuccessRate = float64(a.Success) / float64(a.Total) * 100
+			}
+		}
+		out = append(out, item)
+	}
+	return out, nil
+}
+
 // --- internal helpers ---
 
 func (s *ChannelService) getOrNotFound(id uint) (*models.Channel, error) {

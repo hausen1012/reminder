@@ -213,7 +213,7 @@ export function ReminderEditDialog({ reminder, open, onClose, onSaved }: Props) 
               <div>
                 <Label htmlFor="r-confirm" className="cursor-pointer">需要确认机制</Label>
                 <p className="text-xs text-muted-foreground mt-1">
-                  消息会附带 confirm_url；未点击则按下方配置重发。Phase 5 启用。
+                  消息会附带确认链接；未点击则按下方配置重发。
                 </p>
               </div>
               <Switch

@@ -51,6 +51,11 @@ func Setup(staticFS embed.FS, cfg *config.Config) *SetupResult {
 	engine := scheduler.NewEngine(database.DB, dispatchSvc, cfg.Location)
 	reminderSvc := services.NewReminderService(database.DB, engine, cfg.Location, dispatchSvc)
 
+	// 确认机制
+	confirmSvc := services.NewConfirmService(database.DB, cfg)
+	confirmMgr := services.NewConfirmRetryManager(database.DB, dispatchSvc, confirmSvc, cfg.Location)
+	dispatchSvc.ConfirmMgr = confirmMgr
+
 	// 启动调度器并把已 enabled 的提醒注册一遍
 	engine.Start()
 	if err := engine.LoadAndRegisterAll(); err != nil {
@@ -67,20 +72,29 @@ func Setup(staticFS embed.FS, cfg *config.Config) *SetupResult {
 	sweeper.Start()
 
 	// 自动清理日志（每天凌晨 3 点）
-	logSvc := services.NewLogService(database.DB)
+	logSvc := services.NewLogService(database.DB, cfg.PublicBaseURL)
 	if cfg.LogAutoPurgeDays > 0 {
 		purgeAfter := time.Duration(cfg.LogAutoPurgeDays) * 24 * time.Hour
 		_, _ = engine.AddPurgeCron(logSvc, purgeAfter)
 	}
 
+	apiKeySvc := services.NewApiKeyService(database.DB)
+
 	authHandler := &handlers.AuthHandler{JWTSecret: cfg.JWTSecret}
 	channelHandler := &handlers.ChannelHandler{Svc: channelSvc}
 	reminderHandler := &handlers.ReminderHandler{Svc: reminderSvc}
 	logHandler := &handlers.LogHandler{Svc: logSvc}
+	confirmHandler := &handlers.ConfirmHandler{Svc: confirmSvc}
+	apiKeyHandler := &handlers.ApiKeyHandler{Svc: apiKeySvc}
+	ingestHandler := &handlers.IngestHandler{ReminderSvc: reminderSvc, ApiKeySvc: apiKeySvc}
+
+	// 确认链接（无需认证）
+	r.GET("/c/:token", confirmHandler.Confirm)
 
 	api := r.Group("/api")
 	{
-		api.GET("/health", handlers.HealthCheck)
+		healthHandler := &handlers.HealthHandler{Engine: engine, Sweeper: sweeper}
+		api.GET("/health", healthHandler.Check)
 		api.POST("/auth/login", authHandler.Login)
 	}
 
@@ -92,10 +106,28 @@ func Setup(staticFS embed.FS, cfg *config.Config) *SetupResult {
 		auth.PUT("/password", handlers.UpdatePassword)
 	}
 
-	protected := api.Group("")
-	protected.Use(middleware.JWTAuth(cfg.JWTSecret))
-	{
-		channels := protected.Group("/channels")
+	// Ingest API（API Key 鉴权，非 JWT）
+		apiKeyVerify := func(plain string) (uint, bool) {
+			k, ok := apiKeySvc.Verify(plain)
+			if !ok || k == nil {
+				return 0, false
+			}
+			return k.ID, true
+		}
+		ingest := api.Group("/ingest")
+		ingest.Use(middleware.APIKeyAuth(apiKeyVerify, apiKeySvc.TouchLastUsed, nil))
+		{
+			ingest.POST("/reminders", ingestHandler.CreateReminder)
+			ingest.GET("/reminders", ingestHandler.ListReminders)
+			ingest.GET("/reminders/:id", ingestHandler.GetReminder)
+			ingest.DELETE("/reminders/:id", ingestHandler.DeleteReminder)
+			ingest.GET("/docs", ingestHandler.Docs)
+		}
+
+		protected := api.Group("")
+		protected.Use(middleware.JWTAuth(cfg.JWTSecret))
+		{
+			channels := protected.Group("/channels")
 		{
 			channels.GET("", channelHandler.List)
 			channels.POST("", channelHandler.Create)
@@ -104,6 +136,7 @@ func Setup(staticFS embed.FS, cfg *config.Config) *SetupResult {
 			channels.DELETE("/:id", channelHandler.Delete)
 			channels.PATCH("/:id/toggle", channelHandler.Toggle)
 			channels.POST("/:id/test", channelHandler.Test)
+				channels.GET("/stats", channelHandler.Stats)
 		}
 
 		reminders := protected.Group("/reminders")
@@ -111,6 +144,7 @@ func Setup(staticFS embed.FS, cfg *config.Config) *SetupResult {
 			reminders.GET("", reminderHandler.List)
 			reminders.POST("", reminderHandler.Create)
 			reminders.POST("/preview", reminderHandler.Preview)
+				reminders.GET("/upcoming", reminderHandler.Upcoming)
 			reminders.GET("/:id", reminderHandler.Get)
 			reminders.PUT("/:id", reminderHandler.Update)
 			reminders.DELETE("/:id", reminderHandler.Delete)
@@ -124,6 +158,16 @@ func Setup(staticFS embed.FS, cfg *config.Config) *SetupResult {
 			logs.GET("/count", logHandler.PurgeCount)
 			logs.GET("/:id", logHandler.GetDetail)
 			logs.DELETE("", logHandler.Purge)
+		}
+
+		apikeys := protected.Group("/apikeys")
+		{
+			apikeys.GET("", apiKeyHandler.List)
+			apikeys.POST("", apiKeyHandler.Create)
+			apikeys.GET("/stats", apiKeyHandler.Stats)
+			apikeys.DELETE("/:id", apiKeyHandler.Delete)
+			apikeys.PATCH("/:id/toggle", apiKeyHandler.Toggle)
+			apikeys.PUT("/:id/channels", apiKeyHandler.UpdateDefaultChannels)
 		}
 	}
 

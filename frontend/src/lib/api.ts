@@ -1,9 +1,12 @@
 import axios from 'axios'
 import type {
+  APIKey,
   ApiResponse,
   Channel,
   ChannelInput,
   ChannelTestResult,
+  ChannelType,
+  CreateAPIKeyResult,
   DeliveryLog,
   LogFilter,
   LogListResp,
@@ -164,4 +167,56 @@ export async function purgeLogs(olderThan?: string, all?: boolean) {
 export async function countPurgeLogs(olderThan?: string, all?: boolean) {
   const res = await api.get<ApiResponse<{ count: number }>>('/logs/count', { params: { older_than: olderThan, all } })
   return res.data.data
+}
+
+// --- API Key ---
+
+export async function listApiKeys() {
+  const res = await api.get<ApiResponse<APIKey[]>>('/apikeys')
+  return res.data.data ?? []
+}
+
+export async function createApiKey(name: string, defaultChannelIDs?: number[]) {
+  const res = await api.post<ApiResponse<CreateAPIKeyResult>>('/apikeys', { name, default_channel_ids: defaultChannelIDs ?? [] })
+  return res.data.data
+}
+
+export async function toggleApiKey(id: number) {
+  const res = await api.patch<ApiResponse<APIKey>>(`/apikeys/${id}/toggle`)
+  return res.data.data
+}
+
+export async function deleteApiKey(id: number) {
+  await api.delete<ApiResponse<null>>(`/apikeys/${id}`)
+}
+
+export async function updateApiKeyChannels(id: number, channelIDs: number[]) {
+  await api.put<ApiResponse<null>>(`/apikeys/${id}/channels`, { channel_ids: channelIDs })
+}
+
+// --- Dashboard ---
+
+export async function listUpcomingReminders(within = '24h', limit = 10) {
+  const res = await api.get<ApiResponse<Reminder[]>>('/reminders/upcoming', { params: { within, limit } })
+  return res.data.data ?? []
+}
+
+export interface ChannelStats {
+  id: number
+  name: string
+  type: ChannelType
+  total: number
+  success: number
+  failed: number
+  success_rate: number
+}
+
+export async function listChannelStats(window = '24h') {
+  const res = await api.get<ApiResponse<ChannelStats[]>>('/channels/stats', { params: { window } })
+  return res.data.data ?? []
+}
+
+export async function listApiKeyStats() {
+  const res = await api.get<ApiResponse<{ id: number; name: string; usage_24h: number }[]>>('/apikeys/stats')
+  return res.data.data ?? []
 }

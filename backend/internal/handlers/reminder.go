@@ -3,6 +3,7 @@ package handlers
 import (
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/bedrock/backend/internal/middleware"
 	"github.com/bedrock/backend/internal/services"
@@ -158,4 +159,25 @@ func (h *ReminderHandler) Test(c *gin.Context) {
 		return
 	}
 	successJSON(c, gin.H{"delivery_log_id": logID})
+}
+
+// Upcoming GET /api/reminders/upcoming
+func (h *ReminderHandler) Upcoming(c *gin.Context) {
+	withinStr := c.DefaultQuery("within", "24h")
+	limit := 10
+	if v := c.Query("limit"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			limit = n
+		}
+	}
+	within, err := time.ParseDuration(withinStr)
+	if err != nil {
+		within = 24 * time.Hour
+	}
+	items, err := h.Svc.Upcoming(within, limit)
+	if err != nil {
+		abortErr(c, err)
+		return
+	}
+	successJSON(c, items)
 }

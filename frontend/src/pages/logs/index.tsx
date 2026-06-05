@@ -1,5 +1,5 @@
 // 日志页：toolbar（状态/来源/搜索）+ 表格 + 详情抽屉 + 清理
-import { useCallback, useEffect, useState } from 'react'
+import { Fragment, useCallback, useEffect, useState } from 'react'
 import {
   AlertCircle,
   CheckCircle2,
@@ -10,6 +10,7 @@ import {
   ChevronRight,
   Trash2,
   ExternalLink,
+  Copy,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -127,7 +128,6 @@ export default function LogsPage() {
 
   const displayRows = Object.values(chainGroups)
     .map((group) => {
-      // 主行 = 第一条（round=0）或最早 fired_at 的
       group.sort((a, b) => a.retry_round - b.retry_round)
       return { main: group[0], subs: group.slice(1), chainID: group[0].confirm_chain_id }
     })
@@ -184,14 +184,14 @@ export default function LogsPage() {
       <div className="flex flex-wrap items-center gap-3">
         <div className="w-36">
           <Select
-            value={filter.status ?? ''}
-            onValueChange={(v) => setFilter((f) => ({ ...f, status: v || undefined }))}
+            value={filter.status ?? 'all'}
+            onValueChange={(v) => setFilter((f) => ({ ...f, status: v === 'all' ? undefined : v }))}
           >
             <SelectTrigger>
               <SelectValue placeholder="全部状态" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">全部状态</SelectItem>
+              <SelectItem value="all">全部状态</SelectItem>
               <SelectItem value="success">成功</SelectItem>
               <SelectItem value="partial">部分成功</SelectItem>
               <SelectItem value="failed">失败</SelectItem>
@@ -201,12 +201,12 @@ export default function LogsPage() {
           </Select>
         </div>
         <div className="w-36">
-          <Select value={filter.source ?? ''} onValueChange={(v) => setFilter((f) => ({ ...f, source: v || undefined }))}>
+          <Select value={filter.source ?? 'all'} onValueChange={(v) => setFilter((f) => ({ ...f, source: v === 'all' ? undefined : v }))}>
             <SelectTrigger>
               <SelectValue placeholder="全部来源" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">全部来源</SelectItem>
+              <SelectItem value="all">全部来源</SelectItem>
               <SelectItem value="manual">手动</SelectItem>
               <SelectItem value="api">API</SelectItem>
             </SelectContent>
@@ -242,7 +242,7 @@ export default function LogsPage() {
             <table className="w-full text-sm">
               <thead className="border-b bg-muted/40 text-left text-xs uppercase text-muted-foreground">
                 <tr>
-                  <th className="px-4 py-3 w-8"></th>
+                  <th className="px-4 py-3 w-8" />
                   <th className="px-4 py-3">标题</th>
                   <th className="px-4 py-3">触发时间</th>
                   <th className="px-4 py-3">状态</th>
@@ -252,86 +252,83 @@ export default function LogsPage() {
                 </tr>
               </thead>
               <tbody>
-                {displayRows.map(({ main, subs, chainID }) => {
-                  const Icon = STATUS_ICON[main.status] ?? Clock
-                  const colorClass = STATUS_COLOR[main.status] ?? ''
+                {displayRows.map(({ main, subs }) => {
+                  const MainStatusIcon = STATUS_ICON[main.status] ?? Clock
+                  const mainColor = STATUS_COLOR[main.status] ?? ''
                   return (
-                    <>
-                      <tr key={main.id} className="border-b hover:bg-muted/30">
-                        <td className="px-4 py-3">
-                          {subs.length > 0 && (
-                            <button onClick={() => toggleExpand(main.id)} className="p-1">
-                              {expandedRows.has(main.id) ? (
-                                <ChevronDown className="h-4 w-4" />
-                              ) : (
-                                <ChevronRight className="h-4 w-4" />
-                              )}
-                            </button>
-                          )}
+                  <Fragment key={main.id}>
+                    <tr className="border-b hover:bg-muted/30">
+                      <td className="px-4 py-3">
+                        {subs.length > 0 && (
+                          <button onClick={() => toggleExpand(main.id)} className="p-1">
+                            {expandedRows.has(main.id) ? (
+                              <ChevronDown className="h-4 w-4" />
+                            ) : (
+                              <ChevronRight className="h-4 w-4" />
+                            )}
+                          </button>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 max-w-[20rem]">
+                        <div className="font-medium truncate" title={main.title || main.reminder_title}>
+                          {main.reminder_title || main.title}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-xs">
+                        {new Date(main.fired_at).toLocaleString()}
+                      </td>
+                      <td className="px-4 py-3">
+                        <Badge variant="outline" className={`gap-1 ${mainColor}`}>
+                          <MainStatusIcon className="h-3 w-3" />
+                          {STATUS_LABEL[main.status] ?? main.status}
+                        </Badge>
+                      </td>
+                      <td className="px-4 py-3">
+                        <Badge variant="secondary">{main.source === 'api' ? 'API' : '手动'}</Badge>
+                      </td>
+                      <td className="px-4 py-3 text-xs">
+                        {main.confirmed ? (
+                          <span className="text-green-600">已确认</span>
+                        ) : main.confirm_chain_id ? (
+                          <span className="text-muted-foreground">待确认</span>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <Button size="sm" variant="ghost" onClick={() => handleDetail(main.id)}>
+                          <ExternalLink className="h-4 w-4 mr-1" />
+                          详情
+                        </Button>
+                      </td>
+                    </tr>
+                    {expandedRows.has(main.id) && subs.map((sub) => {
+                      const SubStatusIcon = STATUS_ICON[sub.status] ?? Clock
+                      const subColor = STATUS_COLOR[sub.status] ?? ''
+                      return (
+                      <tr key={sub.id} className="border-b bg-muted/20 text-xs">
+                        <td />
+                        <td className="px-4 py-2 pl-12 text-muted-foreground">
+                          重发 #{sub.retry_round}
                         </td>
-                        <td className="px-4 py-3 max-w-[20rem]">
-                          <div className="font-medium truncate" title={main.title || main.reminder_title}>
-                            {main.reminder_title || main.title}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 text-xs">
-                          {new Date(main.fired_at).toLocaleString()}
-                        </td>
-                        <td className="px-4 py-3">
-                          <Badge variant="outline" className={`gap-1 ${colorClass}`}>
-                            <Icon className="h-3 w-3" />
-                            {STATUS_LABEL[main.status] ?? main.status}
+                        <td className="px-4 py-2">{new Date(sub.fired_at).toLocaleString()}</td>
+                        <td className="px-4 py-2">
+                          <Badge variant="outline" className={`gap-1 ${subColor}`}>
+                            <SubStatusIcon className="h-3 w-3" />
+                            {STATUS_LABEL[sub.status] ?? sub.status}
                           </Badge>
                         </td>
-                        <td className="px-4 py-3">
-                          <Badge variant="secondary">{main.source === 'api' ? 'API' : '手动'}</Badge>
-                        </td>
-                        <td className="px-4 py-3 text-xs">
-                          {main.confirmed ? (
-                            <span className="text-green-600">已确认</span>
-                          ) : chainID ? (
-                            <span className="text-muted-foreground">待确认</span>
-                          ) : (
-                            <span className="text-muted-foreground">—</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-right">
-                          <Button size="sm" variant="ghost" onClick={() => handleDetail(main.id)}>
-                            <ExternalLink className="h-4 w-4 mr-1" />
+                        <td />
+                        <td />
+                        <td className="px-4 py-2 text-right">
+                          <Button size="sm" variant="ghost" onClick={() => handleDetail(sub.id)}>
                             详情
                           </Button>
                         </td>
                       </tr>
-                      {expandedRows.has(main.id) &&
-                        subs.map((sub) => {
-                          const SubIcon = STATUS_ICON[sub.status] ?? Clock
-                          const subColor = STATUS_COLOR[sub.status] ?? ''
-                          return (
-                            <tr key={sub.id} className="border-b bg-muted/20 text-xs">
-                              <td></td>
-                              <td className="px-4 py-2 pl-12 text-muted-foreground">
-                                重发 #{sub.retry_round}
-                              </td>
-                              <td className="px-4 py-2">{new Date(sub.fired_at).toLocaleString()}</td>
-                              <td className="px-4 py-2">
-                                <Badge variant="outline" className={`gap-1 ${subColor}`}>
-                                  <SubIcon className="h-3 w-3" />
-                                  {STATUS_LABEL[sub.status] ?? sub.status}
-                                </Badge>
-                              </td>
-                              <td></td>
-                              <td></td>
-                              <td className="px-4 py-2 text-right">
-                                <Button size="sm" variant="ghost" onClick={() => handleDetail(sub.id)}>
-                                  详情
-                                </Button>
-                              </td>
-                            </tr>
-                          )
-                        })}
-                    </>
-                  )
-                })}
+                    )})}
+                  </Fragment>
+                )})}
               </tbody>
             </table>
           </div>
@@ -370,6 +367,26 @@ export default function LogsPage() {
                       <span className="text-muted-foreground">确认链：</span>
                       {detail.confirm_chain_id}
                       {detail.confirmed && <Badge className="ml-2 bg-green-600">已确认</Badge>}
+                    </div>
+                  )}
+                  {detail.confirm_url && (
+                    <div className="col-span-2">
+                      <span className="text-muted-foreground">确认链接：</span>
+                      <div className="mt-1 flex items-center gap-2">
+                        <code className="flex-1 truncate rounded bg-muted px-2 py-1 text-xs">
+                          {detail.confirm_url}
+                        </code>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => {
+                            navigator.clipboard.writeText(detail.confirm_url ?? '')
+                            toast({ title: '链接已复制' })
+                          }}
+                        >
+                          <Copy className="h-3 w-3" />
+                        </Button>
+                      </div>
                     </div>
                   )}
                 </div>

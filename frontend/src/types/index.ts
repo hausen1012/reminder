@@ -121,6 +121,7 @@ export interface DeliveryLog {
   confirmed: boolean
   confirmed_at?: string
   confirm_chain_id?: string
+  confirm_url?: string
   retry_round: number
   source: string
   created_at: string
@@ -141,4 +142,22 @@ export interface LogFilter {
   reminder_id?: number
   limit?: number
   offset?: number
+}
+
+// --- API Key ---
+
+export interface APIKey {
+  id: number
+  name: string
+  prefix: string
+  enabled: boolean
+  last_used_at?: string
+  created_at: string
+  default_channel_ids: number[]
+  usage_24h: number
+}
+
+export interface CreateAPIKeyResult {
+  plaintext: string
+  key: APIKey
 }

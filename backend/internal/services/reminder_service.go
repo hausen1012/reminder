@@ -56,13 +56,17 @@ type ReminderInput struct {
 	RequireConfirm          bool           `json:"require_confirm"`
 	ConfirmRetryIntervalSec int            `json:"confirm_retry_interval_sec"`
 	ConfirmMaxRetries       int            `json:"confirm_max_retries"`
+	Source                  string         `json:"source,omitempty"`
+	APIKeyID                *uint          `json:"api_key_id,omitempty"`
 }
 
 // ReminderView 是返回前端的视图（含 next_fire_at 与绑定的 channel_ids）。
 type ReminderView struct {
 	models.Reminder
-	ScheduleSpec map[string]any `json:"schedule_spec"`
-	ChannelIDs   []uint         `json:"channel_ids"`
+	ScheduleSpec    map[string]any `json:"schedule_spec"`
+	ChannelIDs      []uint         `json:"channel_ids"`
+	NextFireAtLocal string         `json:"next_fire_at_local,omitempty"`
+	LastFiredAtLocal string        `json:"last_fired_at_local,omitempty"`
 }
 
 // Create 新建提醒并写入调度器。
@@ -81,6 +85,10 @@ func (s *ReminderService) Create(in ReminderInput) (*ReminderView, error) {
 		return nil, middleware.NewAppError(middleware.CodeValidationFailed, err.Error()).WithField("schedule_spec")
 	}
 
+	source := in.Source
+	if source == "" {
+		source = "manual"
+	}
 	r := &models.Reminder{
 		Title:                   strings.TrimSpace(in.Title),
 		Content:                 in.Content,
@@ -88,7 +96,8 @@ func (s *ReminderService) Create(in ReminderInput) (*ReminderView, error) {
 		ScheduleType:            in.ScheduleType,
 		ScheduleSpec:            datatypes.JSON(specRaw),
 		Timezone:                in.Timezone,
-		Source:                  "manual",
+		Source:                  in.Source,
+		APIKeyID:                in.APIKeyID,
 		Enabled:                 true,
 		NextFireAt:              next,
 		RequireConfirm:          in.RequireConfirm,
@@ -190,11 +199,12 @@ func (s *ReminderService) Get(id uint) (*ReminderView, error) {
 
 // ListFilter 列表过滤条件。
 type ListFilter struct {
-	Source  string // manual | api | ""
-	Enabled *bool
-	Search  string
-	Limit   int
-	Offset  int
+	Source   string // manual | api | ""
+	Enabled  *bool
+	Search   string
+	APIKeyID *uint
+	Limit    int
+	Offset   int
 }
 
 // List 返回符合条件的提醒分页列表。
@@ -203,7 +213,10 @@ func (s *ReminderService) List(f ListFilter) ([]*ReminderView, int64, error) {
 	if f.Source != "" && f.Source != "all" {
 		q = q.Where("source = ?", f.Source)
 	}
-	if f.Enabled != nil {
+	if f.APIKeyID != nil {
+			q = q.Where("api_key_id = ?", *f.APIKeyID)
+		}
+		if f.Enabled != nil {
 		q = q.Where("enabled = ?", *f.Enabled)
 	}
 	if s := strings.TrimSpace(f.Search); s != "" {
@@ -230,6 +243,30 @@ func (s *ReminderService) List(f ListFilter) ([]*ReminderView, int64, error) {
 		views = append(views, s.toView(&rows[i], chIDs))
 	}
 	return views, total, nil
+}
+
+// Upcoming 返回未来 within 时间内待触发的 enabled 提醒。
+func (s *ReminderService) Upcoming(within time.Duration, limit int) ([]*ReminderView, error) {
+	if limit <= 0 {
+		limit = 10
+	}
+	if limit > 50 {
+		limit = 50
+	}
+	cutoff := time.Now().Add(within)
+	var rows []models.Reminder
+	if err := s.DB.Where("enabled = ? AND deleted_at IS NULL AND next_fire_at IS NOT NULL AND next_fire_at <= ?", true, cutoff).
+		Order("next_fire_at ASC").
+		Limit(limit).
+		Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	views := make([]*ReminderView, 0, len(rows))
+	for i := range rows {
+		chIDs, _ := s.channelIDs(rows[i].ID)
+		views = append(views, s.toView(&rows[i], chIDs))
+	}
+	return views, nil
 }
 
 // Delete 软删一条提醒并从调度器移除。
@@ -402,16 +439,24 @@ func (s *ReminderService) locFor(tz string) *time.Location {
 }
 
 func (s *ReminderService) toView(r *models.Reminder, chIDs []uint) *ReminderView {
-	specMap := map[string]any{}
-	if len(r.ScheduleSpec) > 0 {
-		_ = json.Unmarshal(r.ScheduleSpec, &specMap)
+		specMap := map[string]any{}
+		if len(r.ScheduleSpec) > 0 {
+			_ = json.Unmarshal(r.ScheduleSpec, &specMap)
+		}
+		if chIDs == nil {
+			chIDs = []uint{}
+		}
+		v := &ReminderView{
+			Reminder:     *r,
+			ScheduleSpec: specMap,
+			ChannelIDs:   chIDs,
+		}
+		loc := s.locFor(r.Timezone)
+		if r.NextFireAt != nil {
+			v.NextFireAtLocal = r.NextFireAt.In(loc).Format("2006-01-02 15:04")
+		}
+		if r.LastFiredAt != nil {
+			v.LastFiredAtLocal = r.LastFiredAt.In(loc).Format("2006-01-02 15:04")
+		}
+		return v
 	}
-	if chIDs == nil {
-		chIDs = []uint{}
-	}
-	return &ReminderView{
-		Reminder:     *r,
-		ScheduleSpec: specMap,
-		ChannelIDs:   chIDs,
-	}
-}

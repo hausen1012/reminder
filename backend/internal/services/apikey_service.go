@@ -1,0 +1,270 @@
+// apikey_service 管理 API Key 的全生命周期。
+//
+// 外部程序通过 X-API-Key 鉴权调用 /api/ingest/*，面板也可以创建/管理 Key。
+// 明文 Key 仅创建时一次性返回，后续仅存储 sha256 哈希与前缀。
+package services
+
+import (
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
+	"errors"
+	"fmt"
+	"math/big"
+	"strings"
+	"sync"
+	"time"
+
+	"github.com/bedrock/backend/internal/middleware"
+	"github.com/bedrock/backend/internal/models"
+	"gorm.io/gorm"
+)
+
+// ApiKeyService 管理 API Key。
+type ApiKeyService struct {
+	DB *gorm.DB
+
+	mu         sync.Mutex
+	lastUsedAt map[uint]time.Time // 节流 TouchLastUsed
+}
+
+// NewApiKeyService 构造服务。
+func NewApiKeyService(db *gorm.DB) *ApiKeyService {
+	return &ApiKeyService{
+		DB:         db,
+		lastUsedAt: make(map[uint]time.Time),
+	}
+}
+
+const keyPrefix = "bdrk_"
+const keyBytes = 24
+
+// Create 生成 API Key，返回明文与模型。
+func (s *ApiKeyService) Create(name string, defaultChannelIDs []uint) (string, *models.APIKey, error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return "", nil, middleware.NewAppError(middleware.CodeValidationFailed, "名称必填").WithField("name")
+	}
+
+	plain, err := generateKey()
+	if err != nil {
+		return "", nil, err
+	}
+
+	hash := sha256Hex(plain)
+	key := &models.APIKey{
+		Name:    name,
+		KeyHash: hash,
+		Prefix:  plain[:len(keyPrefix)+8],
+		Enabled: true,
+	}
+
+	err = s.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(key).Error; err != nil {
+			return err
+		}
+		return s.replaceDefaultChannels(tx, key.ID, defaultChannelIDs)
+	})
+	if err != nil {
+		return "", nil, err
+	}
+	return plain, key, nil
+}
+
+// List 返回所有 Key。
+func (s *ApiKeyService) List() ([]*models.APIKey, error) {
+	var rows []models.APIKey
+	if err := s.DB.Order("id DESC").Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	out := make([]*models.APIKey, len(rows))
+	for i := range rows {
+		out[i] = &rows[i]
+	}
+	return out, nil
+}
+
+// Toggle 启用/禁用。
+func (s *ApiKeyService) Toggle(id uint) (*models.APIKey, error) {
+	var key models.APIKey
+	if err := s.DB.First(&key, id).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, middleware.NewAppError(middleware.CodeNotFound, "API Key 不存在")
+		}
+		return nil, err
+	}
+	key.Enabled = !key.Enabled
+	if err := s.DB.Model(&key).Update("enabled", key.Enabled).Error; err != nil {
+		return nil, err
+	}
+	return &key, nil
+}
+
+// Delete 删除 Key。
+func (s *ApiKeyService) Delete(id uint) error {
+	var key models.APIKey
+	if err := s.DB.First(&key, id).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return middleware.NewAppError(middleware.CodeNotFound, "API Key 不存在")
+		}
+		return err
+	}
+	return s.DB.Delete(&key).Error
+}
+
+// Verify 验证明文 Key 是否有效。
+func (s *ApiKeyService) Verify(plain string) (*models.APIKey, bool) {
+	if !strings.HasPrefix(plain, keyPrefix) {
+		return nil, false
+	}
+	hash := sha256Hex(plain)
+	var key models.APIKey
+	if err := s.DB.Where("key_hash = ?", hash).First(&key).Error; err != nil {
+		return nil, false
+	}
+	if !key.Enabled {
+		return nil, false
+	}
+	return &key, true
+}
+
+// TouchLastUsed 更新 LastUsedAt（节流：每分钟/Key 最多一次）。
+func (s *ApiKeyService) TouchLastUsed(keyID uint) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if last, ok := s.lastUsedAt[keyID]; ok && time.Since(last) < time.Minute {
+		return
+	}
+	s.lastUsedAt[keyID] = time.Now()
+	// 异步写 DB，不阻塞请求
+	go func() {
+		now := time.Now()
+		_ = s.DB.Model(&models.APIKey{}).Where("id = ?", keyID).Update("last_used_at", now).Error
+	}()
+}
+
+// DefaultChannelIDs 返回 Key 绑定的默认通道 ID 列表。
+func (s *ApiKeyService) DefaultChannelIDs(keyID uint) []uint {
+	var ids []uint
+	s.DB.Model(&models.APIKeyDefaultChannel{}).
+		Where("api_key_id = ?", keyID).
+		Pluck("channel_id", &ids)
+	return ids
+}
+
+// Stats24h 返回近 24 小时使用次数（按 reminders 表 APIKeyID 统计）。
+func (s *ApiKeyService) Stats24h(keyID uint) int64 {
+	var count int64
+	s.DB.Model(&models.Reminder{}).
+		Where("api_key_id = ? AND created_at > ?", keyID, time.Now().Add(-24*time.Hour)).
+		Count(&count)
+	return count
+}
+
+// UpdateDefaultChannels 更新 Key 的默认通道绑定。
+func (s *ApiKeyService) UpdateDefaultChannels(id uint, channelIDs []uint) error {
+	return s.DB.Transaction(func(tx *gorm.DB) error {
+		return s.replaceDefaultChannels(tx, id, channelIDs)
+	})
+}
+
+// --- internal ---
+
+func (s *ApiKeyService) replaceDefaultChannels(tx *gorm.DB, keyID uint, ids []uint) error {
+	if err := tx.Where("api_key_id = ?", keyID).Delete(&models.APIKeyDefaultChannel{}).Error; err != nil {
+		return err
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	rows := make([]models.APIKeyDefaultChannel, 0, len(ids))
+	seen := map[uint]bool{}
+	for _, id := range ids {
+		if id == 0 || seen[id] {
+			continue
+		}
+		seen[id] = true
+		rows = append(rows, models.APIKeyDefaultChannel{APIKeyID: keyID, ChannelID: id})
+	}
+	return tx.Create(&rows).Error
+}
+
+// generateKey 生成 bdrk_ + 24 字节 base62 密钥。
+func generateKey() (string, error) {
+	b := make([]byte, keyBytes)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	return keyPrefix + base62Encode(b), nil
+}
+
+// sha256Hex 对明文做 sha256 返回 hex。
+func sha256Hex(s string) string {
+	h := sha256.Sum256([]byte(s))
+	return hex.EncodeToString(h[:])
+}
+
+// base62Encode 把字节编码为 base62 字符串。
+func base62Encode(b []byte) string {
+	const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+	n := new(big.Int).SetBytes(b)
+	out := make([]byte, 0, 32)
+	zero := big.NewInt(0)
+	base := big.NewInt(62)
+	mod := new(big.Int)
+	for n.Cmp(zero) > 0 {
+		n.DivMod(n, base, mod)
+		out = append(out, chars[mod.Int64()])
+	}
+	// 反转
+	for i, j := 0, len(out)-1; i < j; i, j = i+1, j-1 {
+		out[i], out[j] = out[j], out[i]
+	}
+	if len(out) == 0 {
+		return string(chars[0])
+	}
+	return string(out)
+}
+
+// ApiKeyView 是前端的富视图。
+type ApiKeyView struct {
+	models.APIKey
+	DefaultChannelIDs []uint `json:"default_channel_ids"`
+	Usage24h          int64  `json:"usage_24h"`
+}
+
+// ListViews 返回 API Key 富列表。
+func (s *ApiKeyService) ListViews() ([]*ApiKeyView, error) {
+	keys, err := s.List()
+	if err != nil {
+		return nil, err
+	}
+	views := make([]*ApiKeyView, 0, len(keys))
+	for _, k := range keys {
+		views = append(views, &ApiKeyView{
+			APIKey:            *k,
+			DefaultChannelIDs: s.DefaultChannelIDs(k.ID),
+			Usage24h:          s.Stats24h(k.ID),
+		})
+	}
+	return views, nil
+}
+
+// GetView 返回单个 Key 的富视图。
+func (s *ApiKeyService) GetView(id uint) (*ApiKeyView, error) {
+	var key models.APIKey
+	if err := s.DB.First(&key, id).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, middleware.NewAppError(middleware.CodeNotFound, "API Key 不存在")
+		}
+		return nil, err
+	}
+	return &ApiKeyView{
+		APIKey:            key,
+		DefaultChannelIDs: s.DefaultChannelIDs(key.ID),
+		Usage24h:          s.Stats24h(key.ID),
+	}, nil
+}
+
+// compile-time assertion
+var _ = fmt.Sprintf

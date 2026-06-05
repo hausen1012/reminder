@@ -14,12 +14,17 @@ import (
 
 // LogService 负责 DeliveryLog 的查询与清理。
 type LogService struct {
-	DB *gorm.DB
+	DB          *gorm.DB
+	PublicURL   string // 用于拼接 confirm_url
 }
 
 // NewLogService 构造日志服务。
-func NewLogService(db *gorm.DB) *LogService {
-	return &LogService{DB: db}
+func NewLogService(db *gorm.DB, publicURL ...string) *LogService {
+	url := "http://localhost:8080"
+	if len(publicURL) > 0 && publicURL[0] != "" {
+		url = publicURL[0]
+	}
+	return &LogService{DB: db, PublicURL: url}
 }
 
 // LogFilter 日志列表过滤条件。
@@ -40,6 +45,9 @@ type LogView struct {
 
 	// 本日志关联的 attempts（仅详情接口加载）
 	Attempts []models.DeliveryAttempt `json:"attempts,omitempty"`
+
+	// 确认链接 URL（仅需要确认且有 token 的日志）
+	ConfirmURL string `json:"confirm_url,omitempty"`
 }
 
 // List 查询日志列表，返回视图切片与总数。
@@ -118,11 +126,24 @@ func (s *LogService) GetDetail(id uint) (*LogView, error) {
 	var attempts []models.DeliveryAttempt
 	s.DB.Where("delivery_log_id = ?", id).Order("attempt ASC").Find(&attempts)
 
+	// 取 confirm_url
+	var confirmURL string
+	if dl.ConfirmChainID != nil && *dl.ConfirmChainID != "" {
+		var tok models.ConfirmToken
+		if err := s.DB.Model(&models.ConfirmToken{}).
+			Joins("JOIN delivery_logs ON delivery_logs.id = confirm_tokens.delivery_log_id").
+			Where("delivery_logs.confirm_chain_id = ?", *dl.ConfirmChainID).
+			First(&tok).Error; err == nil {
+			confirmURL = s.confirmURL(tok.Token)
+		}
+	}
+
 	return &LogView{
 		DeliveryLog:     dl,
 		ReminderTitle:   reminderTitle,
 		ReminderDeleted: reminderDeleted,
 		Attempts:        attempts,
+		ConfirmURL:      confirmURL,
 	}, nil
 }
 
@@ -131,6 +152,10 @@ func (s *LogService) GetDetail(id uint) (*LogView, error) {
 // olderThan > 0 时删除早于 now-olderThan 的日志；
 // all=true 时删除全部日志（忽略 olderThan）。
 // 返回清理的条数。
+//
+// 额外清理：
+//   - 删除过期/孤立的 confirm_tokens
+//   - all=true 时执行 VACUUM（回收 SQLite 空间）
 func (s *LogService) Purge(olderThan time.Duration, all bool) (int64, error) {
 	q := s.DB.Model(&models.DeliveryLog{})
 	if !all && olderThan > 0 {
@@ -140,7 +165,6 @@ func (s *LogService) Purge(olderThan time.Duration, all bool) (int64, error) {
 		return 0, nil
 	}
 
-	// 先查 ids 用于删 attempts
 	var ids []uint
 	if err := q.Pluck("id", &ids).Error; err != nil {
 		return 0, err
@@ -159,10 +183,21 @@ func (s *LogService) Purge(olderThan time.Duration, all bool) (int64, error) {
 			return res.Error
 		}
 		count = res.RowsAffected
+
+		// 清理孤立的 confirm_tokens（关联的 delivery_log 已被删）
+		if err := tx.Where("delivery_log_id NOT IN (SELECT id FROM delivery_logs)").
+			Delete(&models.ConfirmToken{}).Error; err != nil {
+			return err
+		}
 		return nil
 	})
 	if err != nil {
 		return 0, err
+	}
+
+	// all=true 时回收 SQLite 空间
+	if all {
+		s.DB.Exec("VACUUM")
 	}
 	return count, nil
 }
@@ -181,4 +216,9 @@ func (s *LogService) PurgeCount(olderThan time.Duration, all bool) (int64, error
 		return 0, err
 	}
 	return count, nil
+}
+
+// confirmURL 拼接确认链接。
+func (s *LogService) confirmURL(token string) string {
+	return s.PublicURL + "/c/" + token
 }

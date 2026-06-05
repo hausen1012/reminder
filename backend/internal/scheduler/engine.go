@@ -38,7 +38,9 @@ type Engine struct {
 	mu  sync.Mutex
 	reg map[uint]*registered
 
-	stopped bool
+	stopped    bool
+	lastFireMu sync.Mutex
+	lastFireAt time.Time
 }
 
 type registeredKind string
@@ -195,6 +197,20 @@ func (e *Engine) addAfterFunc(r *models.Reminder, spec *ScheduleSpec) error {
 	return nil
 }
 
+// RegisteredCount 返回当前注册的提醒数量。
+func (e *Engine) RegisteredCount() int {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return len(e.reg)
+}
+
+// LastFireTime 返回最近一次 fire 的时间。
+func (e *Engine) LastFireTime() time.Time {
+	e.lastFireMu.Lock()
+	defer e.lastFireMu.Unlock()
+	return e.lastFireAt
+}
+
 // fire 是所有触发器的统一入口。
 //
 // 步骤：
@@ -203,6 +219,10 @@ func (e *Engine) addAfterFunc(r *models.Reminder, spec *ScheduleSpec) error {
 //  3. 异步交给 dispatcher
 //  4. 若非 cron 触发器，注册下一次 AfterFunc
 func (e *Engine) fire(id uint) {
+	e.lastFireMu.Lock()
+	e.lastFireAt = time.Now()
+	e.lastFireMu.Unlock()
+
 	var r models.Reminder
 	if err := e.db.First(&r, id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
