@@ -11,6 +11,13 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/switch'
 import { ChevronDown } from 'lucide-react'
@@ -46,6 +53,29 @@ function formatChannelNames(channels: Channel[], ids: number[]): string {
   const names = ids.map((id) => channels.find((c) => c.id === id)?.name ?? `#${id}`)
   return names.join(', ')
 }
+
+const COMMON_TIMEZONES = [
+  'Asia/Shanghai',
+  'Asia/Tokyo',
+  'Asia/Hong_Kong',
+  'Asia/Singapore',
+  'Asia/Seoul',
+  'Asia/Taipei',
+  'Asia/Kolkata',
+  'Asia/Dubai',
+  'Europe/London',
+  'Europe/Paris',
+  'Europe/Berlin',
+  'Europe/Moscow',
+  'America/New_York',
+  'America/Chicago',
+  'America/Denver',
+  'America/Los_Angeles',
+  'America/Sao_Paulo',
+  'Australia/Sydney',
+  'Pacific/Auckland',
+  'UTC',
+]
 
 export function ReminderEditDialog({ reminder, open, onClose, onSaved }: Props) {
   const isEdit = Boolean(reminder)
@@ -216,12 +246,18 @@ export function ReminderEditDialog({ reminder, open, onClose, onSaved }: Props) 
 
             <div className="space-y-2">
               <Label htmlFor="r-tz">提醒时区</Label>
-              <Input
-                id="r-tz"
-                value={input.timezone ?? ''}
-                onChange={(e) => patch('timezone', e.target.value)}
-                placeholder="Asia/Shanghai"
-              />
+              <Select value={input.timezone || 'Asia/Shanghai'} onValueChange={(v) => patch('timezone', v)}>
+                <SelectTrigger id="r-tz">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {COMMON_TIMEZONES.map((tz) => (
+                    <SelectItem key={tz} value={tz}>
+                      {tz}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
