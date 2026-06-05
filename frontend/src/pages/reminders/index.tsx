@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
-import { Badge } from '@/components/ui/badge'
 import {
   Select,
   SelectContent,
@@ -35,6 +34,59 @@ const TYPE_LABEL: Record<string, string> = {
   once: '一次性',
   interval: '周期',
   cron: 'Cron',
+}
+
+const CHINESE_DIGITS = ['零', '一', '二', '三', '四', '五', '六', '七', '八', '九']
+
+function toChineseYear(n: number): string {
+  return String(n).split('').map((d) => CHINESE_DIGITS[+d]).join('')
+}
+
+function toChineseDay(n: number): string {
+  if (n <= 10) return CHINESE_DIGITS[n]
+  if (n < 20) return '十' + (n > 10 ? CHINESE_DIGITS[n - 10] : '')
+  if (n === 20) return '二十'
+  if (n < 30) return '二十' + CHINESE_DIGITS[n - 20]
+  return '三十'
+}
+
+function formatDetail(r: Reminder): string {
+  const spec = r.schedule_spec ?? {}
+  const h = String(spec.hour ?? 9).padStart(2, '0')
+  const m = String(spec.minute ?? 0).padStart(2, '0')
+  const time = `${h}:${m}`
+
+  if (r.calendar === 'lunar') {
+    const lunar = (spec.lunar ?? spec.start_lunar) as { year: number; month: number; day: number } | undefined
+    if (lunar) {
+      return `农历 ${toChineseYear(lunar.year)}年${CHINESE_DIGITS[lunar.month]}月${toChineseDay(lunar.day)} ${time}`
+    }
+    return '农历'
+  }
+
+  if (r.schedule_type === 'cron') {
+    return (spec.expr as string) ?? ''
+  }
+
+  const at = (spec.at ?? spec.start_at) as string | undefined
+  if (at) {
+    const d = at.slice(0, 10).replace(/-/g, '/')
+    const t = at.slice(11, 16)
+    return `公历 ${d} ${t}`
+  }
+  return '公历'
+}
+
+function formatNextFire(dateStr?: string): string {
+  if (!dateStr) return '—'
+  const d = new Date(dateStr)
+  const y = d.getFullYear()
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  const h = String(d.getHours()).padStart(2, '0')
+  const min = String(d.getMinutes()).padStart(2, '0')
+  const s = String(d.getSeconds()).padStart(2, '0')
+  return `${y}/${month}/${day} ${h}:${min}:${s}`
 }
 
 export default function RemindersPage() {
@@ -192,82 +244,84 @@ export default function RemindersPage() {
               <thead className="border-b bg-muted/40 text-left text-xs uppercase text-muted-foreground">
                 <tr>
                   <th className="px-4 py-3">标题</th>
-                  <th className="px-4 py-3">调度</th>
-                  <th className="px-4 py-3">通道</th>
+                  <th className="px-4 py-3">规则</th>
+                  <th className="px-4 py-3">详情</th>
                   <th className="px-4 py-3">下次触发</th>
-                  <th className="px-4 py-3">来源</th>
+                  <th className="px-4 py-3">通道</th>
                   <th className="px-4 py-3 text-center">启用</th>
+                  <th className="px-4 py-3 pl-16">来源</th>
                   <th className="px-4 py-3 text-right">操作</th>
                 </tr>
               </thead>
               <tbody>
-                {items.map((r) => (
-                  <tr key={r.id} className="border-b last:border-b-0 hover:bg-muted/30">
-                    <td className="px-4 py-3 max-w-[20rem]">
-                      <div className="font-medium truncate" title={r.title}>
-                        {r.title}
-                      </div>
-                      {r.content && (
-                        <div className="text-xs text-muted-foreground truncate" title={r.content}>
-                          {r.content}
+                {items.map((r) => {
+                  const chNames = r.channel_ids.map((cid) => channelMap.get(cid) || `#${cid}`)
+                  return (
+                    <tr key={r.id} className="border-b last:border-b-0 hover:bg-muted/30">
+                      <td className="px-4 py-3 max-w-[12rem]">
+                        <div className="font-medium truncate" title={r.title}>
+                          {r.title}
                         </div>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <Badge variant="outline">
-                        {r.calendar === 'lunar' ? '农历' : '公历'} · {TYPE_LABEL[r.schedule_type] ?? r.schedule_type}
-                      </Badge>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex flex-wrap gap-1">
-                        {r.channel_ids.length === 0 ? (
+                        {r.content && (
+                          <div className="text-xs text-muted-foreground truncate" title={r.content}>
+                            {r.content}
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        {TYPE_LABEL[r.schedule_type] ?? r.schedule_type}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-muted-foreground max-w-[16rem]">
+                        <span className="truncate block" title={formatDetail(r)}>
+                          {formatDetail(r)}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-xs whitespace-nowrap">
+                        {formatNextFire(r.next_fire_at)}
+                      </td>
+                      <td className="px-4 py-3 max-w-[10rem]">
+                        {chNames.length === 0 ? (
                           <span className="text-xs text-muted-foreground">—</span>
                         ) : (
-                          r.channel_ids.map((cid) => (
-                            <Badge key={cid} variant="secondary" className="text-xs">
-                              {channelMap.get(cid) || `#${cid}`}
-                            </Badge>
-                          ))
+                          <span className="truncate block text-xs" title={chNames.join(', ')}>
+                            {chNames.join(', ')}
+                          </span>
                         )}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-xs">
-                      {r.next_fire_at ? new Date(r.next_fire_at).toLocaleString() : '—'}
-                    </td>
-                    <td className="px-4 py-3">
-                      <Badge variant="secondary">{SOURCE_LABEL[r.source] ?? r.source}</Badge>
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <Switch checked={r.enabled} onCheckedChange={() => handleToggle(r)} />
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex justify-end gap-1">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => handleTest(r)}
-                          disabled={testingId === r.id}
-                          title="立即触发一次"
-                        >
-                          <TestTube className="h-4 w-4 mr-1" />
-                          {testingId === r.id ? '发送中…' : '试触发'}
-                        </Button>
-                        <Button size="sm" variant="ghost" onClick={() => setEditing(r)}>
-                          <Pencil className="h-4 w-4 mr-1" />
-                          编辑
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="text-destructive hover:text-destructive"
-                          onClick={() => setToDelete(r)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <Switch checked={r.enabled} onCheckedChange={() => handleToggle(r)} />
+                      </td>
+                      <td className="px-4 py-3 text-xs text-muted-foreground pl-16">
+                        {SOURCE_LABEL[r.source] ?? r.source}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex justify-end gap-1">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleTest(r)}
+                            disabled={testingId === r.id}
+                            title="试触发"
+                          >
+                            <TestTube className="h-4 w-4" />
+                          </Button>
+                          <Button size="sm" variant="ghost" onClick={() => setEditing(r)} title="编辑">
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-destructive hover:text-destructive"
+                            onClick={() => setToDelete(r)}
+                            title="删除"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>
