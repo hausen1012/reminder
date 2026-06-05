@@ -4,6 +4,9 @@ import type {
   Channel,
   ChannelInput,
   ChannelTestResult,
+  DeliveryLog,
+  LogFilter,
+  LogListResp,
   LoginResponse,
   Reminder,
   ReminderInput,
@@ -138,5 +141,27 @@ export async function previewReminder(input: ReminderPreviewInput) {
 
 export async function testReminder(id: number) {
   const res = await api.post<ApiResponse<{ delivery_log_id: number }>>(`/reminders/${id}/test`)
+  return res.data.data
+}
+
+// --- 日志 ---
+
+export async function listLogs(f: LogFilter = {}) {
+  const res = await api.get<ApiResponse<LogListResp>>('/logs', { params: f })
+  return res.data.data
+}
+
+export async function getLogDetail(id: number) {
+  const res = await api.get<ApiResponse<DeliveryLog>>(`/logs/${id}`)
+  return res.data.data
+}
+
+export async function purgeLogs(olderThan?: string, all?: boolean) {
+  const res = await api.delete<ApiResponse<{ deleted: number }>>('/logs', { params: { older_than: olderThan, all } })
+  return res.data.data
+}
+
+export async function countPurgeLogs(olderThan?: string, all?: boolean) {
+  const res = await api.get<ApiResponse<{ count: number }>>('/logs/count', { params: { older_than: olderThan, all } })
   return res.data.data
 }

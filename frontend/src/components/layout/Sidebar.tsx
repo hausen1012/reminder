@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, User, Moon, Sun, LogOut, Mountain, Send, Bell } from 'lucide-react'
+import { LayoutDashboard, User, Moon, Sun, LogOut, Mountain, Send, Bell, ScrollText } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { useTheme } from '@/contexts/ThemeContext'
@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils'
 const navItems = [
   { to: '/', label: '首页', icon: LayoutDashboard },
   { to: '/reminders', label: '提醒', icon: Bell },
+  { to: '/logs', label: '日志', icon: ScrollText },
   { to: '/channels', label: '通知通道', icon: Send },
   { to: '/profile', label: '设置', icon: User },
 ]

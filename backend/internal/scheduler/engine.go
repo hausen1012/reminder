@@ -315,6 +315,18 @@ func (e *Engine) LoadAndRegisterAll() error {
 	return nil
 }
 
+// AddPurgeCron 注册一个每天凌晨 3 点的定时清理任务。
+func (e *Engine) AddPurgeCron(logSrv interface{ Purge(olderThan time.Duration, all bool) (int64, error) }, purgeAfter time.Duration) (cron.EntryID, error) {
+	return e.cron.AddFunc("0 0 3 * * *", func() {
+		n, err := logSrv.Purge(purgeAfter, false)
+		if err != nil {
+			log.Printf("[scheduler] 自动清理日志失败: %v", err)
+		} else if n > 0 {
+			log.Printf("[scheduler] 自动清理日志 %d 条", n)
+		}
+	})
+}
+
 // debugString 用于测试/排查内部状态。
 func (e *Engine) debugString() string {
 	e.mu.Lock()

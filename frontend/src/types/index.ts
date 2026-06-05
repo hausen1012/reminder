@@ -93,3 +93,52 @@ export interface ReminderPreviewInput {
   timezone?: string
   count?: number
 }
+
+// --- 日志 ---
+
+export type LogStatus = 'pending' | 'success' | 'partial' | 'failed' | 'expired'
+
+export interface DeliveryAttempt {
+  id: number
+  delivery_log_id: number
+  channel_id: number
+  channel_type: ChannelType
+  channel_name: string
+  attempt: number
+  status: 'success' | 'failed'
+  error?: string
+  latency_ms: number
+  created_at: string
+}
+
+export interface DeliveryLog {
+  id: number
+  reminder_id: number
+  fired_at: string
+  title: string
+  content: string
+  status: LogStatus
+  confirmed: boolean
+  confirmed_at?: string
+  confirm_chain_id?: string
+  retry_round: number
+  source: string
+  created_at: string
+  reminder_title: string
+  reminder_deleted: boolean
+  attempts?: DeliveryAttempt[]
+}
+
+export interface LogListResp {
+  items: DeliveryLog[]
+  total: number
+}
+
+export interface LogFilter {
+  status?: string
+  source?: string
+  search?: string
+  reminder_id?: number
+  limit?: number
+  offset?: number
+}

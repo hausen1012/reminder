@@ -66,9 +66,17 @@ func Setup(staticFS embed.FS, cfg *config.Config) *SetupResult {
 	)
 	sweeper.Start()
 
+	// 自动清理日志（每天凌晨 3 点）
+	logSvc := services.NewLogService(database.DB)
+	if cfg.LogAutoPurgeDays > 0 {
+		purgeAfter := time.Duration(cfg.LogAutoPurgeDays) * 24 * time.Hour
+		_, _ = engine.AddPurgeCron(logSvc, purgeAfter)
+	}
+
 	authHandler := &handlers.AuthHandler{JWTSecret: cfg.JWTSecret}
 	channelHandler := &handlers.ChannelHandler{Svc: channelSvc}
 	reminderHandler := &handlers.ReminderHandler{Svc: reminderSvc}
+	logHandler := &handlers.LogHandler{Svc: logSvc}
 
 	api := r.Group("/api")
 	{
@@ -108,6 +116,14 @@ func Setup(staticFS embed.FS, cfg *config.Config) *SetupResult {
 			reminders.DELETE("/:id", reminderHandler.Delete)
 			reminders.PATCH("/:id/toggle", reminderHandler.Toggle)
 			reminders.POST("/:id/test", reminderHandler.Test)
+		}
+
+		logs := protected.Group("/logs")
+		{
+			logs.GET("", logHandler.List)
+			logs.GET("/count", logHandler.PurgeCount)
+			logs.GET("/:id", logHandler.GetDetail)
+			logs.DELETE("", logHandler.Purge)
 		}
 	}
 
