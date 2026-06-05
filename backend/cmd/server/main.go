@@ -1,9 +1,15 @@
 package main
 
 import (
+	"context"
 	"embed"
 	"fmt"
 	"log"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/bedrock/backend/internal/config"
 	"github.com/bedrock/backend/internal/database"
@@ -20,10 +26,33 @@ func main() {
 		log.Fatalf("database init failed: %v", err)
 	}
 
-	r := router.Setup(staticFS, cfg)
+	res := router.Setup(staticFS, cfg)
 	addr := fmt.Sprintf(":%s", cfg.Port)
-	log.Printf("Server starting on %s", addr)
-	if err := r.Run(addr); err != nil {
-		log.Fatalf("server start failed: %v", err)
+
+	srv := &http.Server{
+		Addr:    addr,
+		Handler: res.Engine,
 	}
+
+	go func() {
+		log.Printf("Server starting on %s", addr)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("server start failed: %v", err)
+		}
+	}()
+
+	// 优雅停机：先停 HTTP 接收新请求，再停调度器（确保不再有 fire 产生新事务）
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+	log.Println("收到退出信号，开始关闭…")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := srv.Shutdown(ctx); err != nil {
+		log.Printf("HTTP 关闭失败: %v", err)
+	}
+	res.Handles.Sweeper.Stop()
+	res.Handles.Engine.Stop()
+	log.Println("已退出。")
 }

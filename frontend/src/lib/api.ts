@@ -1,5 +1,16 @@
 import axios from 'axios'
-import type { ApiResponse, Channel, ChannelInput, ChannelTestResult, LoginResponse, User } from '@/types'
+import type {
+  ApiResponse,
+  Channel,
+  ChannelInput,
+  ChannelTestResult,
+  LoginResponse,
+  Reminder,
+  ReminderInput,
+  ReminderListResp,
+  ReminderPreviewInput,
+  User,
+} from '@/types'
 
 const api = axios.create({
   baseURL: '/api',
@@ -78,5 +89,54 @@ export async function toggleChannel(id: number) {
 
 export async function testChannel(id: number, body?: { subject?: string; body?: string }) {
   const res = await api.post<ApiResponse<ChannelTestResult>>(`/channels/${id}/test`, body ?? {})
+  return res.data.data
+}
+
+// --- 提醒 ---
+
+export interface ListRemindersQuery {
+  source?: 'manual' | 'api' | 'all'
+  enabled?: boolean
+  search?: string
+  limit?: number
+  offset?: number
+}
+
+export async function listReminders(q: ListRemindersQuery = {}) {
+  const res = await api.get<ApiResponse<ReminderListResp>>('/reminders', { params: q })
+  return res.data.data
+}
+
+export async function getReminder(id: number) {
+  const res = await api.get<ApiResponse<Reminder>>(`/reminders/${id}`)
+  return res.data.data
+}
+
+export async function createReminder(input: ReminderInput) {
+  const res = await api.post<ApiResponse<Reminder>>('/reminders', input)
+  return res.data.data
+}
+
+export async function updateReminder(id: number, input: ReminderInput) {
+  const res = await api.put<ApiResponse<Reminder>>(`/reminders/${id}`, input)
+  return res.data.data
+}
+
+export async function deleteReminder(id: number) {
+  await api.delete<ApiResponse<null>>(`/reminders/${id}`)
+}
+
+export async function toggleReminder(id: number) {
+  const res = await api.patch<ApiResponse<Reminder>>(`/reminders/${id}/toggle`)
+  return res.data.data
+}
+
+export async function previewReminder(input: ReminderPreviewInput) {
+  const res = await api.post<ApiResponse<{ times: string[] }>>('/reminders/preview', input)
+  return res.data.data?.times ?? []
+}
+
+export async function testReminder(id: number) {
+  const res = await api.post<ApiResponse<{ delivery_log_id: number }>>(`/reminders/${id}/test`)
   return res.data.data
 }

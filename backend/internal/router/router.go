@@ -6,31 +6,69 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/bedrock/backend/internal/config"
 	"github.com/bedrock/backend/internal/crypto/secretbox"
 	"github.com/bedrock/backend/internal/database"
 	"github.com/bedrock/backend/internal/handlers"
 	"github.com/bedrock/backend/internal/middleware"
+	"github.com/bedrock/backend/internal/scheduler"
 	"github.com/bedrock/backend/internal/services"
 	"github.com/gin-gonic/gin"
 )
 
-func Setup(staticFS embed.FS, cfg *config.Config) *gin.Engine {
+// SchedulerHandles 把 scheduler 相关启动后实例返回给 main，
+// 便于 main 在 shutdown 时 Stop。
+type SchedulerHandles struct {
+	Engine  *scheduler.Engine
+	Sweeper *scheduler.Sweeper
+}
+
+// SetupResult 包装路由与调度器实例。
+type SetupResult struct {
+	Engine  *gin.Engine
+	Handles *SchedulerHandles
+}
+
+// Setup 构建路由 + 启动调度器 + Sweeper。
+//
+// 与 bedrock 原版相比：返回值新增 SchedulerHandles 用于优雅停机；
+// 旧调用方仍可使用 SetupEngine 取仅 *gin.Engine 的形态。
+func Setup(staticFS embed.FS, cfg *config.Config) *SetupResult {
 	r := gin.Default()
 	r.Use(middleware.ErrorHandler())
 	r.Use(middleware.Logger())
 	r.Use(middleware.CORS())
 
-	// 初始化加密 Box（失败时直接 panic：通道全部依赖它）
 	box, err := secretbox.New(cfg.SecretBoxKey)
 	if err != nil {
 		log.Fatalf("初始化 secretbox 失败: %v", err)
 	}
 
-	authHandler := &handlers.AuthHandler{JWTSecret: cfg.JWTSecret}
 	channelSvc := services.NewChannelService(database.DB, box)
+	dispatchSvc := services.NewDispatchService(database.DB, channelSvc, cfg.Location)
+	engine := scheduler.NewEngine(database.DB, dispatchSvc, cfg.Location)
+	reminderSvc := services.NewReminderService(database.DB, engine, cfg.Location, dispatchSvc)
+
+	// 启动调度器并把已 enabled 的提醒注册一遍
+	engine.Start()
+	if err := engine.LoadAndRegisterAll(); err != nil {
+		log.Printf("调度器加载已有提醒失败: %v", err)
+	}
+
+	// 启动 sweeper
+	sweeper := scheduler.NewSweeper(
+		database.DB, engine, cfg.Location,
+		time.Duration(cfg.SweepIntervalSec)*time.Second,
+		time.Duration(cfg.MissToleranceMinutes)*time.Minute,
+		30*time.Second,
+	)
+	sweeper.Start()
+
+	authHandler := &handlers.AuthHandler{JWTSecret: cfg.JWTSecret}
 	channelHandler := &handlers.ChannelHandler{Svc: channelSvc}
+	reminderHandler := &handlers.ReminderHandler{Svc: reminderSvc}
 
 	api := r.Group("/api")
 	{
@@ -46,7 +84,6 @@ func Setup(staticFS embed.FS, cfg *config.Config) *gin.Engine {
 		auth.PUT("/password", handlers.UpdatePassword)
 	}
 
-	// 业务资源接口需要登录
 	protected := api.Group("")
 	protected.Use(middleware.JWTAuth(cfg.JWTSecret))
 	{
@@ -60,10 +97,25 @@ func Setup(staticFS embed.FS, cfg *config.Config) *gin.Engine {
 			channels.PATCH("/:id/toggle", channelHandler.Toggle)
 			channels.POST("/:id/test", channelHandler.Test)
 		}
+
+		reminders := protected.Group("/reminders")
+		{
+			reminders.GET("", reminderHandler.List)
+			reminders.POST("", reminderHandler.Create)
+			reminders.POST("/preview", reminderHandler.Preview)
+			reminders.GET("/:id", reminderHandler.Get)
+			reminders.PUT("/:id", reminderHandler.Update)
+			reminders.DELETE("/:id", reminderHandler.Delete)
+			reminders.PATCH("/:id/toggle", reminderHandler.Toggle)
+			reminders.POST("/:id/test", reminderHandler.Test)
+		}
 	}
 
 	serveStaticFiles(r, staticFS)
-	return r
+	return &SetupResult{
+		Engine:  r,
+		Handles: &SchedulerHandles{Engine: engine, Sweeper: sweeper},
+	}
 }
 
 func serveStaticFiles(r *gin.Engine, staticFS embed.FS) {
