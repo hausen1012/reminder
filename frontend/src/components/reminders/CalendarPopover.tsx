@@ -55,8 +55,8 @@ export function CalendarPopover({ date, hour: initHour, minute: initMin, onSelec
     if (date) return new Date(date).getDate()
     return now.getDate()
   })
-  const [hour, setHour] = useState(initHour ?? 9)
-  const [minute, setMinute] = useState(initMin ?? 0)
+  const [hour, setHour] = useState(initHour ?? now.getHours())
+  const [minute, setMinute] = useState(initMin ?? now.getMinutes())
 
   // 点击外部关闭（排除 Radix Select portal）
   useEffect(() => {
@@ -64,7 +64,6 @@ export function CalendarPopover({ date, hour: initHour, minute: initMin, onSelec
       const target = e.target as Node
       if (!popoverRef.current) return
       if (popoverRef.current.contains(target)) return
-      // Radix Select portal 渲染在 DOM 根部，允许点击
       if (target instanceof Element && (target.closest('[role="listbox"]') || target.closest('[data-radix-popper-content-wrapper]'))) return
       onClose()
     }
@@ -82,7 +81,6 @@ export function CalendarPopover({ date, hour: initHour, minute: initMin, onSelec
     const daysInMonth = new Date(solarYear, solarMonth, 0).getDate()
     const firstWeekday = toMondayBase(new Date(solarYear, solarMonth - 1, 1).getDay())
 
-    // 上个月的最后几天
     const prevYear = solarMonth === 1 ? solarYear - 1 : solarYear
     const prevMonth = solarMonth === 1 ? 12 : solarMonth - 1
     const prevDaysInMonth = new Date(prevYear, prevMonth, 0).getDate()
@@ -114,7 +112,6 @@ export function CalendarPopover({ date, hour: initHour, minute: initMin, onSelec
       })
     }
 
-    // 补齐下一月开头几天（填满最后一行）
     const nextYear = solarMonth === 12 ? solarYear + 1 : solarYear
     const nextMonth = solarMonth === 12 ? 1 : solarMonth + 1
     const remainder = cells.length % 7
@@ -159,6 +156,15 @@ export function CalendarPopover({ date, hour: initHour, minute: initMin, onSelec
     }
   }
 
+  function goToday() {
+    const n = new Date()
+    setSolarYear(n.getFullYear())
+    setSolarMonth(n.getMonth() + 1)
+    setSelectedDay(n.getDate())
+    setHour(n.getHours())
+    setMinute(n.getMinutes())
+  }
+
   return (
     <div
       ref={popoverRef}
@@ -194,18 +200,27 @@ export function CalendarPopover({ date, hour: initHour, minute: initMin, onSelec
             <ChevronRight className="h-3 w-3" />
           </Button>
         </div>
-        <label className="flex items-center gap-1 cursor-pointer shrink-0">
-          <span className="text-[11px] text-muted-foreground select-none">农历</span>
+        <div className="flex items-center gap-1">
           <button
             type="button"
-            role="switch"
-            aria-checked={showLunar}
-            onClick={() => setShowLunar(!showLunar)}
-            className={`relative inline-flex h-5 w-[34px] shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${showLunar ? 'bg-primary' : 'bg-input'}`}
+            onClick={goToday}
+            className="h-5 px-1.5 text-[11px] text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors"
           >
-            <span className={`block h-4 w-4 rounded-full bg-background shadow-sm ring-0 transition-transform ${showLunar ? 'translate-x-[15px]' : 'translate-x-0'}`} />
+            现在
           </button>
-        </label>
+          <label className="flex items-center gap-1 cursor-pointer shrink-0">
+            <span className="text-[11px] text-muted-foreground select-none">农历</span>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={showLunar}
+              onClick={() => setShowLunar(!showLunar)}
+              className={`relative inline-flex h-4 w-[26px] shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${showLunar ? 'bg-primary' : 'bg-input'}`}
+            >
+              <span className={`block h-3 w-3 rounded-full bg-background shadow-sm ring-0 transition-transform ${showLunar ? 'translate-x-[11px]' : 'translate-x-0'}`} />
+            </button>
+          </label>
+        </div>
       </div>
 
       {/* 星期头 + 日期网格（带切换动画） */}
@@ -217,7 +232,6 @@ export function CalendarPopover({ date, hour: initHour, minute: initMin, onSelec
           ))}
         </div>
 
-        {/* 日期网格 */}
         <div className="grid grid-cols-7">
         {solarGrid.map((cell) => {
           const isSelected = cell.current && cell.day === selectedDay

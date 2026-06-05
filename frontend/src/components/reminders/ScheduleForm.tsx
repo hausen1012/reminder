@@ -160,8 +160,8 @@ export function ScheduleForm({ value, onChange }: Props) {
             {calendarOpen && (
               <CalendarPopover
                 date={value.calendar === 'solar' ? ((spec.at ?? spec.start_at) as string | undefined) : undefined}
-                hour={(spec.hour as number) ?? 9}
-                minute={(spec.minute as number) ?? 0}
+                hour={spec.hour as number | undefined}
+                minute={spec.minute as number | undefined}
                 onSelect={handleCalendarSelect}
                 onClose={() => setCalendarOpen(false)}
               />
