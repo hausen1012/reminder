@@ -1,0 +1,407 @@
+// Package services 业务服务层：handler 与 DB/外部资源之间的胶水。
+//
+// channel_service 负责通道的 CRUD、敏感字段透明加解密、试发。
+// 敏感字段约定：Config JSON 内任意以 "_enc" 结尾的字段值在落库前加密、读出后解密。
+package services
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"strings"
+	"time"
+
+	"github.com/bedrock/backend/internal/crypto/secretbox"
+	"github.com/bedrock/backend/internal/middleware"
+	"github.com/bedrock/backend/internal/models"
+	"github.com/bedrock/backend/internal/notifier"
+	"gorm.io/datatypes"
+	"gorm.io/gorm"
+)
+
+// ChannelService 持有 DB + secretbox 实例。
+type ChannelService struct {
+	DB  *gorm.DB
+	Box *secretbox.Box
+}
+
+// NewChannelService 构造服务实例。
+func NewChannelService(db *gorm.DB, box *secretbox.Box) *ChannelService {
+	return &ChannelService{DB: db, Box: box}
+}
+
+// ChannelInput 是 Create/Update 的入参。
+//
+// Config 是前端传入的明文 map，内含 _enc 后缀字段时由本服务加密后再落库。
+type ChannelInput struct {
+	Name    string         `json:"name"`
+	Type    string         `json:"type"`
+	Enabled *bool          `json:"enabled,omitempty"`
+	Config  map[string]any `json:"config"`
+}
+
+// ChannelView 是返回给前端的视图：Config 内 _enc 后缀字段统一脱敏成 "***"，
+// 这样前端看不到明文，编辑时若留空表示不修改。
+type ChannelView struct {
+	ID        uint           `json:"id"`
+	Name      string         `json:"name"`
+	Type      string         `json:"type"`
+	Enabled   bool           `json:"enabled"`
+	Config    map[string]any `json:"config"`
+	CreatedAt time.Time      `json:"created_at"`
+	UpdatedAt time.Time      `json:"updated_at"`
+}
+
+const encSuffix = "_enc"
+
+// 占位符常量：前端编辑时未改动敏感字段就回传这个值，服务端识别后不更新。
+const sensitivePlaceholder = "***"
+
+func validType(t string) bool {
+	switch t {
+	case "smtp", "dingtalk", "wecom", "webhook":
+		return true
+	}
+	return false
+}
+
+// Create 新建通道。Type 一旦创建不可变更。
+func (s *ChannelService) Create(in ChannelInput) (*ChannelView, error) {
+	if err := s.validateInput(in, false, nil); err != nil {
+		return nil, err
+	}
+	encConfig, err := s.encryptConfig(in.Config, nil)
+	if err != nil {
+		return nil, middleware.NewAppError(middleware.CodeValidationFailed, err.Error())
+	}
+	raw, _ := json.Marshal(encConfig)
+	ch := &models.Channel{
+		Name:    strings.TrimSpace(in.Name),
+		Type:    in.Type,
+		Enabled: true,
+		Config:  datatypes.JSON(raw),
+	}
+	if in.Enabled != nil {
+		ch.Enabled = *in.Enabled
+	}
+	if err := s.DB.Create(ch).Error; err != nil {
+		if isUniqueErr(err) {
+			return nil, middleware.NewAppError(middleware.CodeValidationFailed, "通道名称已存在").WithField("name")
+		}
+		return nil, err
+	}
+	return s.toView(ch), nil
+}
+
+// Update 修改通道，禁止修改 Type。
+//
+// Config 中带 _enc 后缀的字段：值为占位符 "***" 时保留原密文不变，其他值视为新明文。
+func (s *ChannelService) Update(id uint, in ChannelInput) (*ChannelView, error) {
+	ch, err := s.getOrNotFound(id)
+	if err != nil {
+		return nil, err
+	}
+	if in.Type != "" && in.Type != ch.Type {
+		return nil, middleware.NewAppError(middleware.CodeValidationFailed, "通道类型创建后不可修改").WithField("type")
+	}
+	in.Type = ch.Type
+	if err := s.validateInput(in, true, ch); err != nil {
+		return nil, err
+	}
+
+	// 取旧的 Config（密文形态），用于占位符回填
+	var oldEnc map[string]any
+	if len(ch.Config) > 0 {
+		_ = json.Unmarshal(ch.Config, &oldEnc)
+	}
+
+	encConfig, err := s.encryptConfig(in.Config, oldEnc)
+	if err != nil {
+		return nil, middleware.NewAppError(middleware.CodeValidationFailed, err.Error())
+	}
+	raw, _ := json.Marshal(encConfig)
+
+	updates := map[string]any{
+		"name":   strings.TrimSpace(in.Name),
+		"config": datatypes.JSON(raw),
+	}
+	if in.Enabled != nil {
+		updates["enabled"] = *in.Enabled
+	}
+	if err := s.DB.Model(ch).Updates(updates).Error; err != nil {
+		if isUniqueErr(err) {
+			return nil, middleware.NewAppError(middleware.CodeValidationFailed, "通道名称已存在").WithField("name")
+		}
+		return nil, err
+	}
+	return s.Get(id)
+}
+
+// Get 返回脱敏视图。
+func (s *ChannelService) Get(id uint) (*ChannelView, error) {
+	ch, err := s.getOrNotFound(id)
+	if err != nil {
+		return nil, err
+	}
+	return s.toView(ch), nil
+}
+
+// List 返回全部通道（按 id 升序）。
+func (s *ChannelService) List() ([]*ChannelView, error) {
+	var rows []models.Channel
+	if err := s.DB.Order("id ASC").Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	out := make([]*ChannelView, 0, len(rows))
+	for i := range rows {
+		out = append(out, s.toView(&rows[i]))
+	}
+	return out, nil
+}
+
+// Delete 删除通道。
+func (s *ChannelService) Delete(id uint) error {
+	if _, err := s.getOrNotFound(id); err != nil {
+		return err
+	}
+	return s.DB.Delete(&models.Channel{}, id).Error
+}
+
+// Toggle 切换启用状态。
+func (s *ChannelService) Toggle(id uint) (*ChannelView, error) {
+	ch, err := s.getOrNotFound(id)
+	if err != nil {
+		return nil, err
+	}
+	ch.Enabled = !ch.Enabled
+	if err := s.DB.Model(ch).Update("enabled", ch.Enabled).Error; err != nil {
+		return nil, err
+	}
+	return s.toView(ch), nil
+}
+
+// Test 用占位变量渲染并真发一次，不写日志。
+// payload 允许覆盖默认的 subject/body；为 nil 时使用内置示例。
+func (s *ChannelService) Test(ctx context.Context, id uint, subject, body string) error {
+	ch, err := s.getOrNotFound(id)
+	if err != nil {
+		return err
+	}
+	n, err := notifier.Get(ch.Type)
+	if err != nil {
+		return middleware.NewAppError(middleware.CodeValidationFailed, err.Error())
+	}
+
+	// 解密 Config 拿到明文 configJSON
+	decConfig, err := s.decryptConfig(ch.Config)
+	if err != nil {
+		return middleware.NewAppError(middleware.CodeInternalError, "解密通道配置失败: "+err.Error())
+	}
+	plainConfig, _ := json.Marshal(decConfig)
+
+	if subject == "" {
+		subject = "通道试发 - " + ch.Name
+	}
+	if body == "" {
+		body = "这是来自 reminder2 的通道试发消息。\n通道名：{{channel_name}}\n时间：{{now}}"
+	}
+	vars := map[string]string{
+		"channel_name": ch.Name,
+		"now":          time.Now().Format("2006-01-02 15:04:05"),
+		"title":        subject,
+		"content":      body,
+	}
+	rendered := notifier.Message{
+		Subject: notifier.Render(subject, vars),
+		Body:    notifier.Render(body, vars),
+		Vars:    vars,
+	}
+	return n.Send(ctx, plainConfig, rendered)
+}
+
+// DecryptedConfig 返回明文 config JSON，供 dispatch 阶段直接喂给 Notifier。
+//
+// dispatch 不应再回经 ChannelView（视图把敏感字段脱敏掉了）。
+func (s *ChannelService) DecryptedConfig(ch *models.Channel) ([]byte, error) {
+	dec, err := s.decryptConfig(ch.Config)
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(dec)
+}
+
+// --- internal helpers ---
+
+func (s *ChannelService) getOrNotFound(id uint) (*models.Channel, error) {
+	var ch models.Channel
+	if err := s.DB.First(&ch, id).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, middleware.NewAppError(middleware.CodeNotFound, "通道不存在")
+		}
+		return nil, err
+	}
+	return &ch, nil
+}
+
+func (s *ChannelService) validateInput(in ChannelInput, isUpdate bool, _ *models.Channel) error {
+	if strings.TrimSpace(in.Name) == "" {
+		return middleware.NewAppError(middleware.CodeValidationFailed, "通道名称必填").WithField("name")
+	}
+	if len([]rune(in.Name)) > 64 {
+		return middleware.NewAppError(middleware.CodeValidationFailed, "通道名称最长 64 字符").WithField("name")
+	}
+	if !validType(in.Type) {
+		return middleware.NewAppError(middleware.CodeValidationFailed, "未知通道类型").WithField("type")
+	}
+	if in.Config == nil {
+		return middleware.NewAppError(middleware.CodeValidationFailed, "config 必填").WithField("config")
+	}
+	if !isUpdate {
+		// 创建时强校验关键字段非空
+		if err := requireFields(in.Type, in.Config); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func requireFields(typ string, cfg map[string]any) error {
+	missing := func(field string) error {
+		return middleware.NewAppError(middleware.CodeValidationFailed, "缺少必填字段").WithField(field)
+	}
+	switch typ {
+	case "smtp":
+		if asString(cfg["host"]) == "" {
+			return missing("config.host")
+		}
+		if _, ok := cfg["port"]; !ok {
+			return missing("config.port")
+		}
+		if asString(cfg["from_addr"]) == "" {
+			return missing("config.from_addr")
+		}
+		to, ok := cfg["to"].([]any)
+		if !ok || len(to) == 0 {
+			return missing("config.to")
+		}
+	case "dingtalk":
+		if asString(cfg["webhook_url"]) == "" {
+			return missing("config.webhook_url")
+		}
+	case "wecom":
+		if asString(cfg["webhook_url"]) == "" {
+			return missing("config.webhook_url")
+		}
+	case "webhook":
+		if asString(cfg["url"]) == "" {
+			return missing("config.url")
+		}
+	}
+	return nil
+}
+
+func asString(v any) string {
+	s, _ := v.(string)
+	return s
+}
+
+// encryptConfig 把 cfg 内 _enc 后缀字段的明文值加密。
+// 当字段值是 sensitivePlaceholder（"***"）时：
+//   - oldEnc 中存在该字段：复制原密文；
+//   - 否则视为留空。
+func (s *ChannelService) encryptConfig(cfg map[string]any, oldEnc map[string]any) (map[string]any, error) {
+	out := make(map[string]any, len(cfg))
+	for k, v := range cfg {
+		if strings.HasSuffix(k, encSuffix) {
+			str, ok := v.(string)
+			if !ok {
+				return nil, fmt.Errorf("字段 %s 必须是字符串", k)
+			}
+			if str == sensitivePlaceholder {
+				if oldEnc != nil {
+					if old, ok := oldEnc[k]; ok {
+						out[k] = old
+						continue
+					}
+				}
+				out[k] = ""
+				continue
+			}
+			if str == "" {
+				out[k] = ""
+				continue
+			}
+			enc, err := s.Box.EncryptString(str)
+			if err != nil {
+				return nil, err
+			}
+			out[k] = enc
+		} else {
+			out[k] = v
+		}
+	}
+	return out, nil
+}
+
+// decryptConfig 把 cfg 内 _enc 后缀字段的密文解密为明文。
+func (s *ChannelService) decryptConfig(raw datatypes.JSON) (map[string]any, error) {
+	cfg := map[string]any{}
+	if len(raw) > 0 {
+		if err := json.Unmarshal(raw, &cfg); err != nil {
+			return nil, err
+		}
+	}
+	for k, v := range cfg {
+		if !strings.HasSuffix(k, encSuffix) {
+			continue
+		}
+		str, ok := v.(string)
+		if !ok || str == "" {
+			continue
+		}
+		plain, err := s.Box.DecryptString(str)
+		if err != nil {
+			return nil, fmt.Errorf("字段 %s 解密失败: %w", k, err)
+		}
+		cfg[k] = plain
+	}
+	return cfg, nil
+}
+
+// toView 把 Channel 转成脱敏视图：_enc 字段统一显示为 "***"。
+func (s *ChannelService) toView(ch *models.Channel) *ChannelView {
+	cfg := map[string]any{}
+	if len(ch.Config) > 0 {
+		_ = json.Unmarshal(ch.Config, &cfg)
+	}
+	for k, v := range cfg {
+		if !strings.HasSuffix(k, encSuffix) {
+			continue
+		}
+		str, _ := v.(string)
+		if str == "" {
+			cfg[k] = ""
+		} else {
+			cfg[k] = sensitivePlaceholder
+		}
+	}
+	return &ChannelView{
+		ID:        ch.ID,
+		Name:      ch.Name,
+		Type:      ch.Type,
+		Enabled:   ch.Enabled,
+		Config:    cfg,
+		CreatedAt: ch.CreatedAt,
+		UpdatedAt: ch.UpdatedAt,
+	}
+}
+
+// isUniqueErr 粗略识别 SQLite 唯一索引冲突。
+func isUniqueErr(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+	return strings.Contains(msg, "UNIQUE constraint failed") || strings.Contains(msg, "unique constraint")
+}

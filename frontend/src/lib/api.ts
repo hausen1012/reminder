@@ -1,5 +1,5 @@
 import axios from 'axios'
-import type { ApiResponse, LoginResponse, User } from '@/types'
+import type { ApiResponse, Channel, ChannelInput, ChannelTestResult, LoginResponse, User } from '@/types'
 
 const api = axios.create({
   baseURL: '/api',
@@ -43,4 +43,40 @@ export async function updatePassword(oldPassword: string, newPassword: string) {
 export async function logout() {
   const res = await api.post<ApiResponse<null>>('/auth/logout')
   return res.data
+}
+
+// --- 通道 ---
+
+export async function listChannels() {
+  const res = await api.get<ApiResponse<Channel[]>>('/channels')
+  return res.data.data ?? []
+}
+
+export async function getChannel(id: number) {
+  const res = await api.get<ApiResponse<Channel>>(`/channels/${id}`)
+  return res.data.data
+}
+
+export async function createChannel(input: ChannelInput) {
+  const res = await api.post<ApiResponse<Channel>>('/channels', input)
+  return res.data.data
+}
+
+export async function updateChannel(id: number, input: ChannelInput) {
+  const res = await api.put<ApiResponse<Channel>>(`/channels/${id}`, input)
+  return res.data.data
+}
+
+export async function deleteChannel(id: number) {
+  await api.delete<ApiResponse<null>>(`/channels/${id}`)
+}
+
+export async function toggleChannel(id: number) {
+  const res = await api.patch<ApiResponse<Channel>>(`/channels/${id}/toggle`)
+  return res.data.data
+}
+
+export async function testChannel(id: number, body?: { subject?: string; body?: string }) {
+  const res = await api.post<ApiResponse<ChannelTestResult>>(`/channels/${id}/test`, body ?? {})
+  return res.data.data
 }
