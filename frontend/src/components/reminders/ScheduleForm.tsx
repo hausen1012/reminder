@@ -145,7 +145,7 @@ export function ScheduleForm({ value, onChange }: Props) {
                 <span className="text-xs text-muted-foreground ml-2">（农历）</span>
               )}
             </Label>
-            <div className="flex gap-2">
+            <div className="relative flex gap-2">
               <Input
                 readOnly
                 value={formatScheduleDate(spec, value.calendar)}
@@ -156,19 +156,17 @@ export function ScheduleForm({ value, onChange }: Props) {
               <Button type="button" variant="outline" onClick={() => setCalendarOpen(true)}>
                 选择
               </Button>
+              {calendarOpen && (
+                <CalendarPopover
+                  date={value.calendar === 'solar' ? ((spec.at ?? spec.start_at) as string | undefined) : undefined}
+                  hour={(spec.hour as number) ?? 9}
+                  minute={(spec.minute as number) ?? 0}
+                  onSelect={handleCalendarSelect}
+                  onClose={() => setCalendarOpen(false)}
+                />
+              )}
             </div>
           </div>
-
-          <CalendarPopover
-            open={calendarOpen}
-            calendar={value.calendar}
-            date={value.calendar === 'solar' ? ((spec.at ?? spec.start_at) as string | undefined) : undefined}
-            lunarDate={value.calendar === 'lunar' ? ((spec.lunar ?? spec.start_lunar) as { year: number; month: number; day: number } | undefined) : undefined}
-            hour={(spec.hour as number) ?? 9}
-            minute={(spec.minute as number) ?? 0}
-            onSelect={handleCalendarSelect}
-            onClose={() => setCalendarOpen(false)}
-          />
 
           {value.schedule_type === 'interval' && (
             <>
