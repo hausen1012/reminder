@@ -41,6 +41,7 @@ function defaultInput(): ReminderInput {
     schedule_type: 'once',
     schedule_spec: { at: '' },
     timezone: 'Asia/Shanghai',
+    source: 'manual',
     channel_ids: [],
     require_confirm: false,
     confirm_retry_interval_sec: 300,

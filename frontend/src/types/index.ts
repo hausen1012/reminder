@@ -75,6 +75,7 @@ export interface ReminderInput {
   schedule_spec: Record<string, unknown>
   timezone?: string
   enabled?: boolean
+  source?: 'manual' | 'api'
   channel_ids: number[]
   require_confirm: boolean
   confirm_retry_interval_sec: number

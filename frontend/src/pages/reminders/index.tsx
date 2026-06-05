@@ -46,7 +46,7 @@ export default function RemindersPage() {
   const [toDelete, setToDelete] = useState<Reminder | null>(null)
   const [testingId, setTestingId] = useState<number | null>(null)
 
-  const [source, setSource] = useState<string>('all')
+  const [source, setSource] = useState<string>('manual')
   const [enabled, setEnabled] = useState<string>('all')
   const [search, setSearch] = useState('')
 
