@@ -20,7 +20,7 @@ func main() {
 		log.Fatalf("database init failed: %v", err)
 	}
 
-	r := router.Setup(staticFS, cfg.JWTSecret)
+	r := router.Setup(staticFS, cfg)
 	addr := fmt.Sprintf(":%s", cfg.Port)
 	log.Printf("Server starting on %s", addr)
 	if err := r.Run(addr); err != nil {

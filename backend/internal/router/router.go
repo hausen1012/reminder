@@ -7,17 +7,19 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/bedrock/backend/internal/config"
 	"github.com/bedrock/backend/internal/handlers"
 	"github.com/bedrock/backend/internal/middleware"
 	"github.com/gin-gonic/gin"
 )
 
-func Setup(staticFS embed.FS, jwtSecret string) *gin.Engine {
+func Setup(staticFS embed.FS, cfg *config.Config) *gin.Engine {
 	r := gin.Default()
+	r.Use(middleware.ErrorHandler())
 	r.Use(middleware.Logger())
 	r.Use(middleware.CORS())
 
-	authHandler := &handlers.AuthHandler{JWTSecret: jwtSecret}
+	authHandler := &handlers.AuthHandler{JWTSecret: cfg.JWTSecret}
 
 	api := r.Group("/api")
 	{
@@ -26,7 +28,7 @@ func Setup(staticFS embed.FS, jwtSecret string) *gin.Engine {
 	}
 
 	auth := api.Group("/auth")
-	auth.Use(middleware.JWTAuth(jwtSecret))
+	auth.Use(middleware.JWTAuth(cfg.JWTSecret))
 	{
 		auth.GET("/me", authHandler.Me)
 		auth.POST("/logout", authHandler.Logout)
