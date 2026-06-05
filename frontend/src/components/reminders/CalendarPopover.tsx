@@ -32,7 +32,9 @@ const YEAR_OPTIONS = Array.from({ length: 31 }, (_, i) => 2020 + i)
 
 interface DayCell {
   key: string
-  solarDay: number
+  day: number
+  month: number
+  year: number
   lunarDayName: string
   current: boolean
 }
@@ -56,14 +58,16 @@ export function CalendarPopover({ date, hour: initHour, minute: initMin, onSelec
   const [hour, setHour] = useState(initHour ?? 9)
   const [minute, setMinute] = useState(initMin ?? 0)
 
-  // 点击外部关闭
+  // 点击外部关闭（排除 Radix Select portal）
   useEffect(() => {
     function handleClick(e: MouseEvent) {
-      if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
-        onClose()
-      }
+      const target = e.target as Node
+      if (!popoverRef.current) return
+      if (popoverRef.current.contains(target)) return
+      // Radix Select portal 渲染在 DOM 根部，允许点击
+      if (target instanceof Element && (target.closest('[role="listbox"]') || target.closest('[data-radix-popper-content-wrapper]'))) return
+      onClose()
     }
-    // 延迟添加避免触发打开弹窗的点击事件
     const timer = setTimeout(() => {
       document.addEventListener('mousedown', handleClick)
     }, 0)
@@ -77,20 +81,55 @@ export function CalendarPopover({ date, hour: initHour, minute: initMin, onSelec
   const solarGrid = useMemo(() => {
     const daysInMonth = new Date(solarYear, solarMonth, 0).getDate()
     const firstWeekday = toMondayBase(new Date(solarYear, solarMonth - 1, 1).getDay())
-    const cells: (DayCell | null)[] = []
 
-    for (let i = 0; i < firstWeekday; i++) {
-      cells.push(null)
+    // 上个月的最后几天
+    const prevYear = solarMonth === 1 ? solarYear - 1 : solarYear
+    const prevMonth = solarMonth === 1 ? 12 : solarMonth - 1
+    const prevDaysInMonth = new Date(prevYear, prevMonth, 0).getDate()
+
+    const cells: DayCell[] = []
+
+    for (let i = firstWeekday - 1; i >= 0; i--) {
+      const d = prevDaysInMonth - i
+      const solar = Solar.fromYmd(prevYear, prevMonth, d)
+      cells.push({
+        key: `p-${d}`,
+        day: d,
+        month: prevMonth,
+        year: prevYear,
+        lunarDayName: solar.getLunar().getDayInChinese(),
+        current: false,
+      })
     }
 
     for (let d = 1; d <= daysInMonth; d++) {
       const solar = Solar.fromYmd(solarYear, solarMonth, d)
       cells.push({
         key: `s-${d}`,
-        solarDay: d,
+        day: d,
+        month: solarMonth,
+        year: solarYear,
         lunarDayName: solar.getLunar().getDayInChinese(),
         current: true,
       })
+    }
+
+    // 补齐下一月开头几天（填满最后一行）
+    const nextYear = solarMonth === 12 ? solarYear + 1 : solarYear
+    const nextMonth = solarMonth === 12 ? 1 : solarMonth + 1
+    const remainder = cells.length % 7
+    if (remainder > 0) {
+      for (let d = 1; d <= 7 - remainder; d++) {
+        const solar = Solar.fromYmd(nextYear, nextMonth, d)
+        cells.push({
+          key: `n-${d}`,
+          day: d,
+          month: nextMonth,
+          year: nextYear,
+          lunarDayName: solar.getLunar().getDayInChinese(),
+          current: false,
+        })
+      }
     }
 
     return cells
@@ -169,35 +208,45 @@ export function CalendarPopover({ date, hour: initHour, minute: initMin, onSelec
         </label>
       </div>
 
-      {/* 星期头 */}
-      <div className="grid grid-cols-7 mb-0.5">
-        {WEEKDAYS.map((w) => (
-          <div key={w} className="text-center text-[10px] text-muted-foreground py-0.5">{w}</div>
-        ))}
-      </div>
+      {/* 星期头 + 日期网格（带切换动画） */}
+      <div key={`body-${solarYear}-${solarMonth}`} style={{ animation: 'cfade 0.15s ease-out' }}>
+        <style>{`@keyframes cfade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}`}</style>
+        <div className="grid grid-cols-7 mb-0.5">
+          {WEEKDAYS.map((w) => (
+            <div key={w} className="text-center text-[10px] text-muted-foreground py-0.5">{w}</div>
+          ))}
+        </div>
 
-      {/* 日期网格 */}
-      <div className="grid grid-cols-7">
-        {solarGrid.map((cell, i) => {
-          if (!cell) return <div key={`e-${i}`} className="h-8" />
-          const isSelected = cell.solarDay === selectedDay
+        {/* 日期网格 */}
+        <div className="grid grid-cols-7">
+        {solarGrid.map((cell) => {
+          const isSelected = cell.current && cell.day === selectedDay
           return (
             <button
               key={cell.key}
               type="button"
               className={`h-8 flex flex-col items-center justify-center rounded text-[10px] leading-tight transition-colors
-                ${isSelected ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}
-              onClick={() => setSelectedDay(cell.solarDay)}
+                ${isSelected ? 'bg-primary text-primary-foreground' : cell.current ? 'hover:bg-muted' : 'text-muted-foreground/40 hover:text-muted-foreground/60'}`}
+              onClick={() => {
+                if (cell.current) {
+                  setSelectedDay(cell.day)
+                } else {
+                  setSolarYear(cell.year)
+                  setSolarMonth(cell.month)
+                  setSelectedDay(cell.day)
+                }
+              }}
             >
-              <span className="text-[11px] font-medium leading-none">{cell.solarDay}</span>
+              <span className="text-[11px] font-medium leading-none">{cell.day}</span>
               {showLunar && (
-                <span className={`text-[8px] leading-none mt-[1px] ${isSelected ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>
+                <span className={`text-[8px] leading-none mt-[1px] ${isSelected ? 'text-primary-foreground/70' : 'text-muted-foreground/50'}`}>
                   {cell.lunarDayName}
                 </span>
               )}
             </button>
           )
         })}
+        </div>
       </div>
 
       {/* 底部：时间 + 操作按钮 */}
