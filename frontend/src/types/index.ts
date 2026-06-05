@@ -15,7 +15,7 @@ export interface LoginResponse {
   user: User
 }
 
-export type ChannelType = 'smtp' | 'dingtalk' | 'wecom' | 'webhook'
+export type ChannelType = 'smtp' | 'dingtalk' | 'wecom' | 'webhook' | 'log'
 
 export interface Channel {
   id: number

@@ -1,6 +1,6 @@
 // 通道页：列表 + 新建/编辑对话框 + 试发 + 删除
 import { useEffect, useState } from 'react'
-import { Mail, MessageSquare, Webhook, Plus, Pencil, Trash2, TestTube } from 'lucide-react'
+import { Mail, MessageSquare, Webhook, Terminal, Plus, Pencil, Trash2, TestTube } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Switch } from '@/components/ui/switch'
@@ -21,6 +21,7 @@ const TYPE_LABEL: Record<ChannelType, string> = {
   dingtalk: '钉钉机器人',
   wecom: '企业微信机器人',
   webhook: '通用 Webhook',
+  log: '日志输出',
 }
 
 const TYPE_ICON: Record<ChannelType, typeof Mail> = {
@@ -28,6 +29,7 @@ const TYPE_ICON: Record<ChannelType, typeof Mail> = {
   dingtalk: MessageSquare,
   wecom: MessageSquare,
   webhook: Webhook,
+  log: Terminal,
 }
 
 export default function ChannelsPage() {
@@ -99,7 +101,7 @@ export default function ChannelsPage() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">通知</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            管理用于发送提醒的通道：邮件、钉钉、企微、Webhook。
+            管理用于发送提醒的通道：邮件、钉钉、企微、Webhook、日志。
           </p>
         </div>
         <Button onClick={() => setCreating(true)}>

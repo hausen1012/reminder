@@ -60,7 +60,7 @@ const sensitivePlaceholder = "***"
 
 func validType(t string) bool {
 	switch t {
-	case "smtp", "dingtalk", "wecom", "webhook":
+	case "smtp", "dingtalk", "wecom", "webhook", "log":
 		return true
 	}
 	return false
@@ -361,6 +361,8 @@ func requireFields(typ string, cfg map[string]any) error {
 		if asString(cfg["url"]) == "" {
 			return missing("config.url")
 		}
+	case "log":
+		// 日志通道无需配置
 	}
 	return nil
 }

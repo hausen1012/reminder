@@ -24,6 +24,7 @@ import { SMTPForm } from './SMTPForm'
 import { DingTalkForm } from './DingTalkForm'
 import { WeComForm } from './WeComForm'
 import { WebhookForm } from './WebhookForm'
+import { LogForm } from './LogForm'
 import type { Channel, ChannelType } from '@/types'
 import { createChannel, updateChannel } from '@/lib/api'
 
@@ -39,6 +40,7 @@ const TYPE_OPTIONS: { value: ChannelType; label: string; hint: string }[] = [
   { value: 'dingtalk', label: '钉钉机器人', hint: '钉钉群自定义机器人 Webhook' },
   { value: 'wecom', label: '企业微信机器人', hint: '企业微信群自定义机器人 Webhook' },
   { value: 'webhook', label: '通用 Webhook', hint: 'GET 或 POST 任意 HTTP 接口' },
+  { value: 'log', label: '日志输出', hint: '将通知输出到服务器控制台' },
 ]
 
 // 各类型默认 Config 模板，新建时初始化使用。
@@ -69,6 +71,8 @@ function defaultConfig(type: ChannelType): Record<string, unknown> {
         query_template: {},
         content_type: 'application/json',
       }
+    case 'log':
+      return {}
   }
 }
 
@@ -107,6 +111,8 @@ export function ChannelEditDialog({ channel, open, onClose, onSaved }: Props) {
         return WeComForm
       case 'webhook':
         return WebhookForm
+      case 'log':
+        return LogForm
     }
   }, [type])
 
