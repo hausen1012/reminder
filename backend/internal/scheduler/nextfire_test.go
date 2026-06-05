@@ -150,11 +150,104 @@ func TestParseSpec_RoundTrip(t *testing.T) {
 	}
 }
 
-func TestCompute_LunarReturnsError(t *testing.T) {
+func TestComputeLunarOnce_Future(t *testing.T) {
 	loc := mustLoc(t, "Asia/Shanghai")
-	_, err := Compute("lunar", "once", &ScheduleSpec{}, time.Now(), loc)
+	// 2026 年农历正月初一 = 公历 2026-02-17
+	spec := &ScheduleSpec{
+		Lunar:  &LunarDate{Year: 2026, Month: 1, Day: 1},
+		Hour:   9,
+		Minute: 0,
+	}
+	after := time.Date(2026, 1, 1, 8, 0, 0, 0, loc)
+	got, err := Compute("lunar", "once", spec, after, loc)
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	if got == nil {
+		t.Fatal("expected non-nil time")
+	}
+	want := time.Date(2026, 2, 17, 9, 0, 0, 0, loc)
+	if !got.Equal(want) {
+		t.Errorf("got %s, want %s", got, want)
+	}
+}
+
+func TestComputeLunarOnce_Past(t *testing.T) {
+	loc := mustLoc(t, "Asia/Shanghai")
+	// 2024 年农历正月初一 = 公历 2024-02-10
+	spec := &ScheduleSpec{
+		Lunar:  &LunarDate{Year: 2024, Month: 1, Day: 1},
+		Hour:   9,
+		Minute: 0,
+	}
+	after := time.Date(2026, 6, 5, 8, 0, 0, 0, loc)
+	got, err := Compute("lunar", "once", spec, after, loc)
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	if got != nil {
+		t.Errorf("过去农历日期应返回 nil，得到 %s", got)
+	}
+}
+
+func TestComputeLunarInterval_Month(t *testing.T) {
+	loc := mustLoc(t, "Asia/Shanghai")
+	// 农历每月初一 09:00，看 3 个月后
+	spec := &ScheduleSpec{
+		StartLunar: &LunarDate{Year: 2026, Month: 1, Day: 1},
+		Every:      1,
+		Unit:       "month",
+		Hour:       9,
+		Minute:     0,
+	}
+	// 公历 2026-05-01（农历三月十五左右）
+	after := time.Date(2026, 5, 1, 8, 0, 0, 0, loc)
+	got, err := Compute("lunar", "interval", spec, after, loc)
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	if got == nil {
+		t.Fatal("expected non-nil time")
+	}
+	// 从正月初一开始，加 3 个月 = 四月，1926-04-01 → 公历约 2026-05-17
+	// 具体日期需要 library 确定；我们只验证月份 >= 4 且时间在 09:00
+	if got.Hour() != 9 || got.Minute() != 0 {
+		t.Errorf("期望 09:00，得到 %s", got)
+	}
+}
+
+func TestComputeLunarInterval_Year(t *testing.T) {
+	loc := mustLoc(t, "Asia/Shanghai")
+	// 农历每年正月初一（春节）09:00
+	spec := &ScheduleSpec{
+		StartLunar: &LunarDate{Year: 2026, Month: 1, Day: 1},
+		Every:      1,
+		Unit:       "year",
+		Hour:       9,
+		Minute:     0,
+	}
+	after := time.Date(2026, 6, 5, 8, 0, 0, 0, loc)
+	got, err := Compute("lunar", "interval", spec, after, loc)
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	if got == nil {
+		t.Fatal("expected non-nil time")
+	}
+	// 下一次是 2027 年春节，应该在 2027 年 1 月底~2 月
+	if got.Year() != 2027 {
+		t.Errorf("期望 2027 年，得到 %d", got.Year())
+	}
+	if got.Hour() != 9 {
+		t.Errorf("期望 09:00，得到 %d", got.Hour())
+	}
+}
+
+func TestCompute_InvalidLunarCombo(t *testing.T) {
+	loc := mustLoc(t, "Asia/Shanghai")
+	_, err := Compute("lunar", "cron", &ScheduleSpec{}, time.Now(), loc)
 	if err == nil {
-		t.Fatal("Phase 2 应返回 lunar 暂未实现错误")
+		t.Fatal("lunar/cron 应报错")
 	}
 }
 

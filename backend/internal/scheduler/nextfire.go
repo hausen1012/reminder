@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/6tail/lunar-go/calendar"
 	"github.com/robfig/cron/v3"
 )
 
@@ -59,7 +60,6 @@ func ParseSpec(raw []byte) (*ScheduleSpec, error) {
 // Compute 根据 (calendar, scheduleType, spec, after, loc) 算出下一次触发的 UTC 时间。
 //
 // 返回 nil（不报错）表示该 spec 已不会再触发（如单次已过期）。
-// 农历分支留待 Phase 3 接入。
 func Compute(calendar, scheduleType string, spec *ScheduleSpec, after time.Time, loc *time.Location) (*time.Time, error) {
 	if spec == nil {
 		return nil, fmt.Errorf("spec 不能为空")
@@ -78,8 +78,12 @@ func Compute(calendar, scheduleType string, spec *ScheduleSpec, after time.Time,
 			return computeSolarCron(spec, after, loc)
 		}
 	case "lunar":
-		// Phase 3 接入
-		return nil, fmt.Errorf("lunar 调度暂未实现")
+		switch scheduleType {
+		case "once":
+			return computeLunarOnce(spec, after, loc)
+		case "interval":
+			return computeLunarInterval(spec, after, loc)
+		}
 	}
 	return nil, fmt.Errorf("不支持的调度组合: %s/%s", calendar, scheduleType)
 }
@@ -164,6 +168,125 @@ func addInterval(t time.Time, every int, unit string) (time.Time, error) {
 	return time.Time{}, fmt.Errorf("不支持的 unit: %s", unit)
 }
 
+// --- 农历计算 ---
+
+func computeLunarOnce(s *ScheduleSpec, after time.Time, loc *time.Location) (*time.Time, error) {
+	if s.Lunar == nil {
+		return nil, fmt.Errorf("lunar/once 需要字段 lunar")
+	}
+	lun := calendar.NewLunarFromYmd(s.Lunar.Year, s.Lunar.Month, s.Lunar.Day)
+	sol := lun.GetSolar()
+	t := time.Date(sol.GetYear(), time.Month(sol.GetMonth()), sol.GetDay(),
+		s.Hour, s.Minute, 0, 0, loc)
+	if !t.After(after) {
+		return nil, nil
+	}
+	return &t, nil
+}
+
+func computeLunarInterval(s *ScheduleSpec, after time.Time, loc *time.Location) (*time.Time, error) {
+	if s.StartLunar == nil || s.Every <= 0 || s.Unit == "" {
+		return nil, fmt.Errorf("lunar/interval 需要 start_lunar + every + unit")
+	}
+	lun := calendar.NewLunarFromYmd(s.StartLunar.Year, s.StartLunar.Month, s.StartLunar.Day)
+	sol := lun.GetSolar()
+	start := time.Date(sol.GetYear(), time.Month(sol.GetMonth()), sol.GetDay(),
+		s.Hour, s.Minute, 0, 0, loc)
+
+	t := start
+	const maxIters = 1 << 20
+	for i := 0; i < maxIters; i++ {
+		if t.After(after) {
+			return &t, nil
+		}
+		next, err := addLunarInterval(t, s.Every, s.Unit, loc)
+		if err != nil {
+			return nil, err
+		}
+		if !next.After(t) {
+			return nil, fmt.Errorf("lunar interval 计算未推进：every=%d unit=%s", s.Every, s.Unit)
+		}
+		t = next
+	}
+	return nil, fmt.Errorf("lunar interval 循环超过上限")
+}
+
+// addLunarInterval 按 unit 在农历上累加。
+//
+// day：用 lunar-go 的 Next(days) 保留农历日历语义；
+// month/year：直接对农历月份/年份做加法，size_policy=shift 自动处理月末。
+// leap_policy=skip：始终只产生非闰月的日期，自然满足。
+func addLunarInterval(t time.Time, every int, unit string, loc *time.Location) (time.Time, error) {
+	switch unit {
+	case "day":
+		lun := calendar.NewLunarFromSolar(calendar.NewSolarFromYmd(t.Year(), int(t.Month()), t.Day()))
+		nextLun := lun.Next(every)
+		sol := nextLun.GetSolar()
+		return time.Date(sol.GetYear(), time.Month(sol.GetMonth()), sol.GetDay(),
+			t.Hour(), t.Minute(), 0, 0, loc), nil
+	case "month":
+		return addLunarMonths(t, every, loc)
+	case "year":
+		return addLunarYears(t, every, loc)
+	}
+	return time.Time{}, fmt.Errorf("lunar 不支持的 unit: %s", unit)
+}
+
+// addLunarMonths 在农历月份上累加，使用 calendar 语义：
+//   - month 1-12 永远对应非闰月（闰月编号为负值，不在计算中出现）
+//   - 月份超出 12 时进位到年份
+//   - size_policy=shift：目标日的天数超过当月天数时顺延到月末
+func addLunarMonths(t time.Time, months int, loc *time.Location) (time.Time, error) {
+	lun := calendar.NewLunarFromSolar(calendar.NewSolarFromYmd(t.Year(), int(t.Month()), t.Day()))
+	ly := lun.GetYear()
+	lm := lun.GetMonth()
+	if lm < 0 {
+		lm = -lm // 若落在闰月，取其对应的非闰月编号
+	}
+	ld := lun.GetDay()
+
+	lm += months
+	for lm > 12 {
+		ly++
+		lm -= 12
+	}
+	for lm < 1 {
+		ly--
+		lm += 12
+	}
+
+	targetMonth := calendar.NewLunarMonthFromYm(ly, lm)
+	if ld > targetMonth.GetDayCount() {
+		ld = targetMonth.GetDayCount() // shift
+	}
+
+	nextLun := calendar.NewLunarFromYmd(ly, lm, ld)
+	sol := nextLun.GetSolar()
+	return time.Date(sol.GetYear(), time.Month(sol.GetMonth()), sol.GetDay(),
+		t.Hour(), t.Minute(), 0, 0, loc), nil
+}
+
+// addLunarYears 在农历年份上累加，月日不变。
+func addLunarYears(t time.Time, years int, loc *time.Location) (time.Time, error) {
+	lun := calendar.NewLunarFromSolar(calendar.NewSolarFromYmd(t.Year(), int(t.Month()), t.Day()))
+	ly := lun.GetYear() + years
+	lm := lun.GetMonth()
+	if lm < 0 {
+		lm = -lm
+	}
+	ld := lun.GetDay()
+
+	targetMonth := calendar.NewLunarMonthFromYm(ly, lm)
+	if ld > targetMonth.GetDayCount() {
+		ld = targetMonth.GetDayCount() // shift
+	}
+
+	nextLun := calendar.NewLunarFromYmd(ly, lm, ld)
+	sol := nextLun.GetSolar()
+	return time.Date(sol.GetYear(), time.Month(sol.GetMonth()), sol.GetDay(),
+		t.Hour(), t.Minute(), 0, 0, loc), nil
+}
+
 // parseLocalTime 解析 "YYYY-MM-DDTHH:MM[:SS]" 字符串为指定时区时间。
 // 允许末尾不带秒。
 func parseLocalTime(s string, loc *time.Location) (time.Time, error) {
@@ -181,7 +304,7 @@ func parseLocalTime(s string, loc *time.Location) (time.Time, error) {
 	return time.Time{}, fmt.Errorf("时间格式不识别: %s", s)
 }
 
-// PreviewSolar 返回未来 n 次触发时间（仅公历）。
+// PreviewSolar 返回未来 n 次触发时间（公历/农历均支持）。
 //
 // 用于编辑页的"下次触发预览"。
 func PreviewSolar(calendar, scheduleType string, spec *ScheduleSpec, from time.Time, loc *time.Location, n int) ([]time.Time, error) {

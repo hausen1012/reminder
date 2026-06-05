@@ -1,5 +1,5 @@
 // ScheduleForm 把 (calendar, schedule_type, schedule_spec) 三元组的编辑界面
-// 集中放在一处。Phase 2 只实现 solar 三型；lunar Tab 在 Phase 3 接入。
+// 集中放在一处。公历三型 + 农历两型。
 import { useEffect } from 'react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -11,9 +11,11 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import { LunarPicker } from './LunarPicker'
 import type { ReminderCalendar, ReminderScheduleType } from '@/types'
 
 type SolarType = 'once' | 'interval' | 'cron'
+type LunarType = 'once' | 'interval'
 
 export interface ScheduleValue {
   calendar: ReminderCalendar
@@ -34,18 +36,32 @@ const INTERVAL_UNITS = [
   { value: 'year', label: '年' },
 ]
 
-// 把 ISO 字符串转成 datetime-local 控件期望的 "YYYY-MM-DDTHH:mm"。
+const LUNAR_INTERVAL_UNITS = [
+  { value: 'day', label: '天' },
+  { value: 'month', label: '月' },
+  { value: 'year', label: '年' },
+]
+
 function toDatetimeLocal(v: string | undefined): string {
   if (!v) return ''
-  // 后端约定字符串就是配置时区下的 "2006-01-02T15:04:05"，可直接截前 16 位
   return v.slice(0, 16)
 }
 
 export function ScheduleForm({ value, onChange }: Props) {
-  // calendar 切换
   function setCalendar(next: ReminderCalendar) {
-    if (next === 'lunar') return // Phase 2 禁用
-    onChange({ calendar: 'solar', schedule_type: value.schedule_type, schedule_spec: value.schedule_spec })
+    if (next === 'lunar') {
+      onChange({
+        calendar: 'lunar',
+        schedule_type: 'once',
+        schedule_spec: {
+          lunar: { year: 2026, month: 1, day: 1 },
+          hour: 9,
+          minute: 0,
+        },
+      })
+    } else {
+      onChange({ calendar: 'solar', schedule_type: 'once', schedule_spec: { at: '' } })
+    }
   }
 
   function setSolarType(t: SolarType) {
@@ -54,6 +70,22 @@ export function ScheduleForm({ value, onChange }: Props) {
     if (t === 'interval') defaults = { start_at: '', every: 1, unit: 'day' }
     if (t === 'cron') defaults = { expr: '0 9 * * *' }
     onChange({ calendar: 'solar', schedule_type: t, schedule_spec: defaults })
+  }
+
+  function setLunarType(t: LunarType) {
+    if (t === 'once') {
+      onChange({
+        calendar: 'lunar',
+        schedule_type: 'once',
+        schedule_spec: { lunar: { year: 2026, month: 1, day: 1 }, hour: 9, minute: 0 },
+      })
+    } else {
+      onChange({
+        calendar: 'lunar',
+        schedule_type: 'interval',
+        schedule_spec: { start_lunar: { year: 2026, month: 1, day: 1 }, every: 1, unit: 'month', hour: 9, minute: 0 },
+      })
+    }
   }
 
   function patchSpec(patch: Record<string, unknown>) {
@@ -75,10 +107,9 @@ export function ScheduleForm({ value, onChange }: Props) {
       <Tabs value={value.calendar} onValueChange={(v) => setCalendar(v as ReminderCalendar)}>
         <TabsList>
           <TabsTrigger value="solar">公历</TabsTrigger>
-          <TabsTrigger value="lunar" disabled title="Phase 3 启用">
-            农历
-          </TabsTrigger>
+          <TabsTrigger value="lunar">农历</TabsTrigger>
         </TabsList>
+
         <TabsContent value="solar" className="space-y-3 pt-3">
           <Tabs value={value.schedule_type} onValueChange={(v) => setSolarType(v as SolarType)}>
             <TabsList>
@@ -152,6 +183,88 @@ export function ScheduleForm({ value, onChange }: Props) {
               />
               <p className="text-xs text-muted-foreground">
                 5 字段标准 cron。例：每天 09:00 → <code>0 9 * * *</code>；工作日早 9 点 → <code>0 9 * * 1-5</code>。
+              </p>
+            </TabsContent>
+          </Tabs>
+        </TabsContent>
+
+        <TabsContent value="lunar" className="space-y-3 pt-3">
+          <Tabs value={value.schedule_type} onValueChange={(v) => setLunarType(v as LunarType)}>
+            <TabsList>
+              <TabsTrigger value="once">一次性</TabsTrigger>
+              <TabsTrigger value="interval">周期</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="once" className="pt-3 space-y-3">
+              <LunarPicker
+                value={(spec.lunar as { year: number; month: number; day: number }) ?? { year: 2026, month: 1, day: 1 }}
+                onChange={(v) =>
+                  onChange({
+                    ...value,
+                    schedule_spec: { ...value.schedule_spec, lunar: v, hour: spec.hour ?? 9, minute: spec.minute ?? 0 },
+                  })
+                }
+                hour={(spec.hour as number) ?? 9}
+                minute={(spec.minute as number) ?? 0}
+                onHourChange={(h) => patchSpec({ hour: h })}
+                onMinuteChange={(m) => patchSpec({ minute: m })}
+              />
+            </TabsContent>
+
+            <TabsContent value="interval" className="pt-3 space-y-3">
+              <LunarPicker
+                value={
+                  (spec.start_lunar as { year: number; month: number; day: number }) ?? {
+                    year: 2026,
+                    month: 1,
+                    day: 1,
+                  }
+                }
+                onChange={(v) =>
+                  onChange({
+                    ...value,
+                    schedule_spec: {
+                      ...value.schedule_spec,
+                      start_lunar: v,
+                      hour: spec.hour ?? 9,
+                      minute: spec.minute ?? 0,
+                    },
+                  })
+                }
+                hour={(spec.hour as number) ?? 9}
+                minute={(spec.minute as number) ?? 0}
+                onHourChange={(h) => patchSpec({ hour: h })}
+                onMinuteChange={(m) => patchSpec({ minute: m })}
+              />
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label htmlFor="lunar-every">每</Label>
+                  <Input
+                    id="lunar-every"
+                    type="number"
+                    min={1}
+                    value={(spec.every as number) ?? 1}
+                    onChange={(e) => patchSpec({ every: Number(e.target.value) || 1 })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="lunar-unit">单位</Label>
+                  <Select value={(spec.unit as string) ?? 'month'} onValueChange={(v) => patchSpec({ unit: v })}>
+                    <SelectTrigger id="lunar-unit">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {LUNAR_INTERVAL_UNITS.map((u) => (
+                        <SelectItem key={u.value} value={u.value}>
+                          {u.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                闰月跳过（按公历年份安排）。日数超出该月天数时自动顺延至月末。
               </p>
             </TabsContent>
           </Tabs>

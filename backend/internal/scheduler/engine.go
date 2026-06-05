@@ -117,8 +117,9 @@ func (e *Engine) Add(r *models.Reminder) error {
 		return e.addCron(r, spec)
 	case r.Calendar == "solar" && (r.ScheduleType == "once" || r.ScheduleType == "interval"):
 		return e.addAfterFunc(r, spec)
+	case r.Calendar == "lunar" && (r.ScheduleType == "once" || r.ScheduleType == "interval"):
+		return e.addAfterFunc(r, spec)
 	}
-	// lunar 分支留待 Phase 3
 	return nil
 }
 
