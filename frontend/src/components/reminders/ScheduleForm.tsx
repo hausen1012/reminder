@@ -2,7 +2,6 @@
 import { useState } from 'react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Button } from '@/components/ui/button'
 import {
   Select,
   SelectContent,
@@ -69,145 +68,142 @@ export function ScheduleForm({ value, onChange }: Props) {
 
   function handleCalendarSelect(result: CalendarResult) {
     if (result.calendar === 'lunar' && result.lunar) {
-      if (value.schedule_type === 'interval') {
-        onChange({
-          ...value,
-          calendar: 'lunar',
-          schedule_spec: {
-            ...spec,
-            start_lunar: result.lunar,
-            hour: result.hour,
-            minute: result.minute,
-          },
-        })
-      } else {
-        onChange({
-          ...value,
-          calendar: 'lunar',
-          schedule_spec: {
-            ...spec,
-            lunar: result.lunar,
-            hour: result.hour,
-            minute: result.minute,
-          },
-        })
-      }
+      const key = value.schedule_type === 'interval' ? 'start_lunar' : 'lunar'
+      onChange({
+        ...value,
+        calendar: 'lunar',
+        schedule_spec: { ...spec, [key]: result.lunar, hour: result.hour, minute: result.minute },
+      })
     } else if (result.calendar === 'solar') {
       const key = value.schedule_type === 'interval' ? 'start_at' : 'at'
       onChange({
         ...value,
         calendar: 'solar',
-        schedule_spec: {
-          ...spec,
-          [key]: result.date,
-        },
+        schedule_spec: { ...spec, [key]: result.date },
       })
     }
   }
 
   return (
     <div className="space-y-3">
-      <div className="space-y-2">
-        <Label>提醒类型</Label>
-        <Select value={value.schedule_type} onValueChange={handleTypeChange}>
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="once">一次性</SelectItem>
-            <SelectItem value="interval">周期</SelectItem>
-            <SelectItem value="cron">Cron</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      {value.schedule_type === 'cron' && (
+      <div className="grid grid-cols-2 gap-3">
         <div className="space-y-2">
-          <Label htmlFor="spec-expr">Cron 表达式</Label>
-          <Input
-            id="spec-expr"
-            value={(spec.expr as string) ?? ''}
-            onChange={(e) => patchSpec({ expr: e.target.value })}
-            placeholder="例如：0 9 * * 1-5"
-          />
-          <p className="text-xs text-muted-foreground">
-            5 字段标准 cron。例：每天 09:00 → <code>0 9 * * *</code>；工作日早 9 点 → <code>0 9 * * 1-5</code>。
-          </p>
+          <Label>提醒类型</Label>
+          <Select value={value.schedule_type} onValueChange={handleTypeChange}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="once">一次性</SelectItem>
+              <SelectItem value="interval">周期</SelectItem>
+              <SelectItem value="cron">Cron</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
-      )}
 
-      {(value.schedule_type === 'once' || value.schedule_type === 'interval') && (
-        <>
+        {value.schedule_type === 'cron' && (
           <div className="space-y-2">
+            <Label htmlFor="spec-expr">Cron 表达式</Label>
+            <Input
+              id="spec-expr"
+              value={(spec.expr as string) ?? ''}
+              onChange={(e) => patchSpec({ expr: e.target.value })}
+              placeholder="例如：0 9 * * 1-5"
+            />
+          </div>
+        )}
+
+        {value.schedule_type === 'once' && (
+          <div className="relative space-y-2">
             <Label>
-              {value.schedule_type === 'once' ? '触发时间' : '起始时间'}
+              触发时间
               {value.calendar === 'lunar' && (
                 <span className="text-xs text-muted-foreground ml-2">（农历）</span>
               )}
             </Label>
-            <div className="relative flex gap-2">
-              <Input
-                readOnly
-                value={formatScheduleDate(spec, value.calendar)}
-                placeholder="点击选择日期"
-                onClick={() => setCalendarOpen(true)}
-                className="cursor-pointer"
+            <Input
+              readOnly
+              value={formatScheduleDate(spec, value.calendar)}
+              placeholder="点击选择日期"
+              onClick={() => setCalendarOpen(true)}
+              className="cursor-pointer"
+            />
+            {calendarOpen && (
+              <CalendarPopover
+                date={value.calendar === 'solar' ? ((spec.at ?? spec.start_at) as string | undefined) : undefined}
+                hour={(spec.hour as number) ?? 9}
+                minute={(spec.minute as number) ?? 0}
+                onSelect={handleCalendarSelect}
+                onClose={() => setCalendarOpen(false)}
               />
-              <Button type="button" variant="outline" onClick={() => setCalendarOpen(true)}>
-                选择
-              </Button>
-              {calendarOpen && (
-                <CalendarPopover
-                  date={value.calendar === 'solar' ? ((spec.at ?? spec.start_at) as string | undefined) : undefined}
-                  hour={(spec.hour as number) ?? 9}
-                  minute={(spec.minute as number) ?? 0}
-                  onSelect={handleCalendarSelect}
-                  onClose={() => setCalendarOpen(false)}
-                />
+            )}
+          </div>
+        )}
+      </div>
+
+      {value.schedule_type === 'interval' && (
+        <div className="grid grid-cols-2 gap-3">
+          <div className="relative space-y-2">
+            <Label>
+              起始时间
+              {value.calendar === 'lunar' && (
+                <span className="text-xs text-muted-foreground ml-2">（农历）</span>
               )}
+            </Label>
+            <Input
+              readOnly
+              value={formatScheduleDate(spec, value.calendar)}
+              placeholder="点击选择日期"
+              onClick={() => setCalendarOpen(true)}
+              className="cursor-pointer"
+            />
+            {calendarOpen && (
+              <CalendarPopover
+                date={value.calendar === 'solar' ? ((spec.at ?? spec.start_at) as string | undefined) : undefined}
+                hour={(spec.hour as number) ?? 9}
+                minute={(spec.minute as number) ?? 0}
+                onSelect={handleCalendarSelect}
+                onClose={() => setCalendarOpen(false)}
+              />
+            )}
+          </div>
+          <div className="flex gap-2 items-end">
+            <div className="space-y-2 flex-1">
+              <Label htmlFor="spec-every">每</Label>
+              <Input
+                id="spec-every"
+                type="number"
+                min={1}
+                value={(spec.every as number) ?? 1}
+                onChange={(e) => patchSpec({ every: Number(e.target.value) || 1 })}
+              />
+            </div>
+            <div className="space-y-2 flex-1">
+              <Label htmlFor="spec-unit">单位</Label>
+              <Select
+                value={(spec.unit as string) ?? (value.calendar === 'lunar' ? 'month' : 'day')}
+                onValueChange={(v) => patchSpec({ unit: v })}
+              >
+                <SelectTrigger id="spec-unit">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {(value.calendar === 'lunar' ? LUNAR_INTERVAL_UNITS : INTERVAL_UNITS).map((u) => (
+                    <SelectItem key={u.value} value={u.value}>
+                      {u.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
+        </div>
+      )}
 
-          {value.schedule_type === 'interval' && (
-            <>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <Label htmlFor="spec-every">每</Label>
-                  <Input
-                    id="spec-every"
-                    type="number"
-                    min={1}
-                    value={(spec.every as number) ?? 1}
-                    onChange={(e) => patchSpec({ every: Number(e.target.value) || 1 })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="spec-unit">单位</Label>
-                  <Select
-                    value={(spec.unit as string) ?? (value.calendar === 'lunar' ? 'month' : 'day')}
-                    onValueChange={(v) => patchSpec({ unit: v })}
-                  >
-                    <SelectTrigger id="spec-unit">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {(value.calendar === 'lunar' ? LUNAR_INTERVAL_UNITS : INTERVAL_UNITS).map((u) => (
-                        <SelectItem key={u.value} value={u.value}>
-                          {u.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {value.calendar === 'lunar'
-                  ? '闰月跳过（按公历年份安排）。日数超出该月天数时自动顺延至月末。'
-                  : '月 / 年单位使用日历语义：1 月 31 日 + 1 月 = 2 月 28 日（自动归一）。'}
-              </p>
-            </>
-          )}
-        </>
+      {value.schedule_type === 'cron' && (
+        <p className="text-xs text-muted-foreground">
+          5 字段标准 cron。例：每天 09:00 → <code>0 9 * * *</code>；工作日早 9 点 → <code>0 9 * * 1-5</code>。
+        </p>
       )}
     </div>
   )
