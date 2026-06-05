@@ -400,6 +400,7 @@ export default function LogsPage() {
                           <th className="py-1 pr-2">通道</th>
                           <th className="py-1 pr-2">类型</th>
                           <th className="py-1 pr-2">#</th>
+                          <th className="py-1 pr-2">发送时间</th>
                           <th className="py-1 pr-2">状态</th>
                           <th className="py-1 pr-2">延迟</th>
                           <th className="py-1 pr-2">错误</th>
@@ -411,6 +412,7 @@ export default function LogsPage() {
                             <td className="py-1 pr-2 font-medium">{a.channel_name}</td>
                             <td className="py-1 pr-2 text-muted-foreground">{a.channel_type}</td>
                             <td className="py-1 pr-2">{a.attempt}</td>
+                            <td className="py-1 pr-2 text-xs whitespace-nowrap">{new Date(a.created_at).toLocaleString()}</td>
                             <td className="py-1 pr-2">
                               {a.status === 'success' ? (
                                 <span className="text-green-600">成功</span>
