@@ -60,7 +60,7 @@ function formatDetail(r: Reminder): string {
   const spec = r.schedule_spec ?? {}
   const h = String(spec.hour ?? 9).padStart(2, '0')
   const m = String(spec.minute ?? 0).padStart(2, '0')
-  const time = `${h}:${m}`
+  const time = `${h}:${m}:00`
 
   if (r.calendar === 'lunar') {
     const lunar = (spec.lunar ?? spec.start_lunar) as { year: number; month: number; day: number } | undefined
@@ -77,7 +77,7 @@ function formatDetail(r: Reminder): string {
   const at = (spec.at ?? spec.start_at) as string | undefined
   if (at) {
     const d = at.slice(0, 10).replace(/-/g, '/')
-    const t = at.slice(11, 16)
+    const t = at.slice(11, 16) + ':00'
     return `公历 ${d} ${t}`
   }
   return '公历'

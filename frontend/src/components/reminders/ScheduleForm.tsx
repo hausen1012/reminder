@@ -10,7 +10,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { CalendarPopover } from './CalendarPopover'
-import { Solar } from 'lunar-typescript'
+import { Solar, Lunar } from 'lunar-typescript'
 import type { ReminderCalendar, ReminderScheduleType } from '@/types'
 import type { CalendarResult } from '@/types'
 
@@ -155,7 +155,16 @@ export function ScheduleForm({ value, onChange }: Props) {
             </div>
             {calendarOpen && (
               <CalendarPopover
-                date={value.calendar === 'solar' ? ((spec.at ?? spec.start_at) as string | undefined) : undefined}
+                date={(() => {
+                  if (value.calendar === 'solar') return (spec.at ?? spec.start_at) as string | undefined
+                  const lunar = (spec.lunar ?? spec.start_lunar) as { year: number; month: number; day: number } | undefined
+                  if (lunar) {
+                    const l = Lunar.fromYmd(lunar.year, lunar.month, lunar.day)
+                    const s = l.getSolar()
+                    return `${s.getYear()}-${String(s.getMonth()).padStart(2, '0')}-${String(s.getDay()).padStart(2, '0')}T${String(spec.hour ?? 9).padStart(2, '0')}:${String(spec.minute ?? 0).padStart(2, '0')}`
+                  }
+                  return undefined
+                })()}
                 hour={spec.hour as number | undefined}
                 minute={spec.minute as number | undefined}
                 onSelect={handleCalendarSelect}
