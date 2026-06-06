@@ -135,7 +135,14 @@ export function CalendarPopover({ date, hour: initHour, minute: initMin, onSelec
   function handleConfirm() {
     if (selectedDay === null) return
     const dateStr = `${solarYear}-${String(solarMonth).padStart(2, '0')}-${String(selectedDay).padStart(2, '0')}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`
-    onSelect({ date: dateStr, calendar: 'solar', hour, minute })
+    if (showLunar) {
+      const solar = Solar.fromYmd(solarYear, solarMonth, selectedDay)
+      const lunar = solar.getLunar()
+      onSelect({ date: dateStr, calendar: 'lunar', lunar: { year: lunar.getYear(), month: lunar.getMonth(), day: lunar.getDay() }, hour, minute })
+    } else {
+      onSelect({ date: dateStr, calendar: 'solar', hour, minute })
+    }
+    onClose()
   }
 
   function prevMonth() {

@@ -42,6 +42,12 @@ function toChineseYear(n: number): string {
   return String(n).split('').map((d) => CHINESE_DIGITS[+d]).join('')
 }
 
+function toChineseMonth(n: number): string {
+  if (n <= 10) return CHINESE_DIGITS[n]
+  if (n === 11) return '十一'
+  return '十二'
+}
+
 function toChineseDay(n: number): string {
   if (n <= 10) return CHINESE_DIGITS[n]
   if (n < 20) return '十' + (n > 10 ? CHINESE_DIGITS[n - 10] : '')
@@ -59,7 +65,7 @@ function formatDetail(r: Reminder): string {
   if (r.calendar === 'lunar') {
     const lunar = (spec.lunar ?? spec.start_lunar) as { year: number; month: number; day: number } | undefined
     if (lunar) {
-      return `农历 ${toChineseYear(lunar.year)}年${CHINESE_DIGITS[lunar.month]}月${toChineseDay(lunar.day)} ${time}`
+      return `农历 ${toChineseYear(lunar.year)}年${toChineseMonth(lunar.month)}月${toChineseDay(lunar.day)} ${time}`
     }
     return '农历'
   }
