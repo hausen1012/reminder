@@ -13,6 +13,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useToast } from '@/components/ui/use-toast'
+import { Pagination } from '@/components/ui/pagination'
 import { ReminderEditDialog } from '@/components/reminders/ReminderEditDialog'
 import { ConfirmDialog } from '@/components/channels/ConfirmDialog'
 import {
@@ -107,6 +108,8 @@ export default function RemindersPage() {
   const [source, setSource] = useState<string>('manual')
   const [enabled, setEnabled] = useState<string>('all')
   const [search, setSearch] = useState('')
+  const limit = 10
+  const [offset, setOffset] = useState(0)
 
   const [channels, setChannels] = useState<Channel[]>([])
 
@@ -119,6 +122,8 @@ export default function RemindersPage() {
       if (source !== 'all') q.source = source as 'manual' | 'api'
       if (enabled !== 'all') q.enabled = enabled === 'true'
       if (search.trim()) q.search = search.trim()
+      q.limit = limit
+      q.offset = offset
       const data = await listReminders(q)
       setItems(data?.items ?? [])
       setTotal(data?.total ?? 0)
@@ -134,9 +139,13 @@ export default function RemindersPage() {
   }, [])
 
   useEffect(() => {
+    setOffset(0)
+  }, [source, enabled])
+
+  useEffect(() => {
     refresh()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [source, enabled])
+  }, [source, enabled, offset])
 
   async function handleToggle(r: Reminder) {
     try {
@@ -331,6 +340,7 @@ export default function RemindersPage() {
               </tbody>
             </table>
           </div>
+          <Pagination total={total} limit={limit} offset={offset} onPageChange={setOffset} />
         </Card>
       )}
 

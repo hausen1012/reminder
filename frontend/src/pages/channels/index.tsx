@@ -2,9 +2,8 @@
 import { useEffect, useState } from 'react'
 import { Mail, MessageSquare, Webhook, Terminal, Plus, Pencil, Trash2, TestTube } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Switch } from '@/components/ui/switch'
-import { Badge } from '@/components/ui/badge'
 import { useToast } from '@/components/ui/use-toast'
 import { ChannelEditDialog } from '@/components/channels/ChannelEditDialog'
 import { ConfirmDialog } from '@/components/channels/ConfirmDialog'
@@ -119,52 +118,52 @@ export default function ChannelsPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {items.map((ch) => {
-            const Icon = TYPE_ICON[ch.type]
-            return (
-              <Card key={ch.id} className="overflow-hidden">
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <Icon className="h-4 w-4 text-muted-foreground shrink-0" />
-                      <CardTitle className="text-base truncate" title={ch.name}>
-                        {ch.name}
-                      </CardTitle>
-                    </div>
-                    <Switch
-                      checked={ch.enabled}
-                      onCheckedChange={() => handleToggle(ch)}
-                      aria-label="启用/禁用通道"
-                    />
-                  </div>
-                  <CardDescription className="flex items-center gap-2">
-                    <Badge variant="outline">{TYPE_LABEL[ch.type]}</Badge>
-                    {!ch.enabled && <Badge variant="secondary">已禁用</Badge>}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="flex items-center justify-end gap-1 pt-0">
-                  <Button size="sm" variant="ghost" onClick={() => handleTest(ch)} disabled={testingId === ch.id}>
-                    <TestTube className="h-4 w-4 mr-1" />
-                    {testingId === ch.id ? '发送中…' : '试发'}
-                  </Button>
-                  <Button size="sm" variant="ghost" onClick={() => setEditing(ch)}>
-                    <Pencil className="h-4 w-4 mr-1" />
-                    编辑
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="text-destructive hover:text-destructive"
-                    onClick={() => setToDelete(ch)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </CardContent>
-              </Card>
-            )
-          })}
-        </div>
+        <Card>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="border-b bg-muted/40 text-left text-xs uppercase text-muted-foreground">
+                <tr>
+                  <th className="px-4 py-3">名称</th>
+                  <th className="px-4 py-3">类型</th>
+                  <th className="px-4 py-3 text-center">启用</th>
+                  <th className="px-4 py-3 text-right">操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((ch) => {
+                  const Icon = TYPE_ICON[ch.type]
+                  return (
+                    <tr key={ch.id} className="border-b last:border-b-0 hover:bg-muted/30">
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <Icon className="h-4 w-4 text-muted-foreground shrink-0" />
+                          <span className="font-medium truncate" title={ch.name}>{ch.name}</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-xs text-muted-foreground">{TYPE_LABEL[ch.type]}</td>
+                      <td className="px-4 py-3 text-center">
+                        <Switch checked={ch.enabled} onCheckedChange={() => handleToggle(ch)} aria-label="启用/禁用通道" />
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex justify-end gap-1">
+                          <Button size="sm" variant="ghost" onClick={() => handleTest(ch)} disabled={testingId === ch.id} title="试发">
+                            <TestTube className="h-4 w-4" />
+                          </Button>
+                          <Button size="sm" variant="ghost" onClick={() => setEditing(ch)} title="编辑">
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => setToDelete(ch)} title="删除">
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </Card>
       )}
 
       {/* 编辑/新建对话框 */}

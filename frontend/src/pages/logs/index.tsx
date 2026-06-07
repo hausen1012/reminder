@@ -33,6 +33,7 @@ import {
 } from '@/components/ui/dialog'
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer'
 import { useToast } from '@/components/ui/use-toast'
+import { Pagination } from '@/components/ui/pagination'
 import { listLogs, getLogDetail, purgeLogs, countPurgeLogs } from '@/lib/api'
 import type { DeliveryLog, LogFilter } from '@/types'
 
@@ -66,6 +67,8 @@ export default function LogsPage() {
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<LogFilter>({})
   const [search, setSearch] = useState('')
+  const limit = 10
+  const [offset, setOffset] = useState(0)
   const [detailId, setDetailId] = useState<number | null>(null)
   const [detail, setDetail] = useState<DeliveryLog | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
@@ -76,11 +79,17 @@ export default function LogsPage() {
   const [purging, setPurging] = useState(false)
   const { toast } = useToast()
 
+  useEffect(() => {
+    setOffset(0)
+  }, [filter])
+
   const refresh = useCallback(async () => {
     setLoading(true)
     try {
       const q: LogFilter = { ...filter }
       if (search.trim()) q.search = search.trim()
+      q.limit = limit
+      q.offset = offset
       const data = await listLogs(q)
       setItems(data?.items ?? [])
       setTotal(data?.total ?? 0)
@@ -90,7 +99,7 @@ export default function LogsPage() {
       setLoading(false)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filter])
+  }, [filter, offset])
 
   useEffect(() => {
     refresh()
@@ -332,6 +341,7 @@ export default function LogsPage() {
               </tbody>
             </table>
           </div>
+          <Pagination total={total} limit={limit} offset={offset} onPageChange={setOffset} />
         </Card>
       )}
 
