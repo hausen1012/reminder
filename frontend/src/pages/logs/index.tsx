@@ -87,7 +87,6 @@ export default function LogsPage() {
     setLoading(true)
     try {
       const q: LogFilter = { ...filter }
-      if (search.trim()) q.search = search.trim()
       q.limit = limit
       q.offset = offset
       const data = await listLogs(q)
@@ -225,7 +224,8 @@ export default function LogsPage() {
           className="flex-1 max-w-md"
           onSubmit={(e) => {
             e.preventDefault()
-            refresh()
+            setOffset(0)
+            setFilter((f) => ({ ...f, search: search.trim() || undefined }))
           }}
         >
           <Input
