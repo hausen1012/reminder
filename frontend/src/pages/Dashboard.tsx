@@ -164,7 +164,7 @@ export default function Dashboard() {
             ) : upcoming.length === 0 ? (
               <p className="text-sm text-muted-foreground">未来 24 小时内没有待触发的提醒。</p>
             ) : (
-              <div className="space-y-2">
+              <div className="space-y-2 max-h-[420px] overflow-y-auto pr-1">
                 {upcoming.map((r) => (
                   <Link
                     key={r.id}
@@ -199,7 +199,7 @@ export default function Dashboard() {
             ) : logs.length === 0 ? (
               <p className="text-sm text-muted-foreground">暂无发送记录。</p>
             ) : (
-              <div className="space-y-2">
+              <div className="space-y-2 max-h-[420px] overflow-y-auto pr-1">
                 {logs.map((log) => (
                   <Link
                     key={log.id}
