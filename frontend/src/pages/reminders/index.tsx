@@ -1,6 +1,6 @@
 // 提醒列表页：toolbar（来源筛选/状态/搜索/新建）+ 表格 + 编辑/试发/删除。
 import { useEffect, useState, useMemo } from 'react'
-import { Plus, Pencil, Trash2, TestTube } from 'lucide-react'
+import { Plus, Pencil, Trash2, TestTube, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -86,6 +86,8 @@ function formatDetail(r: Reminder): string {
 
 function formatNextFire(dateStr?: string): string {
   if (!dateStr) return '—'
+  const d = new Date(dateStr)
+  if (d.getTime() <= Date.now()) return '—'
   const d = new Date(dateStr)
   const y = d.getFullYear()
   const month = String(d.getMonth() + 1).padStart(2, '0')
@@ -242,6 +244,9 @@ export default function RemindersPage() {
           />
         </form>
         <span className="text-sm text-muted-foreground">共 {total} 条</span>
+        <Button variant="outline" size="icon" onClick={refresh} title="刷新">
+          <RefreshCw className="h-4 w-4" />
+        </Button>
       </div>
 
       {loading ? (
@@ -292,7 +297,7 @@ export default function RemindersPage() {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-xs whitespace-nowrap">
-                        {formatNextFire(r.next_fire_at)}
+                        {r.enabled ? formatNextFire(r.next_fire_at) : '—'}
                       </td>
                       <td className="px-4 py-3 max-w-[10rem]">
                         {chNames.length === 0 ? (
