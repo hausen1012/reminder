@@ -29,7 +29,7 @@ $BackendArgs = @(
     "-NoLogo"
     "-NoExit"
     "-Command"
-    "`$Host.UI.RawUI.WindowTitle = '$BackendTitle'; cd '$RootDir\backend'; go run ./cmd/server/"
+    "`$Host.UI.RawUI.WindowTitle = '$BackendTitle'; `$env:LOG_FILE = '$RootDir\logs'; cd '$RootDir\backend'; go run ./cmd/server/"
 )
 $backendJob = Start-Process -WindowStyle Normal -PassThru -FilePath "powershell" -ArgumentList $BackendArgs
 

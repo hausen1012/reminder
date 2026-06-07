@@ -4,10 +4,12 @@ import (
 	"context"
 	"embed"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -21,6 +23,19 @@ var staticFS embed.FS
 
 func main() {
 	cfg := config.Load()
+
+	// 日志同时输出到控制台和文件
+	logDir := cfg.LogFile
+	if logDir == "" {
+		logDir = "logs"
+	}
+	if err := os.MkdirAll(logDir, 0755); err == nil {
+		logPath := filepath.Join(logDir, fmt.Sprintf("app-%s.log", time.Now().Format("2006-01-02")))
+		f, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+		if err == nil {
+			log.SetOutput(io.MultiWriter(os.Stderr, f))
+		}
+	}
 
 	if err := database.Init(cfg); err != nil {
 		log.Fatalf("database init failed: %v", err)
