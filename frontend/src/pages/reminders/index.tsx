@@ -87,8 +87,7 @@ function formatDetail(r: Reminder): string {
 function formatNextFire(dateStr?: string): string {
   if (!dateStr) return '—'
   const d = new Date(dateStr)
-  if (d.getTime() <= Date.now()) return '—'
-  const d = new Date(dateStr)
+  if (isNaN(d.getTime()) || d.getTime() <= Date.now()) return '—'
   const y = d.getFullYear()
   const month = String(d.getMonth() + 1).padStart(2, '0')
   const day = String(d.getDate()).padStart(2, '0')
