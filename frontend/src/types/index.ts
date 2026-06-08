@@ -39,6 +39,11 @@ export interface ChannelTestResult {
   error?: string
 }
 
+export interface ChannelListResp {
+  items: Channel[]
+  total: number
+}
+
 // --- 提醒 ---
 
 export type ReminderCalendar = 'solar' | 'lunar'

@@ -4,6 +4,7 @@ import type {
   ApiResponse,
   Channel,
   ChannelInput,
+  ChannelListResp,
   ChannelTestResult,
   ChannelType,
   CreateAPIKeyResult,
@@ -64,9 +65,19 @@ export async function logout() {
 
 // --- 通道 ---
 
+export interface ListChannelsQuery {
+  limit?: number
+  offset?: number
+}
+
 export async function listChannels() {
   const res = await api.get<ApiResponse<Channel[]>>('/channels')
   return res.data.data ?? []
+}
+
+export async function listChannelsPaged(q: ListChannelsQuery = {}) {
+  const res = await api.get<ApiResponse<ChannelListResp>>('/channels', { params: q })
+  return res.data.data
 }
 
 export async function getChannel(id: number) {

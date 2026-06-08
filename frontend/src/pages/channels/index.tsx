@@ -4,11 +4,12 @@ import { Mail, MessageSquare, Webhook, Terminal, Plus, Pencil, Trash2, TestTube 
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Switch } from '@/components/ui/switch'
+import { Pagination } from '@/components/ui/pagination'
 import { useToast } from '@/components/ui/use-toast'
 import { ChannelEditDialog } from '@/components/channels/ChannelEditDialog'
 import { ConfirmDialog } from '@/components/channels/ConfirmDialog'
 import {
-  listChannels,
+  listChannelsPaged,
   toggleChannel,
   deleteChannel,
   testChannel,
@@ -33,6 +34,9 @@ const TYPE_ICON: Record<ChannelType, typeof Mail> = {
 
 export default function ChannelsPage() {
   const [items, setItems] = useState<Channel[]>([])
+  const [total, setTotal] = useState(0)
+  const [limit, setLimit] = useState(10)
+  const [offset, setOffset] = useState(0)
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState<Channel | null>(null)
   const [creating, setCreating] = useState(false)
@@ -43,8 +47,9 @@ export default function ChannelsPage() {
   async function refresh() {
     setLoading(true)
     try {
-      const list = await listChannels()
-      setItems(list)
+      const data = await listChannelsPaged({ limit, offset })
+      setItems(data?.items ?? [])
+      setTotal(data?.total ?? 0)
     } catch (err) {
       toast({ title: '加载通道失败', description: String(err), variant: 'destructive' })
     } finally {
@@ -54,7 +59,8 @@ export default function ChannelsPage() {
 
   useEffect(() => {
     refresh()
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [offset, limit])
 
   async function handleToggle(ch: Channel) {
     try {
@@ -69,7 +75,14 @@ export default function ChannelsPage() {
     if (!toDelete) return
     try {
       await deleteChannel(toDelete.id)
-      setItems((prev) => prev.filter((it) => it.id !== toDelete.id))
+      const nextTotal = Math.max(0, total - 1)
+      const shouldGoPrevPage = items.length === 1 && offset > 0
+      if (shouldGoPrevPage) {
+        setTotal(nextTotal)
+        setOffset(Math.max(0, offset - limit))
+      } else {
+        await refresh()
+      }
       toast({ title: '通道已删除', variant: 'success' })
     } catch (err) {
       toast({ title: '删除失败', description: String(err), variant: 'destructive' })
@@ -163,10 +176,10 @@ export default function ChannelsPage() {
               </tbody>
             </table>
           </div>
+          <Pagination total={total} limit={limit} offset={offset} onPageChange={setOffset} onLimitChange={setLimit} />
         </Card>
       )}
 
-      {/* 编辑/新建对话框 */}
       {(creating || editing) && (
         <ChannelEditDialog
           channel={editing}

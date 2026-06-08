@@ -44,12 +44,35 @@ func successJSON(c *gin.Context, data any) {
 
 // List GET /api/channels
 func (h *ChannelHandler) List(c *gin.Context) {
-	views, err := h.Svc.List()
+	limitStr := c.Query("limit")
+	offsetStr := c.Query("offset")
+	if limitStr == "" && offsetStr == "" {
+		views, err := h.Svc.List()
+		if err != nil {
+			abortErr(c, err)
+			return
+		}
+		successJSON(c, views)
+		return
+	}
+
+	f := services.ChannelListFilter{}
+	if limitStr != "" {
+		if n, err := strconv.Atoi(limitStr); err == nil {
+			f.Limit = n
+		}
+	}
+	if offsetStr != "" {
+		if n, err := strconv.Atoi(offsetStr); err == nil {
+			f.Offset = n
+		}
+	}
+	views, total, err := h.Svc.ListPaged(f)
 	if err != nil {
 		abortErr(c, err)
 		return
 	}
-	successJSON(c, views)
+	successJSON(c, gin.H{"items": views, "total": total})
 }
 
 // Get GET /api/channels/:id

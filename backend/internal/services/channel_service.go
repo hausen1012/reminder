@@ -53,6 +53,12 @@ type ChannelView struct {
 	UpdatedAt time.Time      `json:"updated_at"`
 }
 
+// ChannelListFilter 是通道列表分页参数。
+type ChannelListFilter struct {
+	Limit  int
+	Offset int
+}
+
 const encSuffix = "_enc"
 
 // 占位符常量：前端编辑时未改动敏感字段就回传这个值，服务端识别后不更新。
@@ -158,6 +164,37 @@ func (s *ChannelService) List() ([]*ChannelView, error) {
 		out = append(out, s.toView(&rows[i]))
 	}
 	return out, nil
+}
+
+// ListPaged 返回通道分页结果（按 id 升序）。
+func (s *ChannelService) ListPaged(f ChannelListFilter) ([]*ChannelView, int64, error) {
+	if f.Limit <= 0 {
+		f.Limit = 50
+	}
+	if f.Limit > 200 {
+		f.Limit = 200
+	}
+	if f.Offset < 0 {
+		f.Offset = 0
+	}
+
+	q := s.DB.Model(&models.Channel{})
+
+	var total int64
+	if err := q.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	var rows []models.Channel
+	if err := s.DB.Order("id ASC").Limit(f.Limit).Offset(f.Offset).Find(&rows).Error; err != nil {
+		return nil, 0, err
+	}
+
+	out := make([]*ChannelView, 0, len(rows))
+	for i := range rows {
+		out = append(out, s.toView(&rows[i]))
+	}
+	return out, total, nil
 }
 
 // Delete 删除通道。
