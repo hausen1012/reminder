@@ -173,6 +173,7 @@ export function ScheduleForm({ value, onChange }: Props) {
                 })()}
                 hour={getReminderSpecHour(spec)}
                 minute={getReminderSpecMinute(spec)}
+                initialCalendar={value.calendar}
                 onSelect={handleCalendarSelect}
                 onClose={() => setCalendarOpen(false)}
               />

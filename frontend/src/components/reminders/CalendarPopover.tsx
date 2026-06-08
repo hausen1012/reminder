@@ -17,6 +17,7 @@ interface Props {
   date?: string
   hour?: number
   minute?: number
+  initialCalendar?: 'solar' | 'lunar'
   onSelect: (result: CalendarResult) => void
   onClose: () => void
 }
@@ -39,12 +40,12 @@ interface DayCell {
   current: boolean
 }
 
-export function CalendarPopover({ date, hour: initHour, minute: initMin, onSelect, onClose }: Props) {
+export function CalendarPopover({ date, hour: initHour, minute: initMin, initialCalendar = 'solar', onSelect, onClose }: Props) {
   const now = new Date()
   const popoverRef = useRef<HTMLDivElement>(null)
   const hourListRef = useRef<HTMLDivElement>(null)
   const minuteListRef = useRef<HTMLDivElement>(null)
-  const [showLunar, setShowLunar] = useState(false)
+  const [showLunar, setShowLunar] = useState(initialCalendar === 'lunar')
   const [solarYear, setSolarYear] = useState(() => {
     if (date) return new Date(date).getFullYear()
     return now.getFullYear()
