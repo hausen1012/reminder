@@ -67,7 +67,7 @@ export default function LogsPage() {
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<LogFilter>({})
   const [search, setSearch] = useState('')
-  const limit = 10
+  const [limit, setLimit] = useState(10)
   const [offset, setOffset] = useState(0)
   const [detailId, setDetailId] = useState<number | null>(null)
   const [detail, setDetail] = useState<DeliveryLog | null>(null)
@@ -98,7 +98,7 @@ export default function LogsPage() {
       setLoading(false)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filter, offset])
+  }, [filter, offset, limit])
 
   useEffect(() => {
     refresh()
@@ -341,7 +341,7 @@ export default function LogsPage() {
               </tbody>
             </table>
           </div>
-          <Pagination total={total} limit={limit} offset={offset} onPageChange={setOffset} />
+          <Pagination total={total} limit={limit} offset={offset} onPageChange={setOffset} onLimitChange={setLimit} />
         </Card>
       )}
 

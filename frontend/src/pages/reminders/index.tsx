@@ -109,7 +109,7 @@ export default function RemindersPage() {
   const [source, setSource] = useState<string>('manual')
   const [enabled, setEnabled] = useState<string>('all')
   const [search, setSearch] = useState('')
-  const limit = 10
+  const [limit, setLimit] = useState(10)
   const [offset, setOffset] = useState(0)
 
   const [channels, setChannels] = useState<Channel[]>([])
@@ -146,7 +146,7 @@ export default function RemindersPage() {
   useEffect(() => {
     refresh()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [source, enabled, offset])
+  }, [source, enabled, offset, limit])
 
   async function handleToggle(r: Reminder) {
     try {
@@ -344,7 +344,7 @@ export default function RemindersPage() {
               </tbody>
             </table>
           </div>
-          <Pagination total={total} limit={limit} offset={offset} onPageChange={setOffset} />
+          <Pagination total={total} limit={limit} offset={offset} onPageChange={setOffset} onLimitChange={setLimit} />
         </Card>
       )}
 

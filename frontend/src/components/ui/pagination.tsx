@@ -1,74 +1,100 @@
 // 分页组件
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 
 interface Props {
   total: number
   limit: number
   offset: number
   onPageChange: (offset: number) => void
+  onLimitChange?: (limit: number) => void
+  limitOptions?: number[]
 }
 
-export function Pagination({ total, limit, offset, onPageChange }: Props) {
+export function Pagination({
+  total,
+  limit,
+  offset,
+  onPageChange,
+  onLimitChange,
+  limitOptions = [10, 20, 50, 100],
+}: Props) {
   const totalPages = Math.max(1, Math.ceil(total / limit))
-  const currentPage = Math.floor(offset / limit) + 1
-
-  if (totalPages <= 1) return null
+  const currentPage = Math.min(Math.floor(offset / limit) + 1, totalPages)
+  const start = total === 0 ? 0 : offset + 1
+  const end = Math.min(offset + limit, total)
+  const canChangeLimit = Boolean(onLimitChange)
 
   function goTo(page: number) {
-    onPageChange((page - 1) * limit)
+    const nextPage = Math.max(1, Math.min(page, totalPages))
+    onPageChange((nextPage - 1) * limit)
   }
 
-  function pageNumbers(): (number | 'ellipsis')[] {
-    const pages: (number | 'ellipsis')[] = []
-    if (totalPages <= 5) {
-      for (let i = 1; i <= totalPages; i++) pages.push(i)
-      return pages
-    }
-    pages.push(1)
-    if (currentPage > 3) pages.push('ellipsis')
-    const start = Math.max(2, currentPage - 1)
-    const end = Math.min(totalPages - 1, currentPage + 1)
-    for (let i = start; i <= end; i++) pages.push(i)
-    if (currentPage < totalPages - 2) pages.push('ellipsis')
-    pages.push(totalPages)
-    return pages
+  function handleLimitChange(value: string) {
+    if (!onLimitChange) return
+    const nextLimit = Number(value)
+    if (!Number.isFinite(nextLimit) || nextLimit <= 0) return
+    const nextOffset = total === 0 ? 0 : Math.floor(offset / nextLimit) * nextLimit
+    onLimitChange(nextLimit)
+    onPageChange(nextOffset)
   }
 
   return (
-    <div className="flex items-center justify-center gap-1 pt-4">
-      <Button
-        variant="ghost"
-        size="sm"
-        disabled={currentPage <= 1}
-        onClick={() => goTo(currentPage - 1)}
-      >
-        <ChevronLeft className="h-4 w-4" />
-      </Button>
-      {pageNumbers().map((p, i) =>
-        p === 'ellipsis' ? (
-          <span key={`e-${i}`} className="px-1 text-xs text-muted-foreground">…</span>
-        ) : (
+    <div className="flex flex-col gap-3 border-t px-4 py-4 text-sm md:flex-row md:items-center md:justify-between">
+      <div className="text-muted-foreground">
+        共 {total} 条&nbsp;&nbsp;第 {start}-{end} 条
+      </div>
+      <div className="flex flex-wrap items-center gap-3 md:justify-end">
+        {canChangeLimit && (
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <span>每页</span>
+            <Select value={String(limit)} onValueChange={handleLimitChange}>
+              <SelectTrigger className="h-8 w-[88px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {limitOptions.map((option) => (
+                  <SelectItem key={option} value={String(option)}>
+                    {option}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+        <div className="flex items-center gap-1">
           <Button
-            key={p}
-            variant={p === currentPage ? 'default' : 'ghost'}
-            size="sm"
-            className="min-w-[2rem]"
-            onClick={() => goTo(p)}
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            disabled={currentPage <= 1}
+            onClick={() => goTo(currentPage - 1)}
+            aria-label="上一页"
           >
-            {p}
+            <ChevronLeft className="h-4 w-4" />
           </Button>
-        ),
-      )}
-      <Button
-        variant="ghost"
-        size="sm"
-        disabled={currentPage >= totalPages}
-        onClick={() => goTo(currentPage + 1)}
-      >
-        <ChevronRight className="h-4 w-4" />
-      </Button>
-      <span className="ml-2 text-xs text-muted-foreground">共 {total} 条</span>
+          <span className="min-w-[3rem] text-center text-foreground">
+            {currentPage} / {totalPages}
+          </span>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            disabled={currentPage >= totalPages}
+            onClick={() => goTo(currentPage + 1)}
+            aria-label="下一页"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
     </div>
   )
 }
