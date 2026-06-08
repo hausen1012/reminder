@@ -5,12 +5,13 @@ import "time"
 // APIKey 用于外部程序调用 /api/ingest/* 时鉴权。
 //
 // KeyHash 是明文 sha256，Prefix 是明文前 8 位用于列表展示。
-// 明文仅在创建时一次性返回前端。
+// Plaintext 保存完整明文，用于面板按需查看。
 type APIKey struct {
 	ID         uint       `gorm:"primaryKey" json:"id"`
 	Name       string     `gorm:"size:64;not null" json:"name"`
 	KeyHash    string     `gorm:"size:64;uniqueIndex" json:"-"`
 	Prefix     string     `gorm:"size:16" json:"prefix"`
+	Plaintext  string     `gorm:"type:text" json:"-"`
 	Enabled    bool       `gorm:"default:true" json:"enabled"`
 	LastUsedAt *time.Time `json:"last_used_at,omitempty"`
 	CreatedAt  time.Time  `json:"created_at"`

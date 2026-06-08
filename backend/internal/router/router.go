@@ -166,6 +166,8 @@ func Setup(staticFS embed.FS, cfg *config.Config) *SetupResult {
 			apikeys.GET("", apiKeyHandler.List)
 			apikeys.POST("", apiKeyHandler.Create)
 			apikeys.GET("/stats", apiKeyHandler.Stats)
+			apikeys.GET("/:id", apiKeyHandler.Get)
+			apikeys.GET("/:id/plaintext", apiKeyHandler.GetPlaintext)
 			apikeys.DELETE("/:id", apiKeyHandler.Delete)
 			apikeys.PATCH("/:id/toggle", apiKeyHandler.Toggle)
 			apikeys.PUT("/:id/channels", apiKeyHandler.UpdateDefaultChannels)

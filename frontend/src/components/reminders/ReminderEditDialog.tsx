@@ -20,8 +20,8 @@ import {
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/switch'
-import { ChevronDown } from 'lucide-react'
 import { useToast } from '@/components/ui/use-toast'
+import { ChannelMultiSelect } from '@/components/channels/ChannelMultiSelect'
 import { ScheduleForm, type ScheduleValue } from './ScheduleForm'
 import { createReminder, listChannels, updateReminder } from '@/lib/api'
 import type { Channel, Reminder, ReminderInput } from '@/types'
@@ -49,11 +49,6 @@ function defaultInput(): ReminderInput {
   }
 }
 
-function formatChannelNames(channels: Channel[], ids: number[]): string {
-  if (ids.length === 0) return '选择通道'
-  const names = ids.map((id) => channels.find((c) => c.id === id)?.name ?? `#${id}`)
-  return names.join(', ')
-}
 
 const COMMON_TIMEZONES = [
   'Asia/Shanghai',
@@ -122,13 +117,6 @@ export function ReminderEditDialog({ reminder, open, onClose, onSaved }: Props) 
       schedule_type: v.schedule_type,
       schedule_spec: v.schedule_spec,
     }))
-  }
-
-  function toggleChannel(id: number) {
-    setInput((prev) => {
-      const has = prev.channel_ids.includes(id)
-      return { ...prev, channel_ids: has ? prev.channel_ids.filter((x) => x !== id) : [...prev.channel_ids, id] }
-    })
   }
 
   async function handleSubmit(e: FormEvent) {
@@ -202,47 +190,13 @@ export function ReminderEditDialog({ reminder, open, onClose, onSaved }: Props) 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
               <Label>通道</Label>
-              {channels.length === 0 ? (
-                <p className="text-xs text-muted-foreground">还没有通道，先到「通知」页面创建一个。</p>
-              ) : (
-                <div className="relative">
-                  <button
-                    type="button"
-                    onClick={() => setChannelOpen(!channelOpen)}
-                    className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                  >
-                    <span className={`truncate ${input.channel_ids.length > 0 ? '' : 'text-muted-foreground'}`}>
-                      {formatChannelNames(channels, input.channel_ids)}
-                    </span>
-                    <ChevronDown className="h-4 w-4 opacity-50 shrink-0 ml-1" />
-                  </button>
-                  {channelOpen && (
-                    <>
-                      <div className="fixed inset-0 z-40" onClick={() => setChannelOpen(false)} />
-                      <div className="absolute bottom-full z-50 mb-1 max-h-64 w-full overflow-y-auto rounded-md border bg-card shadow-lg">
-                        {channels.map((ch) => {
-                          const checked = input.channel_ids.includes(ch.id)
-                          return (
-                            <label
-                              key={ch.id}
-                              className="flex cursor-pointer items-center gap-2 px-3 py-2 text-sm hover:bg-muted first:rounded-t-md last:rounded-b-md"
-                            >
-                              <input
-                                type="checkbox"
-                                checked={checked}
-                                onChange={() => toggleChannel(ch.id)}
-                                className="h-4 w-4"
-                              />
-                              <span>{ch.name}</span>
-                              <span className="ml-auto text-xs text-muted-foreground">{ch.type}</span>
-                            </label>
-                          )
-                        })}
-                      </div>
-                    </>
-                  )}
-                </div>
-              )}
+              <ChannelMultiSelect
+                channels={channels}
+                value={input.channel_ids}
+                open={channelOpen}
+                onOpenChange={setChannelOpen}
+                onChange={(channelIds) => patch('channel_ids', channelIds)}
+              />
             </div>
 
             <div className="space-y-2">

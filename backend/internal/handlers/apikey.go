@@ -22,6 +22,36 @@ func (h *ApiKeyHandler) List(c *gin.Context) {
 	successJSON(c, views)
 }
 
+// Get GET /api/apikeys/:id
+func (h *ApiKeyHandler) Get(c *gin.Context) {
+	id, err := parseID(c, "id")
+	if err != nil {
+		abortErr(c, err)
+		return
+	}
+	view, err := h.Svc.GetView(id)
+	if err != nil {
+		abortErr(c, err)
+		return
+	}
+	successJSON(c, view)
+}
+
+// GetPlaintext GET /api/apikeys/:id/plaintext
+func (h *ApiKeyHandler) GetPlaintext(c *gin.Context) {
+	id, err := parseID(c, "id")
+	if err != nil {
+		abortErr(c, err)
+		return
+	}
+	plaintext, err := h.Svc.GetPlaintext(id)
+	if err != nil {
+		abortErr(c, err)
+		return
+	}
+	successJSON(c, gin.H{"plaintext": plaintext})
+}
+
 // Create POST /api/apikeys
 func (h *ApiKeyHandler) Create(c *gin.Context) {
 	var in struct {

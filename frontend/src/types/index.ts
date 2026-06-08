@@ -163,6 +163,10 @@ export interface APIKey {
   usage_24h: number
 }
 
+export interface APIKeyPlaintextResp {
+  plaintext: string
+}
+
 export interface CreateAPIKeyResult {
   plaintext: string
   key: APIKey

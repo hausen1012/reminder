@@ -189,6 +189,16 @@ export async function listApiKeys() {
   return res.data.data ?? []
 }
 
+export async function getApiKey(id: number) {
+  const res = await api.get<ApiResponse<APIKey>>(`/apikeys/${id}`)
+  return res.data.data
+}
+
+export async function getApiKeyPlaintext(id: number) {
+  const res = await api.get<ApiResponse<{ plaintext: string }>>(`/apikeys/${id}/plaintext`)
+  return res.data.data?.plaintext ?? ''
+}
+
 export async function createApiKey(name: string, defaultChannelIDs?: number[]) {
   const res = await api.post<ApiResponse<CreateAPIKeyResult>>('/apikeys', { name, default_channel_ids: defaultChannelIDs ?? [] })
   return res.data.data

@@ -1,7 +1,7 @@
 // apikey_service 管理 API Key 的全生命周期。
 //
 // 外部程序通过 X-API-Key 鉴权调用 /api/ingest/*，面板也可以创建/管理 Key。
-// 明文 Key 仅创建时一次性返回，后续仅存储 sha256 哈希与前缀。
+// 明文 Key 仅创建时一次性返回，后续默认只展示前缀；如需重复查看则直接读取明文。
 package services
 
 import (
@@ -53,10 +53,11 @@ func (s *ApiKeyService) Create(name string, defaultChannelIDs []uint) (string, *
 
 	hash := sha256Hex(plain)
 	key := &models.APIKey{
-		Name:    name,
-		KeyHash: hash,
-		Prefix:  plain[:len(keyPrefix)+8],
-		Enabled: true,
+		Name:      name,
+		KeyHash:   hash,
+		Prefix:    plain[:len(keyPrefix)+8],
+		Plaintext: plain,
+		Enabled:   true,
 	}
 
 	err = s.DB.Transaction(func(tx *gorm.DB) error {
@@ -136,7 +137,6 @@ func (s *ApiKeyService) TouchLastUsed(keyID uint) {
 		return
 	}
 	s.lastUsedAt[keyID] = time.Now()
-	// 异步写 DB，不阻塞请求
 	go func() {
 		now := time.Now()
 		_ = s.DB.Model(&models.APIKey{}).Where("id = ?", keyID).Update("last_used_at", now).Error
@@ -166,6 +166,21 @@ func (s *ApiKeyService) UpdateDefaultChannels(id uint, channelIDs []uint) error 
 	return s.DB.Transaction(func(tx *gorm.DB) error {
 		return s.replaceDefaultChannels(tx, id, channelIDs)
 	})
+}
+
+// GetPlaintext 返回 Key 的明文。
+func (s *ApiKeyService) GetPlaintext(id uint) (string, error) {
+	var key models.APIKey
+	if err := s.DB.First(&key, id).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return "", middleware.NewAppError(middleware.CodeNotFound, "API Key 不存在")
+		}
+		return "", err
+	}
+	if strings.TrimSpace(key.Plaintext) == "" {
+		return "", middleware.NewAppError(middleware.CodeNotFound, "该 API Key 暂无可查看的明文，请重新创建")
+	}
+	return key.Plaintext, nil
 }
 
 // --- internal ---
@@ -216,7 +231,6 @@ func base62Encode(b []byte) string {
 		n.DivMod(n, base, mod)
 		out = append(out, chars[mod.Int64()])
 	}
-	// 反转
 	for i, j := 0, len(out)-1; i < j; i, j = i+1, j-1 {
 		out[i], out[j] = out[j], out[i]
 	}
@@ -266,5 +280,4 @@ func (s *ApiKeyService) GetView(id uint) (*ApiKeyView, error) {
 	}, nil
 }
 
-// compile-time assertion
 var _ = fmt.Sprintf
