@@ -133,13 +133,13 @@ export default function ChannelsPage() {
       ) : (
         <Card>
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-[13px]">
               <thead className="border-b bg-muted/40 text-left text-xs uppercase text-muted-foreground">
                 <tr>
-                  <th className="px-4 py-3">名称</th>
-                  <th className="px-4 py-3">类型</th>
-                  <th className="px-4 py-3 text-center">启用</th>
-                  <th className="px-4 py-3 text-right">操作</th>
+                  <th className="px-4 py-2.5">名称</th>
+                  <th className="px-4 py-2.5">类型</th>
+                  <th className="px-4 py-2.5 text-center">启用</th>
+                  <th className="px-4 py-2.5 text-right">操作</th>
                 </tr>
               </thead>
               <tbody>
@@ -147,25 +147,25 @@ export default function ChannelsPage() {
                   const Icon = TYPE_ICON[ch.type]
                   return (
                     <tr key={ch.id} className="border-b last:border-b-0 hover:bg-muted/30">
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-2.5">
                         <div className="flex items-center gap-2">
                           <Icon className="h-4 w-4 text-muted-foreground shrink-0" />
                           <span className="font-medium truncate" title={ch.name}>{ch.name}</span>
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-xs text-muted-foreground">{TYPE_LABEL[ch.type]}</td>
-                      <td className="px-4 py-3 text-center">
+                      <td className="px-4 py-2.5 text-xs text-muted-foreground">{TYPE_LABEL[ch.type]}</td>
+                      <td className="px-4 py-2.5 text-center">
                         <Switch checked={ch.enabled} onCheckedChange={() => handleToggle(ch)} aria-label="启用/禁用通道" />
                       </td>
-                      <td className="px-4 py-3">
-                        <div className="flex justify-end gap-1">
-                          <Button size="sm" variant="ghost" onClick={() => handleTest(ch)} disabled={testingId === ch.id} title="试发">
+                      <td className="px-4 py-2.5">
+                        <div className="flex justify-end gap-0.5">
+                          <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => handleTest(ch)} disabled={testingId === ch.id} title="试发">
                             <TestTube className="h-4 w-4" />
                           </Button>
-                          <Button size="sm" variant="ghost" onClick={() => setEditing(ch)} title="编辑">
+                          <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setEditing(ch)} title="编辑">
                             <Pencil className="h-4 w-4" />
                           </Button>
-                          <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => setToDelete(ch)} title="删除">
+                          <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setToDelete(ch)} title="删除">
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>

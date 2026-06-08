@@ -259,17 +259,17 @@ export default function RemindersPage() {
       ) : (
         <Card>
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-[13px]">
               <thead className="border-b bg-muted/40 text-left text-xs uppercase text-muted-foreground">
                 <tr>
-                  <th className="px-4 py-3">标题</th>
-                  <th className="px-4 py-3">规则</th>
-                  <th className="px-4 py-3">详情</th>
-                  <th className="px-4 py-3">下次触发</th>
-                  <th className="px-4 py-3">通道</th>
-                  <th className="px-4 py-3 text-center">启用</th>
-                  <th className="px-4 py-3 pl-16">来源</th>
-                  <th className="px-4 py-3 text-right">操作</th>
+                  <th className="px-4 py-2.5">标题</th>
+                  <th className="px-4 py-2.5">规则</th>
+                  <th className="px-4 py-2.5">详情</th>
+                  <th className="px-4 py-2.5">下次触发</th>
+                  <th className="px-4 py-2.5">通道</th>
+                  <th className="px-4 py-2.5 text-center">启用</th>
+                  <th className="px-4 py-2.5 pl-16">来源</th>
+                  <th className="px-4 py-2.5 text-right">操作</th>
                 </tr>
               </thead>
               <tbody>
@@ -277,7 +277,7 @@ export default function RemindersPage() {
                   const chNames = r.channel_ids.map((cid) => channelMap.get(cid) || `#${cid}`)
                   return (
                     <tr key={r.id} className="border-b last:border-b-0 hover:bg-muted/30">
-                      <td className="px-4 py-3 max-w-[12rem]">
+                      <td className="px-4 py-2.5 max-w-[12rem]">
                         <div className="font-medium truncate" title={r.title}>
                           {r.title}
                         </div>
@@ -287,18 +287,18 @@ export default function RemindersPage() {
                           </div>
                         )}
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-2.5">
                         {TYPE_LABEL[r.schedule_type] ?? r.schedule_type}
                       </td>
-                      <td className="px-4 py-3 text-xs text-muted-foreground max-w-[16rem]">
+                      <td className="px-4 py-2.5 text-xs text-muted-foreground max-w-[16rem]">
                         <span className="truncate block" title={formatDetail(r)}>
                           {formatDetail(r)}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-xs whitespace-nowrap">
+                      <td className="px-4 py-2.5 text-xs whitespace-nowrap">
                         {r.enabled ? formatNextFire(r.next_fire_at) : '—'}
                       </td>
-                      <td className="px-4 py-3 max-w-[10rem]">
+                      <td className="px-4 py-2.5 max-w-[10rem]">
                         {chNames.length === 0 ? (
                           <span className="text-xs text-muted-foreground">—</span>
                         ) : (
@@ -307,30 +307,31 @@ export default function RemindersPage() {
                           </span>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-center">
+                      <td className="px-4 py-2.5 text-center">
                         <Switch checked={r.enabled} onCheckedChange={() => handleToggle(r)} />
                       </td>
-                      <td className="px-4 py-3 text-xs text-muted-foreground pl-16">
+                      <td className="px-4 py-2.5 text-xs text-muted-foreground pl-16">
                         {SOURCE_LABEL[r.source] ?? r.source}
                       </td>
-                      <td className="px-4 py-3">
-                        <div className="flex justify-end gap-1">
+                      <td className="px-4 py-2.5">
+                        <div className="flex justify-end gap-0.5">
                           <Button
-                            size="sm"
+                            size="icon"
                             variant="ghost"
+                            className="h-8 w-8"
                             onClick={() => handleTest(r)}
                             disabled={testingId === r.id}
                             title="试触发"
                           >
                             <TestTube className="h-4 w-4" />
                           </Button>
-                          <Button size="sm" variant="ghost" onClick={() => setEditing(r)} title="编辑">
+                          <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setEditing(r)} title="编辑">
                             <Pencil className="h-4 w-4" />
                           </Button>
                           <Button
-                            size="sm"
+                            size="icon"
                             variant="ghost"
-                            className="text-destructive hover:text-destructive"
+                            className="h-8 w-8 text-destructive hover:text-destructive"
                             onClick={() => setToDelete(r)}
                             title="删除"
                           >
