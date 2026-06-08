@@ -165,8 +165,8 @@ export function ScheduleForm({ value, onChange }: Props) {
                   }
                   return undefined
                 })()}
-                hour={spec.hour as number | undefined}
-                minute={spec.minute as number | undefined}
+                hour={getSpecHour(spec)}
+                minute={getSpecMinute(spec)}
                 onSelect={handleCalendarSelect}
                 onClose={() => setCalendarOpen(false)}
               />
@@ -211,6 +211,22 @@ function getLunarYmd(dateStr: string): { year: number; month: number; day: numbe
   const sol = Solar.fromYmd(Number(d[0]), Number(d[1]), Number(d[2]))
   const l = sol.getLunar()
   return { year: l.getYear(), month: l.getMonth(), day: l.getDay() }
+}
+
+function getSpecHour(spec: Record<string, unknown>): number | undefined {
+  if (typeof spec.hour === 'number') return spec.hour as number
+  const at = (spec.at ?? spec.start_at) as string | undefined
+  if (!at || at.length < 16) return undefined
+  const hour = Number(at.slice(11, 13))
+  return Number.isFinite(hour) ? hour : undefined
+}
+
+function getSpecMinute(spec: Record<string, unknown>): number | undefined {
+  if (typeof spec.minute === 'number') return spec.minute as number
+  const at = (spec.at ?? spec.start_at) as string | undefined
+  if (!at || at.length < 16) return undefined
+  const minute = Number(at.slice(14, 16))
+  return Number.isFinite(minute) ? minute : undefined
 }
 
 function formatSolarLine(spec: Record<string, unknown>, calendar: ReminderCalendar): string {
