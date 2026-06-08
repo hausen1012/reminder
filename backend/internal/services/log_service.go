@@ -5,6 +5,7 @@ package services
 
 import (
 	"errors"
+	"sort"
 	"time"
 
 	"github.com/bedrock/backend/internal/middleware"
@@ -52,27 +53,25 @@ type LogView struct {
 
 // List 查询日志列表，返回视图切片与总数。
 func (s *LogService) List(f LogFilter) ([]*LogView, int64, error) {
-	q := s.DB.Model(&models.DeliveryLog{}).
-		Select("delivery_logs.*, COALESCE(r.title, delivery_logs.title) AS reminder_title, r.deleted_at IS NOT NULL AS reminder_deleted").
-		Joins("LEFT JOIN reminders r ON r.id = delivery_logs.reminder_id")
+	buildQuery := func() *gorm.DB {
+		q := s.DB.Model(&models.DeliveryLog{}).
+			Select("delivery_logs.*, COALESCE(r.title, delivery_logs.title) AS reminder_title, r.deleted_at IS NOT NULL AS reminder_deleted").
+			Joins("LEFT JOIN reminders r ON r.id = delivery_logs.reminder_id")
 
-	if f.ReminderID > 0 {
-		q = q.Where("delivery_logs.reminder_id = ?", f.ReminderID)
-	}
-	if f.Status != "" {
-		q = q.Where("delivery_logs.status = ?", f.Status)
-	}
-	if f.Source != "" && f.Source != "all" {
-		q = q.Where("delivery_logs.source = ?", f.Source)
-	}
-	if s := f.Search; s != "" {
-		like := "%" + s + "%"
-		q = q.Where("delivery_logs.title LIKE ? OR delivery_logs.content LIKE ?", like, like)
-	}
-
-	var total int64
-	if err := q.Count(&total).Error; err != nil {
-		return nil, 0, err
+		if f.ReminderID > 0 {
+			q = q.Where("delivery_logs.reminder_id = ?", f.ReminderID)
+		}
+		if f.Status != "" {
+			q = q.Where("delivery_logs.status = ?", f.Status)
+		}
+		if f.Source != "" && f.Source != "all" {
+			q = q.Where("delivery_logs.source = ?", f.Source)
+		}
+		if s := f.Search; s != "" {
+			like := "%" + s + "%"
+			q = q.Where("delivery_logs.title LIKE ? OR delivery_logs.content LIKE ?", like, like)
+		}
+		return q
 	}
 
 	if f.Limit <= 0 {
@@ -87,18 +86,73 @@ func (s *LogService) List(f LogFilter) ([]*LogView, int64, error) {
 		ReminderTitle   string `gorm:"column:reminder_title"`
 		ReminderDeleted bool   `gorm:"column:reminder_deleted"`
 	}
-	var rows []row
-	if err := q.Order("delivery_logs.id DESC").Limit(f.Limit).Offset(f.Offset).Scan(&rows).Error; err != nil {
+
+	var total int64
+	if err := buildQuery().Where("delivery_logs.retry_round = 0").Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
 
-	views := make([]*LogView, 0, len(rows))
-	for i := range rows {
-		views = append(views, &LogView{
-			DeliveryLog:     rows[i].DeliveryLog,
-			ReminderTitle:   rows[i].ReminderTitle,
-			ReminderDeleted: rows[i].ReminderDeleted,
+	var mainRows []row
+	if err := buildQuery().Where("delivery_logs.retry_round = 0").Order("delivery_logs.id DESC").Limit(f.Limit).Offset(f.Offset).Scan(&mainRows).Error; err != nil {
+		return nil, 0, err
+	}
+	if len(mainRows) == 0 {
+		return []*LogView{}, total, nil
+	}
+
+	mainByID := make(map[uint]row, len(mainRows))
+	ids := make([]uint, 0, len(mainRows))
+	chainIDs := make([]string, 0, len(mainRows))
+	for _, r := range mainRows {
+		mainByID[r.ID] = r
+		ids = append(ids, r.ID)
+		if r.ConfirmChainID != nil && *r.ConfirmChainID != "" {
+			chainIDs = append(chainIDs, *r.ConfirmChainID)
+		}
+	}
+
+	var subRows []row
+	if len(chainIDs) > 0 {
+		if err := buildQuery().Where("delivery_logs.retry_round > 0").Where("delivery_logs.confirm_chain_id IN ?", chainIDs).Order("delivery_logs.id ASC").Scan(&subRows).Error; err != nil {
+			return nil, 0, err
+		}
+	}
+
+	groupedSubs := make(map[string][]row, len(chainIDs))
+	for _, r := range subRows {
+		if r.ConfirmChainID == nil || *r.ConfirmChainID == "" {
+			continue
+		}
+		key := *r.ConfirmChainID
+		groupedSubs[key] = append(groupedSubs[key], r)
+	}
+	for key := range groupedSubs {
+		sort.Slice(groupedSubs[key], func(i, j int) bool {
+			if groupedSubs[key][i].RetryRound == groupedSubs[key][j].RetryRound {
+				return groupedSubs[key][i].ID < groupedSubs[key][j].ID
+			}
+			return groupedSubs[key][i].RetryRound < groupedSubs[key][j].RetryRound
 		})
+	}
+
+	views := make([]*LogView, 0, len(mainRows)+len(subRows))
+	for _, id := range ids {
+		main := mainByID[id]
+		views = append(views, &LogView{
+			DeliveryLog:     main.DeliveryLog,
+			ReminderTitle:   main.ReminderTitle,
+			ReminderDeleted: main.ReminderDeleted,
+		})
+		if main.ConfirmChainID == nil || *main.ConfirmChainID == "" {
+			continue
+		}
+		for _, sub := range groupedSubs[*main.ConfirmChainID] {
+			views = append(views, &LogView{
+				DeliveryLog:     sub.DeliveryLog,
+				ReminderTitle:   sub.ReminderTitle,
+				ReminderDeleted: sub.ReminderDeleted,
+			})
+		}
 	}
 	return views, total, nil
 }

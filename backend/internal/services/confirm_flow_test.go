@@ -67,6 +67,87 @@ func TestConfirmRetryStopsAtMaxRetries(t *testing.T) {
 	}
 }
 
+func TestLogServiceListPaginatesByConfirmChain(t *testing.T) {
+	db := openTestDB(t)
+	stack := newConfirmTestStack(t, db)
+	reminder := createConfirmReminder(t, db, 1, 2)
+
+	_, err := stack.dispatch.TestOnce(context.Background(), reminder)
+	if err != nil {
+		t.Fatalf("TestOnce 失败: %v", err)
+	}
+
+	waitFor(t, 5*time.Second, func() bool {
+		return countLogsByReminder(t, db, reminder.ID) == 3
+	}, "等待确认重试链生成完成")
+
+	other := &models.DeliveryLog{
+		ReminderID: reminder.ID,
+		FiredAt:    time.Now().Add(time.Minute),
+		Title:      "另一条独立日志",
+		Content:    "独立内容",
+		Status:     "success",
+		Source:     "manual",
+		RetryRound: 0,
+	}
+	if err := db.Create(other).Error; err != nil {
+		t.Fatalf("创建独立日志失败: %v", err)
+	}
+
+	logs := listLogsByReminder(t, db, reminder.ID)
+	if len(logs) != 4 {
+		t.Fatalf("期望 4 条原始日志，实际 %d", len(logs))
+	}
+	chainID := ""
+	for _, row := range logs {
+		if row.ConfirmChainID != nil && *row.ConfirmChainID != "" {
+			chainID = *row.ConfirmChainID
+			break
+		}
+	}
+	if chainID == "" {
+		t.Fatal("确认链 ID 为空")
+	}
+
+	svc := NewLogService(db)
+	items, total, err := svc.List(LogFilter{Limit: 10})
+	if err != nil {
+		t.Fatalf("List 失败: %v", err)
+	}
+	if total != 2 {
+		t.Fatalf("期望分页总数为 2，实际 %d", total)
+	}
+	if len(items) != 4 {
+		t.Fatalf("期望返回 4 条展示日志，实际 %d", len(items))
+	}
+	if items[0].ID != other.ID {
+		t.Fatalf("第一页首条应为独立日志，实际 %d", items[0].ID)
+	}
+	if items[1].RetryRound != 0 {
+		t.Fatalf("确认链主日志 retry_round 应为 0，实际 %d", items[1].RetryRound)
+	}
+	if items[1].ConfirmChainID == nil || *items[1].ConfirmChainID != chainID {
+		t.Fatal("确认链主日志链 ID 不匹配")
+	}
+	if items[2].RetryRound != 1 || items[3].RetryRound != 2 {
+		t.Fatalf("重发日志顺序不正确，实际为 %d、%d", items[2].RetryRound, items[3].RetryRound)
+	}
+
+	page2, total2, err := svc.List(LogFilter{Limit: 1, Offset: 1})
+	if err != nil {
+		t.Fatalf("分页查询失败: %v", err)
+	}
+	if total2 != 2 {
+		t.Fatalf("分页总数应保持为 2，实际 %d", total2)
+	}
+	if len(page2) != 3 {
+		t.Fatalf("第二页应返回整条确认链 3 条展示日志，实际 %d", len(page2))
+	}
+	if page2[0].RetryRound != 0 || page2[1].RetryRound != 1 || page2[2].RetryRound != 2 {
+		t.Fatalf("第二页确认链顺序不正确：%d、%d、%d", page2[0].RetryRound, page2[1].RetryRound, page2[2].RetryRound)
+	}
+}
+
 func TestConfirmRetryStopsAfterConfirmAndMarksWholeChain(t *testing.T) {
 	db := openTestDB(t)
 	stack := newConfirmTestStack(t, db)
