@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { useAuth } from '@/contexts/AuthContext'
 import { listUpcomingReminders, listLogs, listChannelStats, listApiKeyStats } from '@/lib/api'
+import { formatReminderDetail } from '@/lib/utils'
 import type { Reminder, DeliveryLog } from '@/types'
 import type { ChannelStats } from '@/lib/api'
 
@@ -178,7 +179,7 @@ export default function Dashboard() {
                       </Badge>
                     </div>
                     <div className="text-xs text-muted-foreground mt-1">
-                      {r.schedule_type === 'cron' ? String(r.schedule_spec?.expr ?? '') : r.schedule_type}
+                      {formatReminderDetail(r)}
                       {r.channel_ids.length > 0 && ` · ${r.channel_ids.length} 个通道`}
                     </div>
                   </Link>
