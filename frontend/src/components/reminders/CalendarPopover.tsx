@@ -9,7 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Clock3 } from 'lucide-react'
 import { Solar } from 'lunar-typescript'
 import type { CalendarResult } from '@/types'
 
@@ -42,6 +42,8 @@ interface DayCell {
 export function CalendarPopover({ date, hour: initHour, minute: initMin, onSelect, onClose }: Props) {
   const now = new Date()
   const popoverRef = useRef<HTMLDivElement>(null)
+  const hourListRef = useRef<HTMLDivElement>(null)
+  const minuteListRef = useRef<HTMLDivElement>(null)
   const [showLunar, setShowLunar] = useState(false)
   const [solarYear, setSolarYear] = useState(() => {
     if (date) return new Date(date).getFullYear()
@@ -57,6 +59,7 @@ export function CalendarPopover({ date, hour: initHour, minute: initMin, onSelec
   })
   const [hour, setHour] = useState(initHour ?? now.getHours())
   const [minute, setMinute] = useState(initMin ?? now.getMinutes())
+  const [timePanelOpen, setTimePanelOpen] = useState(false)
 
   // 点击外部关闭（排除 Radix Select portal）
   useEffect(() => {
@@ -75,6 +78,21 @@ export function CalendarPopover({ date, hour: initHour, minute: initMin, onSelec
       document.removeEventListener('mousedown', handleClick)
     }
   }, [onClose])
+
+  useEffect(() => {
+    if (!timePanelOpen) return
+
+    function scrollSelectedIntoView(container: HTMLDivElement | null, index: number) {
+      if (!container) return
+      const item = container.children[index] as HTMLElement | undefined
+      if (!item) return
+      const offset = item.offsetTop - (container.clientHeight - item.offsetHeight) / 2
+      container.scrollTop = Math.max(0, offset)
+    }
+
+    scrollSelectedIntoView(hourListRef.current, hour)
+    scrollSelectedIntoView(minuteListRef.current, minute)
+  }, [timePanelOpen, hour, minute])
 
   // 公历模式网格
   const solarGrid = useMemo(() => {
@@ -170,6 +188,18 @@ export function CalendarPopover({ date, hour: initHour, minute: initMin, onSelec
     setSelectedDay(n.getDate())
     setHour(n.getHours())
     setMinute(n.getMinutes())
+  }
+
+  function toggleTimePanel() {
+    setTimePanelOpen((open) => !open)
+  }
+
+  function handleHourSelect(value: number) {
+    setHour(value)
+  }
+
+  function handleMinuteSelect(value: number) {
+    setMinute(value)
   }
 
   return (
@@ -271,35 +301,56 @@ export function CalendarPopover({ date, hour: initHour, minute: initMin, onSelec
       </div>
 
       {/* 底部：时间 + 操作按钮 */}
-      <div className="flex items-center gap-1 mt-2 pt-2 border-t">
-        <Select value={String(hour)} onValueChange={(v) => setHour(Number(v))}>
-          <SelectTrigger className="h-6 w-14 text-xs">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {Array.from({ length: 24 }, (_, i) => (
-              <SelectItem key={i} value={String(i)} className="text-xs">
-                {String(i).padStart(2, '0')}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <span className="text-xs text-muted-foreground shrink-0">:</span>
-        <Select value={String(minute)} onValueChange={(v) => setMinute(Number(v))}>
-          <SelectTrigger className="h-6 w-14 text-xs">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {Array.from({ length: 60 }, (_, i) => (
-              <SelectItem key={i} value={String(i)} className="text-xs">
-                {String(i).padStart(2, '0')}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <div className="flex gap-1 ml-auto">
-          <Button type="button" onClick={onClose} className="h-6 text-xs px-2" variant="outline">取消</Button>
-          <Button type="button" onClick={handleConfirm} className="h-6 text-xs px-2" disabled={selectedDay === null}>确定</Button>
+      <div className="mt-2 border-t pt-2">
+        <div className="flex items-center justify-between gap-2">
+          <div className="relative">
+            <button
+              type="button"
+              onClick={toggleTimePanel}
+              className="flex items-center gap-1 rounded-md border bg-background px-2 py-1 text-sm leading-none transition-colors hover:bg-muted"
+            >
+              <Clock3 className="h-3.5 w-3.5 text-muted-foreground" />
+              <span className="font-medium tracking-tight text-foreground">{String(hour).padStart(2, '0')}:{String(minute).padStart(2, '0')}</span>
+            </button>
+            {timePanelOpen && (
+              <div className="absolute bottom-full left-0 z-20 mb-1 w-[108px] overflow-hidden rounded-md border bg-card shadow-lg">
+                <div className="grid grid-cols-2">
+                  <div className="border-r bg-background/40">
+                    <div ref={hourListRef} className="max-h-40 overflow-y-auto py-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                      {Array.from({ length: 24 }, (_, i) => (
+                        <button
+                          key={i}
+                          type="button"
+                          onClick={() => handleHourSelect(i)}
+                          className={`block w-full px-1 py-1 text-center text-[13px] leading-none transition-colors ${hour === i ? 'bg-muted font-medium text-foreground' : 'hover:bg-muted/70'}`}
+                        >
+                          {String(i).padStart(2, '0')}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="bg-background/40">
+                    <div ref={minuteListRef} className="max-h-40 overflow-y-auto py-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                      {Array.from({ length: 60 }, (_, i) => (
+                        <button
+                          key={i}
+                          type="button"
+                          onClick={() => handleMinuteSelect(i)}
+                          className={`block w-full px-1 py-1 text-center text-[13px] leading-none transition-colors ${minute === i ? 'bg-muted font-medium text-foreground' : 'hover:bg-muted/70'}`}
+                        >
+                          {String(i).padStart(2, '0')}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+          <div className="flex gap-1">
+            <Button type="button" onClick={onClose} className="h-6 px-2 text-xs" variant="outline">取消</Button>
+            <Button type="button" onClick={handleConfirm} className="h-6 px-2 text-xs" disabled={selectedDay === null}>确定</Button>
+          </div>
         </div>
       </div>
     </div>
