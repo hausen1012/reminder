@@ -1,12 +1,11 @@
-// API Key 管理页：列表 + 新建对话框 + 详情编辑 + 明文展示
-import { useEffect, useState } from 'react'
-import { Key, Plus, Trash2, Copy, CheckCircle2, Pencil, Eye } from 'lucide-react'
+// API Key 管理页：列表 + 搜索 + 分页 + 新建对话框 + 详情编辑 + 明文展示
+import { useEffect, useMemo, useState } from 'react'
+import { Plus, Trash2, Copy, CheckCircle2, Pencil, Eye, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
-import { Badge } from '@/components/ui/badge'
 import {
   Dialog,
   DialogContent,
@@ -15,7 +14,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { Pagination } from '@/components/ui/pagination'
 import { ChannelMultiSelect } from '@/components/channels/ChannelMultiSelect'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { useToast } from '@/components/ui/use-toast'
 import {
   listApiKeys,
@@ -32,6 +39,10 @@ import type { APIKey, Channel } from '@/types'
 function formatChannelNames(channels: Channel[], ids: number[]): string {
   if (ids.length === 0) return '未设置'
   return ids.map((id) => channels.find((c) => c.id === id)?.name ?? `#${id}`).join(', ')
+}
+
+function formatRecentTime(dateStr?: string): string {
+  return dateStr ? new Date(dateStr).toLocaleString() : '—'
 }
 
 export default function ApiKeysPage() {
@@ -54,6 +65,11 @@ export default function ApiKeysPage() {
   const [detailChannelIDs, setDetailChannelIDs] = useState<number[]>([])
   const [detailPlaintext, setDetailPlaintext] = useState('')
   const [plaintextLoading, setPlaintextLoading] = useState(false)
+  const [enabled, setEnabled] = useState<string>('all')
+  const [searchInput, setSearchInput] = useState('')
+  const [search, setSearch] = useState('')
+  const [limit, setLimit] = useState(10)
+  const [offset, setOffset] = useState(0)
   const { toast } = useToast()
 
   async function refresh() {
@@ -72,6 +88,24 @@ export default function ApiKeysPage() {
   useEffect(() => {
     refresh()
   }, [])
+
+  const filteredItems = useMemo(() => {
+    const keyword = search.trim().toLowerCase()
+    return items.filter((item) => {
+      if (enabled === 'true' && !item.enabled) return false
+      if (enabled === 'false' && item.enabled) return false
+      if (!keyword) return true
+      return item.name.toLowerCase().includes(keyword)
+    })
+  }, [items, enabled, search])
+
+  const pagedItems = useMemo(() => {
+    return filteredItems.slice(offset, offset + limit)
+  }, [filteredItems, offset, limit])
+
+  useEffect(() => {
+    setOffset(0)
+  }, [enabled, search, limit])
 
   function resetCreateDialog() {
     setCreateOpen(false)
@@ -205,48 +239,99 @@ export default function ApiKeysPage() {
         </Button>
       </div>
 
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="w-40">
+          <Select value={enabled} onValueChange={setEnabled}>
+            <SelectTrigger>
+              <SelectValue placeholder="状态" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">全部状态</SelectItem>
+              <SelectItem value="true">已启用</SelectItem>
+              <SelectItem value="false">已禁用</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <form
+          className="max-w-md flex-1"
+          onSubmit={(e) => {
+            e.preventDefault()
+            setSearch(searchInput)
+          }}
+        >
+          <Input
+            placeholder="搜索名称…"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+          />
+        </form>
+        <span className="text-sm text-muted-foreground">共 {filteredItems.length} 条</span>
+        <Button variant="outline" size="icon" onClick={refresh} title="刷新">
+          <RefreshCw className="h-4 w-4" />
+        </Button>
+      </div>
+
       {loading ? (
         <p className="text-sm text-muted-foreground">加载中…</p>
-      ) : items.length === 0 ? (
+      ) : filteredItems.length === 0 ? (
         <Card>
           <CardContent className="py-10 text-center text-sm text-muted-foreground">
-            还没有 API Key。创建后可通过 Ingest API 外部调用创建提醒。
+            {search.trim() ? '没有匹配的 API Key。' : '还没有 API Key。创建后可通过 Ingest API 外部调用创建提醒。'}
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-3">
-          {items.map((key) => (
-            <Card key={key.id}>
-              <CardContent className="flex items-center gap-4 py-4">
-                <Key className="h-5 w-5 shrink-0 text-muted-foreground" />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="truncate font-medium">{key.name}</span>
-                    <code className="rounded bg-muted px-1.5 py-0.5 text-xs">{key.prefix}...</code>
-                    <Badge variant="outline" className="text-xs">{key.usage_24h}/24h</Badge>
-                  </div>
-                  <div className="mt-0.5 text-xs text-muted-foreground">
-                    创建于 {new Date(key.created_at).toLocaleDateString()}
-                    {key.last_used_at && ` · 最近使用 ${new Date(key.last_used_at).toLocaleDateString()}`}
-                    {!key.enabled && <span> · 已禁用</span>}
-                  </div>
-                  <div className="mt-1 truncate text-xs text-muted-foreground" title={formatChannelNames(channels, key.default_channel_ids)}>
-                    默认通道：{formatChannelNames(channels, key.default_channel_ids)}
-                  </div>
-                </div>
-                <div className="flex shrink-0 items-center gap-2">
-                  <Switch checked={key.enabled} onCheckedChange={() => handleToggle(key)} />
-                  <Button variant="ghost" size="icon" onClick={() => openDetail(key)} title="查看与编辑">
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                  <Button variant="ghost" size="icon" onClick={() => setToDelete(key)} title="删除">
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+        <Card>
+          <div className="overflow-x-auto">
+            <table className="w-full text-[13px]">
+              <thead className="border-b bg-muted/40 text-left text-xs uppercase text-muted-foreground">
+                <tr>
+                  <th className="px-4 py-2.5">名称</th>
+                  <th className="px-4 py-2.5">通道</th>
+                  <th className="px-4 py-2.5 text-center">启用</th>
+                  <th className="px-4 py-2.5">最近使用</th>
+                  <th className="px-4 py-2.5">创建时间</th>
+                  <th className="px-4 py-2.5 text-right">操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pagedItems.map((key) => (
+                  <tr key={key.id} className="border-b last:border-b-0 hover:bg-muted/30">
+                    <td className="max-w-[14rem] px-4 py-2.5">
+                      <div className="truncate font-medium" title={key.name}>
+                        {key.name}
+                      </div>
+                    </td>
+                    <td className="max-w-[14rem] px-4 py-2.5 text-xs text-muted-foreground">
+                      <span className="block truncate" title={formatChannelNames(channels, key.default_channel_ids)}>
+                        {formatChannelNames(channels, key.default_channel_ids)}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2.5 text-center">
+                      <Switch checked={key.enabled} onCheckedChange={() => handleToggle(key)} />
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-2.5 text-xs text-muted-foreground">
+                      {formatRecentTime(key.last_used_at)}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-2.5 text-xs text-muted-foreground">
+                      {new Date(key.created_at).toLocaleString()}
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <div className="flex justify-end gap-0.5">
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openDetail(key)} title="查看与编辑">
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setToDelete(key)} title="删除">
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <Pagination total={filteredItems.length} limit={limit} offset={offset} onPageChange={setOffset} onLimitChange={setLimit} />
+        </Card>
       )}
 
       <Dialog open={createOpen && !createdResult} onOpenChange={(open) => !open && resetCreateDialog()}>
@@ -304,19 +389,21 @@ export default function ApiKeysPage() {
             <div className="space-y-3">
               <div className="rounded-md border bg-muted p-3">
                 <div className="mb-1 text-xs text-muted-foreground">{createdResult.name}</div>
-                <code className="select-all break-all text-sm">{createdResult.plaintext}</code>
+                <div className="flex items-start gap-2">
+                  <code className="min-w-0 flex-1 select-all break-all text-sm">{createdResult.plaintext}</code>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(createdResult.plaintext)
+                      toast({ title: '密钥已复制' })
+                    }}
+                    className="rounded p-1 text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
+                    title="复制密钥"
+                  >
+                    <Copy className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
-              <Button
-                className="w-full"
-                variant="outline"
-                onClick={() => {
-                  navigator.clipboard.writeText(createdResult.plaintext)
-                  toast({ title: '密钥已复制' })
-                }}
-              >
-                <Copy className="mr-1 h-4 w-4" />
-                复制密钥
-              </Button>
             </div>
           )}
           <DialogFooter>
@@ -346,24 +433,16 @@ export default function ApiKeysPage() {
                   <p className="font-medium">{selectedKey.name}</p>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground">前缀</p>
-                  <code className="rounded bg-muted px-2 py-1 text-xs">{selectedKey.prefix}...</code>
-                </div>
-                <div className="space-y-1">
                   <p className="text-xs text-muted-foreground">状态</p>
                   <p>{selectedKey.enabled ? '已启用' : '已禁用'}</p>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground">近 24 小时调用</p>
-                  <p>{selectedKey.usage_24h}</p>
+                  <p className="text-xs text-muted-foreground">最近使用</p>
+                  <p>{formatRecentTime(selectedKey.last_used_at)}</p>
                 </div>
                 <div className="space-y-1">
                   <p className="text-xs text-muted-foreground">创建时间</p>
                   <p>{new Date(selectedKey.created_at).toLocaleString()}</p>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground">最近使用</p>
-                  <p>{selectedKey.last_used_at ? new Date(selectedKey.last_used_at).toLocaleString() : '—'}</p>
                 </div>
               </div>
 
@@ -376,19 +455,21 @@ export default function ApiKeysPage() {
                   </Button>
                 </div>
                 {detailPlaintext ? (
-                  <div className="space-y-2 rounded-md border bg-muted p-3">
-                    <code className="block select-all break-all text-sm">{detailPlaintext}</code>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        navigator.clipboard.writeText(detailPlaintext)
-                        toast({ title: '密钥已复制' })
-                      }}
-                    >
-                      <Copy className="mr-1 h-4 w-4" />
-                      复制密钥
-                    </Button>
+                  <div className="rounded-md border bg-muted p-3">
+                    <div className="flex items-start gap-2">
+                      <code className="min-w-0 flex-1 select-all break-all text-sm">{detailPlaintext}</code>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(detailPlaintext)
+                          toast({ title: '密钥已复制' })
+                        }}
+                        className="rounded p-1 text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
+                        title="复制密钥"
+                      >
+                        <Copy className="h-4 w-4" />
+                      </button>
+                    </div>
                   </div>
                 ) : (
                   <p className="text-xs text-muted-foreground">点击按钮后按需读取并展示明文。</p>
