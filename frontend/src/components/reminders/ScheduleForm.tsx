@@ -156,10 +156,16 @@ export function ScheduleForm({ value, onChange }: Props) {
             <Label>触发时间</Label>
             <div
               onClick={() => setCalendarOpen(true)}
-              className="flex h-auto min-h-[2.5rem] cursor-pointer flex-col justify-center rounded-md border border-input bg-background px-3 py-1.5 text-sm ring-offset-background hover:bg-accent"
+              className="flex min-h-[2.5rem] cursor-pointer items-center rounded-md border border-input bg-background px-3 py-1.5 text-sm ring-offset-background hover:bg-accent"
             >
-              <span className="text-xs leading-tight">{formatReminderSolarLine(spec, value.calendar)}</span>
-              <span className="text-[11px] text-muted-foreground leading-tight mt-0.5">{formatReminderLunarLine(spec, value.calendar)}</span>
+              <span className="truncate text-xs leading-tight">
+                {formatReminderSolarLine(spec, value.calendar)}
+                {formatReminderLunarLine(spec, value.calendar) && (
+                  <span className="ml-1.5 text-[11px] text-muted-foreground">
+                    · {formatReminderLunarLine(spec, value.calendar)}
+                  </span>
+                )}
+              </span>
             </div>
             {calendarOpen && (
               <CalendarPopover

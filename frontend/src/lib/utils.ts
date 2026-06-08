@@ -75,7 +75,7 @@ export function formatReminderLunarLine(spec: Record<string, unknown>, calendar:
     if (at) ymd = getLunarYmd(at)
   }
   if (!ymd) return ''
-  return `${formatChineseLunarYear(ymd.year)} ${formatChineseLunarMonth(ymd.month)}${formatChineseLunarDay(ymd.day)}`
+  return `${formatChineseLunarYear(ymd.year)}年${formatChineseLunarMonth(ymd.month)}${formatChineseLunarDay(ymd.day)}`
 }
 
 export function formatReminderDetail(reminder: Reminder): string {
