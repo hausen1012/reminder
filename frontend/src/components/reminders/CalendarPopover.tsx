@@ -220,6 +220,7 @@ export function CalendarPopover({ date, hour: initHour, minute: initMin, initial
 
   function handleMinuteSelect(value: number) {
     setMinute(value)
+    setTimePanelOpen(false)
   }
 
   return (
