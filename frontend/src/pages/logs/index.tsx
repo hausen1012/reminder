@@ -170,10 +170,7 @@ export default function LogsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">发送日志</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            查看提醒触发的发送记录与各通道的投递详情。
-          </p>
+          <h1 className="text-3xl font-bold tracking-tight">日志</h1>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={() => openPurge('7d')}>

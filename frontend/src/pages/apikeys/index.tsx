@@ -227,12 +227,7 @@ export default function ApiKeysPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">API</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            管理外部 API 调用的密钥，可配置默认通知渠道；明文默认隐藏，点击时再查看。
-          </p>
-        </div>
+        <h1 className="text-3xl font-bold tracking-tight">API</h1>
         <Button onClick={() => setCreateOpen(true)}>
           <Plus className="mr-1 h-4 w-4" />
           新建 Key

@@ -132,9 +132,6 @@ export default function ChannelsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">通知</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            管理用于发送提醒的通道：邮件、钉钉、企微、Webhook、日志。
-          </p>
         </div>
         <Button onClick={() => setCreating(true)}>
           <Plus className="h-4 w-4 mr-1" />

@@ -148,9 +148,6 @@ export default function RemindersPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">提醒</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            创建一次性 / 周期 / Cron 提醒；到达触发时间通过所选通道发送。
-          </p>
         </div>
         <Button onClick={() => setCreating(true)}>
           <Plus className="h-4 w-4 mr-1" />
