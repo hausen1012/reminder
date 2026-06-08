@@ -160,7 +160,7 @@ export function ReminderEditDialog({ reminder, open, onClose, onSaved }: Props) 
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-2xl max-h-[95vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[95vh] overflow-visible">
         <DialogHeader>
           <DialogTitle>{isEdit ? '编辑提醒' : '新建提醒'}</DialogTitle>
           <DialogDescription>
@@ -219,7 +219,7 @@ export function ReminderEditDialog({ reminder, open, onClose, onSaved }: Props) 
                   {channelOpen && (
                     <>
                       <div className="fixed inset-0 z-40" onClick={() => setChannelOpen(false)} />
-                      <div className="absolute z-50 mt-1 w-full rounded-md border bg-card shadow-lg">
+                      <div className="absolute bottom-full z-50 mb-1 max-h-64 w-full overflow-y-auto rounded-md border bg-card shadow-lg">
                         {channels.map((ch) => {
                           const checked = input.channel_ids.includes(ch.id)
                           return (
@@ -302,7 +302,6 @@ export function ReminderEditDialog({ reminder, open, onClose, onSaved }: Props) 
             )}
           </div>
 
-          <div className="h-12" />
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose}>
               取消
