@@ -1,9 +1,9 @@
 // ReminderEditDialog 是提醒的新建 / 编辑表单。
 import { useEffect, useState, type FormEvent } from 'react'
+import { Info } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -151,10 +151,6 @@ export function ReminderEditDialog({ reminder, open, onClose, onSaved }: Props) 
       <DialogContent className="max-w-2xl max-h-[95vh] overflow-visible">
         <DialogHeader>
           <DialogTitle>{isEdit ? '编辑提醒' : '新建提醒'}</DialogTitle>
-          <DialogDescription>
-            到达触发时间后会通过所选通道发送；内容支持 <code>{'{{var}}'}</code> 占位（如{' '}
-            <code>{'{{now}}'}</code>、<code>{'{{lunar_date}}'}</code>）。
-          </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
@@ -168,7 +164,26 @@ export function ReminderEditDialog({ reminder, open, onClose, onSaved }: Props) 
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="r-content">内容</Label>
+            <div className="flex items-center gap-1.5">
+              <Label htmlFor="r-content">内容</Label>
+              <div className="group relative inline-flex">
+                <button
+                  type="button"
+                  className="rounded-sm p-0.5 text-muted-foreground transition-colors hover:text-foreground"
+                  aria-label="查看可用占位符"
+                >
+                  <Info className="h-3.5 w-3.5" />
+                </button>
+                <div className="pointer-events-none absolute left-full top-1/2 z-50 ml-2 hidden w-64 -translate-y-1/2 rounded-md border bg-popover p-3 text-xs text-popover-foreground shadow-md group-hover:block">
+                  <div className="space-y-1">
+                    <p className="font-medium">可用占位符</p>
+                    <p><code>{'{{now}}'}</code> 当前日期时间</p>
+                    <p><code>{'{{now_date}}'}</code> 当前日期</p>
+                    <p><code>{'{{lunar_date}}'}</code> 当前农历日期</p>
+                  </div>
+                </div>
+              </div>
+            </div>
             <Textarea
               id="r-content"
               value={input.content}
