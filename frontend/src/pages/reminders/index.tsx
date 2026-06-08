@@ -24,6 +24,7 @@ import {
   toggleReminder,
   type ListRemindersQuery,
 } from '@/lib/api'
+import { formatReminderDetail } from '@/lib/utils'
 import type { Channel, Reminder } from '@/types'
 
 const SOURCE_LABEL: Record<string, string> = {
@@ -35,53 +36,6 @@ const TYPE_LABEL: Record<string, string> = {
   once: '一次性',
   interval: '周期',
   cron: 'Cron',
-}
-
-const CHINESE_DIGITS = ['零', '一', '二', '三', '四', '五', '六', '七', '八', '九']
-
-function toChineseYear(n: number): string {
-  return String(n).split('').map((d) => CHINESE_DIGITS[+d]).join('')
-}
-
-function toChineseMonth(n: number): string {
-  if (n <= 10) return CHINESE_DIGITS[n]
-  if (n === 11) return '十一'
-  return '十二'
-}
-
-function toChineseDay(n: number): string {
-  if (n <= 10) return CHINESE_DIGITS[n]
-  if (n < 20) return '十' + (n > 10 ? CHINESE_DIGITS[n - 10] : '')
-  if (n === 20) return '二十'
-  if (n < 30) return '二十' + CHINESE_DIGITS[n - 20]
-  return '三十'
-}
-
-function formatDetail(r: Reminder): string {
-  const spec = r.schedule_spec ?? {}
-  const h = String(spec.hour ?? 9).padStart(2, '0')
-  const m = String(spec.minute ?? 0).padStart(2, '0')
-  const time = `${h}:${m}:00`
-
-  if (r.calendar === 'lunar') {
-    const lunar = (spec.lunar ?? spec.start_lunar) as { year: number; month: number; day: number } | undefined
-    if (lunar) {
-      return `农历 ${toChineseYear(lunar.year)}年${toChineseMonth(lunar.month)}月${toChineseDay(lunar.day)} ${time}`
-    }
-    return '农历'
-  }
-
-  if (r.schedule_type === 'cron') {
-    return (spec.expr as string) ?? ''
-  }
-
-  const at = (spec.at ?? spec.start_at) as string | undefined
-  if (at) {
-    const d = at.slice(0, 10).replace(/-/g, '/')
-    const t = at.slice(11, 16) + ':00'
-    return `公历 ${d} ${t}`
-  }
-  return '公历'
 }
 
 function formatNextFire(dateStr?: string): string {
@@ -291,8 +245,8 @@ export default function RemindersPage() {
                         {TYPE_LABEL[r.schedule_type] ?? r.schedule_type}
                       </td>
                       <td className="px-4 py-2.5 text-xs text-muted-foreground max-w-[16rem]">
-                        <span className="truncate block" title={formatDetail(r)}>
-                          {formatDetail(r)}
+                        <span className="truncate block" title={formatReminderDetail(r)}>
+                          {formatReminderDetail(r)}
                         </span>
                       </td>
                       <td className="px-4 py-2.5 text-xs whitespace-nowrap">

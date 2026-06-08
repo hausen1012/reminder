@@ -10,7 +10,13 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { CalendarPopover } from './CalendarPopover'
-import { Solar, Lunar } from 'lunar-typescript'
+import {
+  formatReminderSolarLine,
+  formatReminderLunarLine,
+  getReminderSpecHour,
+  getReminderSpecMinute,
+} from '@/lib/utils'
+import { Lunar } from 'lunar-typescript'
 import type { ReminderCalendar, ReminderScheduleType } from '@/types'
 import type { CalendarResult } from '@/types'
 
@@ -150,8 +156,8 @@ export function ScheduleForm({ value, onChange }: Props) {
               onClick={() => setCalendarOpen(true)}
               className="flex h-auto min-h-[2.5rem] cursor-pointer flex-col justify-center rounded-md border border-input bg-background px-3 py-1.5 text-sm ring-offset-background hover:bg-accent"
             >
-              <span className="text-xs leading-tight">{formatSolarLine(spec, value.calendar)}</span>
-              <span className="text-[11px] text-muted-foreground leading-tight mt-0.5">{formatLunarLine(spec, value.calendar)}</span>
+              <span className="text-xs leading-tight">{formatReminderSolarLine(spec, value.calendar)}</span>
+              <span className="text-[11px] text-muted-foreground leading-tight mt-0.5">{formatReminderLunarLine(spec, value.calendar)}</span>
             </div>
             {calendarOpen && (
               <CalendarPopover
@@ -165,8 +171,8 @@ export function ScheduleForm({ value, onChange }: Props) {
                   }
                   return undefined
                 })()}
-                hour={getSpecHour(spec)}
-                minute={getSpecMinute(spec)}
+                hour={getReminderSpecHour(spec)}
+                minute={getReminderSpecMinute(spec)}
                 onSelect={handleCalendarSelect}
                 onClose={() => setCalendarOpen(false)}
               />
@@ -182,74 +188,4 @@ export function ScheduleForm({ value, onChange }: Props) {
       )}
     </div>
   )
-}
-
-const SOLAR_DIGITS = ['零', '一', '二', '三', '四', '五', '六', '七', '八', '九']
-
-function toChineseYear(n: number): string {
-  return String(n).split('').map((d) => SOLAR_DIGITS[+d]).join('')
-}
-
-function toChineseMonth(n: number): string {
-  if (n <= 10) return SOLAR_DIGITS[n] + '月'
-  if (n === 11) return '十一月'
-  return '十二月'
-}
-
-function toChineseDay(n: number): string {
-  if (n <= 10) return SOLAR_DIGITS[n]
-  if (n < 20) return '十' + (n > 10 ? SOLAR_DIGITS[n - 10] : '')
-  if (n === 20) return '二十'
-  if (n < 30) return '二十' + SOLAR_DIGITS[n - 20]
-  return '三十'
-}
-
-function getLunarYmd(dateStr: string): { year: number; month: number; day: number } | null {
-  if (!dateStr) return null
-  const d = dateStr.slice(0, 10).split('-')
-  if (d.length !== 3) return null
-  const sol = Solar.fromYmd(Number(d[0]), Number(d[1]), Number(d[2]))
-  const l = sol.getLunar()
-  return { year: l.getYear(), month: l.getMonth(), day: l.getDay() }
-}
-
-function getSpecHour(spec: Record<string, unknown>): number | undefined {
-  if (typeof spec.hour === 'number') return spec.hour as number
-  const at = (spec.at ?? spec.start_at) as string | undefined
-  if (!at || at.length < 16) return undefined
-  const hour = Number(at.slice(11, 13))
-  return Number.isFinite(hour) ? hour : undefined
-}
-
-function getSpecMinute(spec: Record<string, unknown>): number | undefined {
-  if (typeof spec.minute === 'number') return spec.minute as number
-  const at = (spec.at ?? spec.start_at) as string | undefined
-  if (!at || at.length < 16) return undefined
-  const minute = Number(at.slice(14, 16))
-  return Number.isFinite(minute) ? minute : undefined
-}
-
-function formatSolarLine(spec: Record<string, unknown>, calendar: ReminderCalendar): string {
-  const at = (spec.at ?? spec.start_at) as string | undefined
-  if (at) return `公历 ${at.slice(0, 10)} ${at.slice(11, 16)}:00`
-  if (calendar === 'lunar') {
-    const lunar = (spec.lunar ?? spec.start_lunar) as { year: number; month: number; day: number } | undefined
-    if (lunar) {
-      const sol = Solar.fromYmd(lunar.year, lunar.month, lunar.day)
-      return `公历 ${sol.getYear()}-${String(sol.getMonth()).padStart(2, '0')}-${String(sol.getDay()).padStart(2, '0')} ${String(spec.hour ?? 9).padStart(2, '0')}:${String(spec.minute ?? 0).padStart(2, '0')}:00`
-    }
-  }
-  return '选择日期'
-}
-
-function formatLunarLine(spec: Record<string, unknown>, calendar: ReminderCalendar): string {
-  let ymd: { year: number; month: number; day: number } | null = null
-  if (calendar === 'lunar') {
-    ymd = (spec.lunar ?? spec.start_lunar) as { year: number; month: number; day: number } | undefined ?? null
-  } else {
-    const at = (spec.at ?? spec.start_at) as string | undefined
-    if (at) ymd = getLunarYmd(at)
-  }
-  if (ymd) return `${toChineseYear(ymd.year)}年${toChineseMonth(ymd.month)}${toChineseDay(ymd.day)}`
-  return ''
 }
