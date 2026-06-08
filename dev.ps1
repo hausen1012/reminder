@@ -16,11 +16,11 @@ if (-not (Test-Path "$RootDir\frontend\node_modules")) {
     Pop-Location
 }
 
-$BackendTitle = "Bedrock Backend (Go)"
-$FrontendTitle = "Bedrock Frontend (Vite)"
+$BackendTitle = "Reminder Backend (Go)"
+$FrontendTitle = "Reminder Frontend (Vite)"
 
 Write-Host "===================================" -ForegroundColor Cyan
-Write-Host "  Bedrock Dev Server Starting..." -ForegroundColor Cyan
+Write-Host "  Reminder Dev Server Starting..." -ForegroundColor Cyan
 Write-Host "===================================" -ForegroundColor Cyan
 Write-Host "Press Enter in this window to stop all servers" -ForegroundColor Cyan
 Write-Host ""

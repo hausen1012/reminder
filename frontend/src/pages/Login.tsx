@@ -30,7 +30,7 @@ export default function Login() {
     <div className="flex min-h-screen items-center justify-center bg-background">
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
-          <CardTitle>Bedrock</CardTitle>
+          <CardTitle>Reminder</CardTitle>
           <CardDescription>请输入您的账号信息</CardDescription>
         </CardHeader>
         <CardContent>

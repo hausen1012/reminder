@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, User, Moon, Sun, LogOut, Mountain, Send, Bell, ScrollText, Key } from 'lucide-react'
+import { LayoutDashboard, User, Moon, Sun, LogOut, BellRing, Send, Bell, ScrollText, Key } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { useTheme } from '@/contexts/ThemeContext'
@@ -22,8 +22,8 @@ export function Sidebar() {
   return (
     <aside className="flex h-screen w-48 flex-col border-r bg-card">
       <div className="flex h-14 items-center gap-2 px-6 font-medium text-base leading-none">
-        <Mountain className="h-5 w-5" strokeWidth={1.5} />
-        Bedrock
+        <BellRing className="h-5 w-5" strokeWidth={1.5} />
+        Reminder
       </div>
       <Separator />
       <nav className="flex-1 space-y-1 p-3">

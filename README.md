@@ -45,7 +45,7 @@ make docker
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
 | PORT | 8080 | 监听端口 |
-| DB_PATH | /data/db/bedrock.db | 数据库路径 |
+| DB_PATH | /data/db/reminder.db | 数据库路径 |
 | JWT_SECRET | 自动生成 | JWT 签名密钥 |
 | SECRET_BOX_KEY | 硬编码常量 | 通道敏感字段加密密钥（base64） |
 | PUBLIC_BASE_URL | http://localhost:8080 | 公网地址（确认链接用） |
