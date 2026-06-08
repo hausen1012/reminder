@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -262,7 +263,11 @@ func (s *ChannelService) Test(ctx context.Context, id uint, subject, body string
 		Body:    notifier.Render(body, vars),
 		Vars:    vars,
 	}
-	return n.Send(ctx, plainConfig, rendered)
+	if err := n.Send(ctx, plainConfig, rendered); err != nil {
+		log.Printf("[channel-test] 通道试发失败 channel=%d name=%s type=%s: %v", ch.ID, ch.Name, ch.Type, err)
+		return err
+	}
+	return nil
 }
 
 // DecryptedConfig 返回明文 config JSON，供 dispatch 阶段直接喂给 Notifier。
@@ -353,7 +358,7 @@ func (s *ChannelService) getOrNotFound(id uint) (*models.Channel, error) {
 	return &ch, nil
 }
 
-func (s *ChannelService) validateInput(in ChannelInput, isUpdate bool, _ *models.Channel) error {
+func (s *ChannelService) validateInput(in ChannelInput, isUpdate bool, ch *models.Channel) error {
 	if strings.TrimSpace(in.Name) == "" {
 		return middleware.NewAppError(middleware.CodeValidationFailed, "通道名称必填").WithField("name")
 	}
@@ -366,11 +371,13 @@ func (s *ChannelService) validateInput(in ChannelInput, isUpdate bool, _ *models
 	if in.Config == nil {
 		return middleware.NewAppError(middleware.CodeValidationFailed, "config 必填").WithField("config")
 	}
-	if !isUpdate {
-		// 创建时强校验关键字段非空
-		if err := requireFields(in.Type, in.Config); err != nil {
-			return err
-		}
+
+	cfg := in.Config
+	if isUpdate {
+		cfg = mergeConfig(ch, in.Config)
+	}
+	if err := requireFields(in.Type, cfg); err != nil {
+		return err
 	}
 	return nil
 }
@@ -384,14 +391,13 @@ func requireFields(typ string, cfg map[string]any) error {
 		if asString(cfg["host"]) == "" {
 			return missing("config.host")
 		}
-		if _, ok := cfg["port"]; !ok {
+		if asPositiveInt(cfg["port"]) == 0 {
 			return missing("config.port")
 		}
 		if asString(cfg["from_addr"]) == "" {
 			return missing("config.from_addr")
 		}
-		to, ok := cfg["to"].([]any)
-		if !ok || len(to) == 0 {
+		if len(asStringSlice(cfg["to"])) == 0 {
 			return missing("config.to")
 		}
 	case "dingtalk":
@@ -415,6 +421,63 @@ func requireFields(typ string, cfg map[string]any) error {
 func asString(v any) string {
 	s, _ := v.(string)
 	return s
+}
+
+func asPositiveInt(v any) int {
+	switch n := v.(type) {
+	case int:
+		if n > 0 {
+			return n
+		}
+	case int32:
+		if n > 0 {
+			return int(n)
+		}
+	case int64:
+		if n > 0 {
+			return int(n)
+		}
+	case float64:
+		if n > 0 {
+			return int(n)
+		}
+	}
+	return 0
+}
+
+func asStringSlice(v any) []string {
+	switch items := v.(type) {
+	case []string:
+		out := make([]string, 0, len(items))
+		for _, item := range items {
+			if s := strings.TrimSpace(item); s != "" {
+				out = append(out, s)
+			}
+		}
+		return out
+	case []any:
+		out := make([]string, 0, len(items))
+		for _, item := range items {
+			s, _ := item.(string)
+			if s = strings.TrimSpace(s); s != "" {
+				out = append(out, s)
+			}
+		}
+		return out
+	default:
+		return nil
+	}
+}
+
+func mergeConfig(ch *models.Channel, patch map[string]any) map[string]any {
+	merged := map[string]any{}
+	if ch != nil && len(ch.Config) > 0 {
+		_ = json.Unmarshal(ch.Config, &merged)
+	}
+	for k, v := range patch {
+		merged[k] = v
+	}
+	return merged
 }
 
 // encryptConfig 把 cfg 内 _enc 后缀字段的明文值加密。

@@ -13,14 +13,15 @@ import (
 
 // SMTPConfig 是 Channel.Config 解密后对应的 SMTP 参数 schema。
 type SMTPConfig struct {
-	Host        string   `json:"host"`
-	Port        int      `json:"port"`
-	Username    string   `json:"username"`
-	Password    string   `json:"password_enc"` // 落库 _enc 后缀，传入时已是明文
-	FromAddr    string   `json:"from_addr"`
-	FromName    string   `json:"from_name"`
-	To          []string `json:"to"`
-	UseStartTLS bool     `json:"use_starttls"`
+	Host         string   `json:"host"`
+	Port         int      `json:"port"`
+	Username     string   `json:"username"`
+	Password     string   `json:"password_enc"` // 落库 _enc 后缀，传入时已是明文
+	FromAddr     string   `json:"from_addr"`
+	FromName     string   `json:"from_name"`
+	To           []string `json:"to"`
+	UseStartTLS  bool     `json:"use_starttls"`
+	SecurityMode string   `json:"security_mode"`
 }
 
 type smtpNotifier struct{}
@@ -53,25 +54,45 @@ func (n *smtpNotifier) Send(ctx context.Context, configJSON []byte, msg Message)
 func (n *smtpNotifier) doSend(cfg SMTPConfig, msg Message) error {
 	addr := net.JoinHostPort(cfg.Host, fmt.Sprintf("%d", cfg.Port))
 	dialer := &net.Dialer{Timeout: 15 * time.Second}
-	conn, err := dialer.Dial("tcp", addr)
+	tlsCfg := &tls.Config{ServerName: cfg.Host, MinVersion: tls.VersionTLS12}
+	mode, err := resolveSMTPSecurityMode(cfg)
 	if err != nil {
-		return fmt.Errorf("连接 SMTP 服务器失败: %w", err)
+		return Permanent(err)
+	}
+
+	var conn net.Conn
+	if mode == "implicit_tls" {
+		conn, err = tls.DialWithDialer(dialer, "tcp", addr, tlsCfg)
+		if err != nil {
+			return fmt.Errorf("连接 SMTPS 服务器失败: %w", err)
+		}
+	} else {
+		conn, err = dialer.Dial("tcp", addr)
+		if err != nil {
+			if cfg.Port == 465 && mode == "plain" {
+				return fmt.Errorf("连接 SMTP 服务器失败: %w；465 端口通常需要直连 TLS，请将安全模式改为“直连 TLS（SMTPS）”或改用 587 + STARTTLS", err)
+			}
+			return fmt.Errorf("连接 SMTP 服务器失败: %w", err)
+		}
 	}
 	defer conn.Close()
 	_ = conn.SetDeadline(time.Now().Add(15 * time.Second))
 
 	client, err := smtp.NewClient(conn, cfg.Host)
 	if err != nil {
+		if mode == "implicit_tls" {
+			return fmt.Errorf("初始化 SMTPS 客户端失败: %w", err)
+		}
 		return fmt.Errorf("初始化 SMTP 客户端失败: %w", err)
 	}
 	defer client.Close()
 
-	if cfg.UseStartTLS {
-		if ok, _ := client.Extension("STARTTLS"); ok {
-			tlsCfg := &tls.Config{ServerName: cfg.Host, MinVersion: tls.VersionTLS12}
-			if err := client.StartTLS(tlsCfg); err != nil {
-				return fmt.Errorf("STARTTLS 失败: %w", err)
-			}
+	if mode == "starttls" {
+		if ok, _ := client.Extension("STARTTLS"); !ok {
+			return Permanent(fmt.Errorf("SMTP 服务器不支持 STARTTLS，请改用直连 TLS（SMTPS）或明文 SMTP"))
+		}
+		if err := client.StartTLS(tlsCfg); err != nil {
+			return fmt.Errorf("STARTTLS 失败: %w", err)
 		}
 	}
 
@@ -108,6 +129,24 @@ func (n *smtpNotifier) doSend(cfg SMTPConfig, msg Message) error {
 
 // buildMIME 构造一个最小可用的 MIME 邮件文本：
 // UTF-8 + Subject base64 编码，避免中文乱码。
+func resolveSMTPSecurityMode(cfg SMTPConfig) (string, error) {
+	switch cfg.SecurityMode {
+	case "", "plain", "starttls", "implicit_tls":
+	default:
+		return "", fmt.Errorf("未知 SMTP 安全模式: %s", cfg.SecurityMode)
+	}
+	if cfg.SecurityMode != "" {
+		return cfg.SecurityMode, nil
+	}
+	if cfg.UseStartTLS {
+		return "starttls", nil
+	}
+	if cfg.Port == 465 {
+		return "implicit_tls", nil
+	}
+	return "plain", nil
+}
+
 func buildMIME(cfg SMTPConfig, msg Message) string {
 	from := cfg.FromAddr
 	if cfg.FromName != "" {

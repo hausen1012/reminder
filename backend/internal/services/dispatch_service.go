@@ -180,11 +180,13 @@ func (d *DispatchService) Run(ctx context.Context, r *models.Reminder, deliveryL
 func (d *DispatchService) sendWithRetry(ctx context.Context, ch *models.Channel, deliveryLogID uint, msg notifier.Message) bool {
 	n, err := notifier.Get(ch.Type)
 	if err != nil {
+		log.Printf("[dispatch] 获取通道发送器失败 log=%d channel=%d name=%s type=%s: %v", deliveryLogID, ch.ID, ch.Name, ch.Type, err)
 		d.writeAttempt(deliveryLogID, ch, 1, "failed", err.Error(), 0)
 		return false
 	}
 	plainConfig, err := d.ChannelSvc.DecryptedConfig(ch)
 	if err != nil {
+		log.Printf("[dispatch] 解密通道配置失败 log=%d channel=%d name=%s type=%s: %v", deliveryLogID, ch.ID, ch.Name, ch.Type, err)
 		d.writeAttempt(deliveryLogID, ch, 1, "failed", "decrypt config: "+err.Error(), 0)
 		return false
 	}
@@ -204,7 +206,8 @@ func (d *DispatchService) sendWithRetry(ctx context.Context, ch *models.Channel,
 			d.writeAttempt(deliveryLogID, ch, i+1, "success", "", latency)
 			return true
 		}
-		d.writeAttempt(deliveryLogID, ch, i+1, "failed", err.Error(), latency)
+		log.Printf("[dispatch] 通道发送失败 log=%d channel=%d name=%s type=%s attempt=%d latency=%dms: %v", deliveryLogID, ch.ID, ch.Name, ch.Type, i+1, latency, err)
+			d.writeAttempt(deliveryLogID, ch, i+1, "failed", err.Error(), latency)
 		if notifier.IsPermanent(err) {
 			return false
 		}

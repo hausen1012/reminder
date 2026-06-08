@@ -49,13 +49,14 @@ function defaultConfig(type: ChannelType): Record<string, unknown> {
     case 'smtp':
       return {
         host: '',
-        port: 465,
+        port: 587,
         username: '',
         password_enc: '',
         from_addr: '',
         from_name: '',
         to: [],
-        use_starttls: false,
+        use_starttls: true,
+        security_mode: 'starttls',
       }
     case 'dingtalk':
       return { webhook_url: '', secret_enc: '', msg_type: 'text' }

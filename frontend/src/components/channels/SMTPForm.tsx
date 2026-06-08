@@ -1,14 +1,58 @@
 // SMTP 通道表单
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Switch } from '@/components/ui/switch'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { type SubFormProps, updateField } from './form-utils'
+
+type SMTPSecurityMode = 'plain' | 'starttls' | 'implicit_tls'
+
+const CONNECTION_LABEL: Record<SMTPSecurityMode, string> = {
+  starttls: '推荐：加密连接（常见邮箱）',
+  implicit_tls: '465 专用加密连接',
+  plain: '不加密连接（仅特殊服务器）',
+}
+
+function getSecurityMode(config: Record<string, unknown>): SMTPSecurityMode {
+  const mode = config.security_mode as SMTPSecurityMode | undefined
+  if (mode === 'plain' || mode === 'starttls' || mode === 'implicit_tls') return mode
+  if (config.use_starttls) return 'starttls'
+  if (config.port === 465) return 'implicit_tls'
+  return 'plain'
+}
+
+function getConnectionHint(mode: SMTPSecurityMode): string {
+  switch (mode) {
+    case 'starttls':
+      return '适合大多数邮箱服务，通常使用 587 端口。技术上等同于 STARTTLS。'
+    case 'implicit_tls':
+      return '如果服务商文档明确要求 465 端口，请选这个。技术上等同于 SMTPS / 直连 TLS。'
+    case 'plain':
+      return '仅在内网或旧服务器明确要求时使用。技术上等同于明文 SMTP。'
+  }
+}
+
+function getPortHint(port: number): string {
+  if (port === 587) return '当前端口通常对应推荐加密连接。'
+  if (port === 465) return '当前端口通常对应 465 专用加密连接。'
+  if (port === 25) return '当前端口通常对应不加密连接。'
+  return '常见端口：587（推荐）、465（直连加密）、25（不加密）。'
+}
 
 export function SMTPForm({ config, onChange, isEdit }: SubFormProps) {
   const [toText, setToText] = useState(((config.to as string[] | undefined) ?? []).join(', '))
   const hasOriginalSecret = config.password_enc === '***'
   const [pwdInput, setPwdInput] = useState(hasOriginalSecret ? '' : (config.password_enc as string ?? ''))
+  const securityMode = getSecurityMode(config)
+  const port = Number(config.port ?? 0)
+  const connectionHint = useMemo(() => getConnectionHint(securityMode), [securityMode])
+  const portHint = useMemo(() => getPortHint(port), [port])
 
   return (
     <div className="space-y-3 rounded-md border bg-card/30 p-4">
@@ -25,11 +69,41 @@ export function SMTPForm({ config, onChange, isEdit }: SubFormProps) {
           <Label>端口</Label>
           <Input
             type="number"
-            placeholder="465"
+            placeholder="587"
             value={(config.port as number) ?? ''}
             onChange={(e) => updateField(onChange, 'port', Number(e.target.value))}
           />
+          <p className="text-xs text-muted-foreground">{portHint}</p>
         </div>
+      </div>
+      <div className="space-y-2">
+        <Label>连接方式</Label>
+        <Select
+          value={securityMode}
+          onValueChange={(value) => {
+            const mode = value as SMTPSecurityMode
+            updateField(onChange, 'security_mode', mode)
+            updateField(onChange, 'use_starttls', mode === 'starttls')
+
+            const currentPort = Number(config.port ?? 0)
+            if (mode === 'starttls' && [0, 25, 465].includes(currentPort)) {
+              updateField(onChange, 'port', 587)
+            }
+            if (mode === 'implicit_tls' && [0, 25, 587].includes(currentPort)) {
+              updateField(onChange, 'port', 465)
+            }
+          }}
+        >
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="starttls">{CONNECTION_LABEL.starttls}</SelectItem>
+            <SelectItem value="implicit_tls">{CONNECTION_LABEL.implicit_tls}</SelectItem>
+            <SelectItem value="plain">{CONNECTION_LABEL.plain}</SelectItem>
+          </SelectContent>
+        </Select>
+        <p className="text-xs text-muted-foreground">{connectionHint}</p>
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-2">
@@ -49,7 +123,6 @@ export function SMTPForm({ config, onChange, isEdit }: SubFormProps) {
             onChange={(e) => {
               const v = e.target.value
               setPwdInput(v)
-              // 留空 + 原本有密文 → 占位符
               if (isEdit && hasOriginalSecret && v === '') {
                 updateField(onChange, 'password_enc', '***')
               } else {
@@ -89,16 +162,6 @@ export function SMTPForm({ config, onChange, isEdit }: SubFormProps) {
             updateField(onChange, 'to', arr)
           }}
         />
-      </div>
-      <div className="flex items-center gap-3">
-        <Switch
-          checked={Boolean(config.use_starttls)}
-          onCheckedChange={(v) => updateField(onChange, 'use_starttls', v)}
-          id="use-starttls"
-        />
-        <Label htmlFor="use-starttls" className="text-sm cursor-pointer">
-          启用 STARTTLS（587 端口需要打开）
-        </Label>
       </div>
     </div>
   )
