@@ -46,7 +46,9 @@ func successJSON(c *gin.Context, data any) {
 func (h *ChannelHandler) List(c *gin.Context) {
 	limitStr := c.Query("limit")
 	offsetStr := c.Query("offset")
-	if limitStr == "" && offsetStr == "" {
+	enabledStr := c.Query("enabled")
+	search := c.Query("search")
+	if limitStr == "" && offsetStr == "" && enabledStr == "" && search == "" {
 		views, err := h.Svc.List()
 		if err != nil {
 			abortErr(c, err)
@@ -56,7 +58,7 @@ func (h *ChannelHandler) List(c *gin.Context) {
 		return
 	}
 
-	f := services.ChannelListFilter{}
+	f := services.ChannelListFilter{Search: search}
 	if limitStr != "" {
 		if n, err := strconv.Atoi(limitStr); err == nil {
 			f.Limit = n
@@ -65,6 +67,11 @@ func (h *ChannelHandler) List(c *gin.Context) {
 	if offsetStr != "" {
 		if n, err := strconv.Atoi(offsetStr); err == nil {
 			f.Offset = n
+		}
+	}
+	if enabledStr != "" {
+		if b, err := strconv.ParseBool(enabledStr); err == nil {
+			f.Enabled = &b
 		}
 	}
 	views, total, err := h.Svc.ListPaged(f)

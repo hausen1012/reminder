@@ -66,6 +66,8 @@ export async function logout() {
 // --- 通道 ---
 
 export interface ListChannelsQuery {
+  enabled?: boolean
+  search?: string
   limit?: number
   offset?: number
 }

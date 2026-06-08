@@ -1,8 +1,16 @@
 // 通道页：列表 + 新建/编辑对话框 + 试发 + 删除
-import { useEffect, useState } from 'react'
-import { Mail, MessageSquare, Webhook, Terminal, Plus, Pencil, Trash2, TestTube } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
+import { Mail, MessageSquare, Webhook, Terminal, Plus, Pencil, RefreshCw, Trash2, TestTube } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { Pagination } from '@/components/ui/pagination'
 import { useToast } from '@/components/ui/use-toast'
@@ -38,16 +46,25 @@ export default function ChannelsPage() {
   const [limit, setLimit] = useState(10)
   const [offset, setOffset] = useState(0)
   const [loading, setLoading] = useState(true)
+  const [enabled, setEnabled] = useState<'all' | 'true' | 'false'>('all')
+  const [search, setSearch] = useState('')
+  const [searchInput, setSearchInput] = useState('')
+  const [searchVersion, setSearchVersion] = useState(0)
   const [editing, setEditing] = useState<Channel | null>(null)
   const [creating, setCreating] = useState(false)
   const [toDelete, setToDelete] = useState<Channel | null>(null)
   const [testingId, setTestingId] = useState<number | null>(null)
   const { toast } = useToast()
 
-  async function refresh() {
+  const refresh = useCallback(async () => {
     setLoading(true)
     try {
-      const data = await listChannelsPaged({ limit, offset })
+      const data = await listChannelsPaged({
+        enabled: enabled === 'all' ? undefined : enabled === 'true',
+        search: search.trim() || undefined,
+        limit,
+        offset,
+      })
       setItems(data?.items ?? [])
       setTotal(data?.total ?? 0)
     } catch (err) {
@@ -55,17 +72,20 @@ export default function ChannelsPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [enabled, search, limit, offset, toast])
 
   useEffect(() => {
     refresh()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [offset, limit])
+  }, [refresh, searchVersion])
 
   async function handleToggle(ch: Channel) {
     try {
       const next = await toggleChannel(ch.id)
-      setItems((prev) => prev.map((it) => (it.id === ch.id ? next : it)))
+      if (enabled === 'all') {
+        setItems((prev) => prev.map((it) => (it.id === ch.id ? next : it)))
+      } else {
+        await refresh()
+      }
     } catch (err) {
       toast({ title: '切换状态失败', description: String(err), variant: 'destructive' })
     }
@@ -119,6 +139,46 @@ export default function ChannelsPage() {
         <Button onClick={() => setCreating(true)}>
           <Plus className="h-4 w-4 mr-1" />
           新建通道
+        </Button>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="w-40">
+          <Select
+            value={enabled}
+            onValueChange={(value) => {
+              setEnabled(value as 'all' | 'true' | 'false')
+              setOffset(0)
+            }}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="状态" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">全部状态</SelectItem>
+              <SelectItem value="true">已启用</SelectItem>
+              <SelectItem value="false">已禁用</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <form
+          className="flex-1 max-w-md"
+          onSubmit={(e) => {
+            e.preventDefault()
+            setOffset(0)
+            setSearch(searchInput)
+            setSearchVersion((v) => v + 1)
+          }}
+        >
+          <Input
+            placeholder="搜索通道名称…"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+          />
+        </form>
+        <span className="text-sm text-muted-foreground">共 {total} 条</span>
+        <Button variant="outline" size="icon" onClick={refresh} title="刷新">
+          <RefreshCw className="h-4 w-4" />
         </Button>
       </div>
 
