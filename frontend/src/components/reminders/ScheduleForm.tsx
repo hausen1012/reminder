@@ -74,19 +74,21 @@ export function ScheduleForm({ value, onChange }: Props) {
   }
 
   function handleCalendarSelect(result: CalendarResult) {
+    const { at, start_at, lunar, start_lunar, hour, minute, ...rest } = spec
+
     if (result.calendar === 'lunar' && result.lunar) {
       const key = value.schedule_type === 'interval' ? 'start_lunar' : 'lunar'
       onChange({
         ...value,
         calendar: 'lunar',
-        schedule_spec: { ...spec, [key]: result.lunar, hour: result.hour, minute: result.minute },
+        schedule_spec: { ...rest, [key]: result.lunar, hour: result.hour, minute: result.minute },
       })
     } else if (result.calendar === 'solar') {
       const key = value.schedule_type === 'interval' ? 'start_at' : 'at'
       onChange({
         ...value,
         calendar: 'solar',
-        schedule_spec: { ...spec, [key]: result.date },
+        schedule_spec: { ...rest, [key]: result.date },
       })
     }
   }

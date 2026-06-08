@@ -45,6 +45,8 @@ export function CalendarPopover({ date, hour: initHour, minute: initMin, initial
   const popoverRef = useRef<HTMLDivElement>(null)
   const hourListRef = useRef<HTMLDivElement>(null)
   const minuteListRef = useRef<HTMLDivElement>(null)
+  const onSelectRef = useRef(onSelect)
+  const hasSyncedRef = useRef(false)
   const [showLunar, setShowLunar] = useState(initialCalendar === 'lunar')
   const [solarYear, setSolarYear] = useState(() => {
     if (date) return new Date(date).getFullYear()
@@ -81,6 +83,10 @@ export function CalendarPopover({ date, hour: initHour, minute: initMin, initial
   }, [onClose])
 
   useEffect(() => {
+    onSelectRef.current = onSelect
+  }, [onSelect])
+
+  useEffect(() => {
     if (!timePanelOpen) return
 
     function scrollSelectedIntoView(container: HTMLDivElement | null, index: number) {
@@ -94,6 +100,26 @@ export function CalendarPopover({ date, hour: initHour, minute: initMin, initial
     scrollSelectedIntoView(hourListRef.current, hour)
     scrollSelectedIntoView(minuteListRef.current, minute)
   }, [timePanelOpen, hour, minute])
+
+  function buildResult(): CalendarResult | null {
+    if (selectedDay === null) return null
+    const dateStr = `${solarYear}-${String(solarMonth).padStart(2, '0')}-${String(selectedDay).padStart(2, '0')}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`
+    if (showLunar) {
+      const solar = Solar.fromYmd(solarYear, solarMonth, selectedDay)
+      const lunar = solar.getLunar()
+      return { date: dateStr, calendar: 'lunar', lunar: { year: lunar.getYear(), month: lunar.getMonth(), day: lunar.getDay() }, hour, minute }
+    }
+    return { date: dateStr, calendar: 'solar', hour, minute }
+  }
+
+  useEffect(() => {
+    if (!hasSyncedRef.current) {
+      hasSyncedRef.current = true
+      return
+    }
+    const result = buildResult()
+    if (result) onSelectRef.current(result)
+  }, [solarYear, solarMonth, selectedDay, hour, minute, showLunar])
 
   // 公历模式网格
   const solarGrid = useMemo(() => {
@@ -152,15 +178,8 @@ export function CalendarPopover({ date, hour: initHour, minute: initMin, initial
   }, [solarYear, solarMonth])
 
   function handleConfirm() {
-    if (selectedDay === null) return
-    const dateStr = `${solarYear}-${String(solarMonth).padStart(2, '0')}-${String(selectedDay).padStart(2, '0')}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`
-    if (showLunar) {
-      const solar = Solar.fromYmd(solarYear, solarMonth, selectedDay)
-      const lunar = solar.getLunar()
-      onSelect({ date: dateStr, calendar: 'lunar', lunar: { year: lunar.getYear(), month: lunar.getMonth(), day: lunar.getDay() }, hour, minute })
-    } else {
-      onSelect({ date: dateStr, calendar: 'solar', hour, minute })
-    }
+    const result = buildResult()
+    if (result) onSelectRef.current(result)
     onClose()
   }
 
