@@ -9,8 +9,8 @@ import { cn } from '@/lib/utils'
 const navItems = [
   { to: '/', label: '首页', icon: LayoutDashboard },
   { to: '/reminders', label: '提醒', icon: Bell },
-  { to: '/logs', label: '日志', icon: ScrollText },
   { to: '/channels', label: '通知', icon: Send },
+  { to: '/logs', label: '日志', icon: ScrollText },
   { to: '/apikeys', label: 'API', icon: Key },
   { to: '/profile', label: '设置', icon: User },
 ]
