@@ -130,9 +130,7 @@ export default function ChannelsPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">通知</h1>
-        </div>
+        <h1 className="text-3xl font-bold tracking-tight">通知</h1>
         <Button onClick={() => setCreating(true)}>
           <Plus className="h-4 w-4 mr-1" />
           新建通道
