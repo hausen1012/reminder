@@ -20,10 +20,10 @@ import (
 // 进程重启后重发链会丢失（设计取舍：确认机制是增强功能而非核心可靠性保障；
 // 如需极端可靠应依赖外部消息队列，对本项目的个人使用场景而言不必要）。
 type ConfirmRetryManager struct {
-	DB          *gorm.DB
-	Dispatch    *DispatchService
-	ConfirmSvc  *ConfirmService
-	Loc         *time.Location
+	DB         *gorm.DB
+	Dispatch   *DispatchService
+	ConfirmSvc *ConfirmService
+	Loc        *time.Location
 
 	mu     sync.Mutex
 	timers map[string]*time.Timer
@@ -45,9 +45,11 @@ func NewConfirmRetryManager(db *gorm.DB, dispatch *DispatchService, confirmSvc *
 // round 是已完成的轮次数（0 = 首次触发已发出，下次是第 1 次重发）。
 func (m *ConfirmRetryManager) Schedule(r *models.Reminder, chainID string, round int) {
 	if round >= r.ConfirmMaxRetries {
+		log.Printf("[confirm] 跳过调度 chain=%s：round=%d 已达到上限 %d", chainID, round, r.ConfirmMaxRetries)
 		return
 	}
 	delay := time.Duration(r.ConfirmRetryIntervalSec) * time.Second
+	log.Printf("[confirm] 注册重试定时器 chain=%s reminder=%d next_round=%d delay=%s", chainID, r.ID, round+1, delay)
 	timer := time.AfterFunc(delay, func() {
 		m.retry(r.ID, chainID, round+1)
 	})
@@ -58,11 +60,25 @@ func (m *ConfirmRetryManager) Schedule(r *models.Reminder, chainID string, round
 
 // Cancel 取消指定 chain 的重发（提醒被编辑/关闭时调用）。
 func (m *ConfirmRetryManager) Cancel(chainID string) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	if t, ok := m.timers[chainID]; ok {
-		t.Stop()
-		delete(m.timers, chainID)
+	m.stopChain(chainID)
+}
+
+// CancelByReminderID 取消某条提醒当前所有活动确认链。
+func (m *ConfirmRetryManager) CancelByReminderID(reminderID uint) {
+	if reminderID == 0 {
+		return
+	}
+	var chainIDs []string
+	if err := m.DB.Model(&models.DeliveryLog{}).
+		Distinct("confirm_chain_id").
+		Where("reminder_id = ? AND confirm_chain_id IS NOT NULL AND confirm_chain_id != '' AND confirmed = ?", reminderID, false).
+		Pluck("confirm_chain_id", &chainIDs).Error; err != nil {
+		log.Printf("[confirm] 查询 reminder=%d 活动确认链失败: %v", reminderID, err)
+		return
+	}
+	for _, chainID := range chainIDs {
+		m.stopChain(chainID)
+		log.Printf("[confirm] 取消 reminder=%d 的确认链 chain=%s", reminderID, chainID)
 	}
 }
 
@@ -80,55 +96,56 @@ func (m *ConfirmRetryManager) StopAll() {
 func (m *ConfirmRetryManager) retry(reminderID uint, chainID string, round int) {
 	var r models.Reminder
 	if err := m.DB.First(&r, reminderID).Error; err != nil {
-		// 提醒已被删除
-		m.mu.Lock()
-		delete(m.timers, chainID)
-		m.mu.Unlock()
+		log.Printf("[confirm] 停止确认链 chain=%s：提醒不存在", chainID)
+		m.stopChain(chainID)
 		return
 	}
-	// 提醒已禁用或关闭确认
-	if !r.Enabled || !r.RequireConfirm {
-		m.mu.Lock()
-		delete(m.timers, chainID)
-		m.mu.Unlock()
+	if !r.Enabled {
+		log.Printf("[confirm] 停止确认链 chain=%s：提醒已禁用", chainID)
+		m.stopChain(chainID)
 		return
 	}
-	// 已超过最大重试次数（防御性检查）
+	if !r.RequireConfirm {
+		log.Printf("[confirm] 停止确认链 chain=%s：提醒已关闭确认", chainID)
+		m.stopChain(chainID)
+		return
+	}
 	if round > r.ConfirmMaxRetries {
-		m.mu.Lock()
-		delete(m.timers, chainID)
-		m.mu.Unlock()
+		log.Printf("[confirm] 停止确认链 chain=%s：已达到最大重试次数 %d", chainID, r.ConfirmMaxRetries)
+		m.stopChain(chainID)
 		return
 	}
 
-	// 检查该 chain 是否已被确认
 	var confirmed int64
 	m.DB.Model(&models.DeliveryLog{}).
 		Where("confirm_chain_id = ? AND confirmed = ?", chainID, true).
 		Count(&confirmed)
 	if confirmed > 0 {
-		return // 已被确认，终止
+		log.Printf("[confirm] 停止确认链 chain=%s：用户已确认", chainID)
+		m.stopChain(chainID)
+		return
 	}
 
-	// 查找已有 token
 	var tok models.ConfirmToken
 	err := m.DB.Joins("JOIN delivery_logs ON delivery_logs.id = confirm_tokens.delivery_log_id").
 		Where("delivery_logs.confirm_chain_id = ?", chainID).
 		First(&tok).Error
 	if err != nil {
-		log.Printf("[confirm] 查找 chain=%s token 失败: %v", chainID, err)
+		log.Printf("[confirm] 停止确认链 chain=%s：查找 token 失败: %v", chainID, err)
+		m.stopChain(chainID)
 		return
 	}
-
-	// 校验 token 是否未过期 & 未使用
 	if tok.UsedAt != nil {
+		log.Printf("[confirm] 停止确认链 chain=%s：确认链接已使用", chainID)
+		m.stopChain(chainID)
 		return
 	}
 	if time.Now().After(tok.ExpiresAt) {
+		log.Printf("[confirm] 停止确认链 chain=%s：确认链接已过期", chainID)
+		m.stopChain(chainID)
 		return
 	}
 
-	// 构建 vars 并重新渲染
 	planned := time.Now()
 	if r.NextFireAt != nil {
 		planned = *r.NextFireAt
@@ -142,7 +159,6 @@ func (m *ConfirmRetryManager) retry(reminderID uint, chainID string, round int) 
 		Vars:    vars,
 	}
 
-	// 创建新的 delivery_log（同一 chain）
 	newLog := &models.DeliveryLog{
 		ReminderID:     r.ID,
 		FiredAt:        time.Now(),
@@ -155,16 +171,25 @@ func (m *ConfirmRetryManager) retry(reminderID uint, chainID string, round int) 
 	}
 	if err := m.DB.Create(newLog).Error; err != nil {
 		log.Printf("[confirm] 创建重发日志失败 chain=%s: %v", chainID, err)
+		m.stopChain(chainID)
 		return
 	}
+	log.Printf("[confirm] 触发第 %d 次重发 chain=%s reminder=%d log=%d", round, chainID, r.ID, newLog.ID)
 
-	// 异步 dispatch
 	go func(r models.Reminder, logID uint) {
 		ctx, cancel := context.WithTimeout(context.Background(), 70*time.Second)
 		defer cancel()
 		m.Dispatch.Run(ctx, &r, logID)
 	}(r, newLog.ID)
 
-	// 调度下一轮（如果有）
 	m.Schedule(&r, chainID, round)
+}
+
+func (m *ConfirmRetryManager) stopChain(chainID string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if t, ok := m.timers[chainID]; ok {
+		t.Stop()
+		delete(m.timers, chainID)
+	}
 }

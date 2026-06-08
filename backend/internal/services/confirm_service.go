@@ -68,19 +68,34 @@ func (s *ConfirmService) ConsumeToken(token string) (*models.DeliveryLog, error)
 		return nil, errors.New("确认链接已过期")
 	}
 
+	var target models.DeliveryLog
+	if err := s.DB.First(&target, ct.DeliveryLogID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errors.New("确认记录不存在")
+		}
+		return nil, err
+	}
+
 	now := time.Now()
 	err := s.DB.Transaction(func(tx *gorm.DB) error {
-		// 标记 token 已用
 		if err := tx.Model(&ct).Update("used_at", now).Error; err != nil {
 			return err
 		}
-		// 更新 delivery_log 确认状态
+		updates := map[string]any{
+			"confirmed":    true,
+			"confirmed_at": now,
+		}
+		if target.ConfirmChainID != nil && *target.ConfirmChainID != "" {
+			if err := tx.Model(&models.DeliveryLog{}).
+				Where("confirm_chain_id = ?", *target.ConfirmChainID).
+				Updates(updates).Error; err != nil {
+				return err
+			}
+			return nil
+		}
 		if err := tx.Model(&models.DeliveryLog{}).
 			Where("id = ?", ct.DeliveryLogID).
-			Updates(map[string]any{
-				"confirmed":     true,
-				"confirmed_at":  now,
-			}).Error; err != nil {
+			Updates(updates).Error; err != nil {
 			return err
 		}
 		return nil
@@ -89,7 +104,6 @@ func (s *ConfirmService) ConsumeToken(token string) (*models.DeliveryLog, error)
 		return nil, err
 	}
 
-	// 返回更新后的 delivery_log
 	var dl models.DeliveryLog
 	if err := s.DB.First(&dl, ct.DeliveryLogID).Error; err != nil {
 		return nil, err

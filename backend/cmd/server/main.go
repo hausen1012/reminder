@@ -68,6 +68,9 @@ func main() {
 		log.Printf("HTTP 关闭失败: %v", err)
 	}
 	res.Handles.Sweeper.Stop()
+	if res.Handles.ConfirmMgr != nil {
+		res.Handles.ConfirmMgr.StopAll()
+	}
 	res.Handles.Engine.Stop()
 	log.Println("已退出。")
 }

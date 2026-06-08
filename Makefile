@@ -1,4 +1,5 @@
-.PHONY: dev dev-backend dev-frontend build build-linux build-macos build-windows docker clean
+
+  - 用户一旦确认，整条链立即停止.PHONY: dev dev-backend dev-frontend build build-linux build-macos build-windows docker clean
 
 # Local development
 dev-backend:

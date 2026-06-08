@@ -31,16 +31,16 @@ type SchedulerHook interface {
 
 // ReminderService 提供提醒的 CRUD 与调度器同步。
 type ReminderService struct {
-	DB     *gorm.DB
-	Engine SchedulerHook
-	Loc    *time.Location
-
-	Dispatch *DispatchService
+	DB         *gorm.DB
+	Engine     SchedulerHook
+	Loc        *time.Location
+	Dispatch   *DispatchService
+	ConfirmMgr *ConfirmRetryManager
 }
 
 // NewReminderService 构造服务。
-func NewReminderService(db *gorm.DB, engine SchedulerHook, loc *time.Location, disp *DispatchService) *ReminderService {
-	return &ReminderService{DB: db, Engine: engine, Loc: loc, Dispatch: disp}
+func NewReminderService(db *gorm.DB, engine SchedulerHook, loc *time.Location, disp *DispatchService, confirmMgr *ConfirmRetryManager) *ReminderService {
+	return &ReminderService{DB: db, Engine: engine, Loc: loc, Dispatch: disp, ConfirmMgr: confirmMgr}
 }
 
 // ReminderInput 是 Create / Update 的入参。
@@ -63,10 +63,10 @@ type ReminderInput struct {
 // ReminderView 是返回前端的视图（含 next_fire_at 与绑定的 channel_ids）。
 type ReminderView struct {
 	models.Reminder
-	ScheduleSpec    map[string]any `json:"schedule_spec"`
-	ChannelIDs      []uint         `json:"channel_ids"`
-	NextFireAtLocal string         `json:"next_fire_at_local,omitempty"`
-	LastFiredAtLocal string        `json:"last_fired_at_local,omitempty"`
+	ScheduleSpec     map[string]any `json:"schedule_spec"`
+	ChannelIDs       []uint         `json:"channel_ids"`
+	NextFireAtLocal  string         `json:"next_fire_at_local,omitempty"`
+	LastFiredAtLocal string         `json:"last_fired_at_local,omitempty"`
 }
 
 // Create 新建提醒并写入调度器。
@@ -180,6 +180,9 @@ func (s *ReminderService) Update(id uint, in ReminderInput) (*ReminderView, erro
 			fmt.Printf("[reminder] 更新调度器失败 id=%d: %v\n", id, err)
 		}
 	}
+	if s.ConfirmMgr != nil {
+		s.ConfirmMgr.CancelByReminderID(id)
+	}
 	chIDs, _ := s.channelIDs(id)
 	return s.toView(r, chIDs), nil
 }
@@ -214,9 +217,9 @@ func (s *ReminderService) List(f ListFilter) ([]*ReminderView, int64, error) {
 		q = q.Where("source = ?", f.Source)
 	}
 	if f.APIKeyID != nil {
-			q = q.Where("api_key_id = ?", *f.APIKeyID)
-		}
-		if f.Enabled != nil {
+		q = q.Where("api_key_id = ?", *f.APIKeyID)
+	}
+	if f.Enabled != nil {
 		q = q.Where("enabled = ?", *f.Enabled)
 	}
 	if s := strings.TrimSpace(f.Search); s != "" {
@@ -281,6 +284,9 @@ func (s *ReminderService) Delete(id uint) error {
 	if s.Engine != nil {
 		s.Engine.Remove(id)
 	}
+	if s.ConfirmMgr != nil {
+		s.ConfirmMgr.CancelByReminderID(id)
+	}
 	return nil
 }
 
@@ -312,6 +318,9 @@ func (s *ReminderService) Toggle(id uint) (*ReminderView, error) {
 		} else {
 			s.Engine.Remove(id)
 		}
+	}
+	if !r.Enabled && s.ConfirmMgr != nil {
+		s.ConfirmMgr.CancelByReminderID(id)
 	}
 	chIDs, _ := s.channelIDs(id)
 	return s.toView(r, chIDs), nil
@@ -439,24 +448,24 @@ func (s *ReminderService) locFor(tz string) *time.Location {
 }
 
 func (s *ReminderService) toView(r *models.Reminder, chIDs []uint) *ReminderView {
-		specMap := map[string]any{}
-		if len(r.ScheduleSpec) > 0 {
-			_ = json.Unmarshal(r.ScheduleSpec, &specMap)
-		}
-		if chIDs == nil {
-			chIDs = []uint{}
-		}
-		v := &ReminderView{
-			Reminder:     *r,
-			ScheduleSpec: specMap,
-			ChannelIDs:   chIDs,
-		}
-		loc := s.locFor(r.Timezone)
-		if r.NextFireAt != nil {
-			v.NextFireAtLocal = r.NextFireAt.In(loc).Format("2006-01-02 15:04")
-		}
-		if r.LastFiredAt != nil {
-			v.LastFiredAtLocal = r.LastFiredAt.In(loc).Format("2006-01-02 15:04")
-		}
-		return v
+	specMap := map[string]any{}
+	if len(r.ScheduleSpec) > 0 {
+		_ = json.Unmarshal(r.ScheduleSpec, &specMap)
 	}
+	if chIDs == nil {
+		chIDs = []uint{}
+	}
+	v := &ReminderView{
+		Reminder:     *r,
+		ScheduleSpec: specMap,
+		ChannelIDs:   chIDs,
+	}
+	loc := s.locFor(r.Timezone)
+	if r.NextFireAt != nil {
+		v.NextFireAtLocal = r.NextFireAt.In(loc).Format("2006-01-02 15:04")
+	}
+	if r.LastFiredAt != nil {
+		v.LastFiredAtLocal = r.LastFiredAt.In(loc).Format("2006-01-02 15:04")
+	}
+	return v
+}

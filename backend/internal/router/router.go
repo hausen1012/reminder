@@ -21,8 +21,9 @@ import (
 // SchedulerHandles 把 scheduler 相关启动后实例返回给 main，
 // 便于 main 在 shutdown 时 Stop。
 type SchedulerHandles struct {
-	Engine  *scheduler.Engine
-	Sweeper *scheduler.Sweeper
+	Engine     *scheduler.Engine
+	Sweeper    *scheduler.Sweeper
+	ConfirmMgr *services.ConfirmRetryManager
 }
 
 // SetupResult 包装路由与调度器实例。
@@ -49,12 +50,12 @@ func Setup(staticFS embed.FS, cfg *config.Config) *SetupResult {
 	channelSvc := services.NewChannelService(database.DB, box)
 	dispatchSvc := services.NewDispatchService(database.DB, channelSvc, cfg.Location)
 	engine := scheduler.NewEngine(database.DB, dispatchSvc, cfg.Location)
-	reminderSvc := services.NewReminderService(database.DB, engine, cfg.Location, dispatchSvc)
 
 	// 确认机制
 	confirmSvc := services.NewConfirmService(database.DB, cfg)
 	confirmMgr := services.NewConfirmRetryManager(database.DB, dispatchSvc, confirmSvc, cfg.Location)
 	dispatchSvc.ConfirmMgr = confirmMgr
+	reminderSvc := services.NewReminderService(database.DB, engine, cfg.Location, dispatchSvc, confirmMgr)
 
 	// 启动调度器并把已 enabled 的提醒注册一遍
 	engine.Start()
@@ -107,27 +108,27 @@ func Setup(staticFS embed.FS, cfg *config.Config) *SetupResult {
 	}
 
 	// Ingest API（API Key 鉴权，非 JWT）
-		apiKeyVerify := func(plain string) (uint, bool) {
-			k, ok := apiKeySvc.Verify(plain)
-			if !ok || k == nil {
-				return 0, false
-			}
-			return k.ID, true
+	apiKeyVerify := func(plain string) (uint, bool) {
+		k, ok := apiKeySvc.Verify(plain)
+		if !ok || k == nil {
+			return 0, false
 		}
-		ingest := api.Group("/ingest")
-		ingest.Use(middleware.APIKeyAuth(apiKeyVerify, apiKeySvc.TouchLastUsed, nil))
-		{
-			ingest.POST("/reminders", ingestHandler.CreateReminder)
-			ingest.GET("/reminders", ingestHandler.ListReminders)
-			ingest.GET("/reminders/:id", ingestHandler.GetReminder)
-			ingest.DELETE("/reminders/:id", ingestHandler.DeleteReminder)
-			ingest.GET("/docs", ingestHandler.Docs)
-		}
+		return k.ID, true
+	}
+	ingest := api.Group("/ingest")
+	ingest.Use(middleware.APIKeyAuth(apiKeyVerify, apiKeySvc.TouchLastUsed, nil))
+	{
+		ingest.POST("/reminders", ingestHandler.CreateReminder)
+		ingest.GET("/reminders", ingestHandler.ListReminders)
+		ingest.GET("/reminders/:id", ingestHandler.GetReminder)
+		ingest.DELETE("/reminders/:id", ingestHandler.DeleteReminder)
+		ingest.GET("/docs", ingestHandler.Docs)
+	}
 
-		protected := api.Group("")
-		protected.Use(middleware.JWTAuth(cfg.JWTSecret))
-		{
-			channels := protected.Group("/channels")
+	protected := api.Group("")
+	protected.Use(middleware.JWTAuth(cfg.JWTSecret))
+	{
+		channels := protected.Group("/channels")
 		{
 			channels.GET("", channelHandler.List)
 			channels.POST("", channelHandler.Create)
@@ -136,7 +137,7 @@ func Setup(staticFS embed.FS, cfg *config.Config) *SetupResult {
 			channels.DELETE("/:id", channelHandler.Delete)
 			channels.PATCH("/:id/toggle", channelHandler.Toggle)
 			channels.POST("/:id/test", channelHandler.Test)
-				channels.GET("/stats", channelHandler.Stats)
+			channels.GET("/stats", channelHandler.Stats)
 		}
 
 		reminders := protected.Group("/reminders")
@@ -144,7 +145,7 @@ func Setup(staticFS embed.FS, cfg *config.Config) *SetupResult {
 			reminders.GET("", reminderHandler.List)
 			reminders.POST("", reminderHandler.Create)
 			reminders.POST("/preview", reminderHandler.Preview)
-				reminders.GET("/upcoming", reminderHandler.Upcoming)
+			reminders.GET("/upcoming", reminderHandler.Upcoming)
 			reminders.GET("/:id", reminderHandler.Get)
 			reminders.PUT("/:id", reminderHandler.Update)
 			reminders.DELETE("/:id", reminderHandler.Delete)
@@ -173,8 +174,12 @@ func Setup(staticFS embed.FS, cfg *config.Config) *SetupResult {
 
 	serveStaticFiles(r, staticFS)
 	return &SetupResult{
-		Engine:  r,
-		Handles: &SchedulerHandles{Engine: engine, Sweeper: sweeper},
+		Engine: r,
+		Handles: &SchedulerHandles{
+			Engine:     engine,
+			Sweeper:    sweeper,
+			ConfirmMgr: confirmMgr,
+		},
 	}
 }
 

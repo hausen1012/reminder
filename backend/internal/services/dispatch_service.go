@@ -72,18 +72,36 @@ func (d *DispatchService) Run(ctx context.Context, r *models.Reminder, deliveryL
 	}
 	vars := buildVars(r, time.Now(), *planned, d.Loc)
 
-	// 需要确认时，生成 chain_id + token 并注入 confirm_url
+	// 需要确认时，首发生成 chain_id + token；重发复用已有 chain_id + token
 	var confirmChainID string
 	if r.RequireConfirm && d.ConfirmMgr != nil {
-		confirmChainID = uuid.New().String()
-		ttl := 72 * time.Hour // 充足有效期
-		token, err := d.ConfirmMgr.ConfirmSvc.CreateToken(deliveryLogID, ttl)
-		if err == nil {
-			vars["confirm_url"] = d.ConfirmMgr.ConfirmSvc.BuildURL(token)
-			d.DB.Model(&models.DeliveryLog{}).Where("id = ?", deliveryLogID).
-				Update("confirm_chain_id", confirmChainID)
+		var currentLog models.DeliveryLog
+		if err := d.DB.First(&currentLog, deliveryLogID).Error; err != nil {
+			log.Printf("[dispatch] 加载确认日志失败 log=%d: %v", deliveryLogID, err)
+		} else if currentLog.ConfirmChainID != nil && *currentLog.ConfirmChainID != "" {
+			confirmChainID = *currentLog.ConfirmChainID
+			var tok models.ConfirmToken
+			err := d.DB.Joins("JOIN delivery_logs ON delivery_logs.id = confirm_tokens.delivery_log_id").
+				Where("delivery_logs.confirm_chain_id = ?", confirmChainID).
+				First(&tok).Error
+			if err != nil {
+				log.Printf("[dispatch] 复用确认 token 失败 chain=%s log=%d: %v", confirmChainID, deliveryLogID, err)
+			} else {
+				vars["confirm_url"] = d.ConfirmMgr.ConfirmSvc.BuildURL(tok.Token)
+			}
 		} else {
-			log.Printf("[dispatch] 创建确认 token 失败 log=%d: %v", deliveryLogID, err)
+			confirmChainID = uuid.New().String()
+			ttl := 72 * time.Hour // 充足有效期
+			token, err := d.ConfirmMgr.ConfirmSvc.CreateToken(deliveryLogID, ttl)
+			if err == nil {
+				vars["confirm_url"] = d.ConfirmMgr.ConfirmSvc.BuildURL(token)
+				d.DB.Model(&models.DeliveryLog{}).Where("id = ?", deliveryLogID).
+					Update("confirm_chain_id", confirmChainID)
+				log.Printf("[confirm] 创建确认链 chain=%s reminder=%d log=%d", confirmChainID, r.ID, deliveryLogID)
+			} else {
+				log.Printf("[dispatch] 创建确认 token 失败 log=%d: %v", deliveryLogID, err)
+				confirmChainID = ""
+			}
 		}
 	}
 
@@ -136,12 +154,21 @@ func (d *DispatchService) Run(ctx context.Context, r *models.Reminder, deliveryL
 	}
 	d.finalize(deliveryLogID, status, rendered.Subject, rendered.Body)
 
-	// 需要确认时调度重发链
+	// 仅首发在成功进入确认链后调度重发；重发轮次由 ConfirmRetryManager 继续串联
 	if confirmChainID != "" && d.ConfirmMgr != nil {
-		// 重新读取最新 reminder（确保后续重发时字段是最新的）
-		var refreshed models.Reminder
-		if err := d.DB.First(&refreshed, r.ID); err == nil {
-			d.ConfirmMgr.Schedule(&refreshed, confirmChainID, 0)
+		var currentLog models.DeliveryLog
+		if err := d.DB.First(&currentLog, deliveryLogID).Error; err != nil {
+			log.Printf("[confirm] 读取当前日志失败 log=%d: %v", deliveryLogID, err)
+		} else if currentLog.RetryRound != 0 {
+			log.Printf("[confirm] 跳过首发调度 chain=%s：当前为重发轮次 %d", confirmChainID, currentLog.RetryRound)
+		} else {
+			var refreshed models.Reminder
+			if err := d.DB.First(&refreshed, r.ID).Error; err != nil {
+				log.Printf("[confirm] 重读 reminder 失败 reminder=%d: %v", r.ID, err)
+			} else {
+				log.Printf("[confirm] 调度确认重发 chain=%s reminder=%d interval=%ds max_retries=%d", confirmChainID, refreshed.ID, refreshed.ConfirmRetryIntervalSec, refreshed.ConfirmMaxRetries)
+				d.ConfirmMgr.Schedule(&refreshed, confirmChainID, 0)
+			}
 		}
 	}
 }
