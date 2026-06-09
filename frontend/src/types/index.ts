@@ -48,7 +48,7 @@ export interface ChannelListResp {
 
 export type ReminderCalendar = 'solar' | 'lunar'
 export type ReminderScheduleType = 'once' | 'interval' | 'cron'
-export type ReminderSource = 'manual' | 'api'
+export type ReminderSource = 'web' | 'api'
 
 export interface Reminder {
   id: number
@@ -80,7 +80,7 @@ export interface ReminderInput {
   schedule_spec: Record<string, unknown>
   timezone?: string
   enabled?: boolean
-  source?: 'manual' | 'api'
+  source?: 'web' | 'api'
   channel_ids: number[]
   require_confirm: boolean
   confirm_retry_interval_sec: number

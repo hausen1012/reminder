@@ -114,7 +114,7 @@ export async function testChannel(id: number, body?: { subject?: string; body?: 
 // --- 提醒 ---
 
 export interface ListRemindersQuery {
-  source?: 'manual' | 'api' | 'all'
+  source?: 'web' | 'api' | 'all'
   enabled?: boolean
   search?: string
   limit?: number

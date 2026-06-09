@@ -232,7 +232,7 @@ export default function LogsPage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">全部来源</SelectItem>
-              <SelectItem value="manual">手动</SelectItem>
+              <SelectItem value="web">Web</SelectItem>
               <SelectItem value="api">API</SelectItem>
             </SelectContent>
           </Select>
@@ -310,7 +310,7 @@ export default function LogsPage() {
                         </Badge>
                       </td>
                       <td className="px-4 py-3">
-                        <Badge variant="secondary">{main.source === 'api' ? 'API' : '手动'}</Badge>
+                        <Badge variant="secondary">{main.source === 'api' ? 'API' : 'Web'}</Badge>
                       </td>
                       <td className="px-4 py-3 text-xs">
                         {main.confirmed ? (
@@ -383,7 +383,7 @@ export default function LogsPage() {
                     </Badge>
                   )
                 })()}
-                <Badge variant="secondary">{detail.source === 'api' ? 'API' : '手动'}</Badge>
+                <Badge variant="secondary">{detail.source === 'api' ? 'API' : 'Web'}</Badge>
                 {detail.confirmed ? (
                   <Badge className="bg-green-600">已确认</Badge>
                 ) : detail.confirm_chain_id ? (
@@ -426,7 +426,7 @@ export default function LogsPage() {
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-muted-foreground min-w-[5rem]">来源</span>
-                      <span>{detail.source === 'api' ? 'API' : '手动'}</span>
+                      <span>{detail.source === 'api' ? 'API' : 'Web'}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-muted-foreground min-w-[5rem]">触发时间</span>

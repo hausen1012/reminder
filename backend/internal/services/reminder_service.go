@@ -87,7 +87,7 @@ func (s *ReminderService) Create(in ReminderInput) (*ReminderView, error) {
 
 	source := in.Source
 	if source == "" {
-		source = "manual"
+		source = "web"
 	}
 	r := &models.Reminder{
 		Title:                   strings.TrimSpace(in.Title),

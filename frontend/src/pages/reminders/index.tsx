@@ -28,7 +28,7 @@ import { formatReminderDetail } from '@/lib/utils'
 import type { Channel, Reminder } from '@/types'
 
 const SOURCE_LABEL: Record<string, string> = {
-  manual: '手动',
+  web: 'Web',
   api: 'API',
 }
 
@@ -60,7 +60,7 @@ export default function RemindersPage() {
   const [toDelete, setToDelete] = useState<Reminder | null>(null)
   const [testingId, setTestingId] = useState<number | null>(null)
 
-  const [source, setSource] = useState<string>('manual')
+  const [source, setSource] = useState<string>('web')
   const [enabled, setEnabled] = useState<string>('all')
   const [search, setSearch] = useState('')
   const [limit, setLimit] = useState(10)
@@ -74,7 +74,7 @@ export default function RemindersPage() {
     setLoading(true)
     try {
       const q: ListRemindersQuery = {}
-      if (source !== 'all') q.source = source as 'manual' | 'api'
+      if (source !== 'all') q.source = source as 'web' | 'api'
       if (enabled !== 'all') q.enabled = enabled === 'true'
       if (search.trim()) q.search = search.trim()
       q.limit = limit
@@ -161,7 +161,7 @@ export default function RemindersPage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">全部来源</SelectItem>
-              <SelectItem value="manual">手动</SelectItem>
+              <SelectItem value="web">Web</SelectItem>
               <SelectItem value="api">API</SelectItem>
             </SelectContent>
           </Select>

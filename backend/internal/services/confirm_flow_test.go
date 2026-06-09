@@ -87,7 +87,7 @@ func TestLogServiceListPaginatesByConfirmChain(t *testing.T) {
 		Title:      "另一条独立日志",
 		Content:    "独立内容",
 		Status:     "success",
-		Source:     "manual",
+		Source:     "web",
 		RetryRound: 0,
 	}
 	if err := db.Create(other).Error; err != nil {
@@ -328,7 +328,7 @@ func createConfirmReminder(t *testing.T, db *gorm.DB, intervalSec, maxRetries in
 		RequireConfirm:          true,
 		ConfirmRetryIntervalSec: intervalSec,
 		ConfirmMaxRetries:       maxRetries,
-		Source:                  "manual",
+		Source:                  "web",
 		NextFireAt:              &next,
 	}
 	if err := db.Create(reminder).Error; err != nil {
