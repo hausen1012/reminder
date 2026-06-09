@@ -103,7 +103,7 @@ export function ScheduleForm({ value, onChange }: Props) {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="once">一次性</SelectItem>
+              <SelectItem value="once">单次</SelectItem>
               <SelectItem value="interval">周期</SelectItem>
               <SelectItem value="cron">Cron</SelectItem>
             </SelectContent>

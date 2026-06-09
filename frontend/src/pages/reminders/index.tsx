@@ -33,7 +33,7 @@ const SOURCE_LABEL: Record<string, string> = {
 }
 
 const TYPE_LABEL: Record<string, string> = {
-  once: '一次性',
+  once: '单次',
   interval: '周期',
   cron: 'Cron',
 }
@@ -212,7 +212,7 @@ export default function RemindersPage() {
               <thead className="border-b bg-muted/40 text-left text-xs uppercase text-muted-foreground">
                 <tr>
                   <th className="px-4 py-2.5">标题</th>
-                  <th className="px-4 py-2.5">规则</th>
+                  <th className="px-4 py-2.5">类型</th>
                   <th className="px-4 py-2.5">详情</th>
                   <th className="px-4 py-2.5">下次触发</th>
                   <th className="px-4 py-2.5">通道</th>
