@@ -24,7 +24,7 @@ type Reminder struct {
 	Timezone     string         `gorm:"size:48" json:"timezone"`
 
 	Enabled  bool   `gorm:"index;default:true" json:"enabled"`
-	Source   string `gorm:"size:16;index" json:"source"` // manual | api
+	Source   string `gorm:"size:16;index" json:"source"` // web | api
 	APIKeyID *uint  `gorm:"index" json:"api_key_id,omitempty"`
 
 	RequireConfirm          bool `gorm:"default:false" json:"require_confirm"`
