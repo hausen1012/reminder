@@ -1,43 +1,26 @@
 // 通道页：列表 + 新建/编辑对话框 + 试发 + 删除
 import { useCallback, useEffect, useState } from 'react'
-import { Mail, MessageSquare, Webhook, Terminal, Plus, Pencil, RefreshCw, Trash2, TestTube } from 'lucide-react'
+import { Plus, Pencil, RefreshCw, Trash2, TestTube } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import { Switch } from '@/components/ui/switch'
 import { Pagination } from '@/components/ui/pagination'
 import { useToast } from '@/components/ui/use-toast'
 import { ChannelEditDialog } from '@/components/channels/ChannelEditDialog'
 import { ConfirmDialog } from '@/components/channels/ConfirmDialog'
 import {
   listChannelsPaged,
-  toggleChannel,
   deleteChannel,
   testChannel,
 } from '@/lib/api'
 import type { Channel, ChannelType } from '@/types'
 
 const TYPE_LABEL: Record<ChannelType, string> = {
-  smtp: '邮件 SMTP',
+  smtp: '邮件',
   dingtalk: '钉钉机器人',
   wecom: '企业微信机器人',
-  webhook: '通用 Webhook',
-  log: '日志输出',
-}
-
-const TYPE_ICON: Record<ChannelType, typeof Mail> = {
-  smtp: Mail,
-  dingtalk: MessageSquare,
-  wecom: MessageSquare,
-  webhook: Webhook,
-  log: Terminal,
+  webhook: 'WebHook',
+  log: '控制台日志',
 }
 
 export default function ChannelsPage() {
@@ -46,7 +29,6 @@ export default function ChannelsPage() {
   const [limit, setLimit] = useState(10)
   const [offset, setOffset] = useState(0)
   const [loading, setLoading] = useState(true)
-  const [enabled, setEnabled] = useState<'all' | 'true' | 'false'>('all')
   const [search, setSearch] = useState('')
   const [searchInput, setSearchInput] = useState('')
   const [searchVersion, setSearchVersion] = useState(0)
@@ -60,7 +42,6 @@ export default function ChannelsPage() {
     setLoading(true)
     try {
       const data = await listChannelsPaged({
-        enabled: enabled === 'all' ? undefined : enabled === 'true',
         search: search.trim() || undefined,
         limit,
         offset,
@@ -72,24 +53,11 @@ export default function ChannelsPage() {
     } finally {
       setLoading(false)
     }
-  }, [enabled, search, limit, offset, toast])
+  }, [search, limit, offset, toast])
 
   useEffect(() => {
     refresh()
   }, [refresh, searchVersion])
-
-  async function handleToggle(ch: Channel) {
-    try {
-      const next = await toggleChannel(ch.id)
-      if (enabled === 'all') {
-        setItems((prev) => prev.map((it) => (it.id === ch.id ? next : it)))
-      } else {
-        await refresh()
-      }
-    } catch (err) {
-      toast({ title: '切换状态失败', description: String(err), variant: 'destructive' })
-    }
-  }
 
   async function handleDelete() {
     if (!toDelete) return
@@ -138,24 +106,6 @@ export default function ChannelsPage() {
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
-        <div className="w-40">
-          <Select
-            value={enabled}
-            onValueChange={(value) => {
-              setEnabled(value as 'all' | 'true' | 'false')
-              setOffset(0)
-            }}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="状态" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">全部状态</SelectItem>
-              <SelectItem value="true">已启用</SelectItem>
-              <SelectItem value="false">已禁用</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
         <form
           className="flex-1 max-w-md"
           onSubmit={(e) => {
@@ -193,25 +143,17 @@ export default function ChannelsPage() {
                 <tr>
                   <th className="px-4 py-2.5">名称</th>
                   <th className="px-4 py-2.5">类型</th>
-                  <th className="px-4 py-2.5 text-center">启用</th>
                   <th className="px-4 py-2.5 text-right">操作</th>
                 </tr>
               </thead>
               <tbody>
                 {items.map((ch) => {
-                  const Icon = TYPE_ICON[ch.type]
                   return (
                     <tr key={ch.id} className="border-b last:border-b-0 hover:bg-muted/30">
                       <td className="px-4 py-2.5">
-                        <div className="flex items-center gap-2">
-                          <Icon className="h-4 w-4 text-muted-foreground shrink-0" />
-                          <span className="font-medium truncate" title={ch.name}>{ch.name}</span>
-                        </div>
+                        <span className="font-medium truncate" title={ch.name}>{ch.name}</span>
                       </td>
                       <td className="px-4 py-2.5 text-xs text-muted-foreground">{TYPE_LABEL[ch.type]}</td>
-                      <td className="px-4 py-2.5 text-center">
-                        <Switch checked={ch.enabled} onCheckedChange={() => handleToggle(ch)} aria-label="启用/禁用通道" />
-                      </td>
                       <td className="px-4 py-2.5">
                         <div className="flex justify-end gap-0.5">
                           <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => handleTest(ch)} disabled={testingId === ch.id} title="试发">

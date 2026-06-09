@@ -113,9 +113,6 @@ export function WebhookForm({ config, onChange, isEdit }: SubFormProps) {
               value={(config.body_template as string) ?? ''}
               onChange={(e) => updateField(onChange, 'body_template', e.target.value)}
             />
-            <p className="text-xs text-muted-foreground">
-              留空时使用默认 JSON：{`{"subject": "...", "body": "..."}`}
-            </p>
           </div>
         </>
       )}
@@ -132,9 +129,6 @@ export function WebhookForm({ config, onChange, isEdit }: SubFormProps) {
               updateField(onChange, 'query_template', parseKV(e.target.value))
             }}
           />
-          <p className="text-xs text-muted-foreground">
-            留空时默认附加 subject 与 body 两个查询参数。
-          </p>
         </div>
       )}
     </div>

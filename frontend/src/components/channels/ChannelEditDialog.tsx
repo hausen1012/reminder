@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -35,12 +34,12 @@ interface Props {
   onSaved: () => void
 }
 
-const TYPE_OPTIONS: { value: ChannelType; label: string; hint: string }[] = [
-  { value: 'smtp', label: '邮件 SMTP', hint: '通过 SMTP 协议发送邮件' },
-  { value: 'dingtalk', label: '钉钉机器人', hint: '钉钉群自定义机器人 Webhook' },
-  { value: 'wecom', label: '企业微信机器人', hint: '企业微信群自定义机器人 Webhook' },
-  { value: 'webhook', label: '通用 Webhook', hint: 'GET 或 POST 任意 HTTP 接口' },
-  { value: 'log', label: '日志输出', hint: '将通知输出到服务器控制台' },
+const TYPE_OPTIONS: { value: ChannelType; label: string }[] = [
+  { value: 'smtp', label: '邮件 SMTP' },
+  { value: 'dingtalk', label: '钉钉机器人' },
+  { value: 'wecom', label: '企业微信机器人' },
+  { value: 'webhook', label: '通用 Webhook' },
+  { value: 'log', label: '日志输出' },
 ]
 
 // 各类型默认 Config 模板，新建时初始化使用。
@@ -145,9 +144,6 @@ export function ChannelEditDialog({ channel, open, onClose, onSaved }: Props) {
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{isEdit ? '编辑通道' : '新建通道'}</DialogTitle>
-          <DialogDescription>
-            通道用于发送提醒消息。敏感字段（密码、密钥、Authorization）落库时自动加密。
-          </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">

@@ -41,7 +41,6 @@ export function DingTalkForm({ config, onChange, isEdit }: SubFormProps) {
             }
           }}
         />
-        <p className="text-xs text-muted-foreground">仅在机器人开启"加签"时填写。</p>
       </div>
       <div className="space-y-2">
         <Label>消息类型</Label>
