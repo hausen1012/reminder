@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { HashRouter, Routes, Route } from 'react-router-dom'
 import { ThemeProvider } from '@/contexts/ThemeContext'
 import { AuthProvider } from '@/contexts/AuthContext'
 import { ProtectedRoute } from '@/components/guards/ProtectedRoute'
@@ -15,7 +15,7 @@ import ApiKeysPage from '@/pages/apikeys'
 
 export default function App() {
   return (
-    <BrowserRouter>
+    <HashRouter>
       <ThemeProvider>
         <ToastProviderRoot>
           <AuthProvider>
@@ -46,6 +46,6 @@ export default function App() {
           </AuthProvider>
         </ToastProviderRoot>
       </ThemeProvider>
-    </BrowserRouter>
+    </HashRouter>
   )
 }
