@@ -11,6 +11,11 @@ import {
   Trash2,
   ExternalLink,
   Copy,
+  Mail,
+  MessageCircle,
+  Building2,
+  Link2,
+  FileText,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -31,7 +36,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import { Separator } from '@/components/ui/separator'
 import { useToast } from '@/components/ui/use-toast'
 import { Pagination } from '@/components/ui/pagination'
 import { listLogs, getLogDetail, purgeLogs, countPurgeLogs } from '@/lib/api'
@@ -59,6 +65,20 @@ const STATUS_LABEL: Record<string, string> = {
   failed: '失败',
   pending: '发送中',
   expired: '已过期',
+}
+
+const CHANNEL_ICONS: Record<string, typeof Mail> = {
+  smtp: Mail,
+  dingtalk: MessageCircle,
+  wecom: Building2,
+  webhook: Link2,
+  log: FileText,
+}
+
+function latencyColor(ms: number): string {
+  if (ms < 100) return 'text-green-600'
+  if (ms < 500) return 'text-yellow-600'
+  return 'text-red-600'
 }
 
 export default function LogsPage() {
@@ -342,110 +362,203 @@ export default function LogsPage() {
         </Card>
       )}
 
-      {/* 详情抽屉 */}
-      <Drawer open={detailId != null} onOpenChange={(o) => { if (!o) { setDetailId(null); setDetail(null) } } }>
-        <DrawerContent className="max-h-[85vh]">
-          <DrawerHeader>
-            <DrawerTitle>日志详情</DrawerTitle>
-          </DrawerHeader>
-          <div className="px-6 pb-6 overflow-y-auto max-h-[70vh] space-y-4">
-            {detailLoading ? (
-              <p className="text-sm text-muted-foreground">加载中…</p>
-            ) : detail ? (
-              <>
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div><span className="text-muted-foreground">日志 ID：</span>{detail.id}</div>
-                  <div><span className="text-muted-foreground">提醒 ID：</span>{detail.reminder_id}</div>
-                  <div><span className="text-muted-foreground">提醒标题：</span>{detail.reminder_title}</div>
-                  <div>
-                    <span className="text-muted-foreground">状态：</span>
-                    <Badge variant="outline" className={STATUS_COLOR[detail.status] ?? ''}>
+      {/* 详情对话框 */}
+      <Dialog open={detailId != null} onOpenChange={(o) => { if (!o) { setDetailId(null); setDetail(null) } }}>
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>日志详情</DialogTitle>
+          </DialogHeader>
+          {detailLoading ? (
+            <p className="text-sm text-muted-foreground">加载中…</p>
+          ) : detail ? (
+            <>
+              {/* 顶部概览条 */}
+              <div className="flex flex-wrap items-center gap-3 pb-2">
+                {(() => {
+                  const Icon = STATUS_ICON[detail.status] ?? Clock
+                  return (
+                    <Badge variant="outline" className={`gap-1.5 px-3 py-1 text-sm ${STATUS_COLOR[detail.status] ?? ''}`}>
+                      <Icon className="h-4 w-4" />
                       {STATUS_LABEL[detail.status] ?? detail.status}
                     </Badge>
-                  </div>
-                  <div className="col-span-2"><span className="text-muted-foreground">触发时间：</span>{new Date(detail.fired_at).toLocaleString()}</div>
-                  <div className="col-span-2"><span className="text-muted-foreground">发送标题：</span>{detail.title || '—'}</div>
-                  <div className="col-span-2">
-                    <span className="text-muted-foreground">发送内容：</span>
-                    <pre className="whitespace-pre-wrap text-xs mt-1 rounded bg-muted p-2">{detail.content || '—'}</pre>
-                  </div>
-                  {detail.confirm_chain_id && (
-                    <div className="col-span-2">
-                      <span className="text-muted-foreground">确认链：</span>
-                      {detail.confirm_chain_id}
-                      {detail.confirmed && <Badge className="ml-2 bg-green-600">已确认</Badge>}
-                    </div>
-                  )}
-                  {detail.confirm_url && (
-                    <div className="col-span-2">
-                      <span className="text-muted-foreground">确认链接：</span>
-                      <div className="mt-1 flex items-center gap-2">
-                        <code className="flex-1 truncate rounded bg-muted px-2 py-1 text-xs">
-                          {detail.confirm_url}
-                        </code>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => {
-                            navigator.clipboard.writeText(detail.confirm_url ?? '')
-                            toast({ title: '链接已复制' })
-                          }}
-                        >
-                          <Copy className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                </div>
+                  )
+                })()}
+                <Badge variant="secondary">{detail.source === 'api' ? 'API' : '手动'}</Badge>
+                {detail.confirmed ? (
+                  <Badge className="bg-green-600">已确认</Badge>
+                ) : detail.confirm_chain_id ? (
+                  <Badge variant="outline" className="text-muted-foreground">待确认</Badge>
+                ) : null}
+                <span className="text-xs text-muted-foreground ml-auto">{new Date(detail.fired_at).toLocaleString()}</span>
+              </div>
+              <Separator className="my-1" />
 
-                <div>
-                  <h4 className="text-sm font-medium mb-2">投递尝试</h4>
-                  {detail.attempts && detail.attempts.length > 0 ? (
-                    <table className="w-full text-xs">
-                      <thead>
-                        <tr className="border-b text-left text-muted-foreground">
-                          <th className="py-1 pr-2">通道</th>
-                          <th className="py-1 pr-2">类型</th>
-                          <th className="py-1 pr-2">#</th>
-                          <th className="py-1 pr-2">发送时间</th>
-                          <th className="py-1 pr-2">状态</th>
-                          <th className="py-1 pr-2">延迟</th>
-                          <th className="py-1 pr-2">错误</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {detail.attempts.map((a) => (
-                          <tr key={a.id} className="border-b">
-                            <td className="py-1 pr-2 font-medium">{a.channel_name}</td>
-                            <td className="py-1 pr-2 text-muted-foreground">{a.channel_type}</td>
-                            <td className="py-1 pr-2">{a.attempt}</td>
-                            <td className="py-1 pr-2 text-xs whitespace-nowrap">{new Date(a.created_at).toLocaleString()}</td>
-                            <td className="py-1 pr-2">
-                              {a.status === 'success' ? (
-                                <span className="text-green-600">成功</span>
-                              ) : (
-                                <span className="text-red-600">失败</span>
-                              )}
-                            </td>
-                            <td className="py-1 pr-2">{a.latency_ms}ms</td>
-                            <td className="py-1 pr-2 max-w-[200px] truncate" title={a.error}>
-                              {a.error || '—'}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  ) : (
-                    <p className="text-xs text-muted-foreground">暂无投递记录。</p>
+              <Tabs defaultValue="basic" className="mt-2">
+                <TabsList className="w-full justify-start">
+                  <TabsTrigger value="basic">基本信息</TabsTrigger>
+                  <TabsTrigger value="content">发送内容</TabsTrigger>
+                  {detail.confirm_chain_id && (
+                    <TabsTrigger value="confirm">确认信息</TabsTrigger>
                   )}
-                </div>
-              </>
-            ) : (
-              <p className="text-sm text-muted-foreground">加载失败。</p>
-            )}
-          </div>
-        </DrawerContent>
-      </Drawer>
+                  <TabsTrigger value="attempts">
+                    投递尝试
+                    {detail.attempts && detail.attempts.length > 0 && (
+                      <span className="ml-1.5 rounded-full bg-muted-foreground/20 px-1.5 py-0.5 text-xs">
+                        {detail.attempts.length}
+                      </span>
+                    )}
+                  </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="basic" className="space-y-3">
+                  <div className="grid grid-cols-2 gap-x-6 gap-y-2.5 text-sm">
+                    <div className="flex items-center gap-2">
+                      <span className="text-muted-foreground min-w-[5rem]">日志 ID</span>
+                      <span className="font-mono">{detail.id}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-muted-foreground min-w-[5rem]">提醒 ID</span>
+                      <span className="font-mono">{detail.reminder_id}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-muted-foreground min-w-[5rem]">提醒标题</span>
+                      <span className="font-medium">{detail.reminder_title || '—'}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-muted-foreground min-w-[5rem]">来源</span>
+                      <span>{detail.source === 'api' ? 'API' : '手动'}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-muted-foreground min-w-[5rem]">触发时间</span>
+                      <span>{new Date(detail.fired_at).toLocaleString()}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-muted-foreground min-w-[5rem]">重试轮次</span>
+                      <span>{detail.retry_round > 0 ? `#${detail.retry_round}` : '首次'}</span>
+                    </div>
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="content" className="space-y-4">
+                  <div className="text-sm">
+                    <span className="text-muted-foreground">发送标题：</span>
+                    <span className="font-medium">{detail.title || '—'}</span>
+                  </div>
+                  <div className="text-sm">
+                    <span className="text-muted-foreground">发送内容：</span>
+                    <pre className="mt-1.5 max-h-80 overflow-y-auto whitespace-pre-wrap rounded-lg border bg-muted p-4 text-xs leading-relaxed">
+                      {detail.content || '—'}
+                    </pre>
+                  </div>
+                </TabsContent>
+
+                {detail.confirm_chain_id && (
+                  <TabsContent value="confirm" className="space-y-3">
+                    <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+                      <div className="col-span-2 flex items-center gap-2">
+                        <span className="text-muted-foreground min-w-[5rem]">确认链 ID</span>
+                        <code className="rounded bg-muted px-2 py-0.5 text-xs font-mono">
+                          {detail.confirm_chain_id}
+                        </code>
+                        {detail.confirmed && (
+                          <Badge className="bg-green-600">已确认</Badge>
+                        )}
+                      </div>
+                      {detail.confirmed_at && (
+                        <div className="col-span-2 flex items-center gap-2">
+                          <span className="text-muted-foreground min-w-[5rem]">确认时间</span>
+                          <span>{new Date(detail.confirmed_at).toLocaleString()}</span>
+                        </div>
+                      )}
+                      {detail.confirm_url && (
+                        <div className="col-span-2">
+                          <span className="text-muted-foreground">确认链接：</span>
+                          <div className="mt-1.5 flex items-center gap-2">
+                            <code className="flex-1 truncate rounded border bg-muted px-3 py-1.5 text-xs">
+                              {detail.confirm_url}
+                            </code>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                navigator.clipboard.writeText(detail.confirm_url ?? '')
+                                toast({ title: '链接已复制' })
+                              }}
+                            >
+                              <Copy className="h-3 w-3 mr-1" />
+                              复制
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </TabsContent>
+                )}
+
+                <TabsContent value="attempts">
+                  {detail.attempts && detail.attempts.length > 0 ? (
+                    <div className="rounded-lg border">
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="border-b bg-muted/30 text-left text-muted-foreground">
+                            <th className="px-3 py-2">通道</th>
+                            <th className="px-3 py-2">类型</th>
+                            <th className="px-3 py-2">#</th>
+                            <th className="px-3 py-2">发送时间</th>
+                            <th className="px-3 py-2">状态</th>
+                            <th className="px-3 py-2">延迟</th>
+                            <th className="px-3 py-2">错误</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {detail.attempts.map((a) => {
+                            const ChannelIcon = CHANNEL_ICONS[a.channel_type] ?? FileText
+                            return (
+                            <tr key={a.id} className="border-b last:border-0 hover:bg-muted/20">
+                              <td className="px-3 py-2 font-medium">{a.channel_name}</td>
+                              <td className="px-3 py-2 text-muted-foreground">
+                                <span className="inline-flex items-center gap-1">
+                                  <ChannelIcon className="h-3 w-3" />
+                                  {a.channel_type}
+                                </span>
+                              </td>
+                              <td className="px-3 py-2">{a.attempt}</td>
+                              <td className="px-3 py-2 whitespace-nowrap">{new Date(a.created_at).toLocaleString()}</td>
+                              <td className="px-3 py-2">
+                                {a.status === 'success' ? (
+                                  <span className="inline-flex items-center gap-1 text-green-600">
+                                    <CheckCircle2 className="h-3 w-3" />
+                                    成功
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 text-red-600">
+                                    <XCircle className="h-3 w-3" />
+                                    失败
+                                  </span>
+                                )}
+                              </td>
+                              <td className={`px-3 py-2 font-mono ${latencyColor(a.latency_ms)}`}>
+                                {a.latency_ms}ms
+                              </td>
+                              <td className="px-3 py-2 max-w-[200px]" title={a.error}>
+                                <div className="truncate">{a.error || '—'}</div>
+                              </td>
+                            </tr>
+                          )})}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground py-4">暂无投递记录。</p>
+                  )}
+                </TabsContent>
+              </Tabs>
+            </>
+          ) : (
+            <p className="text-sm text-muted-foreground">加载失败。</p>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* 清理确认对话框 */}
       <Dialog open={purgeOpen} onOpenChange={setPurgeOpen}>
