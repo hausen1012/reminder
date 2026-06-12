@@ -218,7 +218,7 @@ export async function updateApiKeyChannels(id: number, channelIDs: number[]) {
   await api.put<ApiResponse<null>>(`/apikeys/${id}/channels`, { channel_ids: channelIDs })
 }
 
-// --- 调度器 ---
+// --- 监控 ---
 
 export async function getSchedulerStatus() {
   const res = await api.get<ApiResponse<SchedulerStatus>>('/scheduler/status')

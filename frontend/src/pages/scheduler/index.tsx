@@ -50,7 +50,7 @@ export default function SchedulerPage() {
     <div className="space-y-6">
       <div className="flex items-center gap-2">
         <Activity className="h-5 w-5" />
-        <h1 className="text-2xl font-bold tracking-tight">调度器</h1>
+        <h1 className="text-2xl font-bold tracking-tight">监控</h1>
       </div>
 
       {/* 概览卡片 */}

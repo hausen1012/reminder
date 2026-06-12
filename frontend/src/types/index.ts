@@ -172,7 +172,7 @@ export interface CreateAPIKeyResult {
   key: APIKey
 }
 
-// --- 调度器 ---
+// --- 监控 ---
 
 export interface SchedulerEntry {
   id: number
