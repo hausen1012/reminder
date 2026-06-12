@@ -12,6 +12,7 @@ import ChannelsPage from '@/pages/channels'
 import RemindersPage from '@/pages/reminders'
 import LogsPage from '@/pages/logs'
 import ApiKeysPage from '@/pages/apikeys'
+import SchedulerPage from '@/pages/scheduler'
 
 export default function App() {
   return (
@@ -40,6 +41,7 @@ export default function App() {
                 <Route path="logs" element={<LogsPage />} />
                 <Route path="channels" element={<ChannelsPage />} />
                 <Route path="apikeys" element={<ApiKeysPage />} />
+                <Route path="scheduler" element={<SchedulerPage />} />
                 <Route path="profile" element={<Profile />} />
               </Route>
             </Routes>

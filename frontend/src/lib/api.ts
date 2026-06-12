@@ -16,6 +16,7 @@ import type {
   ReminderInput,
   ReminderListResp,
   ReminderPreviewInput,
+  SchedulerStatus,
   User,
 } from '@/types'
 
@@ -215,6 +216,13 @@ export async function deleteApiKey(id: number) {
 
 export async function updateApiKeyChannels(id: number, channelIDs: number[]) {
   await api.put<ApiResponse<null>>(`/apikeys/${id}/channels`, { channel_ids: channelIDs })
+}
+
+// --- 调度器 ---
+
+export async function getSchedulerStatus() {
+  const res = await api.get<ApiResponse<SchedulerStatus>>('/scheduler/status')
+  return res.data.data
 }
 
 // --- Dashboard ---

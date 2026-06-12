@@ -172,6 +172,26 @@ export interface CreateAPIKeyResult {
   key: APIKey
 }
 
+// --- 调度器 ---
+
+export interface SchedulerEntry {
+  id: number
+  kind: 'cron' | 'afterfunc'
+  next_fire_at?: string
+}
+
+export interface SchedulerStatus {
+  engine: {
+    running: boolean
+    registered_count: number
+    entries: SchedulerEntry[]
+  }
+  sweeper: {
+    running: boolean
+    interval_seconds: number
+  }
+}
+
 // --- 日历组件 ---
 
 export interface CalendarResult {

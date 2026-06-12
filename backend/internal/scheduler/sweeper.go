@@ -71,6 +71,11 @@ func (s *Sweeper) IsRunning() bool {
 	return s.cancel != nil
 }
 
+// Interval 返回扫描间隔。
+func (s *Sweeper) Interval() time.Duration {
+	return s.interval
+}
+
 // Stop 通知 sweeper 退出，并等待清理完成。
 func (s *Sweeper) Stop() {
 	if s.cancel == nil {

@@ -13,6 +13,7 @@ import (
 	"encoding/json"
 	"errors"
 	"log"
+	"sort"
 	"sync"
 	"time"
 
@@ -209,6 +210,41 @@ func (e *Engine) RegisteredCount() int {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	return len(e.reg)
+}
+
+// RegisteredEntry 对外暴露注册条目视图。
+type RegisteredEntry struct {
+	ID         uint       `json:"id"`
+	Kind       string     `json:"kind"`
+	NextFireAt *time.Time `json:"next_fire_at"`
+}
+
+// ListRegistered 返回当前 Engine 中所有已注册条目的快照。
+func (e *Engine) ListRegistered() []RegisteredEntry {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	out := make([]RegisteredEntry, 0, len(e.reg))
+	for id, r := range e.reg {
+		ent := RegisteredEntry{
+			ID:   id,
+			Kind: string(r.kind),
+		}
+		// 从 DB 读最新的 NextFireAt
+		var reminder models.Reminder
+		if err := e.db.Select("next_fire_at").First(&reminder, id).Error; err == nil {
+			ent.NextFireAt = reminder.NextFireAt
+		}
+		out = append(out, ent)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
+	return out
+}
+
+// IsRunning 返回 cron 实例是否正在运行（Engine 是否已 Start）。
+func (e *Engine) IsRunning() bool {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return !e.stopped
 }
 
 // LastFireTime 返回最近一次 fire 的时间。

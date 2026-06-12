@@ -88,6 +88,7 @@ func Setup(staticFS embed.FS, cfg *config.Config) *SetupResult {
 	confirmHandler := &handlers.ConfirmHandler{Svc: confirmSvc}
 	apiKeyHandler := &handlers.ApiKeyHandler{Svc: apiKeySvc}
 	ingestHandler := &handlers.IngestHandler{ReminderSvc: reminderSvc, ApiKeySvc: apiKeySvc}
+	schedulerHandler := &handlers.SchedulerHandler{Engine: engine, Sweeper: sweeper}
 
 	// 确认链接（无需认证）
 	r.GET("/c/:token", confirmHandler.Confirm)
@@ -172,6 +173,9 @@ func Setup(staticFS embed.FS, cfg *config.Config) *SetupResult {
 			apikeys.PATCH("/:id/toggle", apiKeyHandler.Toggle)
 			apikeys.PUT("/:id/channels", apiKeyHandler.UpdateDefaultChannels)
 		}
+
+		scheduler := protected.Group("/scheduler")
+		scheduler.GET("/status", schedulerHandler.Status)
 	}
 
 	serveStaticFiles(r, staticFS)
