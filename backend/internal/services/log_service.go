@@ -34,6 +34,7 @@ type LogFilter struct {
 	Status     string // pending | success | partial | failed | expired
 	Source     string
 	Search     string // 搜索日志标题
+	Since      *time.Time // 只返回 fired_at >= 该时间的日志
 	Limit      int
 	Offset     int
 }
@@ -60,6 +61,9 @@ func (s *LogService) List(f LogFilter) ([]*LogView, int64, error) {
 
 		if f.ReminderID > 0 {
 			q = q.Where("delivery_logs.reminder_id = ?", f.ReminderID)
+		}
+		if f.Since != nil {
+			q = q.Where("delivery_logs.fired_at >= ?", *f.Since)
 		}
 		if f.Status != "" {
 			q = q.Where("delivery_logs.status = ?", f.Status)

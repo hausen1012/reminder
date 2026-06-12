@@ -163,6 +163,21 @@ func (h *ReminderHandler) Test(c *gin.Context) {
 
 // Upcoming GET /api/reminders/upcoming
 func (h *ReminderHandler) Upcoming(c *gin.Context) {
+	scope := c.Query("scope")
+	if scope == "today" {
+		now := time.Now().In(h.Svc.Loc)
+		year, month, day := now.Date()
+		todayStart := time.Date(year, month, day, 0, 0, 0, 0, h.Svc.Loc)
+		todayEnd := time.Date(year, month, day, 23, 59, 59, 999999999, h.Svc.Loc)
+		items, err := h.Svc.UpcomingBetween(todayStart, todayEnd, 0)
+		if err != nil {
+			abortErr(c, err)
+			return
+		}
+		successJSON(c, items)
+		return
+	}
+
 	withinStr := c.DefaultQuery("within", "24h")
 	limit := 10
 	if v := c.Query("limit"); v != "" {

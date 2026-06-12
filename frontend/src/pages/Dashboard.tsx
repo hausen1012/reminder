@@ -4,7 +4,7 @@ import { Bell, ScrollText, Send, Key, ArrowRight, CheckCircle2, XCircle, Loader2
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { useAuth } from '@/contexts/AuthContext'
-import { listUpcomingReminders, listLogs, listChannelStats, listApiKeyStats } from '@/lib/api'
+import { listTodayReminders, listLogs, listChannelStats, listApiKeyStats } from '@/lib/api'
 import { formatReminderDetail } from '@/lib/utils'
 import type { Reminder, DeliveryLog } from '@/types'
 import type { ChannelStats } from '@/lib/api'
@@ -16,8 +16,9 @@ function MiniLoader() {
 export default function Dashboard() {
   const { user } = useAuth()
 
-  const [upcoming, setUpcoming] = useState<Reminder[]>([])
-  const [upcomingLoading, setUpcomingLoading] = useState(true)
+  const [todayCount, setTodayCount] = useState(0)
+  const [todayReminders, setTodayReminders] = useState<Reminder[]>([])
+  const [todayLoading, setTodayLoading] = useState(true)
   const [logs, setLogs] = useState<DeliveryLog[]>([])
   const [logsLoading, setLogsLoading] = useState(true)
   const [channelStats, setChannelStats] = useState<ChannelStats[]>([])
@@ -26,8 +27,12 @@ export default function Dashboard() {
   const [apiKeyStatsLoading, setApiKeyStatsLoading] = useState(true)
 
   useEffect(() => {
-    listUpcomingReminders('24h', 10).then(setUpcoming).finally(() => setUpcomingLoading(false))
-    listLogs({ limit: 10 }).then((r) => setLogs(r.items ?? [])).finally(() => setLogsLoading(false))
+    const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+    listTodayReminders().then((items) => {
+      setTodayReminders(items)
+      setTodayCount(items.length)
+    }).finally(() => setTodayLoading(false))
+    listLogs({ limit: 200, since: since24h }).then((r) => setLogs(r.items ?? [])).finally(() => setLogsLoading(false))
     listChannelStats('24h').then(setChannelStats).finally(() => setChannelStatsLoading(false))
     listApiKeyStats().then(setApiKeyStats).finally(() => setApiKeyStatsLoading(false))
   }, [])
@@ -61,17 +66,17 @@ export default function Dashboard() {
         {/* 今日待发 */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">今日待发提醒</CardTitle>
+            <CardTitle className="text-sm font-medium">今日待发提醒 <span className="ml-1.5 text-xs text-muted-foreground">({todayCount})</span></CardTitle>
             <Bell className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            {upcomingLoading ? (
+            {todayLoading ? (
               <MiniLoader />
             ) : (
               <>
-                <div className="text-2xl font-bold">{upcoming.length}</div>
-                <p className="text-xs text-muted-foreground mt-1">未来 24 小时内待触发</p>
-                {upcoming.length > 0 && (
+                <div className="text-2xl font-bold">{todayCount}</div>
+                <p className="text-xs text-muted-foreground mt-1">今天（00:00~23:59）待触发</p>
+                {todayCount > 0 && (
                   <Link to="/reminders" className="text-xs text-primary hover:underline inline-flex items-center gap-1 mt-2">
                     查看全部 <ArrowRight className="h-3 w-3" />
                   </Link>
@@ -84,7 +89,7 @@ export default function Dashboard() {
         {/* 最近发送 */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">最近发送</CardTitle>
+            <CardTitle className="text-sm font-medium">最近发送 <span className="ml-1.5 text-xs text-muted-foreground">({logs.length})</span></CardTitle>
             <ScrollText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -93,7 +98,7 @@ export default function Dashboard() {
             ) : (
               <>
                 <div className="text-2xl font-bold">{logs.length}</div>
-                <p className="text-xs text-muted-foreground mt-1">最近 10 条发送记录</p>
+                <p className="text-xs text-muted-foreground mt-1">过去 24 小时发送记录</p>
                 {logs.length > 0 && (
                   <Link to="/logs" className="text-xs text-primary hover:underline inline-flex items-center gap-1 mt-2">
                     查看全部 <ArrowRight className="h-3 w-3" />
@@ -157,16 +162,16 @@ export default function Dashboard() {
         {/* 今日待发列表 */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">今日待发提醒</CardTitle>
+            <CardTitle className="text-base">今日待发提醒 <span className="text-xs text-muted-foreground">({todayCount})</span></CardTitle>
           </CardHeader>
           <CardContent>
-            {upcomingLoading ? (
+            {todayLoading ? (
               <p className="text-sm text-muted-foreground">加载中…</p>
-            ) : upcoming.length === 0 ? (
-              <p className="text-sm text-muted-foreground">未来 24 小时内没有待触发的提醒。</p>
+            ) : todayReminders.length === 0 ? (
+              <p className="text-sm text-muted-foreground">今天没有待触发的提醒。</p>
             ) : (
               <div className="space-y-2 max-h-[420px] overflow-y-auto pr-1">
-                {upcoming.map((r) => (
+                {todayReminders.map((r) => (
                   <Link
                     key={r.id}
                     to={`/reminders`}
@@ -192,7 +197,7 @@ export default function Dashboard() {
         {/* 最近发送列表 */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">最近发送</CardTitle>
+            <CardTitle className="text-base">最近发送 <span className="text-xs text-muted-foreground">({logs.length})</span></CardTitle>
           </CardHeader>
           <CardContent>
             {logsLoading ? (

@@ -278,6 +278,25 @@ func (s *ReminderService) Upcoming(within time.Duration, limit int) ([]*Reminder
 	return views, nil
 }
 
+// UpcomingBetween 返回指定时间范围内待触发的 enabled 提醒（无 limit 限制）。
+func (s *ReminderService) UpcomingBetween(from, to time.Time, limit int) ([]*ReminderView, error) {
+	var rows []models.Reminder
+	q := s.DB.Where("enabled = ? AND deleted_at IS NULL AND next_fire_at IS NOT NULL AND next_fire_at BETWEEN ? AND ?", true, from, to).
+		Order("next_fire_at ASC")
+	if limit > 0 {
+		q = q.Limit(limit)
+	}
+	if err := q.Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	views := make([]*ReminderView, 0, len(rows))
+	for i := range rows {
+		chIDs, _ := s.channelIDs(rows[i].ID)
+		views = append(views, s.toView(&rows[i], chIDs))
+	}
+	return views, nil
+}
+
 // Delete 软删一条提醒并从调度器移除。
 func (s *ReminderService) Delete(id uint) error {
 	r, err := s.getOrNotFound(id)

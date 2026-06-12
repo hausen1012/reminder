@@ -25,6 +25,11 @@ func (h *LogHandler) List(c *gin.Context) {
 			f.ReminderID = uint(n)
 		}
 	}
+	if v := c.Query("since"); v != "" {
+		if t, err := time.Parse(time.RFC3339, v); err == nil {
+			f.Since = &t
+		}
+	}
 	if v := c.Query("limit"); v != "" {
 		if n, err := strconv.Atoi(v); err == nil {
 			f.Limit = n

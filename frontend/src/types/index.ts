@@ -146,6 +146,7 @@ export interface LogFilter {
   source?: string
   search?: string
   reminder_id?: number
+  since?: string
   limit?: number
   offset?: number
 }

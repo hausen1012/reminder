@@ -227,6 +227,11 @@ export async function getSchedulerStatus() {
 
 // --- Dashboard ---
 
+export async function listTodayReminders() {
+  const res = await api.get<ApiResponse<Reminder[]>>('/reminders/upcoming', { params: { scope: 'today' } })
+  return res.data.data ?? []
+}
+
 export async function listUpcomingReminders(within = '24h', limit = 10) {
   const res = await api.get<ApiResponse<Reminder[]>>('/reminders/upcoming', { params: { within, limit } })
   return res.data.data ?? []
