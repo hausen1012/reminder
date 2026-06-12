@@ -174,6 +174,13 @@ func (e *Engine) addCron(r *models.Reminder, spec *ScheduleSpec) error {
 //
 // 若计算出的下次触发为 nil（spec 已过期）或在过去太久，直接不注册。
 func (e *Engine) addAfterFunc(r *models.Reminder, spec *ScheduleSpec) error {
+	if r == nil {
+		return errors.New("reminder 不能为空")
+	}
+	if !r.Enabled {
+		e.Remove(r.ID)
+		return nil
+	}
 	now := time.Now()
 	next, err := Compute(r.Calendar, r.ScheduleType, spec, now, e.loc)
 	if err != nil {
@@ -252,7 +259,7 @@ func (e *Engine) fire(id uint) {
 	err = e.db.Transaction(func(tx *gorm.DB) error {
 		// 乐观锁：用旧 next_fire_at 防止重复触发
 		oldNext := r.NextFireAt
-		q := tx.Model(&models.Reminder{}).Where("id = ?", id)
+		q := tx.Model(&models.Reminder{}).Where("id = ? AND enabled = ?", id, true)
 		if oldNext != nil {
 			q = q.Where("next_fire_at = ?", oldNext)
 		} else {
