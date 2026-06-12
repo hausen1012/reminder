@@ -152,13 +152,19 @@ func (s *ReminderService) Update(id uint, in ReminderInput) (*ReminderView, erro
 		"schedule_type":              in.ScheduleType,
 		"schedule_spec":              datatypes.JSON(specRaw),
 		"timezone":                   in.Timezone,
-		"next_fire_at":               next,
 		"require_confirm":            in.RequireConfirm,
 		"confirm_retry_interval_sec": in.ConfirmRetryIntervalSec,
 		"confirm_max_retries":        in.ConfirmMaxRetries,
 	}
 	if in.Enabled != nil {
 		updates["enabled"] = *in.Enabled
+		if !*in.Enabled {
+			updates["next_fire_at"] = nil
+		} else {
+			updates["next_fire_at"] = next
+		}
+	} else {
+		updates["next_fire_at"] = next
 	}
 
 	err = s.DB.Transaction(func(tx *gorm.DB) error {
@@ -298,8 +304,8 @@ func (s *ReminderService) Toggle(id uint) (*ReminderView, error) {
 	}
 	r.Enabled = !r.Enabled
 	updates := map[string]any{"enabled": r.Enabled}
-	// 重新启用时再算一次 next_fire_at
 	if r.Enabled {
+		// 重新启用时重新计算 next_fire_at
 		spec, perr := scheduler.ParseSpec(r.ScheduleSpec)
 		if perr == nil {
 			loc := s.locFor(r.Timezone)
@@ -308,6 +314,10 @@ func (s *ReminderService) Toggle(id uint) (*ReminderView, error) {
 				r.NextFireAt = next
 			}
 		}
+	} else {
+		// 禁用时清空下次触发时间
+		updates["next_fire_at"] = nil
+		r.NextFireAt = nil
 	}
 	if err := s.DB.Model(&models.Reminder{}).Where("id = ?", id).Updates(updates).Error; err != nil {
 		return nil, err
