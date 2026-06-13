@@ -105,9 +105,21 @@ func (d *DispatchService) Run(ctx context.Context, r *models.Reminder, deliveryL
 		}
 	}
 
+	body := notifier.Render(r.Content, vars)
+	if confirmChainID != "" && !strings.Contains(r.Content, "{{confirm_url}}") {
+		cu, _ := vars["confirm_url"]
+		switch r.ContentFormat {
+		case "html":
+			body += `<br><a href="` + cu + `">点击确认链接</a>`
+		case "markdown":
+			body += "\n\n[点击确认提醒](" + cu + ")"
+		default:
+			body += "\n点击确认提醒：" + cu
+		}
+	}
 	rendered := notifier.Message{
 		Subject: notifier.Render(r.Title, vars),
-		Body:    notifier.Render(r.Content, vars),
+		Body:    body,
 		Format:  r.ContentFormat,
 		Vars:    vars,
 	}
