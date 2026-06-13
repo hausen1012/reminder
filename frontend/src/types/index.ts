@@ -49,11 +49,13 @@ export interface ChannelListResp {
 export type ReminderCalendar = 'solar' | 'lunar'
 export type ReminderScheduleType = 'once' | 'interval' | 'cron'
 export type ReminderSource = 'web' | 'api'
+export type ContentFormat = 'text' | 'markdown' | 'html'
 
 export interface Reminder {
   id: number
   title: string
   content: string
+  content_format: ContentFormat
   calendar: ReminderCalendar
   schedule_type: ReminderScheduleType
   schedule_spec: Record<string, unknown>
@@ -75,6 +77,7 @@ export interface Reminder {
 export interface ReminderInput {
   title: string
   content: string
+  content_format?: ContentFormat
   calendar: ReminderCalendar
   schedule_type: ReminderScheduleType
   schedule_spec: Record<string, unknown>

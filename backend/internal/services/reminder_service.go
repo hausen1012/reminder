@@ -47,6 +47,7 @@ func NewReminderService(db *gorm.DB, engine SchedulerHook, loc *time.Location, d
 type ReminderInput struct {
 	Title                   string         `json:"title"`
 	Content                 string         `json:"content"`
+	ContentFormat           string         `json:"content_format"`
 	Calendar                string         `json:"calendar"`      // solar | lunar
 	ScheduleType            string         `json:"schedule_type"` // once | interval | cron
 	ScheduleSpec            map[string]any `json:"schedule_spec"`
@@ -89,9 +90,14 @@ func (s *ReminderService) Create(in ReminderInput) (*ReminderView, error) {
 	if source == "" {
 		source = "web"
 	}
+	contentFormat := in.ContentFormat
+	if contentFormat == "" {
+		contentFormat = "text"
+	}
 	r := &models.Reminder{
 		Title:                   strings.TrimSpace(in.Title),
 		Content:                 in.Content,
+		ContentFormat:           contentFormat,
 		Calendar:                in.Calendar,
 		ScheduleType:            in.ScheduleType,
 		ScheduleSpec:            datatypes.JSON(specRaw),
@@ -145,9 +151,14 @@ func (s *ReminderService) Update(id uint, in ReminderInput) (*ReminderView, erro
 		return nil, middleware.NewAppError(middleware.CodeValidationFailed, err.Error()).WithField("schedule_spec")
 	}
 
+	contentFormat := in.ContentFormat
+	if contentFormat == "" {
+		contentFormat = "text"
+	}
 	updates := map[string]any{
 		"title":                      strings.TrimSpace(in.Title),
 		"content":                    in.Content,
+		"content_format":             contentFormat,
 		"calendar":                   in.Calendar,
 		"schedule_type":              in.ScheduleType,
 		"schedule_spec":              datatypes.JSON(specRaw),
@@ -404,6 +415,9 @@ func (s *ReminderService) validate(in *ReminderInput) error {
 	}
 	if in.Calendar == "lunar" && in.ScheduleType == "cron" {
 		return middleware.NewAppError(middleware.CodeValidationFailed, "lunar 不支持 cron").WithField("schedule_type")
+	}
+	if in.ContentFormat != "" && in.ContentFormat != "text" && in.ContentFormat != "markdown" && in.ContentFormat != "html" {
+		return middleware.NewAppError(middleware.CodeValidationFailed, "content_format 仅支持 text / markdown / html").WithField("content_format")
 	}
 	if in.ScheduleSpec == nil {
 		return middleware.NewAppError(middleware.CodeValidationFailed, "schedule_spec 必填").WithField("schedule_spec")

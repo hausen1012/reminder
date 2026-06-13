@@ -1,6 +1,7 @@
 // ReminderEditDialog 是提醒的新建 / 编辑表单。
 import { useEffect, useState, type FormEvent } from 'react'
 import { Info } from 'lucide-react'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   Dialog,
   DialogContent,
@@ -24,7 +25,7 @@ import { useToast } from '@/components/ui/use-toast'
 import { ChannelMultiSelect } from '@/components/channels/ChannelMultiSelect'
 import { ScheduleForm, type ScheduleValue } from './ScheduleForm'
 import { createReminder, listChannels, updateReminder } from '@/lib/api'
-import type { Channel, Reminder, ReminderInput } from '@/types'
+import type { Channel, ContentFormat, Reminder, ReminderInput } from '@/types'
 
 interface Props {
   reminder: Reminder | null
@@ -37,6 +38,7 @@ function defaultInput(): ReminderInput {
   return {
     title: '',
     content: '',
+    content_format: 'text',
     calendar: 'solar',
     schedule_type: 'once',
     schedule_spec: { at: '' },
@@ -92,6 +94,7 @@ export function ReminderEditDialog({ reminder, open, onClose, onSaved }: Props) 
       setInput({
         title: reminder.title,
         content: reminder.content,
+        content_format: (reminder.content_format as ContentFormat) || 'text',
         calendar: reminder.calendar,
         schedule_type: reminder.schedule_type,
         schedule_spec: reminder.schedule_spec,
@@ -164,25 +167,38 @@ export function ReminderEditDialog({ reminder, open, onClose, onSaved }: Props) 
             />
           </div>
           <div className="space-y-2">
-            <div className="flex items-center gap-1.5">
-              <Label htmlFor="r-content">内容</Label>
-              <div className="group relative inline-flex">
-                <button
-                  type="button"
-                  className="rounded-sm p-0.5 text-muted-foreground transition-colors hover:text-foreground"
-                  aria-label="查看可用占位符"
-                >
-                  <Info className="h-3.5 w-3.5" />
-                </button>
-                <div className="pointer-events-none absolute left-full top-1/2 z-50 ml-2 hidden w-64 -translate-y-1/2 rounded-md border bg-popover p-3 text-xs text-popover-foreground shadow-md group-hover:block">
-                  <div className="space-y-1">
-                    <p className="font-medium">可用占位符</p>
-                    <p><code>{'{{now}}'}</code> 当前日期时间</p>
-                    <p><code>{'{{now_date}}'}</code> 当前日期</p>
-                    <p><code>{'{{lunar_date}}'}</code> 当前农历日期</p>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5">
+                <Label htmlFor="r-content">内容</Label>
+                <div className="group relative inline-flex">
+                  <button
+                    type="button"
+                    className="rounded-sm p-0.5 text-muted-foreground transition-colors hover:text-foreground"
+                    aria-label="查看可用占位符"
+                  >
+                    <Info className="h-3.5 w-3.5" />
+                  </button>
+                  <div className="pointer-events-none absolute left-full top-1/2 z-50 ml-2 hidden w-64 -translate-y-1/2 rounded-md border bg-popover p-3 text-xs text-popover-foreground shadow-md group-hover:block">
+                    <div className="space-y-1">
+                      <p className="font-medium">可用占位符</p>
+                      <p><code>{'{{now}}'}</code> 当前日期时间</p>
+                      <p><code>{'{{now_date}}'}</code> 当前日期</p>
+                      <p><code>{'{{lunar_date}}'}</code> 当前农历日期</p>
+                    </div>
                   </div>
                 </div>
               </div>
+              <Tabs
+                value={input.content_format || 'text'}
+                onValueChange={(v) => patch('content_format', v as ContentFormat)}
+                className="w-auto"
+              >
+                <TabsList className="h-8">
+                  <TabsTrigger value="text" className="text-xs px-3">纯文本</TabsTrigger>
+                  <TabsTrigger value="markdown" className="text-xs px-3">Markdown</TabsTrigger>
+                  <TabsTrigger value="html" className="text-xs px-3">HTML</TabsTrigger>
+                </TabsList>
+              </Tabs>
             </div>
             <Textarea
               id="r-content"

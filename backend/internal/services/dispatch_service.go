@@ -108,6 +108,7 @@ func (d *DispatchService) Run(ctx context.Context, r *models.Reminder, deliveryL
 	rendered := notifier.Message{
 		Subject: notifier.Render(r.Title, vars),
 		Body:    notifier.Render(r.Content, vars),
+		Format:  r.ContentFormat,
 		Vars:    vars,
 	}
 
