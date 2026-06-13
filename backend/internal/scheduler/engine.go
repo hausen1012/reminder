@@ -240,6 +240,38 @@ func (e *Engine) ListRegistered() []RegisteredEntry {
 	return out
 }
 
+// ListRegisteredSorted 返回按 next_fire_at 升序排列的分页注册条目。
+// nil next_fire_at 排在最后。offset/limit 为 0 时返回全部。
+func (e *Engine) ListRegisteredSorted(offset, limit int) (entries []RegisteredEntry, total int) {
+	all := e.ListRegistered()
+	total = len(all)
+
+	sort.Slice(all, func(i, j int) bool {
+		if all[i].NextFireAt == nil && all[j].NextFireAt == nil {
+			return all[i].ID < all[j].ID
+		}
+		if all[i].NextFireAt == nil {
+			return false
+		}
+		if all[j].NextFireAt == nil {
+			return true
+		}
+		if all[i].NextFireAt.Equal(*all[j].NextFireAt) {
+			return all[i].ID < all[j].ID
+		}
+		return all[i].NextFireAt.Before(*all[j].NextFireAt)
+	})
+
+	if offset >= total {
+		return nil, total
+	}
+	end := offset + limit
+	if limit <= 0 || end > total {
+		end = total
+	}
+	return all[offset:end], total
+}
+
 // IsRunning 返回 cron 实例是否正在运行（Engine 是否已 Start）。
 func (e *Engine) IsRunning() bool {
 	e.mu.Lock()

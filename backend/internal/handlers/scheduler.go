@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/bedrock/backend/internal/scheduler"
 	"github.com/gin-gonic/gin"
@@ -14,8 +15,31 @@ type SchedulerHandler struct {
 }
 
 func (h *SchedulerHandler) Status(c *gin.Context) {
-	entries := h.Engine.ListRegistered()
-	registeredCount := len(entries)
+	// 分页参数
+	offset, limit := 0, 0
+	if v := c.Query("limit"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			limit = n
+		}
+	}
+	if v := c.Query("offset"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			offset = n
+		}
+	}
+
+	var entries []scheduler.RegisteredEntry
+	registeredCount := 0
+	var entriesTotal int
+
+	if limit > 0 {
+		entries, entriesTotal = h.Engine.ListRegisteredSorted(offset, limit)
+		registeredCount = h.Engine.RegisteredCount()
+	} else {
+		entries = h.Engine.ListRegistered()
+		registeredCount = len(entries)
+		entriesTotal = registeredCount
+	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"code":    200,
@@ -25,6 +49,7 @@ func (h *SchedulerHandler) Status(c *gin.Context) {
 				"running":          h.Engine.IsRunning(),
 				"registered_count": registeredCount,
 				"entries":          entries,
+				"entries_total":    entriesTotal,
 			},
 			"sweeper": gin.H{
 				"running":          h.Sweeper.IsRunning(),

@@ -3,27 +3,32 @@ import { useNavigate } from 'react-router-dom'
 import { Activity, Loader2, AlertCircle } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Pagination } from '@/components/ui/pagination'
 import { getSchedulerStatus } from '@/lib/api'
 import type { SchedulerStatus } from '@/types'
+
+const PAGE_LIMIT = 10
 
 export default function SchedulerPage() {
   const navigate = useNavigate()
   const [status, setStatus] = useState<SchedulerStatus | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [offset, setOffset] = useState(0)
 
-  const fetch = () => {
-    getSchedulerStatus()
+  const fetch = (currentOffset: number) => {
+    setLoading(true)
+    getSchedulerStatus({ limit: PAGE_LIMIT, offset: currentOffset })
       .then(setStatus)
       .catch((e) => setError(e?.response?.data?.message || e.message || '加载失败'))
       .finally(() => setLoading(false))
   }
 
   useEffect(() => {
-    fetch()
-    const id = setInterval(fetch, 10000)
+    fetch(offset)
+    const id = setInterval(() => fetch(offset), 10000)
     return () => clearInterval(id)
-  }, [])
+  }, [offset])
 
   if (loading) {
     return (
@@ -102,39 +107,47 @@ export default function SchedulerPage() {
           <CardTitle className="text-base">注册任务</CardTitle>
         </CardHeader>
         <CardContent>
-          {entries.length === 0 ? (
+          {entries.length === 0 && !loading ? (
             <p className="text-sm text-muted-foreground">暂无注册任务。</p>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b text-left text-muted-foreground">
-                    <th className="pb-2 pr-4 font-medium">ID</th>
-                    <th className="pb-2 pr-4 font-medium">类型</th>
-                    <th className="pb-2 pr-4 font-medium">下次触发</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {entries.map((e) => (
-                    <tr
-                      key={e.id}
-                      className="border-b last:border-0 hover:bg-muted/50 cursor-pointer transition-colors"
-                      onClick={() => navigate(`/reminders`)}
-                    >
-                      <td className="py-2 pr-4 font-medium text-primary">{e.id}</td>
-                      <td className="py-2 pr-4">
-                        <Badge variant="outline">{e.kind}</Badge>
-                      </td>
-                      <td className="py-2 pr-4 text-muted-foreground">
-                        {e.next_fire_at
-                          ? new Date(e.next_fire_at).toLocaleString('zh-CN')
-                          : '—'}
-                      </td>
+            <>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b text-left text-muted-foreground">
+                      <th className="pb-2 pr-4 font-medium">ID</th>
+                      <th className="pb-2 pr-4 font-medium">类型</th>
+                      <th className="pb-2 pr-4 font-medium">下次触发</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {entries.map((e) => (
+                      <tr
+                        key={e.id}
+                        className="border-b last:border-0 hover:bg-muted/50 cursor-pointer transition-colors"
+                        onClick={() => navigate(`/reminders`)}
+                      >
+                        <td className="py-2 pr-4 font-medium text-primary">{e.id}</td>
+                        <td className="py-2 pr-4">
+                          <Badge variant="outline">{e.kind}</Badge>
+                        </td>
+                        <td className="py-2 pr-4 text-muted-foreground">
+                          {e.next_fire_at
+                            ? new Date(e.next_fire_at).toLocaleString('zh-CN')
+                            : '—'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <Pagination
+                total={status?.engine.entries_total ?? 0}
+                limit={PAGE_LIMIT}
+                offset={offset}
+                onPageChange={setOffset}
+              />
+            </>
           )}
         </CardContent>
       </Card>

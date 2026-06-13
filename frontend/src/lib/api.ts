@@ -220,8 +220,8 @@ export async function updateApiKeyChannels(id: number, channelIDs: number[]) {
 
 // --- 监控 ---
 
-export async function getSchedulerStatus() {
-  const res = await api.get<ApiResponse<SchedulerStatus>>('/scheduler/status')
+export async function getSchedulerStatus(params?: { limit?: number; offset?: number }) {
+  const res = await api.get<ApiResponse<SchedulerStatus>>('/scheduler/status', { params })
   return res.data.data
 }
 

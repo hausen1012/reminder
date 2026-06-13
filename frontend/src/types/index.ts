@@ -186,6 +186,7 @@ export interface SchedulerStatus {
     running: boolean
     registered_count: number
     entries: SchedulerEntry[]
+    entries_total: number
   }
   sweeper: {
     running: boolean
