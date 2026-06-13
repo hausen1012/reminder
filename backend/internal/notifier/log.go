@@ -14,17 +14,24 @@ type logNotifier struct{}
 func (n *logNotifier) Type() string { return "log" }
 
 func (n *logNotifier) Send(_ context.Context, _ []byte, msg Message) error {
+	body := msg.Body
+	switch msg.Format {
+	case "html":
+		body = StripHTML(msg.Body)
+	case "markdown":
+		body = StripMarkdown(msg.Body)
+	}
 	log.Printf(
 		"[log-notifier] %s | subject=%s | body=%s",
 		time.Now().Format(time.RFC3339),
 		msg.Subject,
-		msg.Body,
+		body,
 	)
 	fmt.Printf(
 		"=== LOG NOTIFICATION ===\nTime: %s\nSubject: %s\nBody:\n%s\n========================\n",
 		time.Now().Format(time.RFC3339),
 		msg.Subject,
-		msg.Body,
+		body,
 	)
 	return nil
 }

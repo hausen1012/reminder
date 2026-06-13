@@ -35,9 +35,7 @@ func (n *dingtalkNotifier) Send(ctx context.Context, configJSON []byte, msg Mess
 	if cfg.WebhookURL == "" {
 		return Permanent(fmt.Errorf("钉钉 webhook_url 未配置"))
 	}
-	if cfg.MsgType == "" {
-		cfg.MsgType = "text"
-	}
+	// 注意：不再使用 cfg.MsgType，改为使用 msg.Format
 
 	endpoint := cfg.WebhookURL
 	if cfg.Secret != "" {
@@ -106,7 +104,7 @@ func signDingTalk(rawURL, secret string) (string, error) {
 }
 
 func buildDingTalkPayload(cfg DingTalkConfig, msg Message) map[string]any {
-	switch cfg.MsgType {
+	switch msg.Format {
 	case "markdown":
 		title := msg.Subject
 		if title == "" {
@@ -124,9 +122,14 @@ func buildDingTalkPayload(cfg DingTalkConfig, msg Message) map[string]any {
 		}
 		return p
 	default:
-		content := msg.Body
+		// format = "text" 或降级逻辑
+		body := msg.Body
+		if msg.Format == "html" {
+			body = StripHTML(msg.Body)
+		}
+		content := body
 		if msg.Subject != "" {
-			content = msg.Subject + "\n" + msg.Body
+			content = msg.Subject + "\n" + body
 		}
 		p := map[string]any{
 			"msgtype": "text",

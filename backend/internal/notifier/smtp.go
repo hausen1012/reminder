@@ -1,6 +1,7 @@
 package notifier
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"encoding/json"
@@ -9,6 +10,8 @@ import (
 	"net/smtp"
 	"strings"
 	"time"
+
+	"github.com/yuin/goldmark"
 )
 
 // SMTPConfig 是 Channel.Config 解密后对应的 SMTP 参数 schema。
@@ -153,14 +156,39 @@ func buildMIME(cfg SMTPConfig, msg Message) string {
 		from = fmt.Sprintf("=?UTF-8?B?%s?= <%s>", base64Encode(cfg.FromName), cfg.FromAddr)
 	}
 	subjectEncoded := fmt.Sprintf("=?UTF-8?B?%s?=", base64Encode(msg.Subject))
+
+	var contentType string
+	var body string
+	switch msg.Format {
+	case "html":
+		contentType = "text/html; charset=UTF-8"
+		body = msg.Body
+	case "markdown":
+		contentType = "text/html; charset=UTF-8"
+		body = renderMarkdownToHTML(msg.Body)
+	default: // "text" 或未知
+		contentType = "text/plain; charset=UTF-8"
+		body = msg.Body
+	}
+
 	return strings.Join([]string{
 		"From: " + from,
 		"To: " + strings.Join(cfg.To, ", "),
 		"Subject: " + subjectEncoded,
 		"MIME-Version: 1.0",
-		"Content-Type: text/plain; charset=UTF-8",
+		"Content-Type: " + contentType,
 		"Content-Transfer-Encoding: 8bit",
 		"",
-		msg.Body,
+		body,
 	}, "\r\n")
+}
+
+var mdRenderer = goldmark.New()
+
+func renderMarkdownToHTML(src string) string {
+	var buf bytes.Buffer
+	if err := mdRenderer.Convert([]byte(src), &buf); err != nil {
+		return src // 降级返回原文
+	}
+	return buf.String()
 }

@@ -30,9 +30,7 @@ func (n *wecomNotifier) Send(ctx context.Context, configJSON []byte, msg Message
 	if cfg.WebhookURL == "" {
 		return Permanent(fmt.Errorf("企微 webhook_url 未配置"))
 	}
-	if cfg.MsgType == "" {
-		cfg.MsgType = "text"
-	}
+	// 注意：不再使用 cfg.MsgType，改为使用 msg.Format
 
 	payload := buildWeComPayload(cfg, msg)
 	body, _ := json.Marshal(payload)
@@ -73,16 +71,20 @@ func (n *wecomNotifier) Send(ctx context.Context, configJSON []byte, msg Message
 }
 
 func buildWeComPayload(cfg WeComConfig, msg Message) map[string]any {
-	switch cfg.MsgType {
+	switch msg.Format {
 	case "markdown":
 		return map[string]any{
 			"msgtype":  "markdown",
 			"markdown": map[string]any{"content": msg.Body},
 		}
 	default:
-		content := msg.Body
+		body := msg.Body
+		if msg.Format == "html" {
+			body = StripHTML(msg.Body)
+		}
+		content := body
 		if msg.Subject != "" {
-			content = msg.Subject + "\n" + msg.Body
+			content = msg.Subject + "\n" + body
 		}
 		text := map[string]any{"content": content}
 		if len(cfg.MentionedList) > 0 {
