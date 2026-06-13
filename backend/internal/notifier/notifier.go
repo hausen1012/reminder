@@ -38,6 +38,7 @@ func IsPermanent(err error) bool {
 type Message struct {
 	Subject string
 	Body    string
+	Format  string // "text" | "markdown" | "html"
 	Vars    map[string]string
 }
 

@@ -16,7 +16,8 @@ import (
 type Reminder struct {
 	ID      uint   `gorm:"primaryKey" json:"id"`
 	Title   string `gorm:"size:200;not null" json:"title"`
-	Content string `gorm:"type:text" json:"content"`
+	Content       string `gorm:"type:text" json:"content"`
+	ContentFormat string `gorm:"size:8;default:text" json:"content_format"`
 
 	Calendar     string         `gorm:"size:8;index" json:"calendar"`
 	ScheduleType string         `gorm:"size:16;index" json:"schedule_type"`
