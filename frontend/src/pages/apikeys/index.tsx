@@ -1,6 +1,6 @@
-// API Key 管理页：列表 + 搜索 + 分页 + 新建对话框 + 详情编辑 + 明文展示
+// API Key 管理页
 import { useEffect, useMemo, useState } from 'react'
-import { Plus, Trash2, Copy, CheckCircle2, Pencil, Eye, RefreshCw } from 'lucide-react'
+import { Plus, Trash2, Copy, CheckCircle2, Pencil, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -64,12 +64,12 @@ export default function ApiKeysPage() {
   const [selectedKey, setSelectedKey] = useState<APIKey | null>(null)
   const [detailChannelIDs, setDetailChannelIDs] = useState<number[]>([])
   const [detailPlaintext, setDetailPlaintext] = useState('')
-  const [plaintextLoading, setPlaintextLoading] = useState(false)
   const [enabled, setEnabled] = useState<string>('all')
   const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')
   const [limit, setLimit] = useState(10)
   const [offset, setOffset] = useState(0)
+  const [copyingId, setCopyingId] = useState<number | null>(null)
   const { toast } = useToast()
 
   async function refresh() {
@@ -170,12 +170,15 @@ export default function ApiKeysPage() {
   async function openDetail(key: APIKey) {
     setDetailOpen(true)
     setDetailLoading(true)
-    setDetailChannelsOpen(false)
     setDetailPlaintext('')
     try {
-      const detail = await getApiKey(key.id)
+      const [detail, plaintext] = await Promise.all([
+        getApiKey(key.id),
+        getApiKeyPlaintext(key.id),
+      ])
       setSelectedKey(detail)
       setDetailChannelIDs(detail.default_channel_ids ?? [])
+      setDetailPlaintext(plaintext)
     } catch (err) {
       toast({ title: '加载详情失败', description: String(err), variant: 'destructive' })
       setDetailOpen(false)
@@ -192,7 +195,6 @@ export default function ApiKeysPage() {
     setSelectedKey(null)
     setDetailChannelIDs([])
     setDetailPlaintext('')
-    setPlaintextLoading(false)
   }
 
   async function handleSaveDetail() {
@@ -211,16 +213,16 @@ export default function ApiKeysPage() {
     }
   }
 
-  async function handleLoadPlaintext() {
-    if (!selectedKey) return
-    setPlaintextLoading(true)
+  async function handleCopyFromList(keyId: number) {
+    setCopyingId(keyId)
     try {
-      const plaintext = await getApiKeyPlaintext(selectedKey.id)
-      setDetailPlaintext(plaintext)
+      const plaintext = await getApiKeyPlaintext(keyId)
+      await navigator.clipboard.writeText(plaintext)
+      toast({ title: '密钥已复制' })
     } catch (err) {
-      toast({ title: '查看明文失败', description: String(err), variant: 'destructive' })
+      toast({ title: '复制失败', description: String(err), variant: 'destructive' })
     } finally {
-      setPlaintextLoading(false)
+      setCopyingId(null)
     }
   }
 
@@ -271,7 +273,7 @@ export default function ApiKeysPage() {
       ) : filteredItems.length === 0 ? (
         <Card>
           <CardContent className="py-10 text-center text-sm text-muted-foreground">
-            {search.trim() ? '没有匹配的 API Key。' : '还没有 API Key。创建后可通过 Ingest API 外部调用创建提醒。'}
+            {search.trim() ? '没有匹配的 API Key。' : '还没有 API Key。'}
           </CardContent>
         </Card>
       ) : (
@@ -281,10 +283,10 @@ export default function ApiKeysPage() {
               <thead className="border-b bg-muted/40 text-left text-xs uppercase text-muted-foreground">
                 <tr>
                   <th className="px-4 py-2.5 w-[14rem]">名称</th>
-                  <th className="px-4 py-2.5 w-[14rem]">通知</th>
+                  <th className="px-4 py-2.5 w-[10rem]">密钥</th>
+                  <th className="px-4 py-2.5 w-[10rem]">通知</th>
                   <th className="px-4 py-2.5 w-16 text-center">启用</th>
                   <th className="px-4 py-2.5 w-44">最近使用</th>
-                  <th className="px-4 py-2.5 w-44">创建时间</th>
                   <th className="px-4 py-2.5 w-36 text-right">操作</th>
                 </tr>
               </thead>
@@ -296,7 +298,21 @@ export default function ApiKeysPage() {
                         {key.name}
                       </div>
                     </td>
-                    <td className="max-w-[14rem] px-4 py-2.5 text-xs text-muted-foreground">
+                    <td className="max-w-[15rem] px-4 py-2.5">
+                      <div className="flex items-center gap-1.5">
+                        <code className="truncate text-xs text-muted-foreground">{key.prefix}...</code>
+                        <button
+                          type="button"
+                          onClick={() => handleCopyFromList(key.id)}
+                          disabled={copyingId === key.id}
+                          className="shrink-0 rounded p-0.5 text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
+                          title="复制完整密钥"
+                        >
+                          <Copy className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </td>
+                    <td className="max-w-[10rem] px-4 py-2.5 text-xs text-muted-foreground">
                       <span className="block truncate" title={formatChannelNames(channels, key.default_channel_ids)}>
                         {formatChannelNames(channels, key.default_channel_ids)}
                       </span>
@@ -306,9 +322,6 @@ export default function ApiKeysPage() {
                     </td>
                     <td className="whitespace-nowrap px-4 py-2.5 text-xs text-muted-foreground">
                       {formatRecentTime(key.last_used_at)}
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-2.5 text-xs text-muted-foreground">
-                      {new Date(key.created_at).toLocaleString()}
                     </td>
                     <td className="px-4 py-2.5">
                       <div className="flex justify-end gap-0.5">
@@ -333,9 +346,7 @@ export default function ApiKeysPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>新建 API Key</DialogTitle>
-            <DialogDescription>
-              创建后密钥会立即展示，之后默认隐藏，可在详情里按需再次查看。
-            </DialogDescription>
+            <DialogDescription>创建后密钥会立即展示，之后可在详情里查看。</DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div className="space-y-2">
@@ -362,9 +373,7 @@ export default function ApiKeysPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={resetCreateDialog}>
-              取消
-            </Button>
+            <Button variant="outline" onClick={resetCreateDialog}>取消</Button>
             <Button onClick={handleCreate} disabled={creating}>
               {creating ? '创建中…' : '创建'}
             </Button>
@@ -376,9 +385,7 @@ export default function ApiKeysPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>密钥已创建</DialogTitle>
-            <DialogDescription>
-              请立即复制并安全保存。详情里默认隐藏明文，点击按钮后才会再次显示。
-            </DialogDescription>
+            <DialogDescription>请立即复制并安全保存。</DialogDescription>
           </DialogHeader>
           {createdResult && (
             <div className="space-y-3">
@@ -414,14 +421,31 @@ export default function ApiKeysPage() {
         <DialogContent className="overflow-visible">
           <DialogHeader>
             <DialogTitle>API Key 详情</DialogTitle>
-            <DialogDescription>
-              可查看密钥信息、重复查看明文，并编辑默认通知渠道。
-            </DialogDescription>
           </DialogHeader>
           {detailLoading || !selectedKey ? (
             <p className="text-sm text-muted-foreground">加载中…</p>
           ) : (
             <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>明文 Key</Label>
+                <div className="rounded-md border bg-muted p-3">
+                  <div className="flex items-start gap-2">
+                    <code className="min-w-0 flex-1 select-all break-all text-sm">{detailPlaintext}</code>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(detailPlaintext)
+                        toast({ title: '密钥已复制' })
+                      }}
+                      className="rounded p-1 text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
+                      title="复制密钥"
+                    >
+                      <Copy className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <div className="space-y-1">
                   <p className="text-xs text-muted-foreground">名称</p>
@@ -442,36 +466,6 @@ export default function ApiKeysPage() {
               </div>
 
               <div className="space-y-2">
-                <div className="flex items-center justify-between gap-2">
-                  <Label>明文 Key</Label>
-                  <Button variant="outline" size="sm" onClick={handleLoadPlaintext} disabled={plaintextLoading}>
-                    <Eye className="mr-1 h-4 w-4" />
-                    {plaintextLoading ? '读取中…' : detailPlaintext ? '重新查看' : '查看明文'}
-                  </Button>
-                </div>
-                {detailPlaintext ? (
-                  <div className="rounded-md border bg-muted p-3">
-                    <div className="flex items-start gap-2">
-                      <code className="min-w-0 flex-1 select-all break-all text-sm">{detailPlaintext}</code>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          navigator.clipboard.writeText(detailPlaintext)
-                          toast({ title: '密钥已复制' })
-                        }}
-                        className="rounded p-1 text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
-                        title="复制密钥"
-                      >
-                        <Copy className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-xs text-muted-foreground">点击按钮后按需读取并展示明文。</p>
-                )}
-              </div>
-
-              <div className="space-y-2">
                 <Label>默认通知渠道</Label>
                 <ChannelMultiSelect
                   channels={channels}
@@ -482,18 +476,13 @@ export default function ApiKeysPage() {
                   placeholder="未设置默认通知渠道"
                   emptyText="还没有通知渠道，先到「通知」页面创建一个。"
                 />
-                <p className="text-xs text-muted-foreground">
-                  当外部调用未显式传入 <code>channel_ids</code> 时，会回退到这里配置的默认通知渠道。
-                </p>
               </div>
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={closeDetail}>
-              关闭
-            </Button>
+            <Button variant="outline" onClick={closeDetail}>关闭</Button>
             <Button onClick={handleSaveDetail} disabled={detailLoading || !selectedKey || detailSaving}>
-              {detailSaving ? '保存中…' : '保存默认通知渠道'}
+              {detailSaving ? '保存中…' : '保存'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -508,9 +497,7 @@ export default function ApiKeysPage() {
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setToDelete(null)} disabled={deleting}>
-              取消
-            </Button>
+            <Button variant="outline" onClick={() => setToDelete(null)} disabled={deleting}>取消</Button>
             <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
               {deleting ? '删除中…' : '确认删除'}
             </Button>
