@@ -109,10 +109,10 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        {/* 通道健康 */}
+        {/* 通知健康 */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">通道健康</CardTitle>
+            <CardTitle className="text-sm font-medium">通知健康</CardTitle>
             <Send className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -185,7 +185,7 @@ export default function Dashboard() {
                     </div>
                     <div className="text-xs text-muted-foreground mt-1">
                       {formatReminderDetail(r)}
-                      {r.channel_ids.length > 0 && ` · ${r.channel_ids.length} 个通道`}
+                      {r.channel_ids.length > 0 && ` · ${r.channel_ids.length} 个通知渠道`}
                     </div>
                   </Link>
                 ))}

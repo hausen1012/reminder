@@ -203,7 +203,7 @@ export default function ApiKeysPage() {
       const next = { ...selectedKey, default_channel_ids: detailChannelIDs }
       setSelectedKey(next)
       setItems((prev) => prev.map((it) => (it.id === next.id ? next : it)))
-      toast({ title: '默认通道已更新', variant: 'success' })
+      toast({ title: '默认通知渠道已更新', variant: 'success' })
     } catch (err) {
       toast({ title: '保存失败', description: String(err), variant: 'destructive' })
     } finally {
@@ -281,7 +281,7 @@ export default function ApiKeysPage() {
               <thead className="border-b bg-muted/40 text-left text-xs uppercase text-muted-foreground">
                 <tr>
                   <th className="px-4 py-2.5 w-[14rem]">名称</th>
-                  <th className="px-4 py-2.5 w-[14rem]">通道</th>
+                  <th className="px-4 py-2.5 w-[14rem]">通知</th>
                   <th className="px-4 py-2.5 w-16 text-center">启用</th>
                   <th className="px-4 py-2.5 w-44">最近使用</th>
                   <th className="px-4 py-2.5 w-44">创建时间</th>
@@ -356,8 +356,8 @@ export default function ApiKeysPage() {
                 open={newChannelsOpen}
                 onOpenChange={setNewChannelsOpen}
                 onChange={setNewChannelIDs}
-                placeholder="未设置默认通道"
-                emptyText="还没有通道，先到「通知」页面创建一个。"
+                placeholder="未设置默认通知渠道"
+                emptyText="还没有通知渠道，先到「通知」页面创建一个。"
               />
             </div>
           </div>
@@ -479,11 +479,11 @@ export default function ApiKeysPage() {
                   open={detailChannelsOpen}
                   onOpenChange={setDetailChannelsOpen}
                   onChange={setDetailChannelIDs}
-                  placeholder="未设置默认通道"
-                  emptyText="还没有通道，先到「通知」页面创建一个。"
+                  placeholder="未设置默认通知渠道"
+                  emptyText="还没有通知渠道，先到「通知」页面创建一个。"
                 />
                 <p className="text-xs text-muted-foreground">
-                  当外部调用未显式传入 <code>channel_ids</code> 时，会回退到这里配置的默认通道。
+                  当外部调用未显式传入 <code>channel_ids</code> 时，会回退到这里配置的默认通知渠道。
                 </p>
               </div>
             </div>
@@ -493,7 +493,7 @@ export default function ApiKeysPage() {
               关闭
             </Button>
             <Button onClick={handleSaveDetail} disabled={detailLoading || !selectedKey || detailSaving}>
-              {detailSaving ? '保存中…' : '保存默认通道'}
+              {detailSaving ? '保存中…' : '保存默认通知渠道'}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -128,7 +128,7 @@ export function ReminderEditDialog({ reminder, open, onClose, onSaved }: Props) 
     setTesting(true)
     try {
       await testReminder(reminder.id)
-      toast({ title: '已立即触发一次', description: '查看日志页确认通道送达结果。', variant: 'success' })
+      toast({ title: '已立即触发一次', description: '查看日志页确认通知送达结果。', variant: 'success' })
     } catch (err) {
       toast({ title: '触发失败', description: String(err), variant: 'destructive' })
     } finally {
@@ -143,7 +143,7 @@ export function ReminderEditDialog({ reminder, open, onClose, onSaved }: Props) 
       return
     }
     if (input.channel_ids.length === 0) {
-      toast({ title: '至少选择一个通道', variant: 'destructive' })
+      toast({ title: '至少选择一个通知渠道', variant: 'destructive' })
       return
     }
     setSaving(true)
@@ -234,7 +234,7 @@ export function ReminderEditDialog({ reminder, open, onClose, onSaved }: Props) 
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
-              <Label>通道</Label>
+              <Label>通知渠道</Label>
               <ChannelMultiSelect
                 channels={channels}
                 value={input.channel_ids}

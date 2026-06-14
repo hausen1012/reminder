@@ -1,4 +1,4 @@
-// 钉钉机器人通道表单
+// 钉钉机器人通知表单
 import { useState } from 'react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'

@@ -64,7 +64,7 @@ export async function logout() {
   return res.data
 }
 
-// --- 通道 ---
+// --- 通知 ---
 
 export interface ListChannelsQuery {
   enabled?: boolean

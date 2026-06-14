@@ -21,8 +21,8 @@ export function ChannelMultiSelect({
   channels,
   value,
   open,
-  placeholder = '选择通道',
-  emptyText = '还没有通道，先到「通知」页面创建一个。',
+  placeholder = '选择通知渠道',
+  emptyText = '还没有通知渠道，先到「通知」页面创建一个。',
   onOpenChange,
   onChange,
 }: Props) {

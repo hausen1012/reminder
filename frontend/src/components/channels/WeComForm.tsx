@@ -1,4 +1,4 @@
-// 企业微信机器人通道表单
+// 企业微信机器人通知表单
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {

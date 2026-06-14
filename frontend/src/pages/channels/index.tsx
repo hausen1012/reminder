@@ -1,4 +1,4 @@
-// 通道页：列表 + 新建/编辑对话框 + 试发 + 删除
+// 通知页：列表 + 新建/编辑对话框 + 发送测试 + 删除
 import { useCallback, useEffect, useState } from 'react'
 import { Plus, Pencil, RefreshCw, Trash2, Copy } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -83,7 +83,7 @@ export default function ChannelsPage() {
       setItems(data?.items ?? [])
       setTotal(data?.total ?? 0)
     } catch (err) {
-      toast({ title: '加载通道失败', description: String(err), variant: 'destructive' })
+      toast({ title: '加载通知失败', description: String(err), variant: 'destructive' })
     } finally {
       setLoading(false)
     }
@@ -105,7 +105,7 @@ export default function ChannelsPage() {
       } else {
         await refresh()
       }
-      toast({ title: '通道已删除', variant: 'success' })
+      toast({ title: '通知已删除', variant: 'success' })
     } catch (err) {
       toast({ title: '删除失败', description: String(err), variant: 'destructive' })
     } finally {
@@ -121,7 +121,7 @@ export default function ChannelsPage() {
         config: ch.config,
         enabled: ch.enabled,
       })
-      toast({ title: '通道已复制', variant: 'success' })
+      toast({ title: '通知已复制', variant: 'success' })
       refresh()
     } catch (err) {
       toast({ title: '复制失败', description: String(err), variant: 'destructive' })
@@ -134,7 +134,7 @@ export default function ChannelsPage() {
         <h1 className="text-3xl font-bold tracking-tight">通知</h1>
         <Button onClick={() => setCreating(true)}>
           <Plus className="h-4 w-4 mr-1" />
-          新建通道
+          新建通知
         </Button>
       </div>
 
@@ -149,7 +149,7 @@ export default function ChannelsPage() {
           }}
         >
           <Input
-            placeholder="搜索通道名称…"
+            placeholder="搜索通知名称…"
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
           />
@@ -165,7 +165,7 @@ export default function ChannelsPage() {
       ) : items.length === 0 ? (
         <Card>
           <CardContent className="py-10 text-center text-sm text-muted-foreground">
-            还没有通道，点击右上角新建一个吧。
+            还没有通知，点击右上角新建一个吧。
           </CardContent>
         </Card>
       ) : (
@@ -234,8 +234,8 @@ export default function ChannelsPage() {
 
       <ConfirmDialog
         open={Boolean(toDelete)}
-        title="删除通道"
-        description={toDelete ? `确认删除通道「${toDelete.name}」？该操作不可撤销。` : ''}
+        title="删除通知"
+        description={toDelete ? `确认删除通知「${toDelete.name}」？该操作不可撤销。` : ''}
         confirmText="删除"
         destructive
         onConfirm={handleDelete}

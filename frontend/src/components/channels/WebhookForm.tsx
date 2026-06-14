@@ -1,4 +1,4 @@
-// 通用 Webhook 通道表单
+// 通用 Webhook 通知表单
 import { useState } from 'react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'

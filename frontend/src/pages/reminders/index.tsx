@@ -260,7 +260,7 @@ export default function RemindersPage() {
                   <th className="px-4 py-2.5 w-16">类型</th>
                   <th className="px-4 py-2.5 w-[12rem]">详情</th>
                   <th className="px-4 py-2.5 w-40">下次触发</th>
-                  <th className="px-4 py-2.5 w-[10rem]">通道</th>
+                  <th className="px-4 py-2.5 w-[10rem]">通知</th>
                   <th className="px-4 py-2.5 w-16 text-center">启用</th>
                   <th className="px-4 py-2.5 w-16 pl-16">来源</th>
                   <th className="px-4 py-2.5 w-44 whitespace-nowrap cursor-pointer select-none" onClick={() => toggleSort('created_at')}>

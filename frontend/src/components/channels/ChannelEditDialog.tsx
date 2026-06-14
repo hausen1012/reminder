@@ -1,4 +1,4 @@
-// 通道编辑对话框：根据 Type 切换四套表单。
+// 通知编辑对话框：根据 Type 切换四套表单。
 // 新建时 type 可选；编辑时 type 锁死。
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import {
@@ -123,7 +123,7 @@ export function ChannelEditDialog({ channel, open, onClose, onSaved }: Props) {
     try {
       const result = await testChannel(channel.id)
       if (result.success) {
-        toast({ title: '试发成功', description: `通道 ${channel.name} 已成功发送`, variant: 'success' })
+        toast({ title: '试发成功', description: `通知 ${channel.name} 已成功发送`, variant: 'success' })
       } else {
         toast({ title: '试发失败', description: result.error ?? '未知错误', variant: 'destructive' })
       }
@@ -137,7 +137,7 @@ export function ChannelEditDialog({ channel, open, onClose, onSaved }: Props) {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     if (!name.trim()) {
-      toast({ title: '通道名称必填', variant: 'destructive' })
+      toast({ title: '通知名称必填', variant: 'destructive' })
       return
     }
     setSaving(true)
@@ -147,7 +147,7 @@ export function ChannelEditDialog({ channel, open, onClose, onSaved }: Props) {
       } else {
         await createChannel({ name, type, config })
       }
-      toast({ title: isEdit ? '通道已更新' : '通道已创建', variant: 'success' })
+      toast({ title: isEdit ? '通知已更新' : '通知已创建', variant: 'success' })
       onSaved()
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message
@@ -161,11 +161,11 @@ export function ChannelEditDialog({ channel, open, onClose, onSaved }: Props) {
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{isEdit ? '编辑通道' : '新建通道'}</DialogTitle>
+          <DialogTitle>{isEdit ? '编辑通知' : '新建通知'}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="channel-name">通道名称</Label>
+            <Label htmlFor="channel-name">通知名称</Label>
             <Input
               id="channel-name"
               value={name}
@@ -176,7 +176,7 @@ export function ChannelEditDialog({ channel, open, onClose, onSaved }: Props) {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="channel-type">通道类型</Label>
+            <Label htmlFor="channel-type">通知类型</Label>
             <Select value={type} onValueChange={(v) => handleTypeChange(v as ChannelType)} disabled={isEdit}>
               <SelectTrigger id="channel-type">
                 <SelectValue />
@@ -190,7 +190,7 @@ export function ChannelEditDialog({ channel, open, onClose, onSaved }: Props) {
               </SelectContent>
             </Select>
             {isEdit && (
-              <p className="text-xs text-muted-foreground">通道类型创建后不可修改。</p>
+              <p className="text-xs text-muted-foreground">通知类型创建后不可修改。</p>
             )}
           </div>
 
@@ -198,7 +198,7 @@ export function ChannelEditDialog({ channel, open, onClose, onSaved }: Props) {
 
           <DialogFooter>
             {isEdit && (
-              <Button type="button" variant="secondary" onClick={handleTest} disabled={testing} title="向该通道发送一条测试消息">
+              <Button type="button" variant="secondary" onClick={handleTest} disabled={testing} title="向该通知发送一条测试消息">
                 {testing ? '试发中…' : '测试通知'}
               </Button>
             )}
