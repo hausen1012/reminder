@@ -265,16 +265,16 @@ export default function LogsPage() {
       ) : (
         <Card>
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-sm table-fixed">
               <thead className="border-b bg-muted/40 text-left text-xs uppercase text-muted-foreground">
                 <tr>
                   <th className="px-4 py-3 w-8" />
-                  <th className="px-4 py-3">标题</th>
-                  <th className="px-4 py-3">触发时间</th>
-                  <th className="px-4 py-3">状态</th>
-                  <th className="px-4 py-3">来源</th>
-                  <th className="px-4 py-3">确认</th>
-                  <th className="px-4 py-3 text-right">操作</th>
+                  <th className="px-4 py-3 w-[20rem]">标题</th>
+                  <th className="px-4 py-3 w-44">触发时间</th>
+                  <th className="px-4 py-3 w-28">状态</th>
+                  <th className="px-4 py-3 w-16">来源</th>
+                  <th className="px-4 py-3 w-16">确认</th>
+                  <th className="px-4 py-3 w-24 text-right">操作</th>
                 </tr>
               </thead>
               <tbody>
@@ -498,7 +498,7 @@ export default function LogsPage() {
                 <TabsContent value="attempts">
                   {detail.attempts && detail.attempts.length > 0 ? (
                     <div className="rounded-lg border">
-                      <table className="w-full text-xs">
+                      <table className="w-full text-xs table-fixed">
                         <thead>
                           <tr className="border-b bg-muted/30 text-left text-muted-foreground">
                             <th className="px-3 py-2">通道</th>

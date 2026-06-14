@@ -277,15 +277,15 @@ export default function ApiKeysPage() {
       ) : (
         <Card>
           <div className="overflow-x-auto">
-            <table className="w-full text-[13px]">
+            <table className="w-full text-[13px] table-fixed">
               <thead className="border-b bg-muted/40 text-left text-xs uppercase text-muted-foreground">
                 <tr>
-                  <th className="px-4 py-2.5">名称</th>
-                  <th className="px-4 py-2.5">通道</th>
-                  <th className="px-4 py-2.5 text-center">启用</th>
-                  <th className="px-4 py-2.5">最近使用</th>
-                  <th className="px-4 py-2.5">创建时间</th>
-                  <th className="px-4 py-2.5 text-right">操作</th>
+                  <th className="px-4 py-2.5 w-[14rem]">名称</th>
+                  <th className="px-4 py-2.5 w-[14rem]">通道</th>
+                  <th className="px-4 py-2.5 w-16 text-center">启用</th>
+                  <th className="px-4 py-2.5 w-44">最近使用</th>
+                  <th className="px-4 py-2.5 w-44">创建时间</th>
+                  <th className="px-4 py-2.5 w-36 text-right">操作</th>
                 </tr>
               </thead>
               <tbody>

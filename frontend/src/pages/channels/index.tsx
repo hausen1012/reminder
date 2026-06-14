@@ -184,15 +184,15 @@ export default function ChannelsPage() {
       ) : (
         <Card>
           <div className="overflow-x-auto">
-            <table className="w-full text-[13px]">
+            <table className="w-full text-[13px] table-fixed">
               <thead className="border-b bg-muted/40 text-left text-xs uppercase text-muted-foreground">
                 <tr>
-                  <th className="px-4 py-2.5">名称</th>
-                  <th className="px-4 py-2.5">类型</th>
-                  <th className="px-4 py-2.5 whitespace-nowrap cursor-pointer select-none" onClick={() => toggleSort('created_at')}>
+                  <th className="px-4 py-2.5 w-[14rem]">名称</th>
+                  <th className="px-4 py-2.5 w-28">类型</th>
+                  <th className="px-4 py-2.5 w-44 whitespace-nowrap cursor-pointer select-none" onClick={() => toggleSort('created_at')}>
                     创建时间<SortIcon active={sortBy === 'created_at'} direction={sortOrder} />
                   </th>
-                  <th className="px-4 py-2.5 text-right">操作</th>
+                  <th className="px-4 py-2.5 w-36 text-right">操作</th>
                 </tr>
               </thead>
               <tbody>

@@ -111,11 +111,11 @@ export default function SchedulerPage() {
         ) : (
           <>
             <div className="overflow-x-auto">
-              <table className="w-full text-[13px]">
+              <table className="w-full text-[13px] table-fixed">
                 <thead className="border-b bg-muted/40 text-left text-xs uppercase text-muted-foreground">
                   <tr>
-                    <th className="px-4 py-2.5">ID</th>
-                    <th className="px-4 py-2.5">类型</th>
+                    <th className="px-4 py-2.5 w-16">ID</th>
+                    <th className="px-4 py-2.5 w-28">类型</th>
                     <th className="px-4 py-2.5">下次触发</th>
                   </tr>
                 </thead>

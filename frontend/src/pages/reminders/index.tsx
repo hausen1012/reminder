@@ -262,20 +262,20 @@ export default function RemindersPage() {
       ) : (
         <Card>
           <div className="overflow-x-auto">
-            <table className="w-full text-[13px]">
+            <table className="w-full text-[13px] table-fixed">
               <thead className="border-b bg-muted/40 text-left text-xs uppercase text-muted-foreground">
                 <tr>
-                  <th className="px-4 py-2.5">标题</th>
-                  <th className="px-4 py-2.5">类型</th>
-                  <th className="px-4 py-2.5">详情</th>
-                  <th className="px-4 py-2.5">下次触发</th>
-                  <th className="px-4 py-2.5">通道</th>
-                  <th className="px-4 py-2.5 text-center">启用</th>
-                  <th className="px-4 py-2.5 pl-16">来源</th>
-                  <th className="px-4 py-2.5 whitespace-nowrap cursor-pointer select-none" onClick={() => toggleSort('created_at')}>
+                  <th className="px-4 py-2.5 w-[12rem]">标题</th>
+                  <th className="px-4 py-2.5 w-16">类型</th>
+                  <th className="px-4 py-2.5 w-[12rem]">详情</th>
+                  <th className="px-4 py-2.5 w-40">下次触发</th>
+                  <th className="px-4 py-2.5 w-[10rem]">通道</th>
+                  <th className="px-4 py-2.5 w-16 text-center">启用</th>
+                  <th className="px-4 py-2.5 w-16 pl-16">来源</th>
+                  <th className="px-4 py-2.5 w-44 whitespace-nowrap cursor-pointer select-none" onClick={() => toggleSort('created_at')}>
                     创建时间<SortIcon active={sortBy === 'created_at'} direction={sortOrder} />
                   </th>
-                  <th className="px-4 py-2.5 text-right">操作</th>
+                  <th className="px-4 py-2.5 w-36 text-right">操作</th>
                 </tr>
               </thead>
               <tbody>
