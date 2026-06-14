@@ -9,6 +9,12 @@ import type { SchedulerStatus } from '@/types'
 
 const PAGE_LIMIT = 10
 
+const TYPE_LABEL: Record<string, string> = {
+  once: '单次',
+  interval: '周期',
+  cron: 'Cron',
+}
+
 export default function SchedulerPage() {
   const navigate = useNavigate()
   const [status, setStatus] = useState<SchedulerStatus | null>(null)
@@ -115,8 +121,10 @@ export default function SchedulerPage() {
                 <thead className="border-b bg-muted/40 text-left text-xs uppercase text-muted-foreground">
                   <tr>
                     <th className="px-4 py-2.5 w-16">ID</th>
+                    <th className="px-4 py-2.5">标题</th>
                     <th className="px-4 py-2.5 w-28">类型</th>
                     <th className="px-4 py-2.5">下次触发</th>
+                    <th className="px-4 py-2.5">上次触发</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -127,12 +135,18 @@ export default function SchedulerPage() {
                       onClick={() => navigate(`/reminders`)}
                     >
                       <td className="px-4 py-2.5 font-medium text-primary">{e.id}</td>
+                      <td className="px-4 py-2.5 truncate max-w-[200px]" title={e.title}>{e.title || '—'}</td>
                       <td className="px-4 py-2.5">
-                        <Badge variant="outline">{e.kind}</Badge>
+                        {TYPE_LABEL[e.schedule_type] ?? e.schedule_type}
                       </td>
                       <td className="px-4 py-2.5 text-muted-foreground">
                         {e.next_fire_at
                           ? new Date(e.next_fire_at).toLocaleString('zh-CN')
+                          : '—'}
+                      </td>
+                      <td className="px-4 py-2.5 text-muted-foreground">
+                        {e.last_fired_at
+                          ? new Date(e.last_fired_at).toLocaleString('zh-CN')
                           : '—'}
                       </td>
                     </tr>

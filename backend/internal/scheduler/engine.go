@@ -214,9 +214,12 @@ func (e *Engine) RegisteredCount() int {
 
 // RegisteredEntry 对外暴露注册条目视图。
 type RegisteredEntry struct {
-	ID         uint       `json:"id"`
-	Kind       string     `json:"kind"`
-	NextFireAt *time.Time `json:"next_fire_at"`
+	ID           uint       `json:"id"`
+	Kind         string     `json:"kind"`
+	NextFireAt   *time.Time `json:"next_fire_at"`
+	Title        string     `json:"title"`
+	LastFiredAt  *time.Time `json:"last_fired_at"`
+	ScheduleType string     `json:"schedule_type"`
 }
 
 // ListRegistered 返回当前 Engine 中所有已注册条目的快照。
@@ -229,10 +232,12 @@ func (e *Engine) ListRegistered() []RegisteredEntry {
 			ID:   id,
 			Kind: string(r.kind),
 		}
-		// 从 DB 读最新的 NextFireAt
 		var reminder models.Reminder
-		if err := e.db.Select("next_fire_at").First(&reminder, id).Error; err == nil {
+		if err := e.db.Select("next_fire_at, title, last_fired_at, schedule_type").First(&reminder, id).Error; err == nil {
 			ent.NextFireAt = reminder.NextFireAt
+			ent.Title = reminder.Title
+			ent.LastFiredAt = reminder.LastFiredAt
+			ent.ScheduleType = reminder.ScheduleType
 		}
 		out = append(out, ent)
 	}

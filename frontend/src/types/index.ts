@@ -170,6 +170,9 @@ export interface SchedulerEntry {
   id: number
   kind: 'cron' | 'afterfunc'
   next_fire_at?: string
+  title: string
+  last_fired_at?: string
+  schedule_type: string
 }
 
 export interface SchedulerStatus {
