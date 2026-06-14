@@ -363,7 +363,7 @@ func (s *ReminderService) Toggle(id uint) (*ReminderView, error) {
 	}
 	if err := s.DB.Model(&models.Reminder{}).Where("id = ?", id).Updates(updates).Error; err != nil {
 		return nil, err
-	}/mo
+	}
 	if s.Engine != nil {
 		if r.Enabled {
 			_ = s.Engine.Add(r)
