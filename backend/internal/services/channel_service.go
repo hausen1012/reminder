@@ -56,10 +56,12 @@ type ChannelView struct {
 
 // ChannelListFilter 是通道列表分页参数。
 type ChannelListFilter struct {
-	Enabled *bool
-	Search  string
-	Limit   int
-	Offset  int
+	Enabled   *bool
+	Search    string
+	Limit     int
+	Offset    int
+	SortBy    string // created_at | id | name
+	SortOrder string // asc | desc
 }
 
 const encSuffix = "_enc"
@@ -195,7 +197,16 @@ func (s *ChannelService) ListPaged(f ChannelListFilter) ([]*ChannelView, int64, 
 	}
 
 	var rows []models.Channel
-	if err := q.Order("id ASC").Limit(f.Limit).Offset(f.Offset).Find(&rows).Error; err != nil {
+	orderClause := "created_at DESC"
+	if f.SortBy != "" {
+		orderClause = f.SortBy
+		if f.SortOrder == "asc" {
+			orderClause += " ASC"
+		} else {
+			orderClause += " DESC"
+		}
+	}
+	if err := q.Order(orderClause).Limit(f.Limit).Offset(f.Offset).Find(&rows).Error; err != nil {
 		return nil, 0, err
 	}
 

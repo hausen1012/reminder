@@ -1,6 +1,6 @@
 // 通道页：列表 + 新建/编辑对话框 + 试发 + 删除
 import { useCallback, useEffect, useState } from 'react'
-import { Plus, Pencil, RefreshCw, Trash2, TestTube, Copy } from 'lucide-react'
+import { Plus, Pencil, RefreshCw, Trash2, TestTube, Copy, ArrowUpDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -15,6 +15,22 @@ import {
   createChannel,
 } from '@/lib/api'
 import type { Channel, ChannelType } from '@/types'
+
+function formatTime(dateStr?: string): string {
+  if (!dateStr) return '—'
+  const d = new Date(dateStr)
+  if (isNaN(d.getTime())) return '—'
+  const y = d.getFullYear()
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  const h = String(d.getHours()).padStart(2, '0')
+  const min = String(d.getMinutes()).padStart(2, '0')
+  return `${y}/${month}/${day} ${h}:${min}`
+}
+
+function SortIcon({ active, direction }: { active: boolean; direction: string }) {
+  return <ArrowUpDown className={`inline h-3 w-3 ml-0.5 ${active ? 'text-foreground' : 'text-muted-foreground/40'}`} style={active && direction === 'asc' ? { transform: 'rotate(180deg)' } : undefined} />
+}
 
 const TYPE_LABEL: Record<ChannelType, string> = {
   smtp: '邮件',
@@ -37,7 +53,19 @@ export default function ChannelsPage() {
   const [creating, setCreating] = useState(false)
   const [toDelete, setToDelete] = useState<Channel | null>(null)
   const [testingId, setTestingId] = useState<number | null>(null)
+  const [sortBy, setSortBy] = useState('created_at')
+  const [sortOrder, setSortOrder] = useState('desc')
   const { toast } = useToast()
+
+  function toggleSort(field: string) {
+    if (sortBy === field) {
+      setSortOrder((o) => (o === 'desc' ? 'asc' : 'desc'))
+    } else {
+      setSortBy(field)
+      setSortOrder('desc')
+    }
+    setOffset(0)
+  }
 
   const refresh = useCallback(async () => {
     setLoading(true)
@@ -46,6 +74,8 @@ export default function ChannelsPage() {
         search: search.trim() || undefined,
         limit,
         offset,
+        sort_by: sortBy,
+        sort_order: sortOrder,
       })
       setItems(data?.items ?? [])
       setTotal(data?.total ?? 0)
@@ -54,7 +84,7 @@ export default function ChannelsPage() {
     } finally {
       setLoading(false)
     }
-  }, [search, limit, offset, toast])
+  }, [search, limit, offset, toast, sortBy, sortOrder])
 
   useEffect(() => {
     refresh()
@@ -159,6 +189,9 @@ export default function ChannelsPage() {
                 <tr>
                   <th className="px-4 py-2.5">名称</th>
                   <th className="px-4 py-2.5">类型</th>
+                  <th className="px-4 py-2.5 whitespace-nowrap cursor-pointer select-none" onClick={() => toggleSort('created_at')}>
+                    创建时间<SortIcon active={sortBy === 'created_at'} direction={sortOrder} />
+                  </th>
                   <th className="px-4 py-2.5 text-right">操作</th>
                 </tr>
               </thead>
@@ -170,6 +203,9 @@ export default function ChannelsPage() {
                         <span className="font-medium truncate" title={ch.name}>{ch.name}</span>
                       </td>
                       <td className="px-4 py-2.5 text-xs text-muted-foreground">{TYPE_LABEL[ch.type]}</td>
+                      <td className="px-4 py-2.5 text-xs whitespace-nowrap text-muted-foreground">
+                        {formatTime(ch.created_at)}
+                      </td>
                       <td className="px-4 py-2.5">
                         <div className="flex justify-end gap-0.5">
                           <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => handleDuplicate(ch)} title="复制">

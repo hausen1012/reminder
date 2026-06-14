@@ -18,8 +18,10 @@ type ReminderHandler struct {
 // List GET /api/reminders
 func (h *ReminderHandler) List(c *gin.Context) {
 	f := services.ListFilter{
-		Source: c.Query("source"),
-		Search: c.Query("search"),
+		Source:    c.Query("source"),
+		Search:    c.Query("search"),
+		SortBy:    c.Query("sort_by"),
+		SortOrder: c.Query("sort_order"),
 	}
 	if v := c.Query("enabled"); v != "" {
 		b := v == "true" || v == "1"

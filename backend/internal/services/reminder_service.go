@@ -219,12 +219,14 @@ func (s *ReminderService) Get(id uint) (*ReminderView, error) {
 
 // ListFilter 列表过滤条件。
 type ListFilter struct {
-	Source   string // manual | api | ""
-	Enabled  *bool
-	Search   string
-	APIKeyID *uint
-	Limit    int
-	Offset   int
+	Source    string // manual | api | ""
+	Enabled   *bool
+	Search    string
+	APIKeyID  *uint
+	Limit     int
+	Offset    int
+	SortBy    string // created_at | id | next_fire_at
+	SortOrder string // asc | desc
 }
 
 // List 返回符合条件的提醒分页列表。
@@ -253,8 +255,18 @@ func (s *ReminderService) List(f ListFilter) ([]*ReminderView, int64, error) {
 	if f.Limit > 200 {
 		f.Limit = 200
 	}
+
+	orderClause := "created_at DESC"
+	if f.SortBy != "" {
+		orderClause = f.SortBy
+		if f.SortOrder == "asc" {
+			orderClause += " ASC"
+		} else {
+			orderClause += " DESC"
+		}
+	}
 	var rows []models.Reminder
-	if err := q.Order("id DESC").Limit(f.Limit).Offset(f.Offset).Find(&rows).Error; err != nil {
+	if err := q.Order(orderClause).Limit(f.Limit).Offset(f.Offset).Find(&rows).Error; err != nil {
 		return nil, 0, err
 	}
 	views := make([]*ReminderView, 0, len(rows))

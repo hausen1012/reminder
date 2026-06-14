@@ -58,7 +58,11 @@ func (h *ChannelHandler) List(c *gin.Context) {
 		return
 	}
 
-	f := services.ChannelListFilter{Search: search}
+	f := services.ChannelListFilter{
+		Search:    search,
+		SortBy:    c.Query("sort_by"),
+		SortOrder: c.Query("sort_order"),
+	}
 	if limitStr != "" {
 		if n, err := strconv.Atoi(limitStr); err == nil {
 			f.Limit = n

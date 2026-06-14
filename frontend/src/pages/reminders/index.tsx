@@ -1,6 +1,6 @@
 // 提醒列表页：toolbar（来源筛选/状态/搜索/新建）+ 表格 + 编辑/试发/删除。
 import { useEffect, useState, useMemo } from 'react'
-import { Plus, Pencil, Trash2, TestTube, RefreshCw, Copy } from 'lucide-react'
+import { Plus, Pencil, Trash2, TestTube, RefreshCw, Copy, ArrowUpDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -52,6 +52,22 @@ function formatNextFire(dateStr?: string): string {
   return `${y}/${month}/${day} ${h}:${min}:${s}`
 }
 
+function formatTime(dateStr?: string): string {
+  if (!dateStr) return '—'
+  const d = new Date(dateStr)
+  if (isNaN(d.getTime())) return '—'
+  const y = d.getFullYear()
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  const h = String(d.getHours()).padStart(2, '0')
+  const min = String(d.getMinutes()).padStart(2, '0')
+  return `${y}/${month}/${day} ${h}:${min}`
+}
+
+function SortIcon({ active, direction }: { active: boolean; direction: string }) {
+  return <ArrowUpDown className={`inline h-3 w-3 ml-0.5 ${active ? 'text-foreground' : 'text-muted-foreground/40'}`} style={active && direction === 'asc' ? { transform: 'rotate(180deg)' } : undefined} />
+}
+
 export default function RemindersPage() {
   const [items, setItems] = useState<Reminder[]>([])
   const [total, setTotal] = useState(0)
@@ -66,10 +82,22 @@ export default function RemindersPage() {
   const [search, setSearch] = useState('')
   const [limit, setLimit] = useState(10)
   const [offset, setOffset] = useState(0)
+  const [sortBy, setSortBy] = useState('created_at')
+  const [sortOrder, setSortOrder] = useState('desc')
 
   const [channels, setChannels] = useState<Channel[]>([])
 
   const { toast } = useToast()
+
+  function toggleSort(field: string) {
+    if (sortBy === field) {
+      setSortOrder((o) => (o === 'desc' ? 'asc' : 'desc'))
+    } else {
+      setSortBy(field)
+      setSortOrder('desc')
+    }
+    setOffset(0)
+  }
 
   async function refresh() {
     setLoading(true)
@@ -80,6 +108,8 @@ export default function RemindersPage() {
       if (search.trim()) q.search = search.trim()
       q.limit = limit
       q.offset = offset
+      q.sort_by = sortBy
+      q.sort_order = sortOrder
       const data = await listReminders(q)
       setItems(data?.items ?? [])
       setTotal(data?.total ?? 0)
@@ -101,7 +131,7 @@ export default function RemindersPage() {
   useEffect(() => {
     refresh()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [source, enabled, offset, limit])
+  }, [source, enabled, offset, limit, sortBy, sortOrder])
 
   async function handleToggle(r: Reminder) {
     try {
@@ -242,6 +272,9 @@ export default function RemindersPage() {
                   <th className="px-4 py-2.5">通道</th>
                   <th className="px-4 py-2.5 text-center">启用</th>
                   <th className="px-4 py-2.5 pl-16">来源</th>
+                  <th className="px-4 py-2.5 whitespace-nowrap cursor-pointer select-none" onClick={() => toggleSort('created_at')}>
+                    创建时间<SortIcon active={sortBy === 'created_at'} direction={sortOrder} />
+                  </th>
                   <th className="px-4 py-2.5 text-right">操作</th>
                 </tr>
               </thead>
@@ -285,6 +318,9 @@ export default function RemindersPage() {
                       </td>
                       <td className="px-4 py-2.5 text-xs text-muted-foreground pl-16">
                         {SOURCE_LABEL[r.source] ?? r.source}
+                      </td>
+                      <td className="px-4 py-2.5 text-xs whitespace-nowrap text-muted-foreground">
+                        {formatTime(r.created_at)}
                       </td>
                       <td className="px-4 py-2.5">
                         <div className="flex justify-end gap-0.5">

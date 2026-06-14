@@ -71,6 +71,8 @@ export interface ListChannelsQuery {
   search?: string
   limit?: number
   offset?: number
+  sort_by?: string
+  sort_order?: string
 }
 
 export async function listChannels() {
@@ -120,6 +122,8 @@ export interface ListRemindersQuery {
   search?: string
   limit?: number
   offset?: number
+  sort_by?: string
+  sort_order?: string
 }
 
 export async function listReminders(q: ListRemindersQuery = {}) {
