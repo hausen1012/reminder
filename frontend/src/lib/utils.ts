@@ -89,8 +89,8 @@ export function formatReminderDetail(reminder: Reminder): string {
 
   if (reminder.calendar === 'lunar') {
     return lunarLine
-      ? `农历 ${lunarLine} ${String(spec.hour ?? 9).padStart(2, '0')}:${String(spec.minute ?? 0).padStart(2, '0')}:00`
-      : '农历'
+      ? `${lunarLine} ${String(spec.hour ?? 9).padStart(2, '0')}:${String(spec.minute ?? 0).padStart(2, '0')}:00`
+      : '—'
   }
 
   return solarLine === '选择日期' ? '公历' : solarLine.replace(/-/g, '/')
