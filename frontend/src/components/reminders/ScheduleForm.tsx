@@ -115,7 +115,7 @@ export function ScheduleForm({ value, onChange }: Props) {
     <div className="space-y-3">
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-2">
-          <Label>提醒类型</Label>
+          <Label>类型</Label>
           <Select value={value.schedule_type} onValueChange={handleTypeChange}>
             <SelectTrigger className="flex-1">
               <SelectValue />
@@ -128,7 +128,7 @@ export function ScheduleForm({ value, onChange }: Props) {
           </Select>
           {value.schedule_type === 'interval' && (
             <div className="space-y-2 pt-2">
-              <Label>重复间隔</Label>
+              <Label>间隔</Label>
               <div className="flex gap-2">
                 <Input
                   type="number"
@@ -171,7 +171,7 @@ export function ScheduleForm({ value, onChange }: Props) {
 
         {value.schedule_type !== 'cron' && (
           <div className="relative space-y-2">
-            <Label>触发时间</Label>
+            <Label>时间</Label>
             <div
               onClick={() => setCalendarOpen(true)}
               className="flex min-h-[2.5rem] cursor-pointer items-center rounded-md border border-input bg-background px-3 py-1.5 text-sm ring-offset-background hover:bg-accent"

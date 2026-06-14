@@ -165,7 +165,7 @@ export function ChannelEditDialog({ channel, open, onClose, onSaved }: Props) {
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="channel-name">通知名称</Label>
+            <Label htmlFor="channel-name">名称</Label>
             <Input
               id="channel-name"
               value={name}
@@ -176,7 +176,7 @@ export function ChannelEditDialog({ channel, open, onClose, onSaved }: Props) {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="channel-type">通知类型</Label>
+            <Label htmlFor="channel-type">类型</Label>
             <Select value={type} onValueChange={(v) => handleTypeChange(v as ChannelType)} disabled={isEdit}>
               <SelectTrigger id="channel-type">
                 <SelectValue />

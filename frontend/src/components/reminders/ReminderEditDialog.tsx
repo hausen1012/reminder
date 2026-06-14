@@ -234,7 +234,7 @@ export function ReminderEditDialog({ reminder, open, onClose, onSaved }: Props) 
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
-              <Label>通知渠道</Label>
+              <Label>通知</Label>
               <ChannelMultiSelect
                 channels={channels}
                 value={input.channel_ids}
@@ -245,7 +245,7 @@ export function ReminderEditDialog({ reminder, open, onClose, onSaved }: Props) 
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="r-tz">提醒时区</Label>
+              <Label htmlFor="r-tz">时区</Label>
               <Select value={input.timezone || 'Asia/Shanghai'} onValueChange={(v) => patch('timezone', v)}>
                 <SelectTrigger id="r-tz">
                   <SelectValue />
@@ -264,7 +264,7 @@ export function ReminderEditDialog({ reminder, open, onClose, onSaved }: Props) 
           <div className="rounded-md border p-3">
             <div className="flex items-center justify-between">
               <div>
-                <Label htmlFor="r-confirm" className="cursor-pointer">是否需要确认提醒</Label>
+                <Label htmlFor="r-confirm" className="cursor-pointer">确认提醒</Label>
                 <p className="text-xs text-muted-foreground mt-1">
                   消息会附带确认链接；未点击则按下方配置重发。
                 </p>
@@ -278,7 +278,7 @@ export function ReminderEditDialog({ reminder, open, onClose, onSaved }: Props) 
             {input.require_confirm && (
               <div className="mt-3 grid grid-cols-2 gap-3">
                 <div className="space-y-2">
-                  <Label htmlFor="r-retry-interval">重发间隔（秒，≥60）</Label>
+                  <Label htmlFor="r-retry-interval">重试间隔（秒）</Label>
                   <Input
                     id="r-retry-interval"
                     type="number"
@@ -288,7 +288,7 @@ export function ReminderEditDialog({ reminder, open, onClose, onSaved }: Props) 
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="r-retry-max">最大重发次数（≥1）</Label>
+                  <Label htmlFor="r-retry-max">最大重试次数</Label>
                   <Input
                     id="r-retry-max"
                     type="number"
