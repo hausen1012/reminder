@@ -95,14 +95,6 @@ export interface ReminderListResp {
   total: number
 }
 
-export interface ReminderPreviewInput {
-  calendar: ReminderCalendar
-  schedule_type: ReminderScheduleType
-  schedule_spec: Record<string, unknown>
-  timezone?: string
-  count?: number
-}
-
 // --- 日志 ---
 
 export type LogStatus = 'pending' | 'success' | 'partial' | 'failed' | 'expired'

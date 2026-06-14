@@ -15,7 +15,6 @@ import type {
   Reminder,
   ReminderInput,
   ReminderListResp,
-  ReminderPreviewInput,
   SchedulerStatus,
   User,
 } from '@/types'
@@ -153,11 +152,6 @@ export async function deleteReminder(id: number) {
 export async function toggleReminder(id: number) {
   const res = await api.patch<ApiResponse<Reminder>>(`/reminders/${id}/toggle`)
   return res.data.data
-}
-
-export async function previewReminder(input: ReminderPreviewInput) {
-  const res = await api.post<ApiResponse<{ times: string[] }>>('/reminders/preview', input)
-  return res.data.data?.times ?? []
 }
 
 export async function testReminder(id: number) {
