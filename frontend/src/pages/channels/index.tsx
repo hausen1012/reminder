@@ -1,6 +1,6 @@
 // 通道页：列表 + 新建/编辑对话框 + 试发 + 删除
 import { useCallback, useEffect, useState } from 'react'
-import { Plus, Pencil, RefreshCw, Trash2, TestTube, Copy, ArrowUpDown } from 'lucide-react'
+import { Plus, Pencil, RefreshCw, Trash2, Copy, ArrowUpDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -11,7 +11,6 @@ import { ConfirmDialog } from '@/components/channels/ConfirmDialog'
 import {
   listChannelsPaged,
   deleteChannel,
-  testChannel,
   createChannel,
 } from '@/lib/api'
 import type { Channel, ChannelType } from '@/types'
@@ -52,7 +51,6 @@ export default function ChannelsPage() {
   const [editing, setEditing] = useState<Channel | null>(null)
   const [creating, setCreating] = useState(false)
   const [toDelete, setToDelete] = useState<Channel | null>(null)
-  const [testingId, setTestingId] = useState<number | null>(null)
   const [sortBy, setSortBy] = useState('created_at')
   const [sortOrder, setSortOrder] = useState('desc')
   const { toast } = useToast()
@@ -107,22 +105,6 @@ export default function ChannelsPage() {
       toast({ title: '删除失败', description: String(err), variant: 'destructive' })
     } finally {
       setToDelete(null)
-    }
-  }
-
-  async function handleTest(ch: Channel) {
-    setTestingId(ch.id)
-    try {
-      const result = await testChannel(ch.id)
-      if (result.success) {
-        toast({ title: '试发成功', description: `通道 ${ch.name} 已成功发送`, variant: 'success' })
-      } else {
-        toast({ title: '试发失败', description: result.error ?? '未知错误', variant: 'destructive' })
-      }
-    } catch (err) {
-      toast({ title: '试发请求异常', description: String(err), variant: 'destructive' })
-    } finally {
-      setTestingId(null)
     }
   }
 
@@ -210,9 +192,6 @@ export default function ChannelsPage() {
                         <div className="flex justify-end gap-0.5">
                           <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => handleDuplicate(ch)} title="复制">
                             <Copy className="h-4 w-4" />
-                          </Button>
-                          <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => handleTest(ch)} disabled={testingId === ch.id} title="试发">
-                            <TestTube className="h-4 w-4" />
                           </Button>
                           <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setEditing(ch)} title="编辑">
                             <Pencil className="h-4 w-4" />

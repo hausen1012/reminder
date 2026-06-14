@@ -1,6 +1,6 @@
 // 提醒列表页：toolbar（来源筛选/状态/搜索/新建）+ 表格 + 编辑/试发/删除。
 import { useEffect, useState, useMemo } from 'react'
-import { Plus, Pencil, Trash2, TestTube, RefreshCw, Copy, ArrowUpDown } from 'lucide-react'
+import { Plus, Pencil, Trash2, RefreshCw, Copy, ArrowUpDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -21,7 +21,6 @@ import {
   deleteReminder,
   listChannels,
   listReminders,
-  testReminder,
   toggleReminder,
   type ListRemindersQuery,
 } from '@/lib/api'
@@ -75,7 +74,6 @@ export default function RemindersPage() {
   const [editing, setEditing] = useState<Reminder | null>(null)
   const [creating, setCreating] = useState(false)
   const [toDelete, setToDelete] = useState<Reminder | null>(null)
-  const [testingId, setTestingId] = useState<number | null>(null)
 
   const [source, setSource] = useState<string>('web')
   const [enabled, setEnabled] = useState<string>('all')
@@ -153,18 +151,6 @@ export default function RemindersPage() {
       toast({ title: '删除失败', description: String(err), variant: 'destructive' })
     } finally {
       setToDelete(null)
-    }
-  }
-
-  async function handleTest(r: Reminder) {
-    setTestingId(r.id)
-    try {
-      await testReminder(r.id)
-      toast({ title: '已立即触发一次', description: `查看日志页确认通道送达结果。`, variant: 'success' })
-    } catch (err) {
-      toast({ title: '触发失败', description: String(err), variant: 'destructive' })
-    } finally {
-      setTestingId(null)
     }
   }
 
@@ -326,16 +312,6 @@ export default function RemindersPage() {
                         <div className="flex justify-end gap-0.5">
                           <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => handleDuplicate(r)} title="复制">
                             <Copy className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-8 w-8"
-                            onClick={() => handleTest(r)}
-                            disabled={testingId === r.id}
-                            title="试触发"
-                          >
-                            <TestTube className="h-4 w-4" />
                           </Button>
                           <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setEditing(r)} title="编辑">
                             <Pencil className="h-4 w-4" />

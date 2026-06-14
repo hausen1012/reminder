@@ -24,7 +24,7 @@ import { Switch } from '@/components/ui/switch'
 import { useToast } from '@/components/ui/use-toast'
 import { ChannelMultiSelect } from '@/components/channels/ChannelMultiSelect'
 import { ScheduleForm, type ScheduleValue } from './ScheduleForm'
-import { createReminder, listChannels, updateReminder } from '@/lib/api'
+import { createReminder, listChannels, testReminder, updateReminder } from '@/lib/api'
 import type { Channel, ContentFormat, Reminder, ReminderInput } from '@/types'
 
 interface Props {
@@ -79,6 +79,7 @@ export function ReminderEditDialog({ reminder, open, onClose, onSaved }: Props) 
   const isEdit = Boolean(reminder)
   const [input, setInput] = useState<ReminderInput>(defaultInput())
   const [saving, setSaving] = useState(false)
+  const [testing, setTesting] = useState(false)
   const [channelOpen, setChannelOpen] = useState(false)
   const [channels, setChannels] = useState<Channel[]>([])
   const { toast } = useToast()
@@ -120,6 +121,19 @@ export function ReminderEditDialog({ reminder, open, onClose, onSaved }: Props) 
       schedule_type: v.schedule_type,
       schedule_spec: v.schedule_spec,
     }))
+  }
+
+  async function handleTest() {
+    if (!reminder) return
+    setTesting(true)
+    try {
+      await testReminder(reminder.id)
+      toast({ title: '已立即触发一次', description: '查看日志页确认通道送达结果。', variant: 'success' })
+    } catch (err) {
+      toast({ title: '触发失败', description: String(err), variant: 'destructive' })
+    } finally {
+      setTesting(false)
+    }
   }
 
   async function handleSubmit(e: FormEvent) {
@@ -288,6 +302,11 @@ export function ReminderEditDialog({ reminder, open, onClose, onSaved }: Props) 
           </div>
 
           <DialogFooter>
+            {isEdit && (
+              <Button type="button" variant="secondary" onClick={handleTest} disabled={testing} title="立即触发一次该提醒">
+                {testing ? '触发中…' : '测试提醒'}
+              </Button>
+            )}
             <Button type="button" variant="outline" onClick={onClose}>
               取消
             </Button>
