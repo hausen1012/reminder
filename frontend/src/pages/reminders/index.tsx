@@ -1,6 +1,6 @@
 // 提醒列表页：toolbar（来源筛选/状态/搜索/新建）+ 表格 + 编辑/试发/删除。
 import { useEffect, useState, useMemo } from 'react'
-import { Plus, Pencil, Trash2, TestTube, RefreshCw } from 'lucide-react'
+import { Plus, Pencil, Trash2, TestTube, RefreshCw, Copy } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -17,6 +17,7 @@ import { Pagination } from '@/components/ui/pagination'
 import { ReminderEditDialog } from '@/components/reminders/ReminderEditDialog'
 import { ConfirmDialog } from '@/components/channels/ConfirmDialog'
 import {
+  createReminder,
   deleteReminder,
   listChannels,
   listReminders,
@@ -134,6 +135,29 @@ export default function RemindersPage() {
       toast({ title: '触发失败', description: String(err), variant: 'destructive' })
     } finally {
       setTestingId(null)
+    }
+  }
+
+  async function handleDuplicate(r: Reminder) {
+    try {
+      await createReminder({
+        title: r.title + '-copy',
+        content: r.content,
+        content_format: r.content_format,
+        calendar: r.calendar,
+        schedule_type: r.schedule_type,
+        schedule_spec: r.schedule_spec,
+        timezone: r.timezone,
+        channel_ids: r.channel_ids,
+        require_confirm: r.require_confirm,
+        confirm_retry_interval_sec: r.confirm_retry_interval_sec,
+        confirm_max_retries: r.confirm_max_retries,
+        source: 'web',
+      })
+      toast({ title: '提醒已复制', variant: 'success' })
+      refresh()
+    } catch (err) {
+      toast({ title: '复制失败', description: String(err), variant: 'destructive' })
     }
   }
 
@@ -264,6 +288,9 @@ export default function RemindersPage() {
                       </td>
                       <td className="px-4 py-2.5">
                         <div className="flex justify-end gap-0.5">
+                          <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => handleDuplicate(r)} title="复制">
+                            <Copy className="h-4 w-4" />
+                          </Button>
                           <Button
                             size="icon"
                             variant="ghost"

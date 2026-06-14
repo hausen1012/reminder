@@ -1,6 +1,6 @@
 // 通道页：列表 + 新建/编辑对话框 + 试发 + 删除
 import { useCallback, useEffect, useState } from 'react'
-import { Plus, Pencil, RefreshCw, Trash2, TestTube } from 'lucide-react'
+import { Plus, Pencil, RefreshCw, Trash2, TestTube, Copy } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -12,6 +12,7 @@ import {
   listChannelsPaged,
   deleteChannel,
   testChannel,
+  createChannel,
 } from '@/lib/api'
 import type { Channel, ChannelType } from '@/types'
 
@@ -95,6 +96,21 @@ export default function ChannelsPage() {
     }
   }
 
+  async function handleDuplicate(ch: Channel) {
+    try {
+      await createChannel({
+        name: ch.name + '-copy',
+        type: ch.type,
+        config: ch.config,
+        enabled: ch.enabled,
+      })
+      toast({ title: '通道已复制', variant: 'success' })
+      refresh()
+    } catch (err) {
+      toast({ title: '复制失败', description: String(err), variant: 'destructive' })
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -156,6 +172,9 @@ export default function ChannelsPage() {
                       <td className="px-4 py-2.5 text-xs text-muted-foreground">{TYPE_LABEL[ch.type]}</td>
                       <td className="px-4 py-2.5">
                         <div className="flex justify-end gap-0.5">
+                          <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => handleDuplicate(ch)} title="复制">
+                            <Copy className="h-4 w-4" />
+                          </Button>
                           <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => handleTest(ch)} disabled={testingId === ch.id} title="试发">
                             <TestTube className="h-4 w-4" />
                           </Button>
