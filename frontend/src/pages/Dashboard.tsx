@@ -76,11 +76,9 @@ export default function Dashboard() {
               <>
                 <div className="text-2xl font-bold">{todayCount}</div>
                 <p className="text-xs text-muted-foreground mt-1">今天（00:00~23:59）待触发</p>
-                {todayCount > 0 && (
-                  <Link to="/reminders" className="text-xs text-primary hover:underline inline-flex items-center gap-1 mt-2">
-                    查看全部 <ArrowRight className="h-3 w-3" />
-                  </Link>
-                )}
+                <Link to="/reminders" className="text-xs text-primary hover:underline inline-flex items-center gap-1 mt-2">
+                  查看全部 <ArrowRight className="h-3 w-3" />
+                </Link>
               </>
             )}
           </CardContent>
@@ -99,11 +97,9 @@ export default function Dashboard() {
               <>
                 <div className="text-2xl font-bold">{logs.length}</div>
                 <p className="text-xs text-muted-foreground mt-1">过去 24 小时发送记录</p>
-                {logs.length > 0 && (
-                  <Link to="/logs" className="text-xs text-primary hover:underline inline-flex items-center gap-1 mt-2">
-                    查看全部 <ArrowRight className="h-3 w-3" />
-                  </Link>
-                )}
+                <Link to="/logs" className="text-xs text-primary hover:underline inline-flex items-center gap-1 mt-2">
+                  查看全部 <ArrowRight className="h-3 w-3" />
+                </Link>
               </>
             )}
           </CardContent>
@@ -146,11 +142,9 @@ export default function Dashboard() {
               <>
                 <div className="text-2xl font-bold">{apiKeyStats.reduce((s, k) => s + k.usage_24h, 0)}</div>
                 <p className="text-xs text-muted-foreground mt-1">过去 24h API 调用次数</p>
-                {apiKeyStats.length > 0 && (
-                  <Link to="/apikeys" className="text-xs text-primary hover:underline inline-flex items-center gap-1 mt-2">
-                    查看详情 <ArrowRight className="h-3 w-3" />
-                  </Link>
-                )}
+                <Link to="/apikeys" className="text-xs text-primary hover:underline inline-flex items-center gap-1 mt-2">
+                  查看详情 <ArrowRight className="h-3 w-3" />
+                </Link>
               </>
             )}
           </CardContent>
