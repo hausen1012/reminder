@@ -50,23 +50,41 @@ export function ScheduleForm({ value, onChange }: Props) {
   const spec = value.schedule_spec ?? {}
 
   function handleTypeChange(t: ReminderScheduleType) {
-    let defaults: Record<string, unknown> = {}
+    const old = spec
+    let next: Record<string, unknown> = {}
+
     if (t === 'once') {
       if (value.calendar === 'lunar') {
-        defaults = { lunar: { year: 2026, month: 1, day: 1 }, hour: 9, minute: 0 }
+        const lunar = (old.lunar ?? old.start_lunar) as { year: number; month: number; day: number } | undefined
+        next = {
+          lunar: lunar ?? { year: 2026, month: 1, day: 1 },
+          hour: getReminderSpecHour(old) || 9,
+          minute: getReminderSpecMinute(old) ?? 0,
+        }
       } else {
-        defaults = { at: '' }
+        next = { at: (old.at ?? old.start_at ?? '') as string }
       }
     } else if (t === 'interval') {
       if (value.calendar === 'lunar') {
-        defaults = { start_lunar: { year: 2026, month: 1, day: 1 }, every: 1, unit: 'month', hour: 9, minute: 0 }
+        const lunar = (old.lunar ?? old.start_lunar) as { year: number; month: number; day: number } | undefined
+        next = {
+          start_lunar: lunar ?? { year: 2026, month: 1, day: 1 },
+          every: (old.every as number) ?? 1,
+          unit: (old.unit as string) ?? 'month',
+          hour: getReminderSpecHour(old) || 9,
+          minute: getReminderSpecMinute(old) ?? 0,
+        }
       } else {
-        defaults = { start_at: '', every: 1, unit: 'day' }
+        next = {
+          start_at: (old.at ?? old.start_at ?? '') as string,
+          every: (old.every as number) ?? 1,
+          unit: (old.unit as string) ?? 'day',
+        }
       }
     } else {
-      defaults = { expr: '0 9 * * *' }
+      next = { expr: (old.expr as string) || '0 9 * * *' }
     }
-    onChange({ ...value, schedule_type: t, schedule_spec: defaults })
+    onChange({ ...value, schedule_type: t, schedule_spec: next })
   }
 
   function patchSpec(patch: Record<string, unknown>) {
