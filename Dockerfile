@@ -20,5 +20,5 @@ FROM alpine:3.19
 RUN apk --no-cache add tzdata
 WORKDIR /app
 COPY --from=backend /app/server .
-EXPOSE 8080
+EXPOSE 8765
 CMD ["./server"]
