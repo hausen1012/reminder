@@ -13,16 +13,20 @@ function applyBranding(cfg: Record<string, string>) {
   if (cfg.app_name) {
     document.title = cfg.app_name
   }
+  const link = document.querySelector<HTMLLinkElement>('link[rel="icon"]')
   if (cfg.logo_svg) {
     const encoded = encodeURIComponent(cfg.logo_svg)
     const href = `data:image/svg+xml,${encoded}`
-    let link = document.querySelector<HTMLLinkElement>('link[rel="icon"]')
     if (!link) {
-      link = document.createElement('link')
-      link.rel = 'icon'
-      document.head.appendChild(link)
+      const el = document.createElement('link')
+      el.rel = 'icon'
+      document.head.appendChild(el)
+      el.href = href
+    } else {
+      link.href = href
     }
-    link.href = href
+  } else if (link) {
+    link.remove()
   }
 }
 

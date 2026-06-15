@@ -77,6 +77,10 @@ export default function Profile() {
     }
   }
 
+  function clearLogoSvg() {
+    setLogoSvg('')
+  }
+
   function isDataUrl(v: string) {
     return v.startsWith('data:image/')
   }
@@ -85,44 +89,26 @@ export default function Profile() {
     <div className="space-y-6">
       <h1 className="text-3xl font-bold tracking-tight">设置</h1>
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+
+        {/* 修改密码 */}
         <Card>
           <CardHeader>
             <CardTitle>修改密码</CardTitle>
             <CardDescription>请定期更换密码以确保安全</CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handlePassword} className="space-y-4">
+            <form onSubmit={handlePassword} className="max-w-sm space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="old-password">原密码</Label>
-                <Input
-                  id="old-password"
-                  type="password"
-                  value={oldPassword}
-                  onChange={(e) => setOldPassword(e.target.value)}
-                  required
-                />
+                <Input id="old-password" type="password" value={oldPassword} onChange={(e) => setOldPassword(e.target.value)} required />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="new-password">新密码</Label>
-                <Input
-                  id="new-password"
-                  type="password"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  required
-                  minLength={6}
-                />
+                <Input id="new-password" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required minLength={6} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="confirm-password">确认新密码</Label>
-                <Input
-                  id="confirm-password"
-                  type="password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  required
-                  minLength={6}
-                />
+                <Input id="confirm-password" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required minLength={6} />
               </div>
               {pwdMsg && <p className="text-sm text-green-600 dark:text-green-400">{pwdMsg}</p>}
               {pwdError && <p className="text-sm text-destructive">{pwdError}</p>}
@@ -131,39 +117,45 @@ export default function Profile() {
           </CardContent>
         </Card>
 
+        {/* 站点信息 */}
         <Card>
           <CardHeader>
-            <CardTitle>品牌信息</CardTitle>
-            <CardDescription>配置站点名称、描述和 Logo</CardDescription>
+            <CardTitle>站点信息</CardTitle>
+            <CardDescription>配置站点名称和浏览器标签图标</CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleBrandSave} className="space-y-4">
+            <form onSubmit={handleBrandSave} className="max-w-sm space-y-5">
               <div className="space-y-2">
                 <Label htmlFor="app-name">站点名称</Label>
-                <Input
-                  id="app-name"
-                  value={appName}
-                  onChange={(e) => setAppName(e.target.value)}
-                  placeholder="Reminder"
-                />
+                <Input id="app-name" value={appName} onChange={(e) => setAppName(e.target.value)} placeholder="Reminder" />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="logo-upload">Logo</Label>
-                <Input
-                  id="logo-upload"
-                  type="file"
-                  accept="image/*,.svg"
-                  onChange={handleLogoUpload}
-                />
-                {logoSvg && (
-                  <div className="mt-2 flex items-center justify-center rounded-lg border bg-background p-3">
-                    {isDataUrl(logoSvg) ? (
-                      <img src={logoSvg} alt="Logo" className="max-h-16 max-w-48 object-contain" />
+                <Label>浏览器图标</Label>
+                <div className="flex items-center gap-3">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border bg-background">
+                    {logoSvg ? (
+                      isDataUrl(logoSvg) ? (
+                        <img src={logoSvg} alt="图标" className="h-8 w-8 object-contain" />
+                      ) : (
+                        <span className="flex h-8 w-8 items-center justify-center" dangerouslySetInnerHTML={{ __html: logoSvg }} />
+                      )
                     ) : (
-                      <div dangerouslySetInnerHTML={{ __html: logoSvg }} />
+                      <span className="text-xs text-muted-foreground">无</span>
                     )}
                   </div>
-                )}
+                  <div className="flex gap-2">
+                    <Button type="button" variant="outline" size="sm" onClick={() => document.getElementById('logo-upload')?.click()}>
+                      上传
+                    </Button>
+                    {logoSvg && (
+                      <Button type="button" variant="outline" size="sm" onClick={clearLogoSvg}>
+                        清除
+                      </Button>
+                    )}
+                    <input id="logo-upload" type="file" accept="image/*,.svg" className="hidden" onChange={handleLogoUpload} />
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground">支持 PNG、JPG、SVG，将显示在浏览器标签和侧边栏</p>
               </div>
               <Button type="submit" size="sm" disabled={saving}>
                 {saving ? '保存中...' : '保存'}

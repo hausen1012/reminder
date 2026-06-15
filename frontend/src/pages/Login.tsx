@@ -35,12 +35,12 @@ export default function Login() {
           <CardTitle className="flex items-center justify-center gap-2">
             {config.logo_svg && (
               config.logo_svg.startsWith('data:image/') ? (
-                <img src={config.logo_svg} alt="" className="h-5 w-auto" />
+                <img src={config.logo_svg} alt="" className="h-5 w-auto shrink-0" />
               ) : (
-                <span className="flex h-5 w-5 items-center justify-center" dangerouslySetInnerHTML={{ __html: config.logo_svg }} />
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center" dangerouslySetInnerHTML={{ __html: config.logo_svg }} />
               )
             )}
-            {config.app_name || 'Reminder'}
+            <span className="truncate">{config.app_name || 'Reminder'}</span>
           </CardTitle>
         </CardHeader>
         <CardContent>
