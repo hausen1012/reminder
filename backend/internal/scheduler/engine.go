@@ -188,6 +188,7 @@ func (e *Engine) addAfterFunc(r *models.Reminder, spec *ScheduleSpec) error {
 		return err
 	}
 	if next == nil {
+		e.Remove(r.ID)
 		return nil
 	}
 	d := time.Until(*next)
