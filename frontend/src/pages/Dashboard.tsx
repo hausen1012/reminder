@@ -56,7 +56,7 @@ export default function Dashboard() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">仪表盘</h1>
+          <h1 className="text-3xl font-bold tracking-tight">首页</h1>
           <p className="text-sm text-muted-foreground mt-1">你好，{user?.username}。这是今天的概况。</p>
         </div>
       </div>
