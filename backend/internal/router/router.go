@@ -80,6 +80,7 @@ func Setup(staticFS embed.FS, cfg *config.Config) *SetupResult {
 	}
 
 	apiKeySvc := services.NewApiKeyService(database.DB)
+	configSvc := services.NewConfigService(database.DB)
 
 	authHandler := &handlers.AuthHandler{JWTSecret: cfg.JWTSecret}
 	channelHandler := &handlers.ChannelHandler{Svc: channelSvc}
@@ -89,6 +90,7 @@ func Setup(staticFS embed.FS, cfg *config.Config) *SetupResult {
 	apiKeyHandler := &handlers.ApiKeyHandler{Svc: apiKeySvc}
 	ingestHandler := &handlers.IngestHandler{ReminderSvc: reminderSvc, ApiKeySvc: apiKeySvc}
 	schedulerHandler := &handlers.SchedulerHandler{Engine: engine, Sweeper: sweeper}
+		configHandler := &handlers.ConfigHandler{Svc: configSvc}
 
 	// 确认链接（无需认证）
 	r.GET("/c/:token", confirmHandler.Confirm)
@@ -176,6 +178,10 @@ func Setup(staticFS embed.FS, cfg *config.Config) *SetupResult {
 
 		scheduler := protected.Group("/scheduler")
 		scheduler.GET("/status", schedulerHandler.Status)
+
+		cfgRoute := protected.Group("/config")
+		cfgRoute.GET("", configHandler.GetAll)
+		cfgRoute.PUT("", configHandler.Update)
 	}
 
 	serveStaticFiles(r, staticFS)

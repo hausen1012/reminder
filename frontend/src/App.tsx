@@ -1,6 +1,7 @@
 import { HashRouter, Routes, Route } from 'react-router-dom'
 import { ThemeProvider } from '@/contexts/ThemeContext'
 import { AuthProvider } from '@/contexts/AuthContext'
+import { ConfigProvider } from '@/contexts/ConfigContext'
 import { ProtectedRoute } from '@/components/guards/ProtectedRoute'
 import { PublicRoute } from '@/components/guards/PublicRoute'
 import { AppLayout } from '@/components/layout/AppLayout'
@@ -20,31 +21,33 @@ export default function App() {
       <ThemeProvider>
         <ToastProviderRoot>
           <AuthProvider>
-            <Routes>
-              <Route
-                path="/login"
-                element={
-                  <PublicRoute>
-                    <Login />
-                  </PublicRoute>
-                }
-              />
-              <Route
-                element={
-                  <ProtectedRoute>
-                    <AppLayout />
-                  </ProtectedRoute>
-                }
-              >
-                <Route index element={<Dashboard />} />
-                <Route path="reminders" element={<RemindersPage />} />
-                <Route path="logs" element={<LogsPage />} />
-                <Route path="channels" element={<ChannelsPage />} />
-                <Route path="apikeys" element={<ApiKeysPage />} />
-                <Route path="scheduler" element={<SchedulerPage />} />
-                <Route path="profile" element={<Profile />} />
-              </Route>
-            </Routes>
+            <ConfigProvider>
+              <Routes>
+                <Route
+                  path="/login"
+                  element={
+                    <PublicRoute>
+                      <Login />
+                    </PublicRoute>
+                  }
+                />
+                <Route
+                  element={
+                    <ProtectedRoute>
+                      <AppLayout />
+                    </ProtectedRoute>
+                  }
+                >
+                  <Route index element={<Dashboard />} />
+                  <Route path="reminders" element={<RemindersPage />} />
+                  <Route path="logs" element={<LogsPage />} />
+                  <Route path="channels" element={<ChannelsPage />} />
+                  <Route path="apikeys" element={<ApiKeysPage />} />
+                  <Route path="scheduler" element={<SchedulerPage />} />
+                  <Route path="profile" element={<Profile />} />
+                </Route>
+              </Routes>
+            </ConfigProvider>
           </AuthProvider>
         </ToastProviderRoot>
       </ThemeProvider>

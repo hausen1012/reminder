@@ -254,3 +254,15 @@ export async function listApiKeyStats() {
   const res = await api.get<ApiResponse<{ id: number; name: string; usage_24h: number }[]>>('/apikeys/stats')
   return res.data.data ?? []
 }
+
+// --- 站点配置 ---
+
+export async function getConfig() {
+  const res = await api.get<ApiResponse<Record<string, string>>>('/config')
+  return res.data.data ?? {}
+}
+
+export async function updateConfig(cfg: Record<string, string>) {
+  const res = await api.put<ApiResponse<Record<string, string>>>('/config', cfg)
+  return res.data.data ?? {}
+}

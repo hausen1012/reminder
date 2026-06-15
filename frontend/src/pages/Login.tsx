@@ -1,12 +1,14 @@
 import { useState, type FormEvent } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
+import { useConfig } from '@/contexts/ConfigContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 export default function Login() {
   const { login } = useAuth()
+  const { config } = useConfig()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -30,8 +32,16 @@ export default function Login() {
     <div className="flex min-h-screen items-center justify-center bg-background">
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
-          <CardTitle>Reminder</CardTitle>
-          <CardDescription>请输入您的账号信息</CardDescription>
+          <CardTitle className="flex items-center justify-center gap-2">
+            {config.logo_svg && (
+              config.logo_svg.startsWith('data:image/') ? (
+                <img src={config.logo_svg} alt="" className="h-5 w-auto" />
+              ) : (
+                <span className="flex h-5 w-5 items-center justify-center" dangerouslySetInnerHTML={{ __html: config.logo_svg }} />
+              )
+            )}
+            {config.app_name || 'Reminder'}
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">

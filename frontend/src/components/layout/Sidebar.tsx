@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useAuth } from '@/contexts/AuthContext'
+import { useConfig } from '@/contexts/ConfigContext'
 import { cn } from '@/lib/utils'
 
 const navItems = [
@@ -19,12 +20,21 @@ const navItems = [
 export function Sidebar() {
   const { theme, toggle } = useTheme()
   const { user, logout } = useAuth()
+  const { config } = useConfig()
 
   return (
     <aside className="flex h-screen w-48 flex-col border-r bg-card">
       <div className="flex h-14 items-center gap-2 px-6 font-medium text-base leading-none">
-        <BellRing className="h-5 w-5" strokeWidth={1.5} />
-        Reminder
+        {config.logo_svg ? (
+          config.logo_svg.startsWith('data:image/') ? (
+            <img src={config.logo_svg} alt="Logo" className="h-6 w-auto" />
+          ) : (
+            <span className="flex h-5 w-5 items-center justify-center" dangerouslySetInnerHTML={{ __html: config.logo_svg }} />
+          )
+        ) : (
+          <BellRing className="h-5 w-5" strokeWidth={1.5} />
+        )}
+        {config.app_name || 'Reminder'}
       </div>
       <Separator />
       <nav className="flex-1 space-y-1 p-3">

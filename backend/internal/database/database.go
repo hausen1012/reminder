@@ -45,6 +45,7 @@ func Init(cfg *config.Config) error {
 		&models.APIKey{},
 		&models.APIKeyDefaultChannel{},
 		&models.ConfirmToken{},
+			&models.Config{},
 	); err != nil {
 		return fmt.Errorf("migrate: %w", err)
 	}
