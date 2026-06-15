@@ -21,7 +21,7 @@ type LogService struct {
 
 // NewLogService 构造日志服务。
 func NewLogService(db *gorm.DB, publicURL ...string) *LogService {
-	url := "http://localhost:8080"
+	url := "http://localhost:8765"
 	if len(publicURL) > 0 && publicURL[0] != "" {
 		url = publicURL[0]
 	}

@@ -15,12 +15,12 @@ type Config struct {
 	Port         string
 	DBPath       string
 	JWTSecret    string
-	InitUsername string
-	InitPassword string
+	Username string
+	Password string
 
 	// 提醒助手相关新增配置
-	SecretBoxKey         string         // base64 编码的 32 字节密钥；为空则使用 crypto/secretbox 内置 fallback
-	PublicBaseURL        string         // 用于拼接 confirm_url 的对外可访问根
+	EncryptionKey         string         // base64 编码的 32 字节 AES-256 密钥；为空则使用内置 fallback（不安全）
+	BaseURL              string         // 用于拼接 confirm_url 的对外可访问根
 	Timezone             string         // 时区字符串，例如 Asia/Shanghai
 	Location             *time.Location // 解析后的时区实例
 	SweepIntervalSec     int            // 补漏扫描间隔，单位秒
@@ -31,22 +31,22 @@ type Config struct {
 
 func Load() *Config {
 	cfg := &Config{
-		Port:         getEnv("PORT", "8080"),
+		Port:         getEnv("PORT", "8765"),
 		DBPath:       getEnv("DB_PATH", "/data/db/reminder.db"),
-		JWTSecret:    getEnv("JWT_SECRET", ""),
-		InitUsername: getEnv("INIT_USERNAME", "admin"),
-		InitPassword: getEnv("INIT_PASSWORD", "admin123"),
+		JWTSecret:    getEnv("JWT_SECRET", "changeme"),
+		Username: getEnv("USERNAME", "admin"),
+		Password: getEnv("PASSWORD", "admin123"),
 
-		SecretBoxKey:         getEnv("SECRET_BOX_KEY", ""),
-		PublicBaseURL:        getEnv("PUBLIC_BASE_URL", "http://localhost:8080"),
+		EncryptionKey:         getEnv("ENCRYPTION_KEY", "changeme"),
+		BaseURL:              getEnv("BASE_URL", "http://localhost:8765"),
 		Timezone:             getEnv("TIMEZONE", "Asia/Shanghai"),
 		SweepIntervalSec:     getEnvInt("SWEEP_INTERVAL_SEC", 60),
 		MissToleranceMinutes: getEnvInt("MISS_TOLERANCE_MINUTES", 60),
 		LogAutoPurgeDays:     getEnvInt("LOG_AUTO_PURGE_DAYS", 0),
-		LogFile:              getEnv("LOG_FILE", ""),
+		LogFile:              getEnv("LOG_FILE", "/var/log/reminder"),
 	}
 
-	// 沿用 bedrock 的 JWT 自动生成策略
+	// JWTSecret 如果留空就自动生成，保持向下兼容
 	if cfg.JWTSecret == "" {
 		cfg.JWTSecret = randomSecret()
 		log.Printf("JWT_SECRET 未配置，已自动生成")

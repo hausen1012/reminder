@@ -1,11 +1,11 @@
 // Package secretbox 提供通道敏感字段（SMTP 密码、钉钉签名密钥、Webhook Authorization 等）的对称加解密。
 //
 // 密钥来源优先级：
-//  1. 环境变量 SECRET_BOX_KEY（base64 编码的 32 字节）；
+//  1. 环境变量 ENCRYPTION_KEY（base64 编码的 32 字节）；
 //  2. 否则使用本文件内置的硬编码 fallback 常量。
 //
-// 生产部署建议覆盖 SECRET_BOX_KEY 环境变量，否则 DB 文件泄漏即等于明文。
-// 启动时不会因为缺少 SECRET_BOX_KEY 而退出。
+// 生产部署建议覆盖 ENCRYPTION_KEY 环境变量，否则 DB 文件泄漏即等于明文。
+// 启动时不会因为缺少 ENCRYPTION_KEY 而退出。
 package secretbox
 
 import (
@@ -33,19 +33,19 @@ type Box struct {
 }
 
 // New 根据 base64 编码的 keyB64 构造 Box。
-// keyB64 为空字符串时使用内置 fallbackKey。
-// keyB64 不为空但解析失败 / 长度不是 32 字节时返回错误。
+// keyB64 为空或为 "changeme" 时使用内置 fallbackKey。
+// 其他非空值解析失败 / 长度不是 32 字节时返回错误。
 func New(keyB64 string) (*Box, error) {
 	var key []byte
-	if keyB64 == "" {
+	if keyB64 == "" || keyB64 == "changeme" {
 		key = fallbackKey
 	} else {
 		raw, err := base64.StdEncoding.DecodeString(keyB64)
 		if err != nil {
-			return nil, fmt.Errorf("SECRET_BOX_KEY 不是合法 base64: %w", err)
+			return nil, fmt.Errorf("ENCRYPTION_KEY 不是合法 base64: %w", err)
 		}
 		if len(raw) != 32 {
-			return nil, fmt.Errorf("SECRET_BOX_KEY 解码后必须是 32 字节，实际 %d", len(raw))
+			return nil, fmt.Errorf("ENCRYPTION_KEY 解码后必须是 32 字节，实际 %d", len(raw))
 		}
 		key = raw
 	}

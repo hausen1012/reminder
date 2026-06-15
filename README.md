@@ -42,17 +42,17 @@ make docker
 
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
-| PORT | 8080 | 监听端口 |
+| PORT | 8765 | 监听端口 |
 | DB_PATH | /data/db/reminder.db | 数据库路径 |
-| JWT_SECRET | 自动生成 | JWT 签名密钥 |
-| SECRET_BOX_KEY | 硬编码常量 | 通道敏感字段加密密钥（base64） |
-| PUBLIC_BASE_URL | http://localhost:8080 | 公网地址（确认链接用） |
+| JWT_SECRET | changeme | JWT 签名密钥 |
+| ENCRYPTION_KEY | changeme | 通道敏感字段加密密钥（base64） |
+| BASE_URL | http://localhost:8765 | 公网地址（确认链接用） |
 | TIMEZONE | Asia/Shanghai | 系统时区 |
 | SWEEP_INTERVAL_SEC | 60 | 兜底扫描间隔（秒） |
 | MISS_TOLERANCE_MINUTES | 60 | 漏触发容忍窗口（超过标记过期） |
 | LOG_AUTO_PURGE_DAYS | 0 | 日志自动清理天数（0=不自动清理） |
-| INIT_USERNAME | admin | 初始管理员用户名 |
-| INIT_PASSWORD | admin123 | 初始管理员密码 |
+| USERNAME | admin | 初始管理员用户名 |
+| PASSWORD | admin123 | 初始管理员密码 |
 
 ## 技术栈
 

@@ -256,7 +256,7 @@ func newConfirmTestStack(t *testing.T, db *gorm.DB) *confirmTestStack {
 	channelSvc := &ChannelService{DB: db}
 	dispatch := NewDispatchService(db, channelSvc, loc)
 	dispatch.RetryDelays = []time.Duration{0}
-	confirmSvc := NewConfirmService(db, &config.Config{PublicBaseURL: "http://example.test"})
+	confirmSvc := NewConfirmService(db, &config.Config{BaseURL: "http://example.test"})
 	confirmMgr := NewConfirmRetryManager(db, dispatch, confirmSvc, loc)
 	dispatch.ConfirmMgr = confirmMgr
 	reminderSvc := NewReminderService(db, noopEngine{}, loc, dispatch, confirmMgr)

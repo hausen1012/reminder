@@ -4,22 +4,20 @@ services:
   reminder:
     build: .
     ports:
-      - "${PORT:-8080}:8080"
+      - "${PORT:-8765}:8765"
     volumes:
-      - reminder-data:/data/db
+      - ./reminder/db:/data/db
+      - ./reminder/log:/var/log/reminder
     environment:
-      - PORT=8080
+      - PORT=8765
+      - USERNAME=${USERNAME:-admin}
+      - PASSWORD=${PASSWORD:-admin123}
       - DB_PATH=/data/db/reminder.db
-      - JWT_SECRET=${JWT_SECRET}
-      - INIT_USERNAME=${INIT_USERNAME:-admin}
-      - INIT_PASSWORD=${INIT_PASSWORD:-admin123}
-      - SECRET_BOX_KEY=${SECRET_BOX_KEY}
-      - PUBLIC_BASE_URL=${PUBLIC_BASE_URL:-http://localhost:8080}
+      - JWT_SECRET=${JWT_SECRET:-changeme}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:-changeme}
+      - BASE_URL=${BASE_URL:-http://localhost:8765}
       - TIMEZONE=${TIMEZONE:-Asia/Shanghai}
       - SWEEP_INTERVAL_SEC=${SWEEP_INTERVAL_SEC:-60}
       - MISS_TOLERANCE_MINUTES=${MISS_TOLERANCE_MINUTES:-60}
       - LOG_AUTO_PURGE_DAYS=${LOG_AUTO_PURGE_DAYS:-0}
-      - LOG_FILE=${LOG_FILE}
-
-volumes:
-  reminder-data:
+      - LOG_FILE=${LOG_FILE:-/var/log/reminder}

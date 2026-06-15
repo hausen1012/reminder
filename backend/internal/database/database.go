@@ -76,13 +76,13 @@ func ensureAdmin(cfg *config.Config) error {
 		return nil
 	}
 
-	hash, err := bcrypt.GenerateFromPassword([]byte(cfg.InitPassword), bcrypt.DefaultCost)
+	hash, err := bcrypt.GenerateFromPassword([]byte(cfg.Password), bcrypt.DefaultCost)
 	if err != nil {
 		return err
 	}
 
 	user := models.User{
-		Username: cfg.InitUsername,
+		Username: cfg.Username,
 		Password: string(hash),
 	}
 	return DB.Create(&user).Error

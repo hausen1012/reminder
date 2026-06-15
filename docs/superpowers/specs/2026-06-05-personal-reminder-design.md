@@ -548,10 +548,10 @@ Backoff     = [0, 10s, 30s]
 `crypto/secretbox.go`：AES-GCM，提供 `Encrypt(plain)` / `Decrypt(cipher)`。
 
 密钥来源优先级：
-1. 环境变量 `SECRET_BOX_KEY`（base64，32 字节）
+1. 环境变量 `ENCRYPTION_KEY`（base64，32 字节）
 2. 否则使用 `crypto/secretbox.go` 内置硬编码常量
 
-注释说明"生产部署建议设置 SECRET_BOX_KEY 环境变量"。**启动不报错。**
+注释说明"生产部署建议设置 ENCRYPTION_KEY 环境变量"。**启动不报错。**
 
 ### 7.6 通道回退规则
 
@@ -904,7 +904,7 @@ WHERE expires_at < datetime('now')
 
 - `nextfire.Compute` 全组合，含农历闰月、大小月边界、农历三月初一、闰四月、腊月三十
 - `notifier/template.Render`：变量替换、未定义保留、自引用不递归
-- `crypto/secretbox`：加解密往返、`SECRET_BOX_KEY` 缺失时 fallback 行为
+- `crypto/secretbox`：加解密往返、`ENCRYPTION_KEY` 缺失时 fallback 行为
 - `scheduler.Engine`：mock store + mock dispatch，验证 Add/Update/Remove 后的 Registry 状态、fire 内乐观锁
 - API Key sha256 + 限流计数器
 
@@ -927,20 +927,20 @@ WHERE expires_at < datetime('now')
 
 | 变量 | 默认值 | 说明 |
 |---|---|---|
-| PORT | 8080 | 已有 |
+| PORT | 8765 | 已有 |
 | DB_PATH | /data/db/reminder.db | 已有 |
-| JWT_SECRET | auto | 已有 |
-| INIT_USERNAME | admin | 已有 |
-| INIT_PASSWORD | admin123 | 已有 |
-| SECRET_BOX_KEY | 内置硬编码 fallback | 新增；建议生产覆盖 |
-| PUBLIC_BASE_URL | http://localhost:8080 | 新增；confirm_url 用 |
+| JWT_SECRET | changeme | 已有 |
+| USERNAME | admin | 已有 |
+| PASSWORD | admin123 | 已有 |
+| ENCRYPTION_KEY | 内置硬编码 fallback | 新增；建议生产覆盖 |
+| BASE_URL | http://localhost:8765 | 新增；confirm_url 用 |
 | TIMEZONE | Asia/Shanghai | 新增 |
 | SWEEP_INTERVAL_SEC | 60 | 新增 |
 | MISS_TOLERANCE_MINUTES | 60 | 新增 |
 | LOG_AUTO_PURGE_DAYS | 0 | 新增；0 = 关 |
-| LOG_FILE | (stdout) | 新增 |
+| LOG_FILE | /var/log/reminder | 新增 |
 
-启动时**不**因 `SECRET_BOX_KEY` 缺失退出。
+启动时**不**因 `ENCRYPTION_KEY` 缺失退出。
 
 ---
 
@@ -972,5 +972,5 @@ WHERE expires_at < datetime('now')
 | API 范围 | 与面板一致 + Key 默认通道回退 | 仅一次性 |
 | 重启重发链 | 丢失（不持久化） | 持久化到 DB |
 | 通道类型 | 创建后不可改 | 可改但需 migrate Config |
-| SECRET_BOX_KEY | 缺失用硬编码 fallback | 必填启动报错 |
+| ENCRYPTION_KEY | 缺失用硬编码 fallback | 缺失用硬编码 fallback |
 | 时区 | 后端格式化、前端只展示 | 前端做时区转换 |

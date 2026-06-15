@@ -111,11 +111,11 @@ func (s *ConfirmService) ConsumeToken(token string) (*models.DeliveryLog, error)
 	return &dl, nil
 }
 
-// BuildURL 用 PublicBaseURL 拼接完整的确认 URL。
+// BuildURL 用 BaseURL 拼接完整的确认 URL。
 func (s *ConfirmService) BuildURL(token string) string {
-	base := s.Cfg.PublicBaseURL
+	base := s.Cfg.BaseURL
 	if base == "" {
-		base = "http://localhost:8080"
+		base = "http://localhost:8765"
 	}
 	return base + "/c/" + token
 }

@@ -42,7 +42,7 @@ func Setup(staticFS embed.FS, cfg *config.Config) *SetupResult {
 	r.Use(middleware.Logger())
 	r.Use(middleware.CORS())
 
-	box, err := secretbox.New(cfg.SecretBoxKey)
+	box, err := secretbox.New(cfg.EncryptionKey)
 	if err != nil {
 		log.Fatalf("初始化 secretbox 失败: %v", err)
 	}
@@ -73,7 +73,7 @@ func Setup(staticFS embed.FS, cfg *config.Config) *SetupResult {
 	sweeper.Start()
 
 	// 自动清理日志（每天凌晨 3 点）
-	logSvc := services.NewLogService(database.DB, cfg.PublicBaseURL)
+	logSvc := services.NewLogService(database.DB, cfg.BaseURL)
 	if cfg.LogAutoPurgeDays > 0 {
 		purgeAfter := time.Duration(cfg.LogAutoPurgeDays) * 24 * time.Hour
 		_, _ = engine.AddPurgeCron(logSvc, purgeAfter)
