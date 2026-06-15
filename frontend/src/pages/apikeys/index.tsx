@@ -1,6 +1,6 @@
 // API Key 管理页
 import { useEffect, useMemo, useState } from 'react'
-import { Plus, Trash2, Copy, CheckCircle2, Pencil, RefreshCw } from 'lucide-react'
+import { Plus, Trash2, Copy, CheckCircle2, Pencil, RefreshCw, Terminal } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -24,6 +24,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useToast } from '@/components/ui/use-toast'
+import { CurlUsageDialog } from '@/components/apikeys/CurlUsageDialog'
 import {
   listApiKeys,
   createApiKey,
@@ -70,6 +71,9 @@ export default function ApiKeysPage() {
   const [limit, setLimit] = useState(10)
   const [offset, setOffset] = useState(0)
   const [copyingId, setCopyingId] = useState<number | null>(null)
+  const [curlKeyId, setCurlKeyId] = useState<number | null>(null)
+  const [curlPlaintext, setCurlPlaintext] = useState('')
+  const [curlLoading, setCurlLoading] = useState(false)
   const { toast } = useToast()
 
   async function refresh() {
@@ -213,6 +217,26 @@ export default function ApiKeysPage() {
     }
   }
 
+  async function openCurl(key: APIKey) {
+    setCurlKeyId(key.id)
+    setCurlPlaintext('')
+    setCurlLoading(true)
+    try {
+      const plaintext = await getApiKeyPlaintext(key.id)
+      setCurlPlaintext(plaintext)
+    } catch (err) {
+      toast({ title: '加载密钥失败', description: String(err), variant: 'destructive' })
+      setCurlKeyId(null)
+    } finally {
+      setCurlLoading(false)
+    }
+  }
+
+  function closeCurl() {
+    setCurlKeyId(null)
+    setCurlPlaintext('')
+  }
+
   async function handleCopyFromList(keyId: number) {
     setCopyingId(keyId)
     try {
@@ -327,6 +351,9 @@ export default function ApiKeysPage() {
                       <div className="flex justify-end gap-0.5">
                         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openDetail(key)} title="查看与编辑">
                           <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openCurl(key)} title="curl 使用示例">
+                          <Terminal className="h-4 w-4" />
                         </Button>
                         <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setToDelete(key)} title="删除">
                           <Trash2 className="h-4 w-4" />
@@ -504,6 +531,12 @@ export default function ApiKeysPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <CurlUsageDialog
+        apiKey={curlPlaintext}
+        open={curlKeyId !== null && !curlLoading}
+        onClose={closeCurl}
+      />
     </div>
   )
 }
