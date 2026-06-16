@@ -1,5 +1,5 @@
 // ScheduleForm 使用 Select 下拉框选择提醒类型 + CalendarPopover 选择日期时间
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
@@ -47,6 +47,7 @@ const LUNAR_INTERVAL_UNITS = [
 
 export function ScheduleForm({ value, onChange }: Props) {
   const [calendarOpen, setCalendarOpen] = useState(false)
+  const triggerRef = useRef<HTMLDivElement>(null)
   const spec = value.schedule_spec ?? {}
 
   function handleTypeChange(t: ReminderScheduleType) {
@@ -173,6 +174,7 @@ export function ScheduleForm({ value, onChange }: Props) {
           <div className="relative space-y-2">
             <Label>时间</Label>
             <div
+              ref={triggerRef}
               onClick={() => setCalendarOpen(true)}
               className="flex min-h-[2.5rem] cursor-pointer items-center rounded-md border border-input bg-background px-3 py-1.5 text-sm ring-offset-background hover:bg-accent"
             >
@@ -187,6 +189,7 @@ export function ScheduleForm({ value, onChange }: Props) {
             </div>
             {calendarOpen && (
               <CalendarPopover
+                triggerRef={triggerRef}
                 date={(() => {
                   if (value.calendar === 'solar') return (spec.at ?? spec.start_at) as string | undefined
                   const lunar = (spec.lunar ?? spec.start_lunar) as { year: number; month: number; day: number } | undefined
