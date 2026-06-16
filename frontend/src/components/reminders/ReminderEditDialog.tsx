@@ -165,7 +165,7 @@ export function ReminderEditDialog({ reminder, open, onClose, onSaved }: Props) 
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-2xl max-h-[95vh] overflow-visible">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{isEdit ? '编辑提醒' : '新建提醒'}</DialogTitle>
         </DialogHeader>
