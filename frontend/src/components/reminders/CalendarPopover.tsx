@@ -1,6 +1,7 @@
 // CalendarPopover 是弹出日历组件，定位在触发元素下方
 // 始终展示公历网格，农历切换仅在单元格中额外显示农历日期
-import { useState, useMemo, useRef, useEffect } from 'react'
+import { useState, useMemo, useRef, useEffect, useLayoutEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { Button } from '@/components/ui/button'
 import {
   Select,
@@ -18,6 +19,7 @@ interface Props {
   hour?: number
   minute?: number
   initialCalendar?: 'solar' | 'lunar'
+  triggerRef: React.RefObject<HTMLDivElement | null>
   onSelect: (result: CalendarResult) => void
   onClose: () => void
 }
@@ -40,9 +42,10 @@ interface DayCell {
   current: boolean
 }
 
-export function CalendarPopover({ date, hour: initHour, minute: initMin, initialCalendar = 'solar', onSelect, onClose }: Props) {
+export function CalendarPopover({ date, hour: initHour, minute: initMin, initialCalendar = 'solar', triggerRef, onSelect, onClose }: Props) {
   const now = new Date()
   const popoverRef = useRef<HTMLDivElement>(null)
+  const [position, setPosition] = useState<{ top: number; left: number } | null>(null)
   const hourListRef = useRef<HTMLDivElement>(null)
   const minuteListRef = useRef<HTMLDivElement>(null)
   const onSelectRef = useRef(onSelect)
@@ -63,6 +66,33 @@ export function CalendarPopover({ date, hour: initHour, minute: initMin, initial
   const [hour, setHour] = useState(initHour ?? now.getHours())
   const [minute, setMinute] = useState(initMin ?? now.getMinutes())
   const [timePanelOpen, setTimePanelOpen] = useState(false)
+
+  // 计算 fixed 位置（使用 useLayoutEffect 避免首次渲染时位置闪烁）
+  useLayoutEffect(() => {
+    if (!triggerRef.current) return
+
+    function calcPosition() {
+      const rect = triggerRef.current!.getBoundingClientRect()
+      const popupHeight = 360
+      const top = rect.bottom + 4
+      const left = Math.max(8, Math.min(rect.left, window.innerWidth - 280))
+      if (top + popupHeight > window.innerHeight) {
+        setPosition({ top: rect.top - popupHeight - 4, left })
+      } else {
+        setPosition({ top, left })
+      }
+    }
+
+    calcPosition()
+
+    window.addEventListener('scroll', calcPosition, true)
+    window.addEventListener('resize', calcPosition)
+
+    return () => {
+      window.removeEventListener('scroll', calcPosition, true)
+      window.removeEventListener('resize', calcPosition)
+    }
+  }, [triggerRef, setPosition])
 
   // 点击外部关闭（排除 Radix Select portal）
   useEffect(() => {
@@ -223,10 +253,11 @@ export function CalendarPopover({ date, hour: initHour, minute: initMin, initial
     setTimePanelOpen(false)
   }
 
-  return (
+  const popoverContent = (
     <div
       ref={popoverRef}
-      className="absolute top-full left-0 z-50 mt-1 bg-card rounded-lg border shadow-lg w-[272px] max-w-[calc(100vw-2rem)] p-2.5"
+      className="fixed z-[100] bg-card rounded-lg border shadow-lg w-[272px] max-w-[calc(100vw-2rem)] p-2.5"
+      style={position ? { top: position.top, left: position.left } : { top: -9999, left: -9999 }}
     >
       {/* 顶部导航 */}
       <div className="flex items-center justify-between mb-1.5">
@@ -376,4 +407,6 @@ export function CalendarPopover({ date, hour: initHour, minute: initMin, initial
       </div>
     </div>
   )
+
+  return createPortal(popoverContent, document.body)
 }
