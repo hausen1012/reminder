@@ -251,7 +251,6 @@ export default function LogsPage() {
             onChange={(e) => setSearch(e.target.value)}
           />
         </form>
-        <span className="text-sm text-muted-foreground">共 {total} 条</span>
       </div>
 
       {loading ? (

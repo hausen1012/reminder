@@ -236,7 +236,6 @@ export default function RemindersPage() {
             onChange={(e) => setSearch(e.target.value)}
           />
         </form>
-        <span className="text-sm text-muted-foreground">共 {total} 条</span>
         <Button variant="outline" size="icon" onClick={refresh} title="刷新">
           <RefreshCw className="h-4 w-4" />
         </Button>
