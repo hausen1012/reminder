@@ -59,8 +59,6 @@ export function CurlUsageDialog({ apiKey, open, onClose }: Props) {
   -d '{
   "title": "提醒标题",
   "content": "提醒内容",
-  "calendar": "solar",
-  "schedule_type": "once",
   "schedule_spec": {"at": "${at}"}
 }'`,
     [apiKey, at],
@@ -73,8 +71,6 @@ export function CurlUsageDialog({ apiKey, open, onClose }: Props) {
   -d '{
   "title": "提醒标题",
   "content": "提醒内容",
-  "calendar": "solar",
-  "schedule_type": "once",
   "schedule_spec": {"at": "${at}"},
   "timezone": "Asia/Shanghai",
   "channel_ids": [1],
@@ -90,7 +86,6 @@ export function CurlUsageDialog({ apiKey, open, onClose }: Props) {
   -d '{
   "title": "提醒标题",
   "content": "提醒内容",
-  "calendar": "solar",
   "schedule_type": "interval",
   "schedule_spec": {"every": 1, "unit": "hour"},
   "timezone": "Asia/Shanghai",
@@ -107,7 +102,6 @@ export function CurlUsageDialog({ apiKey, open, onClose }: Props) {
   -d '{
   "title": "提醒标题",
   "content": "提醒内容",
-  "calendar": "solar",
   "schedule_type": "cron",
   "schedule_spec": {"expr": "0 * * * *"},
   "timezone": "Asia/Shanghai",

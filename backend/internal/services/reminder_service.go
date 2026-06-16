@@ -72,6 +72,12 @@ type ReminderView struct {
 
 // Create 新建提醒并写入调度器。
 func (s *ReminderService) Create(in ReminderInput) (*ReminderView, error) {
+	if in.Calendar == "" {
+		in.Calendar = "solar"
+	}
+	if in.ScheduleType == "" {
+		in.ScheduleType = "once"
+	}
 	if err := s.validate(&in); err != nil {
 		return nil, err
 	}

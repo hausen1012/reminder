@@ -181,7 +181,6 @@ th{background:#f9fafb;font-weight:600}
   -d '{
     "title": "每日提醒",
     "content": "现在是 {{now}}",
-    "calendar": "solar",
     "schedule_type": "cron",
     "schedule_spec": {"expr": "0 9 * * *"},
     "timezone": "Asia/Shanghai",
@@ -210,8 +209,8 @@ th{background:#f9fafb;font-weight:600}
 <tr><th>字段</th><th>类型</th><th>必填</th><th>说明</th></tr>
 <tr><td>title</td><td>string</td><td>是</td><td>提醒标题，最长 200 字符</td></tr>
 <tr><td>content</td><td>string</td><td>否</td><td>提醒内容，支持 <code>{{var}}</code> 模板</td></tr>
-<tr><td>calendar</td><td>string</td><td>是</td><td><code>solar</code> 或 <code>lunar</code></td></tr>
-<tr><td>schedule_type</td><td>string</td><td>是</td><td><code>once</code> / <code>interval</code> / <code>cron</code></td></tr>
+<tr><td>calendar</td><td>string</td><td>否</td><td><code>solar</code> 或 <code>lunar</code>，默认 solar</td></tr>
+<tr><td>schedule_type</td><td>string</td><td>否</td><td><code>once</code> / <code>interval</code> / <code>cron</code>，默认 once</td></tr>
 <tr><td>schedule_spec</td><td>object</td><td>是</td><td>调度参数，参见下文</td></tr>
 <tr><td>timezone</td><td>string</td><td>否</td><td>时区，默认 Asia/Shanghai</td></tr>
 <tr><td>channel_ids</td><td>int[]</td><td>否</td><td>通知通道 ID，为空时用 Key 默认通道</td></tr>
