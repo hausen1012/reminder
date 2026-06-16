@@ -285,6 +285,64 @@ func (d *DispatchService) loadChannels(reminderID uint) ([]*models.Channel, erro
 	return out, nil
 }
 
+// DryRun 发送测试消息，不落任何 delivery_log / delivery_attempt。
+func (d *DispatchService) DryRun(ctx context.Context, channels []*models.Channel, msg notifier.Message) error {
+	var wg sync.WaitGroup
+	errCh := make(chan error, len(channels))
+	for i := range channels {
+		i := i
+		ch := channels[i]
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if err := d.sendDryRun(ctx, ch, msg); err != nil {
+				errCh <- fmt.Errorf("channel=%d name=%s type=%s: %w", ch.ID, ch.Name, ch.Type, err)
+			}
+		}()
+	}
+	wg.Wait()
+	close(errCh)
+	// 收集所有错误
+	var errs []string
+	for err := range errCh {
+		errs = append(errs, err.Error())
+	}
+	if len(errs) > 0 {
+		return fmt.Errorf("试发失败: %s", strings.Join(errs, "; "))
+	}
+	return nil
+}
+
+// sendDryRun 单通道试发（有重试，不写 attempt）。
+func (d *DispatchService) sendDryRun(ctx context.Context, ch *models.Channel, msg notifier.Message) error {
+	n, err := notifier.Get(ch.Type)
+	if err != nil {
+		return err
+	}
+	plainConfig, err := d.ChannelSvc.DecryptedConfig(ch)
+	if err != nil {
+		return fmt.Errorf("解密配置失败: %w", err)
+	}
+	for i, delay := range d.RetryDelays {
+		if delay > 0 {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(delay):
+			}
+		}
+		if sendErr := n.Send(ctx, plainConfig, msg); sendErr == nil {
+			return nil
+		} else {
+			log.Printf("[dispatch-dryrun] 通道发送失败 ch=%d name=%s attempt=%d: %v", ch.ID, ch.Name, i+1, sendErr)
+			if notifier.IsPermanent(sendErr) {
+				return sendErr
+			}
+		}
+	}
+	return fmt.Errorf("所有重试均失败")
+}
+
 // TestOnce 立刻跑一次 dispatch（用于 /reminders/:id/test）。
 //
 // 写一条 status=pending 的日志再 Run，等同正常触发但绕过调度。
