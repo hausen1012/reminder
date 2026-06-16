@@ -127,11 +127,11 @@ export function CurlUsageDialog({ apiKey, open, onClose }: Props) {
           </DialogTitle>
         </DialogHeader>
         <Tabs defaultValue="simple" className="w-full">
-          <TabsList className="w-full">
-            <TabsTrigger value="simple" className="flex-1">简单</TabsTrigger>
-            <TabsTrigger value="once" className="flex-1">单次</TabsTrigger>
-            <TabsTrigger value="interval" className="flex-1">周期</TabsTrigger>
-            <TabsTrigger value="cron" className="flex-1">CRON</TabsTrigger>
+          <TabsList className="w-full flex-wrap">
+            <TabsTrigger value="simple" className="flex-1 min-w-0">简单</TabsTrigger>
+            <TabsTrigger value="once" className="flex-1 min-w-0">单次</TabsTrigger>
+            <TabsTrigger value="interval" className="flex-1 min-w-0">周期</TabsTrigger>
+            <TabsTrigger value="cron" className="flex-1 min-w-0">CRON</TabsTrigger>
           </TabsList>
           <TabsContent value="simple">
             <CurlBlock

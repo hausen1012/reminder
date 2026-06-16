@@ -60,7 +60,7 @@ export default function SchedulerPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-2">
+      <div className="flex-col items-start gap-2 md:flex-row md:items-center md:flex">
         <Activity className="h-5 w-5" />
         <h1 className="text-2xl font-bold tracking-tight">监控</h1>
       </div>

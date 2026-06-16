@@ -252,7 +252,7 @@ export default function ApiKeysPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex-col items-start gap-2 md:flex-row md:items-center md:justify-between flex">
         <h1 className="text-3xl font-bold tracking-tight">API</h1>
         <Button onClick={() => setCreateOpen(true)}>
           <Plus className="mr-1 h-4 w-4" />
@@ -261,7 +261,7 @@ export default function ApiKeysPage() {
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
-        <div className="w-40">
+        <div className="w-full md:w-40">
           <Select value={enabled} onValueChange={setEnabled}>
             <SelectTrigger>
               <SelectValue placeholder="状态" />
@@ -274,7 +274,7 @@ export default function ApiKeysPage() {
           </Select>
         </div>
         <form
-          className="max-w-md flex-1"
+          className="w-full md:max-w-md flex-1"
           onSubmit={(e) => {
             e.preventDefault()
             setSearch(searchInput)

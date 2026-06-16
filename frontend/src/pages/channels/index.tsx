@@ -130,7 +130,7 @@ export default function ChannelsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex-col items-start gap-2 md:flex-row md:items-center md:justify-between flex">
         <h1 className="text-3xl font-bold tracking-tight">通知</h1>
         <Button onClick={() => setCreating(true)}>
           <Plus className="h-4 w-4 mr-1" />
@@ -140,7 +140,7 @@ export default function ChannelsPage() {
 
       <div className="flex flex-wrap items-center gap-3">
         <form
-          className="flex-1 max-w-md"
+          className="flex-1 w-full md:max-w-md"
           onSubmit={(e) => {
             e.preventDefault()
             setOffset(0)

@@ -17,13 +17,17 @@ const navItems = [
   { to: '/profile', label: '设置', icon: User },
 ]
 
-export function Sidebar() {
+interface SidebarProps {
+  onNavClick?: () => void
+}
+
+export function Sidebar({ onNavClick }: SidebarProps) {
   const { theme, toggle } = useTheme()
   const { user, logout } = useAuth()
   const { config } = useConfig()
 
   return (
-    <aside className="flex h-screen w-48 flex-col border-r bg-card">
+    <aside className="flex h-full w-48 flex-col border-r bg-card md:h-screen">
       <div className="flex h-14 items-center gap-2 px-6 font-medium text-base leading-none">
         {config.logo_svg ? (
           config.logo_svg.startsWith('data:image/') ? (
@@ -43,9 +47,10 @@ export function Sidebar() {
             key={item.to}
             to={item.to}
             end={item.to === '/'}
+            onClick={onNavClick}
             className={({ isActive }) =>
               cn(
-                'flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors',
+                'flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors md:py-2',
                 isActive
                   ? 'bg-secondary text-secondary-foreground font-medium'
                   : 'text-muted-foreground hover:bg-secondary/50 hover:text-foreground',

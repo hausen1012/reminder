@@ -190,7 +190,7 @@ export default function RemindersPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex-col items-start gap-2 md:flex-row md:items-center md:justify-between flex">
         <h1 className="text-3xl font-bold tracking-tight">提醒</h1>
         <Button onClick={() => setCreating(true)}>
           <Plus className="h-4 w-4 mr-1" />
@@ -199,7 +199,7 @@ export default function RemindersPage() {
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
-        <div className="w-40">
+        <div className="w-full md:w-40">
           <Select value={source} onValueChange={setSource}>
             <SelectTrigger>
               <SelectValue placeholder="来源" />
@@ -211,7 +211,7 @@ export default function RemindersPage() {
             </SelectContent>
           </Select>
         </div>
-        <div className="w-40">
+        <div className="w-full md:w-40">
           <Select value={enabled} onValueChange={setEnabled}>
             <SelectTrigger>
               <SelectValue placeholder="状态" />
@@ -224,7 +224,7 @@ export default function RemindersPage() {
           </Select>
         </div>
         <form
-          className="flex-1 max-w-md"
+          className="flex-1 w-full md:max-w-md"
           onSubmit={(e) => {
             e.preventDefault()
             refresh()

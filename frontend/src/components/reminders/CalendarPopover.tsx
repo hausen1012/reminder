@@ -226,7 +226,7 @@ export function CalendarPopover({ date, hour: initHour, minute: initMin, initial
   return (
     <div
       ref={popoverRef}
-      className="absolute top-full left-0 z-50 mt-1 bg-card rounded-lg border shadow-lg w-[272px] p-2.5"
+      className="absolute top-full left-0 z-50 mt-1 bg-card rounded-lg border shadow-lg w-[272px] max-w-[calc(100vw-2rem)] p-2.5"
     >
       {/* 顶部导航 */}
       <div className="flex items-center justify-between mb-1.5">

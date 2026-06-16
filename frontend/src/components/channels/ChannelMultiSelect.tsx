@@ -50,7 +50,7 @@ export function ChannelMultiSelect({
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => onOpenChange(false)} />
-          <div className="absolute bottom-full z-50 mb-1 max-h-64 w-full overflow-y-auto rounded-md border bg-card shadow-lg">
+          <div className="absolute bottom-full z-50 mb-1 max-h-64 w-full overflow-y-auto rounded-md border bg-card shadow-lg md:bottom-full">
             {channels.map((ch) => {
               const checked = value.includes(ch.id)
               return (

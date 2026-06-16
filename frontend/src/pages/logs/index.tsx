@@ -188,11 +188,11 @@ export default function LogsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex-col items-start gap-2 md:flex-row md:items-center md:justify-between flex">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">日志</h1>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button variant="outline" size="sm" onClick={() => openPurge('7d')}>
             <Trash2 className="h-4 w-4 mr-1" />
             清理 7 天前
@@ -207,7 +207,7 @@ export default function LogsPage() {
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
-        <div className="w-36">
+        <div className="w-full md:w-36">
           <Select
             value={filter.status ?? 'all'}
             onValueChange={(v) => setFilter((f) => ({ ...f, status: v === 'all' ? undefined : v }))}
@@ -225,7 +225,7 @@ export default function LogsPage() {
             </SelectContent>
           </Select>
         </div>
-        <div className="w-36">
+        <div className="w-full md:w-36">
           <Select value={filter.source ?? 'all'} onValueChange={(v) => setFilter((f) => ({ ...f, source: v === 'all' ? undefined : v }))}>
             <SelectTrigger>
               <SelectValue placeholder="全部来源" />
@@ -238,7 +238,7 @@ export default function LogsPage() {
           </Select>
         </div>
         <form
-          className="flex-1 max-w-md"
+          className="flex-1 w-full md:max-w-md"
           onSubmit={(e) => {
             e.preventDefault()
             setOffset(0)
