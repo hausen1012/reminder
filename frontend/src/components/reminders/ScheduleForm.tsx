@@ -114,102 +114,100 @@ export function ScheduleForm({ value, onChange }: Props) {
 
   return (
     <div className="space-y-3">
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div className="space-y-2">
-          <Label>类型</Label>
-          <Select value={value.schedule_type} onValueChange={handleTypeChange}>
-            <SelectTrigger className="flex-1">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="once">单次</SelectItem>
-              <SelectItem value="interval">周期</SelectItem>
-              <SelectItem value="cron">Cron</SelectItem>
-            </SelectContent>
-          </Select>
-          {value.schedule_type === 'interval' && (
-            <div className="space-y-2 pt-2">
-              <Label>间隔</Label>
-              <div className="flex gap-2">
-                <Input
-                  type="number"
-                  min={1}
-                  value={(spec.every as number) ?? 1}
-                  onChange={(e) => patchSpec({ every: Number(e.target.value) || 1 })}
-                  className="flex-1"
-                />
-                <Select
-                  value={(spec.unit as string) ?? (value.calendar === 'lunar' ? 'month' : 'day')}
-                  onValueChange={(v) => patchSpec({ unit: v })}
-                >
-                  <SelectTrigger className="flex-1">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(value.calendar === 'lunar' ? LUNAR_INTERVAL_UNITS : INTERVAL_UNITS).map((u) => (
-                      <SelectItem key={u.value} value={u.value}>
-                        {u.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {value.schedule_type === 'cron' && (
-          <div className="space-y-2">
-            <Label htmlFor="spec-expr">Cron 表达式</Label>
-            <Input
-              id="spec-expr"
-              value={(spec.expr as string) ?? ''}
-              onChange={(e) => patchSpec({ expr: e.target.value })}
-              placeholder="例如：0 9 * * 1-5"
-            />
-          </div>
-        )}
-
-        {value.schedule_type !== 'cron' && (
-          <div className="relative space-y-2">
-            <Label>时间</Label>
-            <div
-              ref={triggerRef}
-              onClick={() => setCalendarOpen(true)}
-              className="flex min-h-[2.5rem] cursor-pointer items-center rounded-md border border-input bg-background px-3 py-1.5 text-sm ring-offset-background hover:bg-accent"
-            >
-              <span className="truncate text-xs leading-tight">
-                {formatReminderSolarLine(spec, value.calendar)}
-                {formatReminderLunarLine(spec, value.calendar) && (
-                  <span className="ml-1.5 text-[11px] text-muted-foreground">
-                    · {formatReminderLunarLine(spec, value.calendar)}
-                  </span>
-                )}
-              </span>
-            </div>
-            {calendarOpen && (
-              <CalendarPopover
-                triggerRef={triggerRef}
-                date={(() => {
-                  if (value.calendar === 'solar') return (spec.at ?? spec.start_at) as string | undefined
-                  const lunar = (spec.lunar ?? spec.start_lunar) as { year: number; month: number; day: number } | undefined
-                  if (lunar) {
-                    const l = Lunar.fromYmd(lunar.year, lunar.month, lunar.day)
-                    const s = l.getSolar()
-                    return `${s.getYear()}-${String(s.getMonth()).padStart(2, '0')}-${String(s.getDay()).padStart(2, '0')}T${String(spec.hour ?? 9).padStart(2, '0')}:${String(spec.minute ?? 0).padStart(2, '0')}`
-                  }
-                  return undefined
-                })()}
-                hour={getReminderSpecHour(spec)}
-                minute={getReminderSpecMinute(spec)}
-                initialCalendar={value.calendar}
-                onSelect={handleCalendarSelect}
-                onClose={() => setCalendarOpen(false)}
+      <div className="space-y-2">
+        <Label>类型</Label>
+        <Select value={value.schedule_type} onValueChange={handleTypeChange}>
+          <SelectTrigger className="flex-1">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="once">单次</SelectItem>
+            <SelectItem value="interval">周期</SelectItem>
+            <SelectItem value="cron">Cron</SelectItem>
+          </SelectContent>
+        </Select>
+        {value.schedule_type === 'interval' && (
+          <div className="space-y-2 pt-2">
+            <Label>间隔</Label>
+            <div className="flex gap-2">
+              <Input
+                type="number"
+                min={1}
+                value={(spec.every as number) ?? 1}
+                onChange={(e) => patchSpec({ every: Number(e.target.value) || 1 })}
+                className="flex-1"
               />
-            )}
+              <Select
+                value={(spec.unit as string) ?? (value.calendar === 'lunar' ? 'month' : 'day')}
+                onValueChange={(v) => patchSpec({ unit: v })}
+              >
+                <SelectTrigger className="flex-1">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {(value.calendar === 'lunar' ? LUNAR_INTERVAL_UNITS : INTERVAL_UNITS).map((u) => (
+                    <SelectItem key={u.value} value={u.value}>
+                      {u.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         )}
       </div>
+
+      {value.schedule_type === 'cron' && (
+        <div className="space-y-2">
+          <Label htmlFor="spec-expr">Cron 表达式</Label>
+          <Input
+            id="spec-expr"
+            value={(spec.expr as string) ?? ''}
+            onChange={(e) => patchSpec({ expr: e.target.value })}
+            placeholder="例如：0 9 * * 1-5"
+          />
+        </div>
+      )}
+
+      {value.schedule_type !== 'cron' && (
+        <div className="relative space-y-2">
+          <Label>时间</Label>
+          <div
+            ref={triggerRef}
+            onClick={() => setCalendarOpen(true)}
+            className="flex min-h-[2.5rem] cursor-pointer items-center rounded-md border border-input bg-background px-3 py-1.5 text-sm ring-offset-background hover:bg-accent"
+          >
+            <span className="truncate text-xs leading-tight">
+              {formatReminderSolarLine(spec, value.calendar)}
+              {formatReminderLunarLine(spec, value.calendar) && (
+                <span className="ml-1.5 text-[11px] text-muted-foreground">
+                  · {formatReminderLunarLine(spec, value.calendar)}
+                </span>
+              )}
+            </span>
+          </div>
+          {calendarOpen && (
+            <CalendarPopover
+              triggerRef={triggerRef}
+              date={(() => {
+                if (value.calendar === 'solar') return (spec.at ?? spec.start_at) as string | undefined
+                const lunar = (spec.lunar ?? spec.start_lunar) as { year: number; month: number; day: number } | undefined
+                if (lunar) {
+                  const l = Lunar.fromYmd(lunar.year, lunar.month, lunar.day)
+                  const s = l.getSolar()
+                  return `${s.getYear()}-${String(s.getMonth()).padStart(2, '0')}-${String(s.getDay()).padStart(2, '0')}T${String(spec.hour ?? 9).padStart(2, '0')}:${String(spec.minute ?? 0).padStart(2, '0')}`
+                }
+                return undefined
+              })()}
+              hour={getReminderSpecHour(spec)}
+              minute={getReminderSpecMinute(spec)}
+              initialCalendar={value.calendar}
+              onSelect={handleCalendarSelect}
+              onClose={() => setCalendarOpen(false)}
+            />
+          )}
+        </div>
+      )}
 
       {value.schedule_type === 'cron' && (
         <p className="text-xs text-muted-foreground">
