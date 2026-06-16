@@ -232,7 +232,7 @@ export function ReminderEditDialog({ reminder, open, onClose, onSaved }: Props) 
             onChange={patchSchedule}
           />
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-2">
               <Label>通知</Label>
               <ChannelMultiSelect
@@ -276,7 +276,7 @@ export function ReminderEditDialog({ reminder, open, onClose, onSaved }: Props) 
               />
             </div>
             {input.require_confirm && (
-              <div className="mt-3 grid grid-cols-2 gap-3">
+              <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-2">
                   <Label htmlFor="r-retry-interval">重试间隔（秒）</Label>
                   <Input

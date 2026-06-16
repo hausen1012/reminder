@@ -472,7 +472,7 @@ export default function ApiKeysPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3 text-sm">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                 <div className="space-y-1">
                   <p className="text-xs text-muted-foreground">名称</p>
                   <p className="font-medium">{selectedKey.name}</p>

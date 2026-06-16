@@ -35,7 +35,7 @@ export function SMTPForm({ config, onChange, isEdit }: SubFormProps) {
 
   return (
     <div className="space-y-3 rounded-md border bg-card/30 p-4">
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div className="space-y-2">
           <Label>SMTP Host</Label>
           <Input
@@ -82,7 +82,7 @@ export function SMTPForm({ config, onChange, isEdit }: SubFormProps) {
           </SelectContent>
         </Select>
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div className="space-y-2">
           <Label>用户名</Label>
           <Input
@@ -109,7 +109,7 @@ export function SMTPForm({ config, onChange, isEdit }: SubFormProps) {
           />
         </div>
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div className="space-y-2">
           <Label>发件人地址</Label>
           <Input

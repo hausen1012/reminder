@@ -41,8 +41,8 @@ export function WebhookForm({ config, onChange, isEdit }: SubFormProps) {
 
   return (
     <div className="space-y-3 rounded-md border bg-card/30 p-4">
-      <div className="grid grid-cols-3 gap-3">
-        <div className="space-y-2 col-span-1">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="space-y-2 sm:col-span-1">
           <Label>请求方法</Label>
           <Select value={method} onValueChange={(v) => updateField(onChange, 'method', v)}>
             <SelectTrigger>
@@ -54,7 +54,7 @@ export function WebhookForm({ config, onChange, isEdit }: SubFormProps) {
             </SelectContent>
           </Select>
         </div>
-        <div className="space-y-2 col-span-2">
+        <div className="space-y-2 sm:col-span-2">
           <Label>URL</Label>
           <Input
             placeholder="https://example.com/notify"

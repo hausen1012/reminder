@@ -113,7 +113,7 @@ export function ScheduleForm({ value, onChange }: Props) {
 
   return (
     <div className="space-y-3">
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div className="space-y-2">
           <Label>类型</Label>
           <Select value={value.schedule_type} onValueChange={handleTypeChange}>
