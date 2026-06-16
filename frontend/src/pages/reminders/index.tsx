@@ -1,6 +1,6 @@
 // 提醒列表页：toolbar（来源筛选/状态/搜索/新建）+ 表格 + 编辑/试发/删除。
 import { useEffect, useState, useMemo } from 'react'
-import { Plus, Pencil, Trash2, RefreshCw, Copy } from 'lucide-react'
+import { Plus, Pencil, Trash2, RefreshCw, Copy, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -198,8 +198,8 @@ export default function RemindersPage() {
         </Button>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="w-full md:w-40">
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="w-[calc(50%-0.25rem)] md:w-32">
           <Select value={source} onValueChange={setSource}>
             <SelectTrigger>
               <SelectValue placeholder="来源" />
@@ -211,7 +211,7 @@ export default function RemindersPage() {
             </SelectContent>
           </Select>
         </div>
-        <div className="w-full md:w-40">
+        <div className="w-[calc(50%-0.25rem)] md:w-32">
           <Select value={enabled} onValueChange={setEnabled}>
             <SelectTrigger>
               <SelectValue placeholder="状态" />
@@ -223,22 +223,28 @@ export default function RemindersPage() {
             </SelectContent>
           </Select>
         </div>
-        <form
-          className="flex-1 w-full md:max-w-md"
-          onSubmit={(e) => {
-            e.preventDefault()
-            refresh()
-          }}
-        >
-          <Input
-            placeholder="搜索标题或内容…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </form>
-        <Button variant="outline" size="icon" onClick={refresh} title="刷新">
-          <RefreshCw className="h-4 w-4" />
-        </Button>
+        <div className="flex items-center gap-2 flex-1 w-full md:max-w-sm">
+          <form
+            className="flex-1 flex gap-2"
+            onSubmit={(e) => {
+              e.preventDefault()
+              refresh()
+            }}
+          >
+            <Input
+              placeholder="搜索标题或内容…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="flex-1 min-w-0"
+            />
+            <Button type="submit" variant="outline" size="icon" title="搜索">
+              <Search className="h-4 w-4" />
+            </Button>
+          </form>
+          <Button variant="outline" size="icon" onClick={refresh} title="刷新" className="shrink-0">
+            <RefreshCw className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
 
       {loading ? (

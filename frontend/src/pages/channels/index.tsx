@@ -1,6 +1,6 @@
 // 通知页：列表 + 新建/编辑对话框 + 发送测试 + 删除
 import { useCallback, useEffect, useState } from 'react'
-import { Plus, Pencil, RefreshCw, Trash2, Copy } from 'lucide-react'
+import { Plus, Pencil, RefreshCw, Trash2, Copy, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -138,25 +138,31 @@ export default function ChannelsPage() {
         </Button>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3">
-        <form
-          className="flex-1 w-full md:max-w-md"
-          onSubmit={(e) => {
-            e.preventDefault()
-            setOffset(0)
-            setSearch(searchInput)
-            setSearchVersion((v) => v + 1)
-          }}
-        >
-          <Input
-            placeholder="搜索通知名称…"
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-          />
-        </form>
-        <Button variant="outline" size="icon" onClick={refresh} title="刷新">
-          <RefreshCw className="h-4 w-4" />
-        </Button>
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex items-center gap-2 flex-1 w-full md:max-w-sm">
+          <form
+            className="flex-1 flex gap-2"
+            onSubmit={(e) => {
+              e.preventDefault()
+              setOffset(0)
+              setSearch(searchInput)
+              setSearchVersion((v) => v + 1)
+            }}
+          >
+            <Input
+              placeholder="搜索通知名称…"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              className="flex-1 min-w-0"
+            />
+            <Button type="submit" variant="outline" size="icon" title="搜索">
+              <Search className="h-4 w-4" />
+            </Button>
+          </form>
+          <Button variant="outline" size="icon" onClick={refresh} title="刷新" className="shrink-0">
+            <RefreshCw className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
 
       {loading ? (

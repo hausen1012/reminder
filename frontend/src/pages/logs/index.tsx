@@ -9,7 +9,9 @@ import {
   ChevronDown,
   ChevronRight,
   Trash2,
+  RefreshCw,
   ExternalLink,
+  Search,
   Copy,
   Mail,
   MessageCircle,
@@ -206,8 +208,8 @@ export default function LogsPage() {
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="w-full md:w-36">
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="w-[calc(50%-0.25rem)] md:w-32">
           <Select
             value={filter.status ?? 'all'}
             onValueChange={(v) => setFilter((f) => ({ ...f, status: v === 'all' ? undefined : v }))}
@@ -225,7 +227,7 @@ export default function LogsPage() {
             </SelectContent>
           </Select>
         </div>
-        <div className="w-full md:w-36">
+        <div className="w-[calc(50%-0.25rem)] md:w-32">
           <Select value={filter.source ?? 'all'} onValueChange={(v) => setFilter((f) => ({ ...f, source: v === 'all' ? undefined : v }))}>
             <SelectTrigger>
               <SelectValue placeholder="全部来源" />
@@ -237,20 +239,29 @@ export default function LogsPage() {
             </SelectContent>
           </Select>
         </div>
-        <form
-          className="flex-1 w-full md:max-w-md"
-          onSubmit={(e) => {
-            e.preventDefault()
-            setOffset(0)
-            setFilter((f) => ({ ...f, search: search.trim() || undefined }))
-          }}
-        >
-          <Input
-            placeholder="搜索标题或内容…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </form>
+        <div className="flex items-center gap-2 flex-1 w-full md:max-w-sm">
+          <form
+            className="flex-1 flex gap-2"
+            onSubmit={(e) => {
+              e.preventDefault()
+              setOffset(0)
+              setFilter((f) => ({ ...f, search: search.trim() || undefined }))
+            }}
+          >
+            <Input
+              placeholder="搜索标题或内容…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="flex-1 min-w-0"
+            />
+            <Button type="submit" variant="outline" size="icon" title="搜索">
+              <Search className="h-4 w-4" />
+            </Button>
+          </form>
+          <Button variant="outline" size="icon" onClick={refresh} title="刷新" className="shrink-0">
+            <RefreshCw className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
 
       {loading ? (
