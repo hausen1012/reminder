@@ -139,30 +139,28 @@ export default function ChannelsPage() {
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <div className="flex items-center gap-2 flex-1 w-full md:max-w-sm">
-          <form
-            className="flex-1 flex gap-2"
-            onSubmit={(e) => {
-              e.preventDefault()
-              setOffset(0)
-              setSearch(searchInput)
-              setSearchVersion((v) => v + 1)
-            }}
-          >
-            <Input
-              placeholder="搜索通知名称…"
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              className="flex-1 min-w-0"
-            />
-            <Button type="submit" variant="outline" size="icon" title="搜索">
-              <Search className="h-4 w-4" />
-            </Button>
-          </form>
-          <Button variant="outline" size="icon" onClick={refresh} title="刷新" className="shrink-0">
-            <RefreshCw className="h-4 w-4" />
+        <form
+          className="flex-1 min-w-0 flex gap-2 md:max-w-sm"
+          onSubmit={(e) => {
+            e.preventDefault()
+            setOffset(0)
+            setSearch(searchInput)
+            setSearchVersion((v) => v + 1)
+          }}
+        >
+          <Input
+            placeholder="搜索通知名称…"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            className="flex-1 min-w-0"
+          />
+          <Button type="submit" variant="outline" size="icon" title="搜索">
+            <Search className="h-4 w-4" />
           </Button>
-        </div>
+        </form>
+        <Button variant="outline" size="icon" onClick={refresh} title="刷新" className="ml-auto shrink-0">
+          <RefreshCw className="h-4 w-4" />
+        </Button>
       </div>
 
       {loading ? (
