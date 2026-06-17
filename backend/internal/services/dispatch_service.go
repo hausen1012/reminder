@@ -343,27 +343,6 @@ func (d *DispatchService) sendDryRun(ctx context.Context, ch *models.Channel, ms
 	return fmt.Errorf("所有重试均失败")
 }
 
-// TestOnce 立刻跑一次 dispatch（用于 /reminders/:id/test）。
-//
-// 写一条 status=pending 的日志再 Run，等同正常触发但绕过调度。
-func (d *DispatchService) TestOnce(ctx context.Context, r *models.Reminder) (uint, error) {
-	now := time.Now()
-	dlog := &models.DeliveryLog{
-		ReminderID: r.ID,
-		FiredAt:    now,
-		Title:      r.Title,
-		Content:    r.Content,
-		Status:     "pending",
-		Source:     r.Source,
-		RetryRound: 0,
-	}
-	if err := d.DB.Create(dlog).Error; err != nil {
-		return 0, err
-	}
-	d.Run(ctx, r, dlog.ID)
-	return dlog.ID, nil
-}
-
 // --- helpers ---
 
 func ptrTime(t time.Time) *time.Time { return &t }

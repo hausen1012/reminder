@@ -19,14 +19,33 @@ func (noopEngine) Add(*models.Reminder) error    { return nil }
 func (noopEngine) Update(*models.Reminder) error { return nil }
 func (noopEngine) Remove(uint)                   {}
 
+// triggerDispatch 是 TestOnce 的内联替代，创建 pending 日志后调 Run。
+func triggerDispatch(ctx context.Context, d *DispatchService, r *models.Reminder) (uint, error) {
+	now := time.Now()
+	dlog := &models.DeliveryLog{
+		ReminderID: r.ID,
+		FiredAt:    now,
+		Title:      r.Title,
+		Content:    r.Content,
+		Status:     "pending",
+		Source:     r.Source,
+		RetryRound: 0,
+	}
+	if err := d.DB.Create(dlog).Error; err != nil {
+		return 0, err
+	}
+	d.Run(ctx, r, dlog.ID)
+	return dlog.ID, nil
+}
+
 func TestConfirmRetryStopsAtMaxRetries(t *testing.T) {
 	db := openTestDB(t)
 	stack := newConfirmTestStack(t, db)
 	reminder := createConfirmReminder(t, db, 1, 10)
 
-	logID, err := stack.dispatch.TestOnce(context.Background(), reminder)
+	logID, err := triggerDispatch(context.Background(), stack.dispatch, reminder)
 	if err != nil {
-		t.Fatalf("TestOnce 失败: %v", err)
+		t.Fatalf("triggerDispatch 失败: %v", err)
 	}
 
 	waitFor(t, 15*time.Second, func() bool {
@@ -72,9 +91,9 @@ func TestLogServiceListPaginatesByConfirmChain(t *testing.T) {
 	stack := newConfirmTestStack(t, db)
 	reminder := createConfirmReminder(t, db, 1, 2)
 
-	_, err := stack.dispatch.TestOnce(context.Background(), reminder)
+	_, err := triggerDispatch(context.Background(), stack.dispatch, reminder)
 	if err != nil {
-		t.Fatalf("TestOnce 失败: %v", err)
+		t.Fatalf("triggerDispatch 失败: %v", err)
 	}
 
 	waitFor(t, 5*time.Second, func() bool {
@@ -153,9 +172,9 @@ func TestConfirmRetryStopsAfterConfirmAndMarksWholeChain(t *testing.T) {
 	stack := newConfirmTestStack(t, db)
 	reminder := createConfirmReminder(t, db, 1, 10)
 
-	logID, err := stack.dispatch.TestOnce(context.Background(), reminder)
+	logID, err := triggerDispatch(context.Background(), stack.dispatch, reminder)
 	if err != nil {
-		t.Fatalf("TestOnce 失败: %v", err)
+		t.Fatalf("triggerDispatch 失败: %v", err)
 	}
 
 	waitFor(t, 5*time.Second, func() bool {
@@ -208,9 +227,9 @@ func TestToggleDisablesActiveConfirmChain(t *testing.T) {
 	stack := newConfirmTestStack(t, db)
 	reminder := createConfirmReminder(t, db, 1, 10)
 
-	logID, err := stack.dispatch.TestOnce(context.Background(), reminder)
+	logID, err := triggerDispatch(context.Background(), stack.dispatch, reminder)
 	if err != nil {
-		t.Fatalf("TestOnce 失败: %v", err)
+		t.Fatalf("triggerDispatch 失败: %v", err)
 	}
 
 	waitFor(t, 5*time.Second, func() bool {
