@@ -25,7 +25,7 @@ import { WeComForm } from './WeComForm'
 import { WebhookForm } from './WebhookForm'
 import { LogForm } from './LogForm'
 import type { Channel, ChannelType } from '@/types'
-import { createChannel, testChannel, updateChannel } from '@/lib/api'
+import { createChannel, testChannelDryRun, updateChannel } from '@/lib/api'
 
 interface Props {
   channel: Channel | null
@@ -118,17 +118,17 @@ export function ChannelEditDialog({ channel, open, onClose, onSaved }: Props) {
   }, [type])
 
   async function handleTest() {
-    if (!channel) return
     setTesting(true)
     try {
-      const result = await testChannel(channel.id)
-      if (result.success) {
-        toast({ title: '试发成功', description: `通知 ${channel.name} 已成功发送`, variant: 'success' })
-      } else {
-        toast({ title: '试发失败', description: result.error ?? '未知错误', variant: 'destructive' })
-      }
+      await testChannelDryRun({
+        id: channel?.id ?? 0,
+        type,
+        config,
+      })
+      toast({ title: '测试通知已发送', description: '请检查通知渠道是否收到消息。', variant: 'success' })
     } catch (err) {
-      toast({ title: '试发请求异常', description: String(err), variant: 'destructive' })
+      const msg = (err as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message
+      toast({ title: '测试失败', description: msg ?? String(err), variant: 'destructive' })
     } finally {
       setTesting(false)
     }
@@ -197,11 +197,9 @@ export function ChannelEditDialog({ channel, open, onClose, onSaved }: Props) {
           <SubForm config={config} onChange={setConfig} isEdit={isEdit} />
 
           <DialogFooter>
-            {isEdit && (
-              <Button type="button" variant="secondary" onClick={handleTest} disabled={testing} title="向该通知发送一条测试消息">
-                {testing ? '试发中…' : '测试通知'}
-              </Button>
-            )}
+            <Button type="button" variant="secondary" onClick={handleTest} disabled={testing} title="向该通知发送一条测试消息">
+              {testing ? '试发中…' : '测试通知'}
+            </Button>
             <Button type="button" variant="outline" onClick={onClose}>
               取消
             </Button>
