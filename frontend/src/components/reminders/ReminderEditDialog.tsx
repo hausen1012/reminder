@@ -24,7 +24,7 @@ import { Switch } from '@/components/ui/switch'
 import { useToast } from '@/components/ui/use-toast'
 import { ChannelMultiSelect } from '@/components/channels/ChannelMultiSelect'
 import { ScheduleForm, type ScheduleValue } from './ScheduleForm'
-import { createReminder, listChannels, testReminder, updateReminder } from '@/lib/api'
+import { createReminder, listChannels, testReminderDryRun, updateReminder } from '@/lib/api'
 import type { Channel, ContentFormat, Reminder, ReminderInput } from '@/types'
 
 interface Props {
@@ -124,13 +124,22 @@ export function ReminderEditDialog({ reminder, open, onClose, onSaved }: Props) 
   }
 
   async function handleTest() {
-    if (!reminder) return
+    if (input.channel_ids.length === 0) {
+      toast({ title: '请先选择通知渠道', variant: 'destructive' })
+      return
+    }
     setTesting(true)
     try {
-      await testReminder(reminder.id)
-      toast({ title: '已立即触发一次', description: '查看日志页确认通知送达结果。', variant: 'success' })
+      await testReminderDryRun({
+        id: reminder?.id ?? 0,
+        title: input.title,
+        content: input.content,
+        content_format: input.content_format || 'text',
+        channel_ids: input.channel_ids,
+      })
+      toast({ title: '测试提醒已触发', description: '请检查通知渠道是否收到消息。', variant: 'success' })
     } catch (err) {
-      toast({ title: '触发失败', description: String(err), variant: 'destructive' })
+      toast({ title: '测试失败', description: String(err), variant: 'destructive' })
     } finally {
       setTesting(false)
     }
@@ -302,11 +311,15 @@ export function ReminderEditDialog({ reminder, open, onClose, onSaved }: Props) 
           </div>
 
           <DialogFooter>
-            {isEdit && (
-              <Button type="button" variant="secondary" onClick={handleTest} disabled={testing} title="立即触发一次该提醒">
-                {testing ? '触发中…' : '测试提醒'}
-              </Button>
-            )}
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={handleTest}
+              disabled={testing || input.channel_ids.length === 0}
+              title={input.channel_ids.length === 0 ? '请先选择通知渠道' : '立即触发一次测试发送'}
+            >
+              {testing ? '测试中…' : '测试提醒'}
+            </Button>
             <Button type="button" variant="outline" onClick={onClose}>
               取消
             </Button>
