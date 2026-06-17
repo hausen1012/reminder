@@ -31,7 +31,8 @@ function toMondayBase(jsWeekday: number): number {
   return jsWeekday === 0 ? 6 : jsWeekday - 1
 }
 
-const YEAR_OPTIONS = Array.from({ length: 31 }, (_, i) => 2020 + i)
+// 年份从今年开始，往后 70 年
+const YEAR_OPTIONS = Array.from({ length: 70 }, (_, i) => new Date().getFullYear() + i)
 
 interface DayCell {
   key: string
