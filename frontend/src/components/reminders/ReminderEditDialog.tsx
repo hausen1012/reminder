@@ -174,7 +174,18 @@ export function ReminderEditDialog({ reminder, open, onClose, onSaved }: Props) 
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent
+        className="max-w-2xl max-h-[90vh] overflow-y-auto"
+        onPointerDownOutside={(e) => {
+          // CalendarPopover 通过 createPortal(document.body) 渲染，不在 Dialog DOM 子树内，
+          // Radix Dialog 的 DismissableLayer 会拦截其 pointerdown 并阻止 click 产生。
+          // 检测到点击来自日历弹窗时解除拦截，其他外部点击仍正常关闭 Dialog。
+          const target = e.detail.originalEvent.target as Element | null
+          if (target?.closest('[data-calendar-popover]')) {
+            e.preventDefault()
+          }
+        }}
+      >
         <DialogHeader>
           <DialogTitle>{isEdit ? '编辑提醒' : '新建提醒'}</DialogTitle>
         </DialogHeader>

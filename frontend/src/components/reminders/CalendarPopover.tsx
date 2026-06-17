@@ -260,7 +260,8 @@ export function CalendarPopover({ date, hour: initHour, minute: initMin, initial
     <div
       ref={popoverRef}
       className="fixed z-[100] bg-card rounded-lg border shadow-lg w-[272px] max-w-[calc(100vw-2rem)] p-2.5"
-      style={position ? { top: position.top, left: position.left } : { top: -9999, left: -9999 }}
+      data-calendar-popover
+      style={position ? { top: position.top, left: position.left, pointerEvents: 'auto' as React.CSSProperties['pointerEvents'] } : { top: -9999, left: -9999 }}
     >
       {/* 顶部导航 */}
       <div className="flex items-center justify-between mb-1.5">
@@ -272,7 +273,7 @@ export function CalendarPopover({ date, hour: initHour, minute: initMin, initial
             <SelectTrigger className="h-6 text-[11px] border-0 bg-transparent hover:bg-muted px-1 w-14 [&>svg]:h-3 [&>svg]:w-3">
               <SelectValue />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="z-[110]" side="bottom" align="start" sideOffset={2} avoidCollisions={false} position="popper">
               {YEAR_OPTIONS.map((y) => (
                 <SelectItem key={y} value={String(y)} className="text-xs">{y}</SelectItem>
               ))}
@@ -282,7 +283,7 @@ export function CalendarPopover({ date, hour: initHour, minute: initMin, initial
             <SelectTrigger className="h-6 text-[11px] border-0 bg-transparent hover:bg-muted px-1 w-10 [&>svg]:h-3 [&>svg]:w-3">
               <SelectValue />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="z-[110]" side="bottom" align="start" sideOffset={2} avoidCollisions={false} position="popper">
               {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
                 <SelectItem key={m} value={String(m)} className="text-xs">{m}</SelectItem>
               ))}
