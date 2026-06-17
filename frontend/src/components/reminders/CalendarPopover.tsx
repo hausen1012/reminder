@@ -280,7 +280,16 @@ export function CalendarPopover({ date, hour: initHour, minute: initMin, initial
               ))}
             </SelectContent>
           </Select>
-          <Select value={String(solarMonth)} onValueChange={(v) => setSolarMonth(Number(v))}>
+          <Select value={String(solarMonth)} onValueChange={(v) => setSolarMonth(Number(v))} onOpenChange={(open) => {
+            if (open) {
+              // 等待 Radix Select 完成 Portal 渲染和自动聚焦后，再将当前月份滚动到列表中间
+              requestAnimationFrame(() => requestAnimationFrame(() => {
+                const options = document.querySelectorAll<HTMLElement>('[role="option"]')
+                const target = options[solarMonth - 1]
+                target?.scrollIntoView({ block: 'center', behavior: 'instant' })
+              }))
+            }
+          }}>
             <SelectTrigger className="h-6 text-[11px] border-0 bg-transparent hover:bg-muted px-1 w-10 [&>svg]:h-3 [&>svg]:w-3">
               <SelectValue />
             </SelectTrigger>
