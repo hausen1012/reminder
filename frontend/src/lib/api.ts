@@ -5,7 +5,6 @@ import type {
   Channel,
   ChannelInput,
   ChannelListResp,
-  ChannelTestResult,
   ChannelType,
   CreateAPIKeyResult,
   DeliveryLog,
@@ -108,8 +107,12 @@ export async function toggleChannel(id: number) {
   return res.data.data
 }
 
-export async function testChannel(id: number, body?: { subject?: string; body?: string }) {
-  const res = await api.post<ApiResponse<ChannelTestResult>>(`/channels/${id}/test`, body ?? {})
+export async function testChannelDryRun(input: {
+  id?: number
+  type: ChannelType
+  config: Record<string, unknown>
+}) {
+  const res = await api.post<ApiResponse<{ success: boolean }>>('/channels/test-dry', input)
   return res.data.data
 }
 
@@ -154,8 +157,14 @@ export async function toggleReminder(id: number) {
   return res.data.data
 }
 
-export async function testReminder(id: number) {
-  const res = await api.post<ApiResponse<{ delivery_log_id: number }>>(`/reminders/${id}/test`)
+export async function testReminderDryRun(input: {
+  id?: number
+  title: string
+  content: string
+  content_format: string
+  channel_ids: number[]
+}) {
+  const res = await api.post<ApiResponse<{ success: boolean }>>('/reminders/test-dry', input)
   return res.data.data
 }
 
