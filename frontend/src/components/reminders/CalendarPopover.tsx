@@ -273,7 +273,7 @@ export function CalendarPopover({ date, hour: initHour, minute: initMin, initial
             <SelectTrigger className="h-6 text-[11px] border-0 bg-transparent hover:bg-muted px-1 w-14 [&>svg]:h-3 [&>svg]:w-3">
               <SelectValue />
             </SelectTrigger>
-            <SelectContent className="z-[110]" side="bottom" align="start" sideOffset={2} avoidCollisions={false} position="popper">
+            <SelectContent className="z-[110] max-h-[220px] overflow-y-auto [scrollbar-width:thin]" side="bottom" align="start" sideOffset={2} position="popper">
               {YEAR_OPTIONS.map((y) => (
                 <SelectItem key={y} value={String(y)} className="text-xs">{y}</SelectItem>
               ))}
@@ -283,7 +283,7 @@ export function CalendarPopover({ date, hour: initHour, minute: initMin, initial
             <SelectTrigger className="h-6 text-[11px] border-0 bg-transparent hover:bg-muted px-1 w-10 [&>svg]:h-3 [&>svg]:w-3">
               <SelectValue />
             </SelectTrigger>
-            <SelectContent className="z-[110]" side="bottom" align="start" sideOffset={2} avoidCollisions={false} position="popper">
+            <SelectContent className="z-[110] max-h-[220px] overflow-y-auto [scrollbar-width:thin]" side="bottom" align="start" sideOffset={2} position="popper">
               {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
                 <SelectItem key={m} value={String(m)} className="text-xs">{m}</SelectItem>
               ))}
