@@ -238,49 +238,6 @@ func (s *ChannelService) Toggle(id uint) (*ChannelView, error) {
 	return s.toView(ch), nil
 }
 
-// Test 用占位变量渲染并真发一次，不写日志。
-// payload 允许覆盖默认的 subject/body；为 nil 时使用内置示例。
-func (s *ChannelService) Test(ctx context.Context, id uint, subject, body string) error {
-	ch, err := s.getOrNotFound(id)
-	if err != nil {
-		return err
-	}
-	n, err := notifier.Get(ch.Type)
-	if err != nil {
-		return middleware.NewAppError(middleware.CodeValidationFailed, err.Error())
-	}
-
-	// 解密 Config 拿到明文 configJSON
-	decConfig, err := s.decryptConfig(ch.Config)
-	if err != nil {
-		return middleware.NewAppError(middleware.CodeInternalError, "解密通道配置失败: "+err.Error())
-	}
-	plainConfig, _ := json.Marshal(decConfig)
-
-	if subject == "" {
-		subject = "通道试发 - " + ch.Name
-	}
-	if body == "" {
-		body = "这是来自 reminder2 的通道试发消息。\n通道名：{{channel_name}}\n时间：{{now}}"
-	}
-	vars := map[string]string{
-		"channel_name": ch.Name,
-		"now":          time.Now().Format("2006-01-02 15:04:05"),
-		"title":        subject,
-		"content":      body,
-	}
-	rendered := notifier.Message{
-		Subject: notifier.Render(subject, vars),
-		Body:    notifier.Render(body, vars),
-		Vars:    vars,
-	}
-	if err := n.Send(ctx, plainConfig, rendered); err != nil {
-		log.Printf("[channel-test] 通道试发失败 channel=%d name=%s type=%s: %v", ch.ID, ch.Name, ch.Type, err)
-		return err
-	}
-	return nil
-}
-
 // DryRun 用表单配置试发通知，不写 delivery_log。
 func (s *ChannelService) DryRun(ctx context.Context, chType string, config map[string]any) error {
 	n, err := notifier.Get(chType)
