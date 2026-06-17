@@ -281,6 +281,35 @@ func (s *ChannelService) Test(ctx context.Context, id uint, subject, body string
 	return nil
 }
 
+// DryRun 用表单配置试发通知，不写 delivery_log。
+func (s *ChannelService) DryRun(ctx context.Context, chType string, config map[string]any) error {
+	n, err := notifier.Get(chType)
+	if err != nil {
+		return middleware.NewAppError(middleware.CodeValidationFailed, err.Error())
+	}
+	// 配置可能含 _enc 后缀字段，dry-run 时前端传的是明文，直接序列化
+	plainConfig, _ := json.Marshal(config)
+
+	subject := "通道试发 - " + chType
+	body := "这是来自 reminder2 的通道试发消息。\n类型：{{channel_type}}\n时间：{{now}}"
+	vars := map[string]string{
+		"channel_type": chType,
+		"now":          time.Now().Format("2006-01-02 15:04:05"),
+		"title":        subject,
+		"content":      body,
+	}
+	rendered := notifier.Message{
+		Subject: notifier.Render(subject, vars),
+		Body:    notifier.Render(body, vars),
+		Vars:    vars,
+	}
+	if err := n.Send(ctx, plainConfig, rendered); err != nil {
+		log.Printf("[channel-dryrun] 试发失败 type=%s: %v", chType, err)
+		return err
+	}
+	return nil
+}
+
 // DecryptedConfig 返回明文 config JSON，供 dispatch 阶段直接喂给 Notifier。
 //
 // dispatch 不应再回经 ChannelView（视图把敏感字段脱敏掉了）。

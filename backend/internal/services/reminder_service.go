@@ -15,6 +15,7 @@ import (
 
 	"github.com/bedrock/backend/internal/middleware"
 	"github.com/bedrock/backend/internal/models"
+	"github.com/bedrock/backend/internal/notifier"
 	"github.com/bedrock/backend/internal/scheduler"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
@@ -402,16 +403,57 @@ func (s *ReminderService) Preview(calendar, scheduleType string, specMap map[str
 	return scheduler.PreviewSolar(calendar, scheduleType, spec, from, loc, n)
 }
 
-// TestOnce 立刻跑一次 dispatch，不依赖调度器。
-func (s *ReminderService) TestOnce(ctx context.Context, id uint) (uint, error) {
-	r, err := s.getOrNotFound(id)
-	if err != nil {
-		return 0, err
-	}
+// TestDryRun 用表单数据试发提醒，不写 delivery_log / delivery_attempt。
+func (s *ReminderService) TestDryRun(ctx context.Context, title, content, contentFormat string, channelIDs []uint) error {
 	if s.Dispatch == nil {
-		return 0, errors.New("dispatch 未初始化")
+		return errors.New("dispatch 未初始化")
 	}
-	return s.Dispatch.TestOnce(ctx, r)
+	if len(channelIDs) == 0 {
+		return middleware.NewAppError(middleware.CodeValidationFailed, "至少选择一个通知渠道")
+	}
+	if strings.TrimSpace(title) == "" {
+		return middleware.NewAppError(middleware.CodeValidationFailed, "标题必填")
+	}
+	// 加载绑定的 enabled 通道
+	channels, err := s.loadChannelsByIDs(channelIDs)
+	if err != nil {
+		return err
+	}
+	if len(channels) == 0 {
+		return middleware.NewAppError(middleware.CodeValidationFailed, "没有可用的通知渠道")
+	}
+
+	now := time.Now()
+	vars := buildVars(&models.Reminder{
+		Title:       title,
+		Content:     content,
+		NextFireAt:  &now,
+	}, now, now, s.Loc)
+
+	body := notifier.Render(content, vars)
+	rendered := notifier.Message{
+		Subject: notifier.Render(title, vars),
+		Body:    body,
+		Format:  contentFormat,
+		Vars:    vars,
+	}
+	return s.Dispatch.DryRun(ctx, channels, rendered)
+}
+
+// loadChannelsByIDs 根据 ID 列表加载 enabled 通道。
+func (s *ReminderService) loadChannelsByIDs(ids []uint) ([]*models.Channel, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	var rows []models.Channel
+	if err := s.DB.Where("id IN ? AND enabled = ?", ids, true).Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	out := make([]*models.Channel, 0, len(rows))
+	for i := range rows {
+		out = append(out, &rows[i])
+	}
+	return out, nil
 }
 
 // --- internal helpers ---
