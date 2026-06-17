@@ -123,6 +123,21 @@ export function CalendarPopover({ date, hour: initHour, minute: initMin, initial
   useEffect(() => {
     if (!timePanelOpen) return
 
+    // react-remove-scroll 在 document 的捕获阶段拦截 wheel 事件，
+    // portal 到 document.body 的内容不在其 DOM 子树内，会被一律阻止。
+    // 这里在 window 捕获阶段拦截，阻止事件到达 document 层。
+    function handleWindowWheel(e: WheelEvent) {
+      if (popoverRef.current?.contains(e.target as Node)) {
+        e.stopPropagation()
+      }
+    }
+    window.addEventListener('wheel', handleWindowWheel, { capture: true, passive: false })
+    return () => window.removeEventListener('wheel', handleWindowWheel, { capture: true })
+  }, [timePanelOpen])
+
+  useEffect(() => {
+    if (!timePanelOpen) return
+
     function scrollSelectedIntoView(container: HTMLDivElement | null, index: number) {
       if (!container) return
       const item = container.children[index] as HTMLElement | undefined
@@ -379,10 +394,10 @@ export function CalendarPopover({ date, hour: initHour, minute: initMin, initial
               <span className="font-medium tracking-tight text-foreground">{String(hour).padStart(2, '0')}:{String(minute).padStart(2, '0')}</span>
             </button>
             {timePanelOpen && (
-              <div className="absolute bottom-full left-0 z-20 mb-1 w-[108px] overflow-hidden rounded-md border bg-card shadow-lg">
-                <div className="grid grid-cols-2">
+              <div className="absolute bottom-full left-0 z-20 mb-1 w-[108px] rounded-md border bg-card shadow-lg">
+                <div className="grid grid-cols-2 rounded-md overflow-hidden">
                   <div className="border-r bg-background/40">
-                    <div ref={hourListRef} className="max-h-40 overflow-y-auto py-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                    <div ref={hourListRef} className="max-h-40 overflow-y-auto py-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" data-remove-scroll>
                       {Array.from({ length: 24 }, (_, i) => (
                         <button
                           key={i}
@@ -396,7 +411,7 @@ export function CalendarPopover({ date, hour: initHour, minute: initMin, initial
                     </div>
                   </div>
                   <div className="bg-background/40">
-                    <div ref={minuteListRef} className="max-h-40 overflow-y-auto py-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                    <div ref={minuteListRef} className="max-h-40 overflow-y-auto py-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" data-remove-scroll>
                       {Array.from({ length: 60 }, (_, i) => (
                         <button
                           key={i}
