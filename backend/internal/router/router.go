@@ -139,7 +139,7 @@ func Setup(staticFS embed.FS, cfg *config.Config) *SetupResult {
 			channels.PUT("/:id", channelHandler.Update)
 			channels.DELETE("/:id", channelHandler.Delete)
 			channels.PATCH("/:id/toggle", channelHandler.Toggle)
-			channels.POST("/:id/test", channelHandler.Test)
+			channels.POST("/test-dry", channelHandler.TestDryRun)
 			channels.GET("/stats", channelHandler.Stats)
 		}
 
@@ -153,7 +153,7 @@ func Setup(staticFS embed.FS, cfg *config.Config) *SetupResult {
 			reminders.PUT("/:id", reminderHandler.Update)
 			reminders.DELETE("/:id", reminderHandler.Delete)
 			reminders.PATCH("/:id/toggle", reminderHandler.Toggle)
-			reminders.POST("/:id/test", reminderHandler.Test)
+			reminders.POST("/test-dry", reminderHandler.TestDryRun)
 		}
 
 		logs := protected.Group("/logs")

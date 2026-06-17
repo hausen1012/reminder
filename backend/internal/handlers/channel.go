@@ -180,26 +180,19 @@ func (h *ChannelHandler) Stats(c *gin.Context) {
 	successJSON(c, stats)
 }
 
-// Test POST /api/channels/:id/test
-// Body 可选传 {subject, body}；为空走默认占位。
-func (h *ChannelHandler) Test(c *gin.Context) {
-	id, err := parseID(c, "id")
-	if err != nil {
-		abortErr(c, err)
+// TestDryRun POST /api/channels/test-dry
+func (h *ChannelHandler) TestDryRun(c *gin.Context) {
+	var in struct {
+		ID     uint           `json:"id"`
+		Type   string         `json:"type"`
+		Config map[string]any `json:"config"`
+	}
+	if err := c.ShouldBindJSON(&in); err != nil {
+		abortErr(c, middleware.NewAppError(middleware.CodeValidationFailed, "请求体格式错误"))
 		return
 	}
-	var in struct {
-		Subject string `json:"subject"`
-		Body    string `json:"body"`
-	}
-	_ = c.ShouldBindJSON(&in)
-	if err := h.Svc.Test(c.Request.Context(), id, in.Subject, in.Body); err != nil {
-		// 业务错误也用 200 + data 返回，方便前端展示
-		c.JSON(http.StatusOK, gin.H{
-			"code":    200,
-			"message": "ok",
-			"data":    gin.H{"success": false, "error": err.Error()},
-		})
+	if err := h.Svc.DryRun(c.Request.Context(), in.Type, in.Config); err != nil {
+		abortErr(c, err)
 		return
 	}
 	successJSON(c, gin.H{"success": true})

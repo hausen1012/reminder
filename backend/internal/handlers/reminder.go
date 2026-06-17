@@ -148,19 +148,24 @@ func (h *ReminderHandler) Preview(c *gin.Context) {
 	successJSON(c, gin.H{"times": times})
 }
 
-// Test POST /api/reminders/:id/test
-func (h *ReminderHandler) Test(c *gin.Context) {
-	id, err := parseID(c, "id")
-	if err != nil {
+// TestDryRun POST /api/reminders/test-dry
+func (h *ReminderHandler) TestDryRun(c *gin.Context) {
+	var in struct {
+		ID            uint   `json:"id"`
+		Title         string `json:"title"`
+		Content       string `json:"content"`
+		ContentFormat string `json:"content_format"`
+		ChannelIDs    []uint `json:"channel_ids"`
+	}
+	if err := c.ShouldBindJSON(&in); err != nil {
+		abortErr(c, middleware.NewAppError(middleware.CodeValidationFailed, "请求体格式错误"))
+		return
+	}
+	if err := h.Svc.TestDryRun(c.Request.Context(), in.Title, in.Content, in.ContentFormat, in.ChannelIDs); err != nil {
 		abortErr(c, err)
 		return
 	}
-	logID, err := h.Svc.TestOnce(c.Request.Context(), id)
-	if err != nil {
-		abortErr(c, err)
-		return
-	}
-	successJSON(c, gin.H{"delivery_log_id": logID})
+	successJSON(c, gin.H{"success": true})
 }
 
 // Upcoming GET /api/reminders/upcoming
