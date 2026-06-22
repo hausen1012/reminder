@@ -224,9 +224,12 @@ export default function ChannelsPage() {
                     </Button>
                   </div>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  创建于 {formatTime(ch.created_at)}
-                </p>
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span>创建于 {formatTime(ch.created_at)}</span>
+                  <span className={ch.enabled ? 'text-green-600' : 'text-muted-foreground'}>
+                    {ch.enabled ? '已启用' : '已禁用'}
+                  </span>
+                </div>
               </div>
             ))}
           </div>
