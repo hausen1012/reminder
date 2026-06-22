@@ -63,27 +63,27 @@ export function ScheduleForm({ value, onChange }: Props) {
           minute: getReminderSpecMinute(old) ?? 0,
         }
       } else {
-        next = { at: (old.at ?? old.start_at ?? '') as string }
+        next = { at: String(old.at ?? old.start_at ?? '') }
       }
     } else if (t === 'interval') {
       if (value.calendar === 'lunar') {
         const lunar = (old.lunar ?? old.start_lunar) as { year: number; month: number; day: number } | undefined
         next = {
           start_lunar: lunar ?? { year: 2026, month: 1, day: 1 },
-          every: (old.every as number) ?? 1,
-          unit: (old.unit as string) ?? 'month',
+          every: Number(old.every ?? 1),
+          unit: String(old.unit ?? 'month'),
           hour: getReminderSpecHour(old) || 9,
           minute: getReminderSpecMinute(old) ?? 0,
         }
       } else {
         next = {
-          start_at: (old.at ?? old.start_at ?? '') as string,
-          every: (old.every as number) ?? 1,
-          unit: (old.unit as string) ?? 'day',
+          start_at: String(old.at ?? old.start_at ?? ''),
+          every: Number(old.every ?? 1),
+          unit: String(old.unit ?? 'day'),
         }
       }
     } else {
-      next = { expr: (old.expr as string) || '0 9 * * *' }
+      next = { expr: String(old.expr ?? '0 9 * * *') }
     }
     onChange({ ...value, schedule_type: t, schedule_spec: next })
   }
@@ -133,12 +133,12 @@ export function ScheduleForm({ value, onChange }: Props) {
               <Input
                 type="number"
                 min={1}
-                value={(spec.every as number) ?? 1}
+                value={Number(spec.every ?? 1)}
                 onChange={(e) => patchSpec({ every: Number(e.target.value) || 1 })}
                 className="flex-1"
               />
               <Select
-                value={(spec.unit as string) ?? (value.calendar === 'lunar' ? 'month' : 'day')}
+                value={String(spec.unit ?? (value.calendar === 'lunar' ? 'month' : 'day'))}
                 onValueChange={(v) => patchSpec({ unit: v })}
               >
                 <SelectTrigger className="flex-1">
@@ -162,7 +162,7 @@ export function ScheduleForm({ value, onChange }: Props) {
           <Label htmlFor="spec-expr">Cron 表达式</Label>
           <Input
             id="spec-expr"
-            value={(spec.expr as string) ?? ''}
+            value={String(spec.expr ?? '')}
             onChange={(e) => patchSpec({ expr: e.target.value })}
             placeholder="例如：0 9 * * 1-5"
           />
@@ -190,7 +190,7 @@ export function ScheduleForm({ value, onChange }: Props) {
             <CalendarPopover
               triggerRef={triggerRef}
               date={(() => {
-                if (value.calendar === 'solar') return (spec.at ?? spec.start_at) as string | undefined
+                if (value.calendar === 'solar') return String(spec.at ?? spec.start_at ?? '') || undefined
                 const lunar = (spec.lunar ?? spec.start_lunar) as { year: number; month: number; day: number } | undefined
                 if (lunar) {
                   const l = Lunar.fromYmd(lunar.year, lunar.month, lunar.day)

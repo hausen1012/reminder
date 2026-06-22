@@ -38,23 +38,23 @@ export function getLunarYmd(dateStr: string): { year: number; month: number; day
 }
 
 export function getReminderSpecHour(spec: Record<string, unknown>): number | undefined {
-  if (typeof spec.hour === 'number') return spec.hour as number
-  const at = (spec.at ?? spec.start_at) as string | undefined
-  if (!at || at.length < 16) return undefined
+  if (typeof spec.hour === 'number') return spec.hour
+  const at = String(spec.at ?? spec.start_at ?? '')
+  if (at.length < 16) return undefined
   const hour = Number(at.slice(11, 13))
   return Number.isFinite(hour) ? hour : undefined
 }
 
 export function getReminderSpecMinute(spec: Record<string, unknown>): number | undefined {
-  if (typeof spec.minute === 'number') return spec.minute as number
-  const at = (spec.at ?? spec.start_at) as string | undefined
-  if (!at || at.length < 16) return undefined
+  if (typeof spec.minute === 'number') return spec.minute
+  const at = String(spec.at ?? spec.start_at ?? '')
+  if (at.length < 16) return undefined
   const minute = Number(at.slice(14, 16))
   return Number.isFinite(minute) ? minute : undefined
 }
 
 export function formatReminderSolarLine(spec: Record<string, unknown>, calendar: ReminderCalendar): string {
-  const at = (spec.at ?? spec.start_at) as string | undefined
+  const at = String(spec.at ?? spec.start_at ?? '')
   if (at) return `${at.slice(0, 10)} ${at.slice(11, 16)}:00`
   if (calendar === 'lunar') {
     const lunar = (spec.lunar ?? spec.start_lunar) as { year: number; month: number; day: number } | undefined
@@ -71,7 +71,7 @@ export function formatReminderLunarLine(spec: Record<string, unknown>, calendar:
   if (calendar === 'lunar') {
     ymd = (spec.lunar ?? spec.start_lunar) as { year: number; month: number; day: number } | undefined ?? null
   } else {
-    const at = (spec.at ?? spec.start_at) as string | undefined
+    const at = String(spec.at ?? spec.start_at ?? '')
     if (at) ymd = getLunarYmd(at)
   }
   if (!ymd) return ''
@@ -81,7 +81,7 @@ export function formatReminderLunarLine(spec: Record<string, unknown>, calendar:
 export function formatReminderDetail(reminder: Reminder): string {
   const spec = reminder.schedule_spec ?? {}
   if (reminder.schedule_type === 'cron') {
-    return (spec.expr as string) ?? ''
+    return String(spec.expr ?? '')
   }
 
   const solarLine = formatReminderSolarLine(spec, reminder.calendar)
