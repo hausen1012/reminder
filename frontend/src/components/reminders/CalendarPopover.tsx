@@ -295,7 +295,7 @@ export function CalendarPopover({ date, hour: initHour, minute: initMin, initial
             <ChevronLeft className="h-3 w-3" />
           </Button>
           <Select value={String(solarYear)} onValueChange={(v) => setSolarYear(Number(v))}>
-            <SelectTrigger className="h-6 text-[11px] border-0 bg-transparent hover:bg-muted px-1 w-14 [&>svg]:h-3 [&>svg]:w-3">
+            <SelectTrigger className="h-6 text-[11px] border-0 bg-transparent hover:bg-muted px-1 min-w-0 w-14 [&>svg]:h-3 [&>svg]:w-3 [&[data-state=open]]:bg-transparent focus:ring-0 focus-visible:ring-0 data-[state=open]:ring-0">
               <SelectValue />
             </SelectTrigger>
             <SelectContent className="z-[110] max-h-[220px] overflow-y-auto [scrollbar-width:thin]" side="bottom" align="start" sideOffset={2} position="popper">
@@ -314,7 +314,7 @@ export function CalendarPopover({ date, hour: initHour, minute: initMin, initial
               }))
             }
           }}>
-            <SelectTrigger className="h-6 text-[11px] border-0 bg-transparent hover:bg-muted px-1 w-10 [&>svg]:h-3 [&>svg]:w-3">
+            <SelectTrigger className="h-6 text-[11px] border-0 bg-transparent hover:bg-muted px-1 min-w-0 w-10 [&>svg]:h-3 [&>svg]:w-3 [&[data-state=open]]:bg-transparent focus:ring-0 focus-visible:ring-0 data-[state=open]:ring-0">
               <SelectValue />
             </SelectTrigger>
             <SelectContent className="z-[110] max-h-[220px] overflow-y-auto [scrollbar-width:thin]" side="bottom" align="start" sideOffset={2} position="popper">
