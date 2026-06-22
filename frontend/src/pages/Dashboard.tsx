@@ -154,7 +154,7 @@ export default function Dashboard() {
       {/* 详情行 */}
       <div className="grid gap-4 md:grid-cols-2">
         {/* 今日待发列表 */}
-        <Card>
+        <Card className="min-w-0">
           <CardHeader>
             <CardTitle className="text-base">今日待发提醒 <span className="text-xs text-muted-foreground">({todayCount})</span></CardTitle>
           </CardHeader>
@@ -164,7 +164,7 @@ export default function Dashboard() {
             ) : todayReminders.length === 0 ? (
               <p className="text-sm text-muted-foreground">今天没有待触发的提醒。</p>
             ) : (
-              <div className="space-y-2 max-h-[420px] overflow-y-auto pr-1">
+              <div className="space-y-2 max-h-[420px] overflow-y-auto overflow-x-hidden pr-1">
                 {todayReminders.map((r) => (
                   <Link
                     key={r.id}
@@ -172,12 +172,12 @@ export default function Dashboard() {
                     className="block rounded-md border p-3 hover:bg-muted/50 transition-colors"
                   >
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium truncate">{r.title}</span>
+                      <span className="text-sm font-medium truncate min-w-0">{r.title}</span>
                       <Badge variant="outline" className="text-xs shrink-0 ml-2">
                         {r.next_fire_at ? new Date(r.next_fire_at).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) : '—'}
                       </Badge>
                     </div>
-                    <div className="text-xs text-muted-foreground mt-1">
+                    <div className="text-xs text-muted-foreground mt-1 truncate">
                       {formatReminderDetail(r)}
                       {r.channel_ids.length > 0 && ` · ${r.channel_ids.length} 个通知渠道`}
                     </div>
@@ -189,7 +189,7 @@ export default function Dashboard() {
         </Card>
 
         {/* 最近发送列表 */}
-        <Card>
+        <Card className="min-w-0">
           <CardHeader>
             <CardTitle className="text-base">最近发送 <span className="text-xs text-muted-foreground">({logs.length})</span></CardTitle>
           </CardHeader>
@@ -199,18 +199,18 @@ export default function Dashboard() {
             ) : logs.length === 0 ? (
               <p className="text-sm text-muted-foreground">暂无发送记录。</p>
             ) : (
-              <div className="space-y-2 max-h-[420px] overflow-y-auto pr-1">
+              <div className="space-y-2 max-h-[420px] overflow-y-auto overflow-x-hidden pr-1">
                 {logs.map((log) => (
                   <Link
                     key={log.id}
                     to={`/logs`}
-                    className="block rounded-md border p-3 hover:bg-muted/50 transition-colors"
+                    className="block rounded-md border p-3 hover:bg-muted/50 transition-colors overflow-hidden"
                   >
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium truncate">{log.reminder_title || log.title}</span>
-                      <span className={`text-xs px-1.5 py-0.5 rounded ${statusBadge(log.status)}`}>{log.status}</span>
+                      <span className="text-sm font-medium truncate min-w-0">{log.reminder_title || log.title}</span>
+                      <span className={`text-xs px-1.5 py-0.5 rounded shrink-0 ml-2 whitespace-nowrap ${statusBadge(log.status)}`}>{log.status}</span>
                     </div>
-                    <div className="text-xs text-muted-foreground mt-1">
+                    <div className="text-xs text-muted-foreground mt-1 truncate">
                       {new Date(log.fired_at).toLocaleString('zh-CN')}
                       {log.source && ` · ${log.source}`}
                     </div>
