@@ -1,6 +1,6 @@
 // 通知页：列表 + 新建/编辑对话框 + 发送测试 + 删除
 import { useCallback, useEffect, useState } from 'react'
-import { Plus, Pencil, RefreshCw, Trash2, Copy, Search } from 'lucide-react'
+import { Plus, Pencil, RefreshCw, Trash2, Copy, Search, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -31,6 +31,7 @@ export default function ChannelsPage() {
   const [limit, setLimit] = useState(10)
   const [offset, setOffset] = useState(0)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
   const [search, setSearch] = useState('')
   const [searchInput, setSearchInput] = useState('')
   const [searchVersion, setSearchVersion] = useState(0)
@@ -64,7 +65,9 @@ export default function ChannelsPage() {
       })
       setItems(data?.items ?? [])
       setTotal(data?.total ?? 0)
+      setLoadError('')
     } catch (err) {
+      setLoadError(String(err))
       toast({ title: '加载通知失败', description: String(err), variant: 'destructive' })
     } finally {
       setLoading(false)
@@ -149,6 +152,18 @@ export default function ChannelsPage() {
 
       {loading ? (
         <p className="text-sm text-muted-foreground">加载中…</p>
+      ) : loadError ? (
+        <Card>
+          <CardContent className="py-10 text-center text-sm text-destructive">
+            <div className="flex items-center justify-center gap-2">
+              <AlertCircle className="h-5 w-5" />
+              <span>加载失败：{loadError}</span>
+            </div>
+            <Button variant="outline" size="sm" className="mt-3" onClick={refresh}>
+              重试
+            </Button>
+          </CardContent>
+        </Card>
       ) : items.length === 0 ? (
         <Card>
           <CardContent className="py-10 text-center text-sm text-muted-foreground">

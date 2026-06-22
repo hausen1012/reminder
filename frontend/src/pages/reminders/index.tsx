@@ -1,6 +1,6 @@
 // 提醒列表页：toolbar（来源筛选/状态/搜索/新建）+ 表格 + 编辑/试发/删除。
 import { useEffect, useState, useMemo } from 'react'
-import { Plus, Pencil, Trash2, RefreshCw, Copy, Search } from 'lucide-react'
+import { Plus, Pencil, Trash2, RefreshCw, Copy, Search, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -43,6 +43,7 @@ export default function RemindersPage() {
   const [items, setItems] = useState<Reminder[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
   const [editing, setEditing] = useState<Reminder | null>(null)
   const [creating, setCreating] = useState(false)
   const [toDelete, setToDelete] = useState<Reminder | null>(null)
@@ -84,7 +85,9 @@ export default function RemindersPage() {
       const data = await listReminders(q)
       setItems(data?.items ?? [])
       setTotal(data?.total ?? 0)
+      setLoadError('')
     } catch (err) {
+      setLoadError(String(err))
       toast({ title: '加载提醒失败', description: String(err), variant: 'destructive' })
     } finally {
       setLoading(false)
@@ -217,6 +220,18 @@ export default function RemindersPage() {
 
       {loading ? (
         <p className="text-sm text-muted-foreground">加载中…</p>
+      ) : loadError ? (
+        <Card>
+          <CardContent className="py-10 text-center text-sm text-destructive">
+            <div className="flex items-center justify-center gap-2">
+              <AlertCircle className="h-5 w-5" />
+              <span>加载失败：{loadError}</span>
+            </div>
+            <Button variant="outline" size="sm" className="mt-3" onClick={refresh}>
+              重试
+            </Button>
+          </CardContent>
+        </Card>
       ) : items.length === 0 ? (
         <Card>
           <CardContent className="py-10 text-center text-sm text-muted-foreground">

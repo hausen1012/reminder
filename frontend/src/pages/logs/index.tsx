@@ -87,6 +87,7 @@ export default function LogsPage() {
   const [items, setItems] = useState<DeliveryLog[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
   const [filter, setFilter] = useState<LogFilter>({})
   const [search, setSearch] = useState('')
   const [limit, setLimit] = useState(10)
@@ -114,7 +115,9 @@ export default function LogsPage() {
       const data = await listLogs(q)
       setItems(data?.items ?? [])
       setTotal(data?.total ?? 0)
+      setLoadError('')
     } catch (err) {
+      setLoadError(String(err))
       toast({ title: '加载日志失败', description: String(err), variant: 'destructive' })
     } finally {
       setLoading(false)
@@ -264,6 +267,18 @@ export default function LogsPage() {
 
       {loading ? (
         <p className="text-sm text-muted-foreground">加载中…</p>
+      ) : loadError ? (
+        <Card>
+          <CardContent className="py-10 text-center text-sm text-destructive">
+            <div className="flex items-center justify-center gap-2">
+              <AlertCircle className="h-5 w-5" />
+              <span>加载失败：{loadError}</span>
+            </div>
+            <Button variant="outline" size="sm" className="mt-3" onClick={refresh}>
+              重试
+            </Button>
+          </CardContent>
+        </Card>
       ) : items.length === 0 ? (
         <Card>
           <CardContent className="py-10 text-center text-sm text-muted-foreground">

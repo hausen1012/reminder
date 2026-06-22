@@ -1,6 +1,6 @@
 // API Key 管理页
 import { useEffect, useMemo, useState } from 'react'
-import { Plus, Trash2, Copy, CheckCircle2, Pencil, RefreshCw, Terminal, Search } from 'lucide-react'
+import { Plus, Trash2, Copy, CheckCircle2, Pencil, RefreshCw, Terminal, Search, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -50,6 +50,7 @@ export default function ApiKeysPage() {
   const [items, setItems] = useState<APIKey[]>([])
   const [channels, setChannels] = useState<Channel[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
   const [createOpen, setCreateOpen] = useState(false)
   const [newKeyName, setNewKeyName] = useState('')
   const [newChannelIDs, setNewChannelIDs] = useState<number[]>([])
@@ -82,7 +83,9 @@ export default function ApiKeysPage() {
       const [list, allChannels] = await Promise.all([listApiKeys(), listChannels()])
       setItems(list)
       setChannels(allChannels)
+      setLoadError('')
     } catch (err) {
+      setLoadError(String(err))
       toast({ title: '加载 API Key 失败', description: String(err), variant: 'destructive' })
     } finally {
       setLoading(false)
@@ -297,6 +300,18 @@ export default function ApiKeysPage() {
 
       {loading ? (
         <p className="text-sm text-muted-foreground">加载中…</p>
+      ) : loadError ? (
+        <Card>
+          <CardContent className="py-10 text-center text-sm text-destructive">
+            <div className="flex items-center justify-center gap-2">
+              <AlertCircle className="h-5 w-5" />
+              <span>加载失败：{loadError}</span>
+            </div>
+            <Button variant="outline" size="sm" className="mt-3" onClick={refresh}>
+              重试
+            </Button>
+          </CardContent>
+        </Card>
       ) : filteredItems.length === 0 ? (
         <Card>
           <CardContent className="py-10 text-center text-sm text-muted-foreground">
