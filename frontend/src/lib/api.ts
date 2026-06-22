@@ -16,6 +16,7 @@ import type {
   ReminderListResp,
   SchedulerStatus,
   User,
+  ApiKeyListResp,
 } from '@/types'
 
 const api = axios.create({
@@ -207,9 +208,9 @@ export async function countPurgeLogs(olderThan?: string, all?: boolean) {
 
 // --- API Key ---
 
-export async function listApiKeys() {
-  const res = await api.get<ApiResponse<APIKey[]>>('/apikeys')
-  return res.data.data ?? []
+export async function listApiKeys(params?: { limit?: number; offset?: number; search?: string }) {
+  const res = await api.get<ApiResponse<ApiKeyListResp>>('/apikeys', { params })
+  return res.data.data ?? { items: [], total: 0 }
 }
 
 export async function getApiKey(id: number) {

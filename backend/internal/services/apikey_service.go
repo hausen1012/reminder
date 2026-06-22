@@ -72,17 +72,25 @@ func (s *ApiKeyService) Create(name string, defaultChannelIDs []uint) (string, *
 	return plain, key, nil
 }
 
-// List 返回所有 Key。
-func (s *ApiKeyService) List() ([]*models.APIKey, error) {
+// List 返回所有 Key，支持分页和搜索。
+func (s *ApiKeyService) List(limit, offset int, search string) ([]*models.APIKey, int64, error) {
 	var rows []models.APIKey
-	if err := s.DB.Order("id DESC").Find(&rows).Error; err != nil {
-		return nil, err
+	query := s.DB.Model(&models.APIKey{})
+	if search != "" {
+		query = query.Where("name LIKE ?", "%"+search+"%")
+	}
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	if err := query.Order("id DESC").Limit(limit).Offset(offset).Find(&rows).Error; err != nil {
+		return nil, 0, err
 	}
 	out := make([]*models.APIKey, len(rows))
 	for i := range rows {
 		out[i] = &rows[i]
 	}
-	return out, nil
+	return out, total, nil
 }
 
 // Toggle 启用/禁用。
@@ -247,11 +255,11 @@ type ApiKeyView struct {
 	Usage24h          int64  `json:"usage_24h"`
 }
 
-// ListViews 返回 API Key 富列表。
-func (s *ApiKeyService) ListViews() ([]*ApiKeyView, error) {
-	keys, err := s.List()
+// ListViews 返回 API Key 富列表，支持分页和搜索。
+func (s *ApiKeyService) ListViews(limit, offset int, search string) ([]*ApiKeyView, int64, error) {
+	keys, total, err := s.List(limit, offset, search)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	views := make([]*ApiKeyView, 0, len(keys))
 	for _, k := range keys {
@@ -261,7 +269,7 @@ func (s *ApiKeyService) ListViews() ([]*ApiKeyView, error) {
 			Usage24h:          s.Stats24h(k.ID),
 		})
 	}
-	return views, nil
+	return views, total, nil
 }
 
 // GetView 返回单个 Key 的富视图。

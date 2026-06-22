@@ -174,6 +174,11 @@ export interface CreateAPIKeyResult {
   key: APIKey
 }
 
+export interface ApiKeyListResp {
+  items: APIKey[]
+  total: number
+}
+
 // --- 监控 ---
 
 export interface SchedulerEntry {

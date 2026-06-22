@@ -52,6 +52,7 @@ export default function ApiKeysPage() {
   const [channels, setChannels] = useState<Channel[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
+  const [total, setTotal] = useState(0)
   const [createOpen, setCreateOpen] = useState(false)
   const [newKeyName, setNewKeyName] = useState('')
   const [newChannelIDs, setNewChannelIDs] = useState<number[]>([])
@@ -81,8 +82,12 @@ export default function ApiKeysPage() {
   async function refresh() {
     setLoading(true)
     try {
-      const [list, allChannels] = await Promise.all([listApiKeys(), listChannels()])
-      setItems(list)
+      const [data, allChannels] = await Promise.all([
+        listApiKeys({ limit, offset, search: search.trim() || undefined }),
+        listChannels(),
+      ])
+      setItems(data.items ?? [])
+      setTotal(data.total ?? 0)
       setChannels(allChannels)
       setLoadError('')
     } catch (err) {
@@ -95,21 +100,16 @@ export default function ApiKeysPage() {
 
   useEffect(() => {
     refresh()
-  }, [])
+  }, [offset, limit, search])
+
+  useEffect(() => {
+    setOffset(0)
+  }, [enabled])
 
   const filteredItems = useMemo(() => {
-    const keyword = search.trim().toLowerCase()
-    return items.filter((item) => {
-      if (enabled === 'true' && !item.enabled) return false
-      if (enabled === 'false' && item.enabled) return false
-      if (!keyword) return true
-      return item.name.toLowerCase().includes(keyword)
-    })
-  }, [items, enabled, search])
-
-  const pagedItems = useMemo(() => {
-    return filteredItems.slice(offset, offset + limit)
-  }, [filteredItems, offset, limit])
+    if (enabled === 'all') return items
+    return items.filter((item) => (enabled === 'true') === item.enabled)
+  }, [items, enabled])
 
   useEffect(() => {
     setOffset(0)
@@ -335,7 +335,7 @@ export default function ApiKeysPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {pagedItems.map((key) => (
+                  {filteredItems.map((key) => (
                     <tr key={key.id} className="border-b last:border-b-0 hover:bg-muted/30">
                       <td className="max-w-[14rem] px-4 py-2.5">
                         <div className="truncate font-medium" title={key.name}>
@@ -389,7 +389,7 @@ export default function ApiKeysPage() {
 
           {/* 移动端卡片列表 */}
           <div className="divide-y md:hidden">
-            {pagedItems.map((key) => (
+            {filteredItems.map((key) => (
               <div key={key.id} className="px-4 py-3 space-y-2">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0 flex-1">
@@ -444,7 +444,7 @@ export default function ApiKeysPage() {
             ))}
           </div>
 
-          <Pagination total={filteredItems.length} limit={limit} offset={offset} onPageChange={setOffset} onLimitChange={setLimit} />
+          <Pagination total={total} limit={limit} offset={offset} onPageChange={setOffset} onLimitChange={setLimit} />
         </Card>
       )}
 

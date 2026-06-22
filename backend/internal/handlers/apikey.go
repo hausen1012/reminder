@@ -2,6 +2,8 @@
 package handlers
 
 import (
+	"strconv"
+
 	"github.com/bedrock/backend/internal/middleware"
 	"github.com/bedrock/backend/internal/services"
 	"github.com/gin-gonic/gin"
@@ -14,12 +16,25 @@ type ApiKeyHandler struct {
 
 // List GET /api/apikeys
 func (h *ApiKeyHandler) List(c *gin.Context) {
-	views, err := h.Svc.ListViews()
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
+	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+	search := c.Query("search")
+	if limit < 1 || limit > 100 {
+		limit = 10
+	}
+	if offset < 0 {
+		offset = 0
+	}
+
+	views, total, err := h.Svc.ListViews(limit, offset, search)
 	if err != nil {
 		abortErr(c, err)
 		return
 	}
-	successJSON(c, views)
+	successJSON(c, gin.H{
+		"items": views,
+		"total": total,
+	})
 }
 
 // Get GET /api/apikeys/:id
@@ -125,7 +140,7 @@ func (h *ApiKeyHandler) UpdateDefaultChannels(c *gin.Context) {
 
 // Stats GET /api/apikeys/stats
 func (h *ApiKeyHandler) Stats(c *gin.Context) {
-	views, err := h.Svc.ListViews()
+	views, _, err := h.Svc.ListViews(1000, 0, "")
 	if err != nil {
 		abortErr(c, err)
 		return
