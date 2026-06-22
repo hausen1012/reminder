@@ -21,6 +21,7 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { PageHeader } from '@/components/ui/PageHeader'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -193,10 +194,7 @@ export default function LogsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex-col items-start gap-2 md:flex-row md:items-center md:justify-between flex">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">日志</h1>
-        </div>
+      <PageHeader title="日志">
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" size="sm" onClick={() => openPurge('7d')}>
             <Trash2 className="h-4 w-4 mr-1" />
@@ -209,7 +207,7 @@ export default function LogsPage() {
             全部清理
           </Button>
         </div>
-      </div>
+      </PageHeader>
 
       <div className="flex flex-wrap items-center gap-2">
         <div className="w-[calc(50%-0.25rem)] md:w-32">

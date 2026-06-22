@@ -8,6 +8,7 @@ import { Pagination } from '@/components/ui/pagination'
 import { useToast } from '@/components/ui/use-toast'
 import { formatTime } from '@/lib/utils'
 import { SortIcon } from '@/components/ui/SortIcon'
+import { PageHeader } from '@/components/ui/PageHeader'
 import { ChannelEditDialog } from '@/components/channels/ChannelEditDialog'
 import { ConfirmDialog } from '@/components/channels/ConfirmDialog'
 import {
@@ -117,13 +118,12 @@ export default function ChannelsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex-col items-start gap-2 md:flex-row md:items-center md:justify-between flex">
-        <h1 className="text-3xl font-bold tracking-tight">通知</h1>
+      <PageHeader title="通知">
         <Button size="sm" onClick={() => setCreating(true)}>
           <Plus className="h-4 w-4 mr-1" />
           新建通知
         </Button>
-      </div>
+      </PageHeader>
 
       <div className="flex flex-wrap items-center gap-2">
         <form

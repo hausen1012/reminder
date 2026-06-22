@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { useAuth } from '@/contexts/AuthContext'
 import { listTodayReminders, listLogs, listChannelStats, listApiKeyStats } from '@/lib/api'
 import { formatReminderDetail } from '@/lib/utils'
+import { PageHeader } from '@/components/ui/PageHeader'
 import type { Reminder, DeliveryLog } from '@/types'
 import type { ChannelStats } from '@/lib/api'
 
@@ -54,11 +55,9 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
-      <div className="flex-col items-start justify-between gap-2 md:flex-row md:items-center md:flex">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">首页</h1>
-          <p className="text-sm text-muted-foreground mt-1">你好，{user?.username}。这是今天的概况。</p>
-        </div>
+      <div>
+        <PageHeader title="首页" />
+        <p className="text-sm text-muted-foreground mt-1">你好，{user?.username}。这是今天的概况。</p>
       </div>
 
       {/* 四张统计卡 */}

@@ -4,6 +4,7 @@ import { AlertCircle } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Pagination } from '@/components/ui/pagination'
+import { PageHeader } from '@/components/ui/PageHeader'
 import { getSchedulerStatus } from '@/lib/api'
 import type { SchedulerStatus } from '@/types'
 
@@ -43,9 +44,7 @@ export default function SchedulerPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex-col items-start gap-2 md:flex-row md:items-center md:justify-between flex">
-        <h1 className="text-3xl font-bold tracking-tight">监控</h1>
-      </div>
+      <PageHeader title="监控" />
 
       {/* 概览卡片 */}
       <div className="grid gap-4 md:grid-cols-4">

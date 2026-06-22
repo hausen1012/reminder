@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useToast } from '@/components/ui/use-toast'
 import { AppLogo } from '@/components/ui/AppLogo'
+import { PageHeader } from '@/components/ui/PageHeader'
 
 export default function Profile() {
   // --- 修改密码 ---
@@ -88,7 +89,7 @@ export default function Profile() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold tracking-tight">设置</h1>
+      <PageHeader title="设置" />
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
 
         {/* 修改密码 */}

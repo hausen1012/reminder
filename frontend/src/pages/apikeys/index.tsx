@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Plus, Trash2, Copy, CheckCircle2, Pencil, RefreshCw, Terminal, Search, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { PageHeader } from '@/components/ui/PageHeader'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
@@ -255,13 +256,12 @@ export default function ApiKeysPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex-col items-start gap-2 md:flex-row md:items-center md:justify-between flex">
-        <h1 className="text-3xl font-bold tracking-tight">API</h1>
+      <PageHeader title="API">
         <Button size="sm" onClick={() => setCreateOpen(true)}>
           <Plus className="mr-1 h-4 w-4" />
           新建 Key
         </Button>
-      </div>
+      </PageHeader>
 
       <div className="flex flex-wrap items-center gap-2">
         <div className="w-[calc(50%-0.25rem)] md:w-32">

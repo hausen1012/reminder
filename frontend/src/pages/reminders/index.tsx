@@ -26,6 +26,7 @@ import {
 } from '@/lib/api'
 import { formatReminderDetail, formatTime, formatNextFire } from '@/lib/utils'
 import { SortIcon } from '@/components/ui/SortIcon'
+import { PageHeader } from '@/components/ui/PageHeader'
 import type { Channel, Reminder } from '@/types'
 
 const SOURCE_LABEL: Record<string, string> = {
@@ -162,13 +163,12 @@ export default function RemindersPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex-col items-start gap-2 md:flex-row md:items-center md:justify-between flex">
-        <h1 className="text-3xl font-bold tracking-tight">提醒</h1>
+      <PageHeader title="提醒">
         <Button size="sm" onClick={() => setCreating(true)}>
           <Plus className="h-4 w-4 mr-1" />
           新建提醒
         </Button>
-      </div>
+      </PageHeader>
 
       <div className="flex flex-wrap items-center gap-2">
         <div className="w-[calc(50%-0.25rem)] md:w-32">
