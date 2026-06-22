@@ -74,14 +74,16 @@ export function CalendarPopover({ date, hour: initHour, minute: initMin, initial
 
     function calcPosition() {
       const rect = triggerRef.current!.getBoundingClientRect()
-      const popupHeight = 360
+      // 用弹窗实际渲染高度，首次渲染时 fallback 到 300
+      const popupHeight = popoverRef.current?.offsetHeight ?? 300
       const popupWidth = 272
       const top = rect.bottom + 4
       // 水平居中于触发元素
       const centerX = rect.left + rect.width / 2
       const left = Math.max(8, Math.min(centerX - popupWidth / 2, window.innerWidth - popupWidth - 8))
       if (top + popupHeight > window.innerHeight) {
-        setPosition({ top: rect.top - popupHeight - 4, left })
+        // 底部空间不足，向上弹出，确保不超出顶部边界
+        setPosition({ top: Math.max(8, rect.top - popupHeight - 4), left })
       } else {
         setPosition({ top, left })
       }
