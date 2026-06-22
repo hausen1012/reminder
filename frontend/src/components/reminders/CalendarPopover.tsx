@@ -99,19 +99,15 @@ export function CalendarPopover({ date, hour: initHour, minute: initMin, initial
   }, [triggerRef, setPosition])
 
   // 滚动时关闭日历（移动端滑动 Dialog 时弹窗固定定位会错位）
+  // + 点击外部关闭 + 保持 onSelectRef 同步
   useEffect(() => {
+    onSelectRef.current = onSelect
+
     function handleScroll(e: Event) {
-      // 滚动发生在弹窗内部（时间选择器滚动）时不关闭
       if (popoverRef.current?.contains(e.target as Node)) return
       onClose()
     }
-    // 捕获阶段监听，确保能收到 Dialog 内部滚动
-    document.addEventListener('scroll', handleScroll, true)
-    return () => document.removeEventListener('scroll', handleScroll, true)
-  }, [onClose])
 
-  // 点击外部关闭（排除 Radix Select portal）
-  useEffect(() => {
     function handleClick(e: MouseEvent) {
       const target = e.target as Node
       if (!popoverRef.current) return
@@ -119,18 +115,19 @@ export function CalendarPopover({ date, hour: initHour, minute: initMin, initial
       if (target instanceof Element && (target.closest('[role="listbox"]') || target.closest('[data-radix-popper-content-wrapper]'))) return
       onClose()
     }
+
+    document.addEventListener('scroll', handleScroll, true)
+
     const timer = setTimeout(() => {
       document.addEventListener('mousedown', handleClick)
     }, 0)
+
     return () => {
+      document.removeEventListener('scroll', handleScroll, true)
       clearTimeout(timer)
       document.removeEventListener('mousedown', handleClick)
     }
-  }, [onClose])
-
-  useEffect(() => {
-    onSelectRef.current = onSelect
-  }, [onSelect])
+  }, [onClose, onSelect])
 
   useEffect(() => {
     if (!timePanelOpen) return
