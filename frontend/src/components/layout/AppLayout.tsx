@@ -48,7 +48,7 @@ export function AppLayout() {
       </div>
 
       {/* 主内容区 */}
-      <main className="relative flex-1 overflow-auto bg-background p-4 md:p-8">
+      <main className="relative flex-1 overflow-y-auto bg-background p-4 md:p-8">
         {/* 移动端汉堡菜单 */}
         <div className="mb-4 md:hidden">
           <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(true)} aria-label="打开菜单">
