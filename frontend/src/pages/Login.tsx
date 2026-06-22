@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { AppLogo } from '@/components/ui/AppLogo'
 
 export default function Login() {
   const { login } = useAuth()
@@ -34,11 +35,7 @@ export default function Login() {
         <CardHeader className="text-center">
           <CardTitle className="flex items-center justify-center gap-2">
             {config.logo_svg && (
-              config.logo_svg.startsWith('data:image/') ? (
-                <img src={config.logo_svg} alt="" className="h-5 w-auto shrink-0" />
-              ) : (
-                <span className="flex h-5 w-5 shrink-0 items-center justify-center" dangerouslySetInnerHTML={{ __html: config.logo_svg }} />
-              )
+              <AppLogo svg={config.logo_svg} alt="" />
             )}
             <span className="truncate">{config.app_name || 'Reminder'}</span>
           </CardTitle>

@@ -5,6 +5,7 @@ import { Separator } from '@/components/ui/separator'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useAuth } from '@/contexts/AuthContext'
 import { useConfig } from '@/contexts/ConfigContext'
+import { AppLogo } from '@/components/ui/AppLogo'
 import { cn } from '@/lib/utils'
 
 const navItems = [
@@ -30,11 +31,7 @@ export function Sidebar({ onNavClick }: SidebarProps) {
     <aside className="flex h-full w-48 flex-col border-r bg-card md:h-screen">
       <div className="flex h-14 items-center gap-2 px-6 font-medium text-base leading-none">
         {config.logo_svg ? (
-          config.logo_svg.startsWith('data:image/') ? (
-            <img src={config.logo_svg} alt="Logo" className="h-6 w-auto shrink-0" />
-          ) : (
-            <span className="flex h-5 w-5 shrink-0 items-center justify-center" dangerouslySetInnerHTML={{ __html: config.logo_svg }} />
-          )
+          <AppLogo svg={config.logo_svg} className="h-6 w-auto shrink-0" />
         ) : (
           <BellRing className="h-5 w-5 shrink-0" strokeWidth={1.5} />
         )}

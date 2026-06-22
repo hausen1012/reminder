@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useToast } from '@/components/ui/use-toast'
+import { AppLogo } from '@/components/ui/AppLogo'
 
 export default function Profile() {
   // --- 修改密码 ---
@@ -86,10 +87,6 @@ export default function Profile() {
     setLogoSvg('')
   }
 
-  function isDataUrl(v: string) {
-    return v.startsWith('data:image/')
-  }
-
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-bold tracking-tight">设置</h1>
@@ -142,11 +139,7 @@ export default function Profile() {
                 <div className="flex items-center gap-3">
                   <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border bg-background">
                     {logoSvg ? (
-                      isDataUrl(logoSvg) ? (
-                        <img src={logoSvg} alt="图标" className="h-8 w-8 object-contain" />
-                      ) : (
-                        <span className="flex h-8 w-8 items-center justify-center" dangerouslySetInnerHTML={{ __html: logoSvg }} />
-                      )
+                      <AppLogo svg={logoSvg} className="h-8 w-8 object-contain" alt="图标" />
                     ) : (
                       <span className="text-xs text-muted-foreground">无</span>
                     )}
