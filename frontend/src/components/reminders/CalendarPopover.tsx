@@ -91,14 +91,24 @@ export function CalendarPopover({ date, hour: initHour, minute: initMin, initial
 
     calcPosition()
 
-    window.addEventListener('scroll', calcPosition, true)
     window.addEventListener('resize', calcPosition)
 
     return () => {
-      window.removeEventListener('scroll', calcPosition, true)
       window.removeEventListener('resize', calcPosition)
     }
   }, [triggerRef, setPosition])
+
+  // 滚动时关闭日历（移动端滑动 Dialog 时弹窗固定定位会错位）
+  useEffect(() => {
+    function handleScroll(e: Event) {
+      // 滚动发生在弹窗内部（时间选择器滚动）时不关闭
+      if (popoverRef.current?.contains(e.target as Node)) return
+      onClose()
+    }
+    // 捕获阶段监听，确保能收到 Dialog 内部滚动
+    document.addEventListener('scroll', handleScroll, true)
+    return () => document.removeEventListener('scroll', handleScroll, true)
+  }, [onClose])
 
   // 点击外部关闭（排除 Radix Select portal）
   useEffect(() => {
