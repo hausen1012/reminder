@@ -255,92 +255,165 @@ export default function RemindersPage() {
         </Card>
       ) : (
         <Card>
-          <div className="overflow-x-auto">
-            <table className="w-full text-[13px] table-fixed">
-              <thead className="border-b bg-muted/40 text-left text-xs uppercase text-muted-foreground">
-                <tr>
-                  <th className="px-4 py-2.5 w-[12rem]">标题</th>
-                  <th className="px-4 py-2.5 w-16">类型</th>
-                  <th className="px-4 py-2.5 w-[12rem]">详情</th>
-                  <th className="px-4 py-2.5 w-40">下次触发</th>
-                  <th className="px-4 py-2.5 w-[10rem]">通知</th>
-                  <th className="px-4 py-2.5 w-16 text-center">启用</th>
-                  <th className="px-4 py-2.5 w-16 pl-16">来源</th>
-                  <th className="px-4 py-2.5 w-44 whitespace-nowrap cursor-pointer select-none" onClick={() => toggleSort('created_at')}>
-                    创建时间<SortIcon active={sortBy === 'created_at'} direction={sortOrder} />
-                  </th>
-                  <th className="px-4 py-2.5 w-36 text-right">操作</th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((r) => {
-                  const chNames = r.channel_ids.map((cid) => channelMap.get(cid) || `#${cid}`)
-                  return (
-                    <tr key={r.id} className="border-b last:border-b-0 hover:bg-muted/30">
-                      <td className="px-4 py-2.5 max-w-[12rem]">
-                        <div className="font-medium truncate" title={r.title}>
-                          {r.title}
-                        </div>
-                        {r.content && (
-                          <div className="text-xs text-muted-foreground truncate" title={r.content}>
-                            {r.content}
+          {/* 桌面端表格 */}
+          <div className="hidden md:block">
+            <div className="overflow-x-auto">
+              <table className="w-full text-[13px] table-fixed">
+                <thead className="border-b bg-muted/40 text-left text-xs uppercase text-muted-foreground">
+                  <tr>
+                    <th className="px-4 py-2.5 w-[12rem]">标题</th>
+                    <th className="px-4 py-2.5 w-16">类型</th>
+                    <th className="px-4 py-2.5 w-[12rem]">详情</th>
+                    <th className="px-4 py-2.5 w-40">下次触发</th>
+                    <th className="px-4 py-2.5 w-[10rem]">通知</th>
+                    <th className="px-4 py-2.5 w-16 text-center">启用</th>
+                    <th className="px-4 py-2.5 w-16 pl-16">来源</th>
+                    <th className="px-4 py-2.5 w-44 whitespace-nowrap cursor-pointer select-none" onClick={() => toggleSort('created_at')}>
+                      创建时间<SortIcon active={sortBy === 'created_at'} direction={sortOrder} />
+                    </th>
+                    <th className="px-4 py-2.5 w-36 text-right">操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.map((r) => {
+                    const chNames = r.channel_ids.map((cid) => channelMap.get(cid) || `#${cid}`)
+                    return (
+                      <tr key={r.id} className="border-b last:border-b-0 hover:bg-muted/30">
+                        <td className="px-4 py-2.5 max-w-[12rem]">
+                          <div className="font-medium truncate" title={r.title}>
+                            {r.title}
                           </div>
-                        )}
-                      </td>
-                      <td className="px-4 py-2.5">
-                        {TYPE_LABEL[r.schedule_type] ?? r.schedule_type}
-                      </td>
-                      <td className="px-4 py-2.5 text-xs text-muted-foreground max-w-[16rem]">
-                        <span className="truncate block" title={formatReminderDetail(r)}>
-                          {formatReminderDetail(r)}
-                        </span>
-                      </td>
-                      <td className="px-4 py-2.5 text-xs whitespace-nowrap">
-                        {r.enabled ? formatNextFire(r.next_fire_at) : '—'}
-                      </td>
-                      <td className="px-4 py-2.5 max-w-[10rem]">
-                        {chNames.length === 0 ? (
-                          <span className="text-xs text-muted-foreground">—</span>
-                        ) : (
-                          <span className="truncate block text-xs" title={chNames.join(', ')}>
-                            {chNames.join(', ')}
+                          {r.content && (
+                            <div className="text-xs text-muted-foreground truncate" title={r.content}>
+                              {r.content}
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-4 py-2.5">
+                          {TYPE_LABEL[r.schedule_type] ?? r.schedule_type}
+                        </td>
+                        <td className="px-4 py-2.5 text-xs text-muted-foreground max-w-[16rem]">
+                          <span className="truncate block" title={formatReminderDetail(r)}>
+                            {formatReminderDetail(r)}
                           </span>
-                        )}
-                      </td>
-                      <td className="px-4 py-2.5 text-center">
-                        <Switch checked={r.enabled} onCheckedChange={() => handleToggle(r)} />
-                      </td>
-                      <td className="px-4 py-2.5 text-xs text-muted-foreground pl-16">
-                        {SOURCE_LABEL[r.source] ?? r.source}
-                      </td>
-                      <td className="px-4 py-2.5 text-xs whitespace-nowrap text-muted-foreground">
-                        {formatTime(r.created_at)}
-                      </td>
-                      <td className="px-4 py-2.5">
-                        <div className="flex justify-end gap-0.5">
-                          <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => handleDuplicate(r)} title="复制">
-                            <Copy className="h-4 w-4" />
-                          </Button>
-                          <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setEditing(r)} title="编辑">
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-8 w-8 text-destructive hover:text-destructive"
-                            onClick={() => setToDelete(r)}
-                            title="删除"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
+                        </td>
+                        <td className="px-4 py-2.5 text-xs whitespace-nowrap">
+                          {r.enabled ? formatNextFire(r.next_fire_at) : '—'}
+                        </td>
+                        <td className="px-4 py-2.5 max-w-[10rem]">
+                          {chNames.length === 0 ? (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          ) : (
+                            <span className="truncate block text-xs" title={chNames.join(', ')}>
+                              {chNames.join(', ')}
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-4 py-2.5 text-center">
+                          <Switch checked={r.enabled} onCheckedChange={() => handleToggle(r)} />
+                        </td>
+                        <td className="px-4 py-2.5 text-xs text-muted-foreground pl-16">
+                          {SOURCE_LABEL[r.source] ?? r.source}
+                        </td>
+                        <td className="px-4 py-2.5 text-xs whitespace-nowrap text-muted-foreground">
+                          {formatTime(r.created_at)}
+                        </td>
+                        <td className="px-4 py-2.5">
+                          <div className="flex justify-end gap-0.5">
+                            <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => handleDuplicate(r)} title="复制">
+                              <Copy className="h-4 w-4" />
+                            </Button>
+                            <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setEditing(r)} title="编辑">
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-8 w-8 text-destructive hover:text-destructive"
+                              onClick={() => setToDelete(r)}
+                              title="删除"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
+
+          {/* 移动端卡片列表 */}
+          <div className="divide-y md:hidden">
+            {items.map((r) => {
+              const chNames = r.channel_ids.map((cid) => channelMap.get(cid) || `#${cid}`)
+              return (
+                <div key={r.id} className="px-4 py-3 space-y-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium truncate" title={r.title}>{r.title}</p>
+                      {r.content && (
+                        <p className="text-xs text-muted-foreground truncate mt-0.5" title={r.content}>
+                          {r.content}
+                        </p>
+                      )}
+                    </div>
+                    <Switch checked={r.enabled} onCheckedChange={() => handleToggle(r)} />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
+                    <div>
+                      <span className="text-muted-foreground">类型</span>
+                      <p className="mt-0.5">{TYPE_LABEL[r.schedule_type] ?? r.schedule_type}</p>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">来源</span>
+                      <p className="mt-0.5">{SOURCE_LABEL[r.source] ?? r.source}</p>
+                    </div>
+                    <div className="col-span-2">
+                      <span className="text-muted-foreground">详情</span>
+                      <p className="truncate mt-0.5" title={formatReminderDetail(r)}>{formatReminderDetail(r)}</p>
+                    </div>
+                    <div className="col-span-2">
+                      <span className="text-muted-foreground">下次触发</span>
+                      <p className="mt-0.5">{r.enabled ? formatNextFire(r.next_fire_at) : '—'}</p>
+                    </div>
+                    <div className="col-span-2">
+                      <span className="text-muted-foreground">通知渠道</span>
+                      <p className="truncate mt-0.5" title={chNames.join(', ')}>
+                        {chNames.length === 0 ? '—' : chNames.join(', ')}
+                      </p>
+                    </div>
+                    <div className="col-span-2">
+                      <span className="text-muted-foreground">创建时间</span>
+                      <p className="mt-0.5">{formatTime(r.created_at)}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end gap-0.5 pt-1 border-t">
+                    <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => handleDuplicate(r)} title="复制">
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                    <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setEditing(r)} title="编辑">
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-8 w-8 text-destructive hover:text-destructive"
+                      onClick={() => setToDelete(r)}
+                      title="删除"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
           <Pagination total={total} limit={limit} offset={offset} onPageChange={setOffset} onLimitChange={setLimit} />
         </Card>
       )}

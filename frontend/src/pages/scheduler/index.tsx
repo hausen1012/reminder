@@ -109,44 +109,79 @@ export default function SchedulerPage() {
           </CardContent>
         ) : (
           <>
-            <div className="overflow-x-auto">
-              <table className="w-full text-[13px] table-fixed">
-                <thead className="border-b bg-muted/40 text-left text-xs uppercase text-muted-foreground">
-                  <tr>
-                    <th className="px-4 py-2.5 w-16">ID</th>
-                    <th className="px-4 py-2.5 w-[20rem]">标题</th>
-                    <th className="px-4 py-2.5 w-28">类型</th>
-                    <th className="px-4 py-2.5 w-44">下次触发</th>
-                    <th className="px-4 py-2.5 w-44">上次触发</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {entries.map((e) => (
-                    <tr
-                      key={e.id}
-                      className="border-b last:border-b-0 hover:bg-muted/30 cursor-pointer transition-colors"
-                      onClick={() => navigate(`/reminders`)}
-                    >
-                      <td className="px-4 py-2.5 font-medium text-primary">{e.id}</td>
-                      <td className="px-4 py-2.5 truncate max-w-[200px]" title={e.title}>{e.title || '—'}</td>
-                      <td className="px-4 py-2.5">
-                        {TYPE_LABEL[e.schedule_type] ?? e.schedule_type}
-                      </td>
-                      <td className="px-4 py-2.5 text-muted-foreground">
-                        {e.next_fire_at
-                          ? new Date(e.next_fire_at).toLocaleString('zh-CN')
-                          : '—'}
-                      </td>
-                      <td className="px-4 py-2.5 text-muted-foreground">
-                        {e.last_fired_at
-                          ? new Date(e.last_fired_at).toLocaleString('zh-CN')
-                          : '—'}
-                      </td>
+            {/* 桌面端表格 */}
+            <div className="hidden md:block">
+              <div className="overflow-x-auto">
+                <table className="w-full text-[13px] table-fixed">
+                  <thead className="border-b bg-muted/40 text-left text-xs uppercase text-muted-foreground">
+                    <tr>
+                      <th className="px-4 py-2.5 w-16">ID</th>
+                      <th className="px-4 py-2.5 w-[20rem]">标题</th>
+                      <th className="px-4 py-2.5 w-28">类型</th>
+                      <th className="px-4 py-2.5 w-44">下次触发</th>
+                      <th className="px-4 py-2.5 w-44">上次触发</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {entries.map((e) => (
+                      <tr
+                        key={e.id}
+                        className="border-b last:border-b-0 hover:bg-muted/30 cursor-pointer transition-colors"
+                        onClick={() => navigate(`/reminders`)}
+                      >
+                        <td className="px-4 py-2.5 font-medium text-primary">{e.id}</td>
+                        <td className="px-4 py-2.5 truncate max-w-[200px]" title={e.title}>{e.title || '—'}</td>
+                        <td className="px-4 py-2.5">
+                          {TYPE_LABEL[e.schedule_type] ?? e.schedule_type}
+                        </td>
+                        <td className="px-4 py-2.5 text-muted-foreground">
+                          {e.next_fire_at
+                            ? new Date(e.next_fire_at).toLocaleString('zh-CN')
+                            : '—'}
+                        </td>
+                        <td className="px-4 py-2.5 text-muted-foreground">
+                          {e.last_fired_at
+                            ? new Date(e.last_fired_at).toLocaleString('zh-CN')
+                            : '—'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
+
+            {/* 移动端卡片列表 */}
+            <div className="divide-y md:hidden">
+              {entries.map((e) => (
+                <div
+                  key={e.id}
+                  className="px-4 py-3 space-y-1.5 cursor-pointer active:bg-muted/30 transition-colors"
+                  onClick={() => navigate(`/reminders`)}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-medium text-primary">#{e.id}</span>
+                    <span className="text-xs font-medium">{TYPE_LABEL[e.schedule_type] ?? e.schedule_type}</span>
+                  </div>
+                  <p className="font-medium truncate" title={e.title}>{e.title || '—'}</p>
+                  <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+                    <div>
+                      <span className="block">下次触发</span>
+                      <span className="text-foreground">
+                        {e.next_fire_at ? new Date(e.next_fire_at).toLocaleString('zh-CN') : '—'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="block">上次触发</span>
+                      <span className="text-foreground">
+                        {e.last_fired_at ? new Date(e.last_fired_at).toLocaleString('zh-CN') : '—'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
             <Pagination
               total={status?.engine.entries_total ?? 0}
               limit={limit}

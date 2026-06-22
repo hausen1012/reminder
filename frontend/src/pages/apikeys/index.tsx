@@ -305,69 +305,130 @@ export default function ApiKeysPage() {
         </Card>
       ) : (
         <Card>
-          <div className="overflow-x-auto">
-            <table className="w-full text-[13px] table-fixed">
-              <thead className="border-b bg-muted/40 text-left text-xs uppercase text-muted-foreground">
-                <tr>
-                  <th className="px-4 py-2.5 w-[14rem]">名称</th>
-                  <th className="px-4 py-2.5 w-[10rem]">密钥</th>
-                  <th className="px-4 py-2.5 w-[10rem]">通知</th>
-                  <th className="px-4 py-2.5 w-16 text-center">启用</th>
-                  <th className="px-4 py-2.5 w-44">最近使用</th>
-                  <th className="px-4 py-2.5 w-36 text-right">操作</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pagedItems.map((key) => (
-                  <tr key={key.id} className="border-b last:border-b-0 hover:bg-muted/30">
-                    <td className="max-w-[14rem] px-4 py-2.5">
-                      <div className="truncate font-medium" title={key.name}>
-                        {key.name}
-                      </div>
-                    </td>
-                    <td className="max-w-[15rem] px-4 py-2.5">
-                      <div className="flex items-center gap-1.5">
-                        <code className="truncate text-xs text-muted-foreground">{key.prefix}...</code>
-                        <button
-                          type="button"
-                          onClick={() => handleCopyFromList(key.id)}
-                          disabled={copyingId === key.id}
-                          className="shrink-0 rounded p-0.5 text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
-                          title="复制完整密钥"
-                        >
-                          <Copy className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    </td>
-                    <td className="max-w-[10rem] px-4 py-2.5 text-xs text-muted-foreground">
-                      <span className="block truncate" title={formatChannelNames(channels, key.default_channel_ids)}>
-                        {formatChannelNames(channels, key.default_channel_ids)}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2.5 text-center">
-                      <Switch checked={key.enabled} onCheckedChange={() => handleToggle(key)} />
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-2.5 text-xs text-muted-foreground">
-                      {formatRecentTime(key.last_used_at)}
-                    </td>
-                    <td className="px-4 py-2.5">
-                      <div className="flex justify-end gap-0.5">
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openDetail(key)} title="查看与编辑">
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openCurl(key)} title="curl 使用示例">
-                          <Terminal className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setToDelete(key)} title="删除">
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </td>
+          {/* 桌面端表格 */}
+          <div className="hidden md:block">
+            <div className="overflow-x-auto">
+              <table className="w-full text-[13px] table-fixed">
+                <thead className="border-b bg-muted/40 text-left text-xs uppercase text-muted-foreground">
+                  <tr>
+                    <th className="px-4 py-2.5 w-[14rem]">名称</th>
+                    <th className="px-4 py-2.5 w-[10rem]">密钥</th>
+                    <th className="px-4 py-2.5 w-[10rem]">通知</th>
+                    <th className="px-4 py-2.5 w-16 text-center">启用</th>
+                    <th className="px-4 py-2.5 w-44">最近使用</th>
+                    <th className="px-4 py-2.5 w-36 text-right">操作</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {pagedItems.map((key) => (
+                    <tr key={key.id} className="border-b last:border-b-0 hover:bg-muted/30">
+                      <td className="max-w-[14rem] px-4 py-2.5">
+                        <div className="truncate font-medium" title={key.name}>
+                          {key.name}
+                        </div>
+                      </td>
+                      <td className="max-w-[15rem] px-4 py-2.5">
+                        <div className="flex items-center gap-1.5">
+                          <code className="truncate text-xs text-muted-foreground">{key.prefix}...</code>
+                          <button
+                            type="button"
+                            onClick={() => handleCopyFromList(key.id)}
+                            disabled={copyingId === key.id}
+                            className="shrink-0 rounded p-0.5 text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
+                            title="复制完整密钥"
+                          >
+                            <Copy className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </td>
+                      <td className="max-w-[10rem] px-4 py-2.5 text-xs text-muted-foreground">
+                        <span className="block truncate" title={formatChannelNames(channels, key.default_channel_ids)}>
+                          {formatChannelNames(channels, key.default_channel_ids)}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2.5 text-center">
+                        <Switch checked={key.enabled} onCheckedChange={() => handleToggle(key)} />
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-2.5 text-xs text-muted-foreground">
+                        {formatRecentTime(key.last_used_at)}
+                      </td>
+                      <td className="px-4 py-2.5">
+                        <div className="flex justify-end gap-0.5">
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openDetail(key)} title="查看与编辑">
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openCurl(key)} title="curl 使用示例">
+                            <Terminal className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setToDelete(key)} title="删除">
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
+
+          {/* 移动端卡片列表 */}
+          <div className="divide-y md:hidden">
+            {pagedItems.map((key) => (
+              <div key={key.id} className="px-4 py-3 space-y-2">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium truncate" title={key.name}>{key.name}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      <code className="truncate">{key.prefix}...</code>
+                    </p>
+                  </div>
+                  <Switch checked={key.enabled} onCheckedChange={() => handleToggle(key)} />
+                </div>
+
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
+                  <div>
+                    <span className="text-muted-foreground">密钥</span>
+                    <div className="flex items-center gap-1 mt-0.5">
+                      <code className="truncate text-muted-foreground">{key.prefix}...</code>
+                      <button
+                        type="button"
+                        onClick={() => handleCopyFromList(key.id)}
+                        disabled={copyingId === key.id}
+                        className="shrink-0 rounded p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-50"
+                        title="复制完整密钥"
+                      >
+                        <Copy className="h-3 w-3" />
+                      </button>
+                    </div>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">最近使用</span>
+                    <p className="mt-0.5">{formatRecentTime(key.last_used_at)}</p>
+                  </div>
+                  <div className="col-span-2">
+                    <span className="text-muted-foreground">通知渠道</span>
+                    <p className="truncate mt-0.5" title={formatChannelNames(channels, key.default_channel_ids)}>
+                      {formatChannelNames(channels, key.default_channel_ids)}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-0.5 pt-1 border-t">
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openDetail(key)} title="查看与编辑">
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openCurl(key)} title="curl 使用示例">
+                    <Terminal className="h-4 w-4" />
+                  </Button>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setToDelete(key)} title="删除">
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+
           <Pagination total={filteredItems.length} limit={limit} offset={offset} onPageChange={setOffset} onLimitChange={setLimit} />
         </Card>
       )}
