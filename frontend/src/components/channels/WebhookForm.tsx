@@ -10,7 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { type SubFormProps, updateField } from './form-utils'
+import { type SubFormProps, updateField, cfgStr, cfgObj } from './form-utils'
 
 // 把 Record<string, string> 转成 "key: value" 多行文本，便于编辑
 function kvToText(obj: Record<string, string> | undefined): string {
@@ -33,11 +33,11 @@ function parseKV(text: string): Record<string, string> {
 }
 
 export function WebhookForm({ config, onChange, isEdit }: SubFormProps) {
-  const method = ((config.method as string) ?? 'POST').toUpperCase()
-  const [headersText, setHeadersText] = useState(kvToText(config.headers as Record<string, string>))
-  const [queryText, setQueryText] = useState(kvToText(config.query_template as Record<string, string>))
+  const method = cfgStr(config, 'method', 'POST').toUpperCase()
+  const [headersText, setHeadersText] = useState(kvToText(cfgObj(config, 'headers')))
+  const [queryText, setQueryText] = useState(kvToText(cfgObj(config, 'query_template')))
   const hasOriginalAuth = config.authorization_enc === '***'
-  const [authInput, setAuthInput] = useState(hasOriginalAuth ? '' : (config.authorization_enc as string ?? ''))
+  const [authInput, setAuthInput] = useState(hasOriginalAuth ? '' : cfgStr(config, 'authorization_enc'))
 
   return (
     <div className="space-y-3 rounded-md border bg-card/30 p-4">
@@ -58,7 +58,7 @@ export function WebhookForm({ config, onChange, isEdit }: SubFormProps) {
           <Label>URL</Label>
           <Input
             placeholder="https://example.com/notify"
-            value={(config.url as string) ?? ''}
+            value={cfgStr(config, 'url')}
             onChange={(e) => updateField(onChange, 'url', e.target.value)}
           />
         </div>
@@ -101,7 +101,7 @@ export function WebhookForm({ config, onChange, isEdit }: SubFormProps) {
             <Label>Content-Type</Label>
             <Input
               placeholder="application/json; charset=utf-8"
-              value={(config.content_type as string) ?? ''}
+              value={cfgStr(config, 'content_type', 'application/json')}
               onChange={(e) => updateField(onChange, 'content_type', e.target.value)}
             />
           </div>
@@ -110,7 +110,7 @@ export function WebhookForm({ config, onChange, isEdit }: SubFormProps) {
             <Textarea
               rows={5}
               placeholder={'{\n  "title": "{{title}}",\n  "content": "{{content}}"\n}'}
-              value={(config.body_template as string) ?? ''}
+              value={cfgStr(config, 'body_template')}
               onChange={(e) => updateField(onChange, 'body_template', e.target.value)}
             />
           </div>

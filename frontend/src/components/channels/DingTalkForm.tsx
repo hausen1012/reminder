@@ -9,11 +9,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { type SubFormProps, updateField } from './form-utils'
+import { type SubFormProps, updateField, cfgStr } from './form-utils'
 
 export function DingTalkForm({ config, onChange, isEdit }: SubFormProps) {
   const hasOriginalSecret = config.secret_enc === '***'
-  const [secretInput, setSecretInput] = useState(hasOriginalSecret ? '' : (config.secret_enc as string ?? ''))
+  const [secretInput, setSecretInput] = useState(hasOriginalSecret ? '' : cfgStr(config, 'secret_enc'))
 
   return (
     <div className="space-y-3 rounded-md border bg-card/30 p-4">
@@ -21,7 +21,7 @@ export function DingTalkForm({ config, onChange, isEdit }: SubFormProps) {
         <Label>Webhook URL</Label>
         <Input
           placeholder="https://oapi.dingtalk.com/robot/send?access_token=..."
-          value={(config.webhook_url as string) ?? ''}
+          value={cfgStr(config, 'webhook_url')}
           onChange={(e) => updateField(onChange, 'webhook_url', e.target.value)}
         />
       </div>
@@ -45,7 +45,7 @@ export function DingTalkForm({ config, onChange, isEdit }: SubFormProps) {
       <div className="space-y-2">
         <Label>消息类型</Label>
         <Select
-          value={(config.msg_type as string) ?? 'text'}
+          value={cfgStr(config, 'msg_type', 'text')}
           onValueChange={(v) => updateField(onChange, 'msg_type', v)}
         >
           <SelectTrigger>

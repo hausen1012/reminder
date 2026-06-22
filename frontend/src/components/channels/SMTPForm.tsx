@@ -9,7 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { type SubFormProps, updateField } from './form-utils'
+import { type SubFormProps, updateField, cfgStr, cfgNum, cfgArr } from './form-utils'
 
 type SMTPSecurityMode = 'plain' | 'starttls' | 'implicit_tls'
 
@@ -25,7 +25,7 @@ const CONNECTION_LABEL: Record<SMTPSecurityMode, string> = {
 }
 
 function getSecurityMode(config: Record<string, unknown>): SMTPSecurityMode {
-  const mode = toSMTPSecurityMode(config.security_mode as string | undefined ?? '')
+  const mode = toSMTPSecurityMode(cfgStr(config, 'security_mode'))
   if (mode !== 'plain') return mode
   if (config.use_starttls) return 'starttls'
   if (config.port === 465) return 'implicit_tls'
@@ -33,9 +33,9 @@ function getSecurityMode(config: Record<string, unknown>): SMTPSecurityMode {
 }
 
 export function SMTPForm({ config, onChange, isEdit }: SubFormProps) {
-  const [toText, setToText] = useState(((config.to as string[] | undefined) ?? []).join(', '))
+  const [toText, setToText] = useState(cfgArr<string>(config, 'to').join(', '))
   const hasOriginalSecret = config.password_enc === '***'
-  const [pwdInput, setPwdInput] = useState(hasOriginalSecret ? '' : (config.password_enc as string ?? ''))
+  const [pwdInput, setPwdInput] = useState(hasOriginalSecret ? '' : cfgStr(config, 'password_enc'))
   const securityMode = getSecurityMode(config)
 
   return (
@@ -45,7 +45,7 @@ export function SMTPForm({ config, onChange, isEdit }: SubFormProps) {
           <Label>SMTP Host</Label>
           <Input
             placeholder="smtp.example.com"
-            value={(config.host as string) ?? ''}
+            value={cfgStr(config, 'host')}
             onChange={(e) => updateField(onChange, 'host', e.target.value)}
           />
         </div>
@@ -54,7 +54,7 @@ export function SMTPForm({ config, onChange, isEdit }: SubFormProps) {
           <Input
             type="number"
             placeholder="587"
-            value={(config.port as number) ?? ''}
+            value={cfgNum(config, 'port', 587) || ''}
             onChange={(e) => updateField(onChange, 'port', Number(e.target.value))}
           />
         </div>
@@ -92,7 +92,7 @@ export function SMTPForm({ config, onChange, isEdit }: SubFormProps) {
           <Label>用户名</Label>
           <Input
             placeholder="登录用户名"
-            value={(config.username as string) ?? ''}
+            value={cfgStr(config, 'username')}
             onChange={(e) => updateField(onChange, 'username', e.target.value)}
           />
         </div>
@@ -119,7 +119,7 @@ export function SMTPForm({ config, onChange, isEdit }: SubFormProps) {
           <Label>发件人地址</Label>
           <Input
             placeholder="sender@example.com"
-            value={(config.from_addr as string) ?? ''}
+            value={cfgStr(config, 'from_addr')}
             onChange={(e) => updateField(onChange, 'from_addr', e.target.value)}
           />
         </div>
@@ -127,7 +127,7 @@ export function SMTPForm({ config, onChange, isEdit }: SubFormProps) {
           <Label>发件人显示名</Label>
           <Input
             placeholder="提醒助手"
-            value={(config.from_name as string) ?? ''}
+            value={cfgStr(config, 'from_name')}
             onChange={(e) => updateField(onChange, 'from_name', e.target.value)}
           />
         </div>
