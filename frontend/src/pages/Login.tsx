@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { AppLogo } from '@/components/ui/AppLogo'
+import { extractApiError } from '@/lib/api'
 
 export default function Login() {
   const { login } = useAuth()
@@ -22,8 +23,7 @@ export default function Login() {
     try {
       await login(username, password)
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message || '登录失败'
-      setError(msg)
+      setError(extractApiError(err, '登录失败'))
     } finally {
       setLoading(false)
     }

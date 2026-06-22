@@ -1,6 +1,6 @@
 import { useState, useEffect, type FormEvent } from 'react'
 import { Loader2 } from 'lucide-react'
-import { updatePassword } from '@/lib/api'
+import { extractApiError, updatePassword } from '@/lib/api'
 import { useConfig } from '@/contexts/ConfigContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -34,8 +34,7 @@ export default function Profile() {
       setNewPassword('')
       setConfirmPassword('')
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message || '修改失败'
-      setPwdError(msg)
+      setPwdError(extractApiError(err, '修改失败'))
     } finally {
       setPwdLoading(false)
     }

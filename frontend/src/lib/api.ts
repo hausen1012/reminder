@@ -42,6 +42,21 @@ api.interceptors.response.use(
   },
 )
 
+/** 从 axios error 中提取服务端返回的消息，路径兼容 data.message 和 data.error.message */
+export function extractApiError(err: unknown, fallback = '操作失败'): string {
+  const data: unknown = (err as { response?: { data?: unknown } })?.response?.data
+  if (data && typeof data === 'object') {
+    const obj = data as Record<string, unknown>
+    if (typeof obj.message === 'string') return obj.message
+    if (obj.error && typeof obj.error === 'object') {
+      const errObj = obj.error as Record<string, unknown>
+      if (typeof errObj.message === 'string') return errObj.message
+    }
+  }
+  if (err instanceof Error) return err.message
+  return fallback
+}
+
 export async function login(username: string, password: string) {
   const res = await api.post<ApiResponse<LoginResponse>>('/auth/login', { username, password })
   return res.data

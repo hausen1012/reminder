@@ -24,7 +24,7 @@ import { Switch } from '@/components/ui/switch'
 import { useToast } from '@/components/ui/use-toast'
 import { ChannelMultiSelect } from '@/components/channels/ChannelMultiSelect'
 import { ScheduleForm, type ScheduleValue } from './ScheduleForm'
-import { createReminder, listChannels, testReminderDryRun, updateReminder } from '@/lib/api'
+import { createReminder, extractApiError, listChannels, testReminderDryRun, updateReminder } from '@/lib/api'
 import type { Channel, ContentFormat, Reminder, ReminderInput } from '@/types'
 
 interface Props {
@@ -165,8 +165,7 @@ export function ReminderEditDialog({ reminder, open, onClose, onSaved }: Props) 
       toast({ title: isEdit ? '提醒已更新' : '提醒已创建', variant: 'success' })
       onSaved()
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message
-      toast({ title: '保存失败', description: msg ?? String(err), variant: 'destructive' })
+      toast({ title: '保存失败', description: extractApiError(err), variant: 'destructive' })
     } finally {
       setSaving(false)
     }

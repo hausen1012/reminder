@@ -25,7 +25,7 @@ import { WeComForm } from './WeComForm'
 import { WebhookForm } from './WebhookForm'
 import { LogForm } from './LogForm'
 import type { Channel, ChannelType } from '@/types'
-import { createChannel, testChannelDryRun, updateChannel } from '@/lib/api'
+import { createChannel, extractApiError, testChannelDryRun, updateChannel } from '@/lib/api'
 
 interface Props {
   channel: Channel | null
@@ -127,8 +127,7 @@ export function ChannelEditDialog({ channel, open, onClose, onSaved }: Props) {
       })
       toast({ title: '测试通知已发送', description: '请检查通知渠道是否收到消息。', variant: 'success' })
     } catch (err) {
-      const msg = (err as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message
-      toast({ title: '测试失败', description: msg ?? String(err), variant: 'destructive' })
+      toast({ title: '测试失败', description: extractApiError(err), variant: 'destructive' })
     } finally {
       setTesting(false)
     }
@@ -150,8 +149,7 @@ export function ChannelEditDialog({ channel, open, onClose, onSaved }: Props) {
       toast({ title: isEdit ? '通知已更新' : '通知已创建', variant: 'success' })
       onSaved()
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message
-      toast({ title: '保存失败', description: msg ?? String(err), variant: 'destructive' })
+      toast({ title: '保存失败', description: extractApiError(err), variant: 'destructive' })
     } finally {
       setSaving(false)
     }
