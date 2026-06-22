@@ -95,3 +95,30 @@ export function formatReminderDetail(reminder: Reminder): string {
 
   return solarLine === '选择日期' ? '公历' : solarLine.replace(/-/g, '/')
 }
+
+/** YYYY/MM/DD HH:mm:ss 格式，且只显示未来时间 */
+export function formatNextFire(dateStr?: string): string {
+  if (!dateStr) return '—'
+  const d = new Date(dateStr)
+  if (isNaN(d.getTime()) || d.getTime() <= Date.now()) return '—'
+  const y = d.getFullYear()
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  const h = String(d.getHours()).padStart(2, '0')
+  const min = String(d.getMinutes()).padStart(2, '0')
+  const s = String(d.getSeconds()).padStart(2, '0')
+  return `${y}/${month}/${day} ${h}:${min}:${s}`
+}
+
+/** YYYY/MM/DD HH:mm 格式 */
+export function formatTime(dateStr?: string): string {
+  if (!dateStr) return '—'
+  const d = new Date(dateStr)
+  if (isNaN(d.getTime())) return '—'
+  const y = d.getFullYear()
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  const h = String(d.getHours()).padStart(2, '0')
+  const min = String(d.getMinutes()).padStart(2, '0')
+  return `${y}/${month}/${day} ${h}:${min}`
+}

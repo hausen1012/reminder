@@ -6,6 +6,8 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Pagination } from '@/components/ui/pagination'
 import { useToast } from '@/components/ui/use-toast'
+import { formatTime } from '@/lib/utils'
+import { SortIcon } from '@/components/ui/SortIcon'
 import { ChannelEditDialog } from '@/components/channels/ChannelEditDialog'
 import { ConfirmDialog } from '@/components/channels/ConfirmDialog'
 import {
@@ -14,27 +16,6 @@ import {
   createChannel,
 } from '@/lib/api'
 import type { Channel, ChannelType } from '@/types'
-
-function formatTime(dateStr?: string): string {
-  if (!dateStr) return '—'
-  const d = new Date(dateStr)
-  if (isNaN(d.getTime())) return '—'
-  const y = d.getFullYear()
-  const month = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  const h = String(d.getHours()).padStart(2, '0')
-  const min = String(d.getMinutes()).padStart(2, '0')
-  return `${y}/${month}/${day} ${h}:${min}`
-}
-
-function SortIcon({ active, direction }: { active: boolean; direction: string }) {
-  return (
-    <span className="inline-flex flex-col align-middle leading-none ml-1 -mt-0.5">
-      <svg className={`h-[7px] w-[9px] ${active && direction === 'desc' ? 'text-foreground' : 'text-muted-foreground/25'}`} viewBox="0 0 10 6" fill="currentColor"><path d="M5 0l5 6H0z" /></svg>
-      <svg className={`h-[7px] w-[9px] -mt-[1px] ${active && direction === 'asc' ? 'text-foreground' : 'text-muted-foreground/25'}`} viewBox="0 0 10 6" fill="currentColor"><path d="M5 6L0 0h10z" /></svg>
-    </span>
-  )
-}
 
 const TYPE_LABEL: Record<ChannelType, string> = {
   smtp: '邮件',

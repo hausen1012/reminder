@@ -24,7 +24,8 @@ import {
   toggleReminder,
   type ListRemindersQuery,
 } from '@/lib/api'
-import { formatReminderDetail } from '@/lib/utils'
+import { formatReminderDetail, formatTime, formatNextFire } from '@/lib/utils'
+import { SortIcon } from '@/components/ui/SortIcon'
 import type { Channel, Reminder } from '@/types'
 
 const SOURCE_LABEL: Record<string, string> = {
@@ -36,40 +37,6 @@ const TYPE_LABEL: Record<string, string> = {
   once: '单次',
   interval: '周期',
   cron: 'Cron',
-}
-
-function formatNextFire(dateStr?: string): string {
-  if (!dateStr) return '—'
-  const d = new Date(dateStr)
-  if (isNaN(d.getTime()) || d.getTime() <= Date.now()) return '—'
-  const y = d.getFullYear()
-  const month = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  const h = String(d.getHours()).padStart(2, '0')
-  const min = String(d.getMinutes()).padStart(2, '0')
-  const s = String(d.getSeconds()).padStart(2, '0')
-  return `${y}/${month}/${day} ${h}:${min}:${s}`
-}
-
-function formatTime(dateStr?: string): string {
-  if (!dateStr) return '—'
-  const d = new Date(dateStr)
-  if (isNaN(d.getTime())) return '—'
-  const y = d.getFullYear()
-  const month = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  const h = String(d.getHours()).padStart(2, '0')
-  const min = String(d.getMinutes()).padStart(2, '0')
-  return `${y}/${month}/${day} ${h}:${min}`
-}
-
-function SortIcon({ active, direction }: { active: boolean; direction: string }) {
-  return (
-    <span className="inline-flex flex-col align-middle leading-none ml-1 -mt-0.5">
-      <svg className={`h-[7px] w-[9px] ${active && direction === 'desc' ? 'text-foreground' : 'text-muted-foreground/25'}`} viewBox="0 0 10 6" fill="currentColor"><path d="M5 0l5 6H0z" /></svg>
-      <svg className={`h-[7px] w-[9px] -mt-[1px] ${active && direction === 'asc' ? 'text-foreground' : 'text-muted-foreground/25'}`} viewBox="0 0 10 6" fill="currentColor"><path d="M5 6L0 0h10z" /></svg>
-    </span>
-  )
 }
 
 export default function RemindersPage() {
