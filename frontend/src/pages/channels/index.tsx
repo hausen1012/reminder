@@ -132,7 +132,7 @@ export default function ChannelsPage() {
     <div className="space-y-6">
       <div className="flex-col items-start gap-2 md:flex-row md:items-center md:justify-between flex">
         <h1 className="text-3xl font-bold tracking-tight">通知</h1>
-        <Button onClick={() => setCreating(true)}>
+        <Button size="sm" onClick={() => setCreating(true)}>
           <Plus className="h-4 w-4 mr-1" />
           新建通知
         </Button>

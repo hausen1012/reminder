@@ -254,7 +254,7 @@ export default function ApiKeysPage() {
     <div className="space-y-6">
       <div className="flex-col items-start gap-2 md:flex-row md:items-center md:justify-between flex">
         <h1 className="text-3xl font-bold tracking-tight">API</h1>
-        <Button onClick={() => setCreateOpen(true)}>
+        <Button size="sm" onClick={() => setCreateOpen(true)}>
           <Plus className="mr-1 h-4 w-4" />
           新建 Key
         </Button>
