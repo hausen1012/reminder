@@ -123,7 +123,7 @@ export function CalendarPopover({ date, hour: initHour, minute: initMin, initial
   useEffect(() => {
     if (!timePanelOpen) return
 
-    // react-remove-scroll 在 document 的捕获阶段拦截 wheel 事件，
+    // react-remove-scroll 在 document 的捕获阶段拦截 wheel 和 touchmove 事件，
     // portal 到 document.body 的内容不在其 DOM 子树内，会被一律阻止。
     // 这里在 window 捕获阶段拦截，阻止事件到达 document 层。
     function handleWindowWheel(e: WheelEvent) {
@@ -131,8 +131,17 @@ export function CalendarPopover({ date, hour: initHour, minute: initMin, initial
         e.stopPropagation()
       }
     }
+    function handleWindowTouchMove(e: TouchEvent) {
+      if (popoverRef.current?.contains(e.target as Node)) {
+        e.stopPropagation()
+      }
+    }
     window.addEventListener('wheel', handleWindowWheel, { capture: true, passive: false })
-    return () => window.removeEventListener('wheel', handleWindowWheel, { capture: true })
+    window.addEventListener('touchmove', handleWindowTouchMove, { capture: true, passive: false })
+    return () => {
+      window.removeEventListener('wheel', handleWindowWheel, { capture: true })
+      window.removeEventListener('touchmove', handleWindowTouchMove, { capture: true })
+    }
   }, [timePanelOpen])
 
   useEffect(() => {
