@@ -33,13 +33,13 @@ function CurlBlock({ curl, label }: { curl: string; label: string }) {
   return (
     <div className="relative">
       <div className="mb-2 text-xs text-muted-foreground">{label}</div>
-      <pre className="overflow-x-auto rounded-lg border bg-slate-950 p-4 text-xs leading-relaxed text-slate-50">
+      <pre className="overflow-x-auto whitespace-pre-wrap break-all rounded-lg border bg-slate-950 p-3 text-xs leading-relaxed text-slate-50 sm:p-4">
         <code>{curl}</code>
       </pre>
       <Button
         variant="ghost"
         size="icon"
-        className="absolute right-2 top-8 h-7 w-7 text-slate-400 hover:text-slate-50"
+        className="absolute right-1 top-7 h-7 w-7 text-slate-400 hover:text-slate-50 sm:right-2 sm:top-8"
         onClick={() => copy(curl, toast)}
         title="复制 curl 命令"
       >
@@ -113,7 +113,7 @@ export function CurlUsageDialog({ apiKey, open, onClose }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-2xl sm:max-w-2xl max-sm:max-w-[calc(100%-1rem)] max-sm:p-4">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Terminal className="h-5 w-5" />
@@ -121,11 +121,11 @@ export function CurlUsageDialog({ apiKey, open, onClose }: Props) {
           </DialogTitle>
         </DialogHeader>
         <Tabs defaultValue="simple" className="w-full">
-          <TabsList className="w-full flex-wrap">
-            <TabsTrigger value="simple" className="flex-1 min-w-0">简单</TabsTrigger>
-            <TabsTrigger value="once" className="flex-1 min-w-0">单次</TabsTrigger>
-            <TabsTrigger value="interval" className="flex-1 min-w-0">周期</TabsTrigger>
-            <TabsTrigger value="cron" className="flex-1 min-w-0">CRON</TabsTrigger>
+          <TabsList className="w-full grid grid-cols-4 h-auto">
+            <TabsTrigger value="simple" className="text-xs sm:text-sm px-1 sm:px-3 py-1.5">简单</TabsTrigger>
+            <TabsTrigger value="once" className="text-xs sm:text-sm px-1 sm:px-3 py-1.5">单次</TabsTrigger>
+            <TabsTrigger value="interval" className="text-xs sm:text-sm px-1 sm:px-3 py-1.5">周期</TabsTrigger>
+            <TabsTrigger value="cron" className="text-xs sm:text-sm px-1 sm:px-3 py-1.5">CRON</TabsTrigger>
           </TabsList>
           <TabsContent value="simple">
             <CurlBlock
