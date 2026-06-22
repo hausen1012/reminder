@@ -25,6 +25,7 @@ import { WeComForm } from './WeComForm'
 import { WebhookForm } from './WebhookForm'
 import { LogForm } from './LogForm'
 import type { Channel, ChannelType } from '@/types'
+import { toChannelType } from '@/types'
 import { createChannel, extractApiError, testChannelDryRun, updateChannel } from '@/lib/api'
 
 interface Props {
@@ -175,7 +176,7 @@ export function ChannelEditDialog({ channel, open, onClose, onSaved }: Props) {
           </div>
           <div className="space-y-2">
             <Label htmlFor="channel-type">类型</Label>
-            <Select value={type} onValueChange={(v) => handleTypeChange(v as ChannelType)} disabled={isEdit}>
+            <Select value={type} onValueChange={(v) => handleTypeChange(toChannelType(v))} disabled={isEdit}>
               <SelectTrigger id="channel-type">
                 <SelectValue />
               </SelectTrigger>

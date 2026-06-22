@@ -25,7 +25,8 @@ import { useToast } from '@/components/ui/use-toast'
 import { ChannelMultiSelect } from '@/components/channels/ChannelMultiSelect'
 import { ScheduleForm, type ScheduleValue } from './ScheduleForm'
 import { createReminder, extractApiError, listChannels, testReminderDryRun, updateReminder } from '@/lib/api'
-import type { Channel, ContentFormat, Reminder, ReminderInput } from '@/types'
+import type { Channel, Reminder, ReminderInput } from '@/types'
+import { toContentFormat } from '@/types'
 
 interface Props {
   reminder: Reminder | null
@@ -95,7 +96,7 @@ export function ReminderEditDialog({ reminder, open, onClose, onSaved }: Props) 
       setInput({
         title: reminder.title,
         content: reminder.content,
-        content_format: (reminder.content_format as ContentFormat) || 'text',
+        content_format: reminder.content_format || 'text',
         calendar: reminder.calendar,
         schedule_type: reminder.schedule_type,
         schedule_spec: reminder.schedule_spec,
@@ -223,7 +224,7 @@ export function ReminderEditDialog({ reminder, open, onClose, onSaved }: Props) 
               </div>
               <Tabs
                 value={input.content_format || 'text'}
-                onValueChange={(v) => patch('content_format', v as ContentFormat)}
+                onValueChange={(v) => patch('content_format', toContentFormat(v))}
                 className="w-auto"
               >
                 <TabsList className="h-8">

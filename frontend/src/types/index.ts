@@ -51,6 +51,16 @@ export type ReminderScheduleType = 'once' | 'interval' | 'cron'
 export type ReminderSource = 'web' | 'api'
 export type ContentFormat = 'text' | 'markdown' | 'html'
 
+export function toContentFormat(v: string): ContentFormat {
+  if (v === 'text' || v === 'markdown' || v === 'html') return v
+  return 'text'
+}
+
+export function toChannelType(v: string): ChannelType {
+  if (v === 'smtp' || v === 'dingtalk' || v === 'wecom' || v === 'webhook' || v === 'log') return v
+  return 'webhook'
+}
+
 export interface Reminder {
   id: number
   title: string

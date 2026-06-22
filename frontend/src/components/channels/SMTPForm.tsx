@@ -13,6 +13,11 @@ import { type SubFormProps, updateField } from './form-utils'
 
 type SMTPSecurityMode = 'plain' | 'starttls' | 'implicit_tls'
 
+function toSMTPSecurityMode(v: string): SMTPSecurityMode {
+  if (v === 'plain' || v === 'starttls' || v === 'implicit_tls') return v
+  return 'plain'
+}
+
 const CONNECTION_LABEL: Record<SMTPSecurityMode, string> = {
   starttls: '推荐：加密连接（常见邮箱）',
   implicit_tls: '465 专用加密连接',
@@ -20,8 +25,8 @@ const CONNECTION_LABEL: Record<SMTPSecurityMode, string> = {
 }
 
 function getSecurityMode(config: Record<string, unknown>): SMTPSecurityMode {
-  const mode = config.security_mode as SMTPSecurityMode | undefined
-  if (mode === 'plain' || mode === 'starttls' || mode === 'implicit_tls') return mode
+  const mode = toSMTPSecurityMode(config.security_mode as string | undefined ?? '')
+  if (mode !== 'plain') return mode
   if (config.use_starttls) return 'starttls'
   if (config.port === 465) return 'implicit_tls'
   return 'plain'
@@ -59,7 +64,7 @@ export function SMTPForm({ config, onChange, isEdit }: SubFormProps) {
         <Select
           value={securityMode}
           onValueChange={(value) => {
-            const mode = value as SMTPSecurityMode
+            const mode = toSMTPSecurityMode(value)
             updateField(onChange, 'security_mode', mode)
             updateField(onChange, 'use_starttls', mode === 'starttls')
 
