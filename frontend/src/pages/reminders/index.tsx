@@ -1,5 +1,5 @@
 // 提醒列表页：toolbar（来源筛选/状态/搜索/新建）+ 表格 + 编辑/试发/删除。
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useCallback } from 'react'
 import { Plus, Pencil, Trash2, RefreshCw, Copy, Search, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -71,7 +71,7 @@ export default function RemindersPage() {
     setOffset(0)
   }
 
-  async function refresh() {
+  const refresh = useCallback(async () => {
     setLoading(true)
     try {
       const q: ListRemindersQuery = {}
@@ -92,7 +92,7 @@ export default function RemindersPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [source, enabled, search, limit, offset, sortBy, sortOrder, toast])
 
   useEffect(() => {
     listChannels().then(setChannels).catch(() => setChannels([]))
@@ -104,8 +104,7 @@ export default function RemindersPage() {
 
   useEffect(() => {
     refresh()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [source, enabled, offset, limit, sortBy, sortOrder])
+  }, [refresh])
 
   async function handleToggle(r: Reminder) {
     try {
