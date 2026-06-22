@@ -1,4 +1,5 @@
 import { useState, useEffect, type FormEvent } from 'react'
+import { Loader2 } from 'lucide-react'
 import { updatePassword } from '@/lib/api'
 import { useConfig } from '@/contexts/ConfigContext'
 import { Button } from '@/components/ui/button'
@@ -14,6 +15,7 @@ export default function Profile() {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [pwdMsg, setPwdMsg] = useState('')
   const [pwdError, setPwdError] = useState('')
+  const [pwdLoading, setPwdLoading] = useState(false)
 
   async function handlePassword(e: FormEvent) {
     e.preventDefault()
@@ -23,6 +25,7 @@ export default function Profile() {
       setPwdError('两次输入的新密码不一致')
       return
     }
+    setPwdLoading(true)
     try {
       await updatePassword(oldPassword, newPassword)
       setPwdMsg('密码修改成功')
@@ -32,6 +35,8 @@ export default function Profile() {
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message || '修改失败'
       setPwdError(msg)
+    } finally {
+      setPwdLoading(false)
     }
   }
 
@@ -112,7 +117,10 @@ export default function Profile() {
               </div>
               {pwdMsg && <p className="text-sm text-green-600 dark:text-green-400">{pwdMsg}</p>}
               {pwdError && <p className="text-sm text-destructive">{pwdError}</p>}
-              <Button type="submit" size="sm">修改密码</Button>
+              <Button type="submit" size="sm" disabled={pwdLoading}>
+                {pwdLoading && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
+                {pwdLoading ? '修改中…' : '修改密码'}
+              </Button>
             </form>
           </CardContent>
         </Card>
