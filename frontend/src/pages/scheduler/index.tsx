@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Activity, Loader2, AlertCircle } from 'lucide-react'
+import { Activity, AlertCircle } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Pagination } from '@/components/ui/pagination'
@@ -37,30 +37,13 @@ export default function SchedulerPage() {
     return () => clearInterval(id)
   }, [offset, limit])
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-      </div>
-    )
-  }
-
-  if (error) {
-    return (
-      <div className="flex items-center gap-2 text-destructive">
-        <AlertCircle className="h-5 w-5" />
-        <span>{error}</span>
-      </div>
-    )
-  }
-
   const engine = status?.engine
   const sweeper = status?.sweeper
   const entries = engine?.entries ?? []
 
   return (
     <div className="space-y-6">
-      <div className="flex-col items-start gap-2 md:flex-row md:items-center md:flex">
+      <div className="flex-col items-start gap-2 md:flex-row md:items-center md:justify-between flex">
         <Activity className="h-5 w-5" />
         <h1 className="text-2xl font-bold tracking-tight">监控</h1>
       </div>
@@ -110,8 +93,19 @@ export default function SchedulerPage() {
 
       {/* 注册任务表格 */}
       <Card>
-        {entries.length === 0 && !loading ? (
-          <CardContent>
+        {error ? (
+          <CardContent className="py-6">
+            <div className="flex items-center gap-2 text-destructive">
+              <AlertCircle className="h-5 w-5" />
+              <span>{error}</span>
+            </div>
+          </CardContent>
+        ) : loading ? (
+          <CardContent className="py-6">
+            <p className="text-sm text-muted-foreground">加载中…</p>
+          </CardContent>
+        ) : entries.length === 0 ? (
+          <CardContent className="py-6">
             <p className="text-sm text-muted-foreground">暂无注册任务。</p>
           </CardContent>
         ) : (
@@ -121,10 +115,10 @@ export default function SchedulerPage() {
                 <thead className="border-b bg-muted/40 text-left text-xs uppercase text-muted-foreground">
                   <tr>
                     <th className="px-4 py-2.5 w-16">ID</th>
-                    <th className="px-4 py-2.5">标题</th>
+                    <th className="px-4 py-2.5 w-[20rem]">标题</th>
                     <th className="px-4 py-2.5 w-28">类型</th>
-                    <th className="px-4 py-2.5">下次触发</th>
-                    <th className="px-4 py-2.5">上次触发</th>
+                    <th className="px-4 py-2.5 w-44">下次触发</th>
+                    <th className="px-4 py-2.5 w-44">上次触发</th>
                   </tr>
                 </thead>
                 <tbody>
