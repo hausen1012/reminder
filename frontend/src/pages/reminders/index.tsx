@@ -79,6 +79,7 @@ export default function RemindersPage() {
   const [editing, setEditing] = useState<Reminder | null>(null)
   const [creating, setCreating] = useState(false)
   const [toDelete, setToDelete] = useState<Reminder | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
   const [source, setSource] = useState<string>('web')
   const [enabled, setEnabled] = useState<string>('all')
@@ -147,6 +148,7 @@ export default function RemindersPage() {
 
   async function handleDelete() {
     if (!toDelete) return
+    setDeleting(true)
     try {
       await deleteReminder(toDelete.id)
       setItems((prev) => prev.filter((it) => it.id !== toDelete.id))
@@ -155,6 +157,7 @@ export default function RemindersPage() {
     } catch (err) {
       toast({ title: '删除失败', description: String(err), variant: 'destructive' })
     } finally {
+      setDeleting(false)
       setToDelete(null)
     }
   }
@@ -440,6 +443,7 @@ export default function RemindersPage() {
         description={toDelete ? `确认删除提醒「${toDelete.title}」？该操作不可撤销。` : ''}
         confirmText="删除"
         destructive
+        loading={deleting}
         onConfirm={handleDelete}
         onCancel={() => setToDelete(null)}
       />

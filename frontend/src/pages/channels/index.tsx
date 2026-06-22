@@ -56,6 +56,7 @@ export default function ChannelsPage() {
   const [editing, setEditing] = useState<Channel | null>(null)
   const [creating, setCreating] = useState(false)
   const [toDelete, setToDelete] = useState<Channel | null>(null)
+  const [deleting, setDeleting] = useState(false)
   const [sortBy, setSortBy] = useState('created_at')
   const [sortOrder, setSortOrder] = useState('desc')
   const { toast } = useToast()
@@ -95,6 +96,7 @@ export default function ChannelsPage() {
 
   async function handleDelete() {
     if (!toDelete) return
+    setDeleting(true)
     try {
       await deleteChannel(toDelete.id)
       const nextTotal = Math.max(0, total - 1)
@@ -109,6 +111,7 @@ export default function ChannelsPage() {
     } catch (err) {
       toast({ title: '删除失败', description: String(err), variant: 'destructive' })
     } finally {
+      setDeleting(false)
       setToDelete(null)
     }
   }
@@ -273,6 +276,7 @@ export default function ChannelsPage() {
         description={toDelete ? `确认删除通知「${toDelete.name}」？该操作不可撤销。` : ''}
         confirmText="删除"
         destructive
+        loading={deleting}
         onConfirm={handleDelete}
         onCancel={() => setToDelete(null)}
       />
