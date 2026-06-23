@@ -17,6 +17,7 @@ import (
 type IngestHandler struct {
 	ReminderSvc *services.ReminderService
 	ApiKeySvc   *services.ApiKeyService
+	ChannelSvc  *services.ChannelService
 }
 
 // CreateReminder POST /api/ingest/reminders
@@ -119,6 +120,18 @@ func (h *IngestHandler) DeleteReminder(c *gin.Context) {
 	successJSON(c, nil)
 }
 
+// ListChannels GET /api/ingest/channels
+//
+// 返回所有通知渠道列表，供外部调用方选择 channel_id。
+func (h *IngestHandler) ListChannels(c *gin.Context) {
+	views, err := h.ChannelSvc.List()
+	if err != nil {
+		abortErr(c, err)
+		return
+	}
+	successJSON(c, views)
+}
+
 // Docs GET /api/ingest/docs
 func (h *IngestHandler) Docs(c *gin.Context) {
 	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(ingestDocsHTML))
@@ -197,6 +210,11 @@ th{background:#f9fafb;font-weight:600}
 <h3><span class="tag tag-get">GET</span> /api/ingest/reminders/:id</h3>
 <p>查看单条提醒详情。</p>
 <pre>curl /api/ingest/reminders/1 \
+  -H "X-API-Key: bdrk_xxx"</pre>
+
+<h3><span class="tag tag-get">GET</span> /api/ingest/channels</h3>
+<p>列出所有通知渠道，用于选择 channel_id。</p>
+<pre>curl /api/ingest/channels \
   -H "X-API-Key: bdrk_xxx"</pre>
 
 <h3><span class="tag tag-delete">DELETE</span> /api/ingest/reminders/:id</h3>

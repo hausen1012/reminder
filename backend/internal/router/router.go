@@ -88,7 +88,7 @@ func Setup(staticFS embed.FS, cfg *config.Config) *SetupResult {
 	logHandler := &handlers.LogHandler{Svc: logSvc}
 	confirmHandler := &handlers.ConfirmHandler{Svc: confirmSvc}
 	apiKeyHandler := &handlers.ApiKeyHandler{Svc: apiKeySvc}
-	ingestHandler := &handlers.IngestHandler{ReminderSvc: reminderSvc, ApiKeySvc: apiKeySvc}
+	ingestHandler := &handlers.IngestHandler{ReminderSvc: reminderSvc, ApiKeySvc: apiKeySvc, ChannelSvc: channelSvc}
 	schedulerHandler := &handlers.SchedulerHandler{Engine: engine, Sweeper: sweeper}
 		configHandler := &handlers.ConfigHandler{Svc: configSvc}
 
@@ -125,6 +125,7 @@ func Setup(staticFS embed.FS, cfg *config.Config) *SetupResult {
 		ingest.GET("/reminders", ingestHandler.ListReminders)
 		ingest.GET("/reminders/:id", ingestHandler.GetReminder)
 		ingest.DELETE("/reminders/:id", ingestHandler.DeleteReminder)
+		ingest.GET("/channels", ingestHandler.ListChannels)
 		ingest.GET("/docs", ingestHandler.Docs)
 	}
 
