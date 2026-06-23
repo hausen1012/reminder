@@ -345,6 +345,27 @@ func (s *ReminderService) Delete(id uint) error {
 	return nil
 }
 
+// BatchDelete 批量硬删除提醒并从调度器移除。
+func (s *ReminderService) BatchDelete(ids []uint) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	return s.DB.Transaction(func(tx *gorm.DB) error {
+		for _, id := range ids {
+			if err := tx.Unscoped().Delete(&models.Reminder{}, id).Error; err != nil {
+				return err
+			}
+			if s.Engine != nil {
+				s.Engine.Remove(id)
+			}
+			if s.ConfirmMgr != nil {
+				s.ConfirmMgr.CancelByReminderID(id)
+			}
+		}
+		return nil
+	})
+}
+
 // Toggle 启用 / 禁用。
 func (s *ReminderService) Toggle(id uint) (*ReminderView, error) {
 	r, err := s.getOrNotFound(id)

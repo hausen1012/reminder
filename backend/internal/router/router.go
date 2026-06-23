@@ -150,6 +150,7 @@ func Setup(staticFS embed.FS, cfg *config.Config) *SetupResult {
 			reminders.POST("", reminderHandler.Create)
 			reminders.POST("/preview", reminderHandler.Preview)
 			reminders.GET("/upcoming", reminderHandler.Upcoming)
+			reminders.DELETE("/batch", reminderHandler.BatchDelete)
 			reminders.GET("/:id", reminderHandler.Get)
 			reminders.PUT("/:id", reminderHandler.Update)
 			reminders.DELETE("/:id", reminderHandler.Delete)
