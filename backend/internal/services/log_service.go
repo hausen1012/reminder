@@ -167,10 +167,10 @@ func (s *LogService) GetDetail(id uint) (*LogView, error) {
 		return nil, err
 	}
 
-	// 取 reminder（可能已硬删）
+	// 取 reminder（可能已被硬删，此时回退到日志快照标题）
 	var r models.Reminder
 	reminderTitle := dl.Title
-	if err := s.DB.Unscoped().First(&r, dl.ReminderID).Error; err == nil {
+	if err := s.DB.First(&r, dl.ReminderID).Error; err == nil {
 		reminderTitle = r.Title
 	}
 
