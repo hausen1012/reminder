@@ -181,7 +181,12 @@ export function ReminderEditDialog({ reminder, open, onClose, onSaved }: Props) 
           // Radix Dialog 的 DismissableLayer 会拦截其 pointerdown 并阻止 click 产生。
           // 检测到点击来自日历弹窗时解除拦截，其他外部点击仍正常关闭 Dialog。
           const target = e.detail.originalEvent.target as Element | null
-          if (target?.closest('[data-calendar-popover]')) {
+          if (!target) return
+          if (target.closest('[data-calendar-popover]')) {
+            e.preventDefault()
+          }
+          // Radix Select 也通过 portal 渲染，点击月份/年份选择器时不关闭 Dialog
+          if (target.closest('[role="listbox"]') || target.closest('[data-radix-popper-content-wrapper]')) {
             e.preventDefault()
           }
         }}
