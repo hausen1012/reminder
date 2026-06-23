@@ -4,6 +4,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/bedrock/backend/internal/middleware"
 	"github.com/bedrock/backend/internal/services"
 	"github.com/gin-gonic/gin"
 )
@@ -95,4 +96,24 @@ func parsePurgeParams(c *gin.Context) (time.Duration, bool) {
 		olderThan, _ = time.ParseDuration(v)
 	}
 	return olderThan, all
+}
+
+// BatchDelete DELETE /api/logs/batch
+func (h *LogHandler) BatchDelete(c *gin.Context) {
+	var in struct {
+		IDs []uint `json:"ids"`
+	}
+	if err := c.ShouldBindJSON(&in); err != nil {
+		abortErr(c, middleware.NewAppError(middleware.CodeValidationFailed, "请求体格式错误"))
+		return
+	}
+	if len(in.IDs) == 0 {
+		abortErr(c, middleware.NewAppError(middleware.CodeValidationFailed, "ids 不能为空"))
+		return
+	}
+	if err := h.Svc.BatchDelete(in.IDs); err != nil {
+		abortErr(c, err)
+		return
+	}
+	successJSON(c, nil)
 }

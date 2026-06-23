@@ -198,6 +198,24 @@ func (s *LogService) GetDetail(id uint) (*LogView, error) {
 	}, nil
 }
 
+// BatchDelete 按 ID 批量删除日志及关联的投递尝试。
+func (s *LogService) BatchDelete(ids []uint) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	return s.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("delivery_log_id IN ?", ids).Delete(&models.DeliveryAttempt{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("id IN ?", ids).Delete(&models.DeliveryLog{}).Error; err != nil {
+			return err
+		}
+		// 清理孤立的 confirm_tokens
+		return tx.Where("delivery_log_id NOT IN (SELECT id FROM delivery_logs)").
+			Delete(&models.ConfirmToken{}).Error
+	})
+}
+
 // Purge 清理日志。
 //
 // olderThan > 0 时删除早于 now-olderThan 的日志；

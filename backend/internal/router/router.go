@@ -164,6 +164,7 @@ func Setup(staticFS embed.FS, cfg *config.Config) *SetupResult {
 			logs.GET("", logHandler.List)
 			logs.GET("/count", logHandler.PurgeCount)
 			logs.GET("/:id", logHandler.GetDetail)
+			logs.DELETE("/batch", logHandler.BatchDelete)
 			logs.DELETE("", logHandler.Purge)
 		}
 
