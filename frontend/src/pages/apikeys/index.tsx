@@ -1,9 +1,10 @@
 // API Key 管理页
 import { useEffect, useMemo, useState } from 'react'
-import { Plus, Trash2, Copy, CheckCircle2, Pencil, RefreshCw, Terminal, Search, AlertCircle } from 'lucide-react'
+import { Plus, Trash2, Copy, CheckCircle2, Pencil, Terminal, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { PageHeader } from '@/components/ui/PageHeader'
+import { FilterToolbar } from '@/components/ui/FilterToolbar'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
@@ -263,7 +264,13 @@ export default function ApiKeysPage() {
         </Button>
       </PageHeader>
 
-      <div className="flex flex-wrap items-center gap-2">
+      <FilterToolbar
+        searchValue={searchInput}
+        onSearchChange={setSearchInput}
+        onSearch={() => setSearch(searchInput)}
+        onRefresh={refresh}
+        placeholder="搜索名称…"
+      >
         <div className="w-[calc(50%-0.25rem)] md:w-32">
           <Select value={enabled} onValueChange={setEnabled}>
             <SelectTrigger>
@@ -276,27 +283,7 @@ export default function ApiKeysPage() {
             </SelectContent>
           </Select>
         </div>
-        <form
-          className="flex-1 min-w-0 flex gap-2 md:max-w-sm"
-          onSubmit={(e) => {
-            e.preventDefault()
-            setSearch(searchInput)
-          }}
-        >
-          <Input
-            placeholder="搜索名称…"
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            className="flex-1 min-w-0"
-          />
-          <Button type="submit" variant="outline" size="icon" title="搜索">
-            <Search className="h-4 w-4" />
-          </Button>
-        </form>
-        <Button variant="outline" size="icon" onClick={refresh} title="刷新" className="ml-auto shrink-0">
-          <RefreshCw className="h-4 w-4" />
-        </Button>
-      </div>
+      </FilterToolbar>
 
       {loading ? (
         <p className="text-sm text-muted-foreground">加载中…</p>

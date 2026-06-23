@@ -9,9 +9,7 @@ import {
   ChevronDown,
   ChevronRight,
   Trash2,
-  RefreshCw,
   ExternalLink,
-  Search,
   Copy,
   Mail,
   MessageCircle,
@@ -22,7 +20,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { PageHeader } from '@/components/ui/PageHeader'
-import { Input } from '@/components/ui/input'
+import { FilterToolbar } from '@/components/ui/FilterToolbar'
 import { Badge } from '@/components/ui/badge'
 import {
   Select,
@@ -209,7 +207,16 @@ export default function LogsPage() {
         </div>
       </PageHeader>
 
-      <div className="flex flex-wrap items-center gap-2">
+      <FilterToolbar
+        searchValue={search}
+        onSearchChange={setSearch}
+        onSearch={() => {
+          setOffset(0)
+          setFilter((f) => ({ ...f, search: search.trim() || undefined }))
+        }}
+        onRefresh={refresh}
+        placeholder="搜索标题或内容…"
+      >
         <div className="w-[calc(50%-0.25rem)] md:w-32">
           <Select
             value={filter.status ?? 'all'}
@@ -240,28 +247,7 @@ export default function LogsPage() {
             </SelectContent>
           </Select>
         </div>
-        <form
-          className="flex-1 min-w-0 flex gap-2 md:max-w-sm"
-          onSubmit={(e) => {
-            e.preventDefault()
-            setOffset(0)
-            setFilter((f) => ({ ...f, search: search.trim() || undefined }))
-          }}
-        >
-          <Input
-            placeholder="搜索标题或内容…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="flex-1 min-w-0"
-          />
-          <Button type="submit" variant="outline" size="icon" title="搜索">
-            <Search className="h-4 w-4" />
-          </Button>
-        </form>
-        <Button variant="outline" size="icon" onClick={refresh} title="刷新" className="ml-auto shrink-0">
-          <RefreshCw className="h-4 w-4" />
-        </Button>
-      </div>
+      </FilterToolbar>
 
       {loading ? (
         <p className="text-sm text-muted-foreground">加载中…</p>

@@ -1,9 +1,8 @@
 // 提醒列表页：toolbar（来源筛选/状态/搜索/新建）+ 表格 + 编辑/试发/删除。
 import { useEffect, useState, useMemo, useCallback } from 'react'
-import { Plus, Pencil, Trash2, RefreshCw, Copy, Search, AlertCircle } from 'lucide-react'
+import { Plus, Pencil, Trash2, Copy, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
 import {
   Select,
@@ -27,6 +26,7 @@ import {
 import { formatReminderDetail, formatTime, formatNextFire } from '@/lib/utils'
 import { SortIcon } from '@/components/ui/SortIcon'
 import { PageHeader } from '@/components/ui/PageHeader'
+import { FilterToolbar } from '@/components/ui/FilterToolbar'
 import type { Channel, Reminder } from '@/types'
 
 const SOURCE_LABEL: Record<string, string> = {
@@ -170,7 +170,13 @@ export default function RemindersPage() {
         </Button>
       </PageHeader>
 
-      <div className="flex flex-wrap items-center gap-2">
+      <FilterToolbar
+        searchValue={search}
+        onSearchChange={setSearch}
+        onSearch={refresh}
+        onRefresh={refresh}
+        placeholder="搜索标题或内容…"
+      >
         <div className="w-[calc(50%-0.25rem)] md:w-32">
           <Select value={source} onValueChange={setSource}>
             <SelectTrigger>
@@ -195,27 +201,7 @@ export default function RemindersPage() {
             </SelectContent>
           </Select>
         </div>
-        <form
-          className="flex-1 min-w-0 flex gap-2 md:max-w-sm"
-          onSubmit={(e) => {
-            e.preventDefault()
-            refresh()
-          }}
-        >
-          <Input
-            placeholder="搜索标题或内容…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="flex-1 min-w-0"
-          />
-          <Button type="submit" variant="outline" size="icon" title="搜索">
-            <Search className="h-4 w-4" />
-          </Button>
-        </form>
-        <Button variant="outline" size="icon" onClick={refresh} title="刷新" className="ml-auto shrink-0">
-          <RefreshCw className="h-4 w-4" />
-        </Button>
-      </div>
+      </FilterToolbar>
 
       {loading ? (
         <p className="text-sm text-muted-foreground">加载中…</p>
