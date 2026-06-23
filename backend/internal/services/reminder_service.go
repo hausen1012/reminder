@@ -327,13 +327,13 @@ func (s *ReminderService) UpcomingBetween(from, to time.Time, limit int) ([]*Rem
 	return views, nil
 }
 
-// Delete 软删一条提醒并从调度器移除。
+// Delete 硬删除一条提醒并从调度器移除。
 func (s *ReminderService) Delete(id uint) error {
 	r, err := s.getOrNotFound(id)
 	if err != nil {
 		return err
 	}
-	if err := s.DB.Delete(r).Error; err != nil {
+	if err := s.DB.Unscoped().Delete(r).Error; err != nil {
 		return err
 	}
 	if s.Engine != nil {

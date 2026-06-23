@@ -42,8 +42,7 @@ type LogFilter struct {
 // LogView 是返回前端的日志视图（含关联的 remind 基础信息）。
 type LogView struct {
 	models.DeliveryLog
-	ReminderTitle   string `json:"reminder_title"`
-	ReminderDeleted bool   `json:"reminder_deleted"`
+	ReminderTitle string `json:"reminder_title"`
 
 	// 本日志关联的 attempts（仅详情接口加载）
 	Attempts []models.DeliveryAttempt `json:"attempts,omitempty"`
@@ -56,7 +55,7 @@ type LogView struct {
 func (s *LogService) List(f LogFilter) ([]*LogView, int64, error) {
 	buildQuery := func() *gorm.DB {
 		q := s.DB.Model(&models.DeliveryLog{}).
-			Select("delivery_logs.*, COALESCE(r.title, delivery_logs.title) AS reminder_title, r.deleted_at IS NOT NULL AS reminder_deleted").
+			Select("delivery_logs.*, COALESCE(r.title, delivery_logs.title) AS reminder_title").
 			Joins("LEFT JOIN reminders r ON r.id = delivery_logs.reminder_id")
 
 		if f.ReminderID > 0 {
@@ -87,8 +86,7 @@ func (s *LogService) List(f LogFilter) ([]*LogView, int64, error) {
 
 	type row struct {
 		models.DeliveryLog
-		ReminderTitle   string `gorm:"column:reminder_title"`
-		ReminderDeleted bool   `gorm:"column:reminder_deleted"`
+		ReminderTitle string `gorm:"column:reminder_title"`
 	}
 
 	var total int64
@@ -145,7 +143,6 @@ func (s *LogService) List(f LogFilter) ([]*LogView, int64, error) {
 		views = append(views, &LogView{
 			DeliveryLog:     main.DeliveryLog,
 			ReminderTitle:   main.ReminderTitle,
-			ReminderDeleted: main.ReminderDeleted,
 		})
 		if main.ConfirmChainID == nil || *main.ConfirmChainID == "" {
 			continue
@@ -154,7 +151,6 @@ func (s *LogService) List(f LogFilter) ([]*LogView, int64, error) {
 			views = append(views, &LogView{
 				DeliveryLog:     sub.DeliveryLog,
 				ReminderTitle:   sub.ReminderTitle,
-				ReminderDeleted: sub.ReminderDeleted,
 			})
 		}
 	}
@@ -171,13 +167,11 @@ func (s *LogService) GetDetail(id uint) (*LogView, error) {
 		return nil, err
 	}
 
-	// 取 reminder（可能已软删）
+	// 取 reminder（可能已硬删）
 	var r models.Reminder
 	reminderTitle := dl.Title
-	reminderDeleted := false
 	if err := s.DB.Unscoped().First(&r, dl.ReminderID).Error; err == nil {
 		reminderTitle = r.Title
-		reminderDeleted = r.DeletedAt.Valid
 	}
 
 	// 取 attempts
@@ -199,7 +193,6 @@ func (s *LogService) GetDetail(id uint) (*LogView, error) {
 	return &LogView{
 		DeliveryLog:     dl,
 		ReminderTitle:   reminderTitle,
-		ReminderDeleted: reminderDeleted,
 		Attempts:        attempts,
 		ConfirmURL:      confirmURL,
 	}, nil

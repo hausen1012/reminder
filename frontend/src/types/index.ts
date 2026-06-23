@@ -137,7 +137,6 @@ export interface DeliveryLog {
   source: string
   created_at: string
   reminder_title: string
-  reminder_deleted: boolean
   attempts?: DeliveryAttempt[]
 }
 

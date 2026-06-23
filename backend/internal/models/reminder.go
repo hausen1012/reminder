@@ -1,7 +1,6 @@
 package models
 
 import (
-	"database/sql"
 	"time"
 
 	"gorm.io/datatypes"
@@ -36,9 +35,8 @@ type Reminder struct {
 	LastFiredAt *time.Time `json:"last_fired_at,omitempty"`
 	FireCount   int        `json:"fire_count"`
 
-	CreatedAt time.Time    `json:"created_at"`
-	UpdatedAt time.Time    `json:"updated_at"`
-	DeletedAt sql.NullTime `gorm:"index" json:"-"` // 软删
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 // ReminderChannel 提醒与通道的多对多关联。
