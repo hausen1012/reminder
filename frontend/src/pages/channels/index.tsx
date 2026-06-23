@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Plus, Pencil, Trash2, Copy, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Pagination } from '@/components/ui/pagination'
 import { useToast } from '@/components/ui/use-toast'
 import { formatTime } from '@/lib/utils'
@@ -15,6 +16,7 @@ import {
   listChannelsPaged,
   deleteChannel,
   createChannel,
+  batchDeleteChannels,
 } from '@/lib/api'
 import type { Channel, ChannelType } from '@/types'
 
@@ -42,6 +44,9 @@ export default function ChannelsPage() {
   const [deleting, setDeleting] = useState(false)
   const [sortBy, setSortBy] = useState('created_at')
   const [sortOrder, setSortOrder] = useState('desc')
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
+  const [batchDeleting, setBatchDeleting] = useState(false)
+  const [batchConfirmOpen, setBatchConfirmOpen] = useState(false)
   const { toast } = useToast()
 
   function toggleSort(field: string) {
@@ -116,13 +121,57 @@ export default function ChannelsPage() {
     }
   }
 
+  function toggleSelect(id: number) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function toggleSelectAll() {
+    if (selectedIds.size === items.length) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(items.map((ch) => ch.id)))
+    }
+  }
+
+  async function handleBatchDelete() {
+    setBatchDeleting(true)
+    try {
+      await batchDeleteChannels(Array.from(selectedIds))
+      toast({ title: `已删除 ${selectedIds.size} 条通知`, variant: 'success' })
+      setSelectedIds(new Set())
+      const remainAfterDelete = items.length - selectedIds.size
+      if (remainAfterDelete === 0 && offset > 0) {
+        setOffset(Math.max(0, offset - limit))
+      } else {
+        await refresh()
+      }
+    } catch (err) {
+      toast({ title: '批量删除失败', description: String(err), variant: 'destructive' })
+    } finally {
+      setBatchDeleting(false)
+    }
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader title="通知">
-        <Button size="sm" onClick={() => setCreating(true)}>
-          <Plus className="h-4 w-4 mr-1" />
-          新建通知
-        </Button>
+        <div className="flex items-center gap-2">
+          {selectedIds.size > 0 && (
+            <Button size="sm" variant="destructive" onClick={() => setBatchConfirmOpen(true)}>
+              <Trash2 className="h-4 w-4 mr-1" />
+              删除选中 ({selectedIds.size})
+            </Button>
+          )}
+          <Button size="sm" onClick={() => setCreating(true)}>
+            <Plus className="h-4 w-4 mr-1" />
+            新建通知
+          </Button>
+        </div>
       </PageHeader>
 
       <FilterToolbar
@@ -165,6 +214,12 @@ export default function ChannelsPage() {
               <table className="w-full text-[13px] table-fixed">
                 <thead className="border-b bg-muted/40 text-left text-xs uppercase text-muted-foreground">
                   <tr>
+                    <th className="px-4 py-2.5 w-10">
+                      <Checkbox
+                        checked={items.length > 0 && selectedIds.size === items.length}
+                        onCheckedChange={toggleSelectAll}
+                      />
+                    </th>
                     <th className="px-4 py-2.5 w-[14rem]">名称</th>
                     <th className="px-4 py-2.5 w-28">类型</th>
                     <th className="px-4 py-2.5 w-44 whitespace-nowrap cursor-pointer select-none" onClick={() => toggleSort('created_at')}>
@@ -177,6 +232,12 @@ export default function ChannelsPage() {
                   {items.map((ch) => {
                     return (
                       <tr key={ch.id} className="border-b last:border-b-0 hover:bg-muted/30">
+                        <td className="px-4 py-2.5">
+                          <Checkbox
+                            checked={selectedIds.has(ch.id)}
+                            onCheckedChange={() => toggleSelect(ch.id)}
+                          />
+                        </td>
                         <td className="px-4 py-2.5">
                           <span className="font-medium truncate" title={ch.name}>{ch.name}</span>
                         </td>
@@ -210,6 +271,11 @@ export default function ChannelsPage() {
             {items.map((ch) => (
               <div key={ch.id} className="px-4 py-3 space-y-2">
                 <div className="flex items-start justify-between gap-2">
+                  <Checkbox
+                    checked={selectedIds.has(ch.id)}
+                    onCheckedChange={() => toggleSelect(ch.id)}
+                    className="mt-1"
+                  />
                   <div className="min-w-0 flex-1">
                     <p className="font-medium truncate" title={ch.name}>{ch.name}</p>
                     <p className="text-xs text-muted-foreground mt-0.5">{TYPE_LABEL[ch.type]}</p>
@@ -265,6 +331,20 @@ export default function ChannelsPage() {
         loading={deleting}
         onConfirm={handleDelete}
         onCancel={() => setToDelete(null)}
+      />
+
+      <ConfirmDialog
+        open={batchConfirmOpen}
+        title="批量删除通知"
+        description={`确认删除选中的 ${selectedIds.size} 条通知？该操作不可撤销。`}
+        confirmText="删除"
+        destructive
+        loading={batchDeleting}
+        onConfirm={() => {
+          handleBatchDelete()
+          setBatchConfirmOpen(false)
+        }}
+        onCancel={() => setBatchConfirmOpen(false)}
       />
     </div>
   )

@@ -41,7 +41,9 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Separator } from '@/components/ui/separator'
 import { useToast } from '@/components/ui/use-toast'
 import { Pagination } from '@/components/ui/pagination'
-import { listLogs, getLogDetail, purgeLogs, countPurgeLogs } from '@/lib/api'
+import { Checkbox } from '@/components/ui/checkbox'
+import { ConfirmDialog } from '@/components/channels/ConfirmDialog'
+import { listLogs, getLogDetail, purgeLogs, countPurgeLogs, batchDeleteLogs } from '@/lib/api'
 import type { DeliveryLog, LogFilter } from '@/types'
 
 const STATUS_ICON: Record<string, typeof CheckCircle2> = {
@@ -99,6 +101,9 @@ export default function LogsPage() {
   const [purgeMode, setPurgeMode] = useState<'7d' | '30d' | 'all'>('7d')
   const [purgeCount, setPurgeCount] = useState(0)
   const [purging, setPurging] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
+  const [batchDeleting, setBatchDeleting] = useState(false)
+  const [batchConfirmOpen, setBatchConfirmOpen] = useState(false)
   const { toast } = useToast()
 
   useEffect(() => {
@@ -190,10 +195,53 @@ export default function LogsPage() {
     setPurgeOpen(true)
   }
 
+  function toggleSelect(id: number) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function toggleSelectAll() {
+    const allIds = new Set(items.map((log) => log.id))
+    if (selectedIds.size === items.length && [...selectedIds].every((id) => allIds.has(id))) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(allIds)
+    }
+  }
+
+  async function handleBatchDelete() {
+    setBatchDeleting(true)
+    try {
+      await batchDeleteLogs(Array.from(selectedIds))
+      toast({ title: `已删除 ${selectedIds.size} 条日志`, variant: 'success' })
+      setSelectedIds(new Set())
+      const remainAfterDelete = items.length - selectedIds.size
+      if (remainAfterDelete === 0 && offset > 0) {
+        setOffset(Math.max(0, offset - limit))
+      } else {
+        await refresh()
+      }
+    } catch (err) {
+      toast({ title: '批量删除失败', description: String(err), variant: 'destructive' })
+    } finally {
+      setBatchDeleting(false)
+    }
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader title="日志">
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {selectedIds.size > 0 && (
+            <Button size="sm" variant="destructive" onClick={() => setBatchConfirmOpen(true)}>
+              <Trash2 className="h-4 w-4 mr-1" />
+              删除选中 ({selectedIds.size})
+            </Button>
+          )}
           <Button variant="outline" size="sm" onClick={() => openPurge('7d')}>
             <Trash2 className="h-4 w-4 mr-1" />
             清理 7 天前
@@ -277,7 +325,12 @@ export default function LogsPage() {
               <table className="w-full text-sm table-fixed">
                 <thead className="border-b bg-muted/40 text-left text-xs uppercase text-muted-foreground">
                   <tr>
-                    <th className="px-4 py-3 w-8" />
+                    <th className="px-4 py-3 w-10">
+                      <Checkbox
+                        checked={items.length > 0 && selectedIds.size === items.length}
+                        onCheckedChange={toggleSelectAll}
+                      />
+                    </th>
                     <th className="px-4 py-3 w-[20rem]">标题</th>
                     <th className="px-4 py-3 w-44">触发时间</th>
                     <th className="px-4 py-3 w-28">状态</th>
@@ -294,15 +347,21 @@ export default function LogsPage() {
                     <Fragment key={main.id}>
                       <tr className="border-b hover:bg-muted/30">
                         <td className="px-4 py-3">
-                          {subs.length > 0 && (
-                            <button onClick={() => toggleExpand(main.id)} className="p-1">
-                              {expandedRows.has(main.id) ? (
-                                <ChevronDown className="h-4 w-4" />
-                              ) : (
-                                <ChevronRight className="h-4 w-4" />
-                              )}
-                            </button>
-                          )}
+                          <div className="flex items-center gap-1">
+                            {subs.length > 0 && (
+                              <button onClick={() => toggleExpand(main.id)} className="p-1">
+                                {expandedRows.has(main.id) ? (
+                                  <ChevronDown className="h-4 w-4" />
+                                ) : (
+                                  <ChevronRight className="h-4 w-4" />
+                                )}
+                              </button>
+                            )}
+                            <Checkbox
+                              checked={selectedIds.has(main.id)}
+                              onCheckedChange={() => toggleSelect(main.id)}
+                            />
+                          </div>
                         </td>
                         <td className="px-4 py-3 max-w-[20rem]">
                           <div className="font-medium truncate" title={main.title || main.reminder_title}>
@@ -380,6 +439,11 @@ export default function LogsPage() {
                   {/* 主卡片 */}
                   <div className="px-4 py-3 space-y-2">
                     <div className="flex items-start justify-between gap-2">
+                      <Checkbox
+                        checked={selectedIds.has(main.id)}
+                        onCheckedChange={() => toggleSelect(main.id)}
+                        className="mt-1"
+                      />
                       <div className="min-w-0 flex-1">
                         <p className="font-medium truncate" title={main.title || main.reminder_title}>
                           {main.reminder_title || main.title}
@@ -667,6 +731,21 @@ export default function LogsPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* 批量删除确认对话框 */}
+      <ConfirmDialog
+        open={batchConfirmOpen}
+        title="批量删除日志"
+        description={`确认删除选中的 ${selectedIds.size} 条日志？该操作不可撤销。`}
+        confirmText="删除"
+        destructive
+        loading={batchDeleting}
+        onConfirm={() => {
+          handleBatchDelete()
+          setBatchConfirmOpen(false)
+        }}
+        onCancel={() => setBatchConfirmOpen(false)}
+      />
 
       {/* 清理确认对话框 */}
       <Dialog open={purgeOpen} onOpenChange={setPurgeOpen}>
