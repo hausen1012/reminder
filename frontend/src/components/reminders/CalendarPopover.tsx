@@ -105,6 +105,8 @@ export function CalendarPopover({ date, hour: initHour, minute: initMin, initial
 
     function handleScroll(e: Event) {
       if (popoverRef.current?.contains(e.target as Node)) return
+      // Radix Select 的 portal 滚动不关闭日历
+      if (e.target instanceof Element && (e.target.closest('[role="listbox"]') || e.target.closest('[data-radix-popper-content-wrapper]'))) return
       onClose()
     }
 
