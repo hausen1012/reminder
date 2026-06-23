@@ -1,5 +1,6 @@
 // 提醒列表页：toolbar（来源筛选/状态/搜索/新建）+ 表格 + 编辑/试发/删除。
 import { useEffect, useState, useMemo, useCallback } from 'react'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Plus, Pencil, Trash2, Copy, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -16,6 +17,7 @@ import { Pagination } from '@/components/ui/pagination'
 import { ReminderEditDialog } from '@/components/reminders/ReminderEditDialog'
 import { ConfirmDialog } from '@/components/channels/ConfirmDialog'
 import {
+  batchDeleteReminders,
   createReminder,
   deleteReminder,
   listChannels,
@@ -49,6 +51,9 @@ export default function RemindersPage() {
   const [creating, setCreating] = useState(false)
   const [toDelete, setToDelete] = useState<Reminder | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
+  const [batchDeleting, setBatchDeleting] = useState(false)
+  const [batchConfirmOpen, setBatchConfirmOpen] = useState(false)
 
   const [source, setSource] = useState<string>('web')
   const [enabled, setEnabled] = useState<string>('all')
@@ -155,6 +160,43 @@ export default function RemindersPage() {
     }
   }
 
+  function toggleSelect(id: number) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function toggleSelectAll() {
+    if (selectedIds.size === items.length) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(items.map((r) => r.id)))
+    }
+  }
+
+  async function handleBatchDelete() {
+    setBatchDeleting(true)
+    try {
+      await batchDeleteReminders(Array.from(selectedIds))
+      toast({ title: `已删除 ${selectedIds.size} 条提醒`, variant: 'success' })
+      setSelectedIds(new Set())
+      setTotal((n) => Math.max(0, n - selectedIds.size))
+      const remainAfterDelete = items.length - selectedIds.size
+      if (remainAfterDelete === 0 && offset > 0) {
+        setOffset(Math.max(0, offset - limit))
+      } else {
+        await refresh()
+      }
+    } catch (err) {
+      toast({ title: '批量删除失败', description: String(err), variant: 'destructive' })
+    } finally {
+      setBatchDeleting(false)
+    }
+  }
+
   const channelMap = useMemo(() => {
     const map = new Map<number, string>()
     channels.forEach((ch) => map.set(ch.id, ch.name))
@@ -164,11 +206,19 @@ export default function RemindersPage() {
   return (
     <div className="space-y-6">
       <PageHeader title="提醒">
-        <Button size="sm" onClick={() => setCreating(true)}>
-          <Plus className="h-4 w-4 mr-1" />
-          新建提醒
-        </Button>
-      </PageHeader>
+          <div className="flex items-center gap-2">
+            {selectedIds.size > 0 && (
+              <Button size="sm" variant="destructive" onClick={() => setBatchConfirmOpen(true)}>
+                <Trash2 className="h-4 w-4 mr-1" />
+                删除选中 ({selectedIds.size})
+              </Button>
+            )}
+            <Button size="sm" onClick={() => setCreating(true)}>
+              <Plus className="h-4 w-4 mr-1" />
+              新建提醒
+            </Button>
+          </div>
+        </PageHeader>
 
       <FilterToolbar
         searchValue={search}
@@ -231,6 +281,12 @@ export default function RemindersPage() {
               <table className="w-full text-[13px] table-fixed">
                 <thead className="border-b bg-muted/40 text-left text-xs uppercase text-muted-foreground">
                   <tr>
+                    <th className="px-4 py-2.5 w-10">
+                      <Checkbox
+                        checked={items.length > 0 && selectedIds.size === items.length}
+                        onCheckedChange={toggleSelectAll}
+                      />
+                    </th>
                     <th className="px-4 py-2.5 w-[12rem]">标题</th>
                     <th className="px-4 py-2.5 w-16">类型</th>
                     <th className="px-4 py-2.5 w-[12rem]">详情</th>
@@ -249,6 +305,12 @@ export default function RemindersPage() {
                     const chNames = r.channel_ids.map((cid) => channelMap.get(cid) || `#${cid}`)
                     return (
                       <tr key={r.id} className="border-b last:border-b-0 hover:bg-muted/30">
+                        <td className="px-4 py-2.5">
+                          <Checkbox
+                            checked={selectedIds.has(r.id)}
+                            onCheckedChange={() => toggleSelect(r.id)}
+                          />
+                        </td>
                         <td className="px-4 py-2.5 max-w-[12rem]">
                           <div className="font-medium truncate" title={r.title}>
                             {r.title}
@@ -322,6 +384,11 @@ export default function RemindersPage() {
               return (
                 <div key={r.id} className="px-4 py-3 space-y-2">
                   <div className="flex items-start justify-between gap-2">
+                    <Checkbox
+                      checked={selectedIds.has(r.id)}
+                      onCheckedChange={() => toggleSelect(r.id)}
+                      className="mt-1"
+                    />
                     <div className="min-w-0 flex-1">
                       <p className="font-medium truncate" title={r.title}>{r.title}</p>
                       {r.content && (
@@ -413,6 +480,20 @@ export default function RemindersPage() {
         loading={deleting}
         onConfirm={handleDelete}
         onCancel={() => setToDelete(null)}
+      />
+
+      <ConfirmDialog
+        open={batchConfirmOpen}
+        title="批量删除提醒"
+        description={`确认删除选中的 ${selectedIds.size} 条提醒？该操作不可撤销。`}
+        confirmText="删除"
+        destructive
+        loading={batchDeleting}
+        onConfirm={() => {
+          handleBatchDelete()
+          setBatchConfirmOpen(false)
+        }}
+        onCancel={() => setBatchConfirmOpen(false)}
       />
     </div>
   )
