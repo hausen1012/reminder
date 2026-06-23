@@ -138,6 +138,7 @@ func Setup(staticFS embed.FS, cfg *config.Config) *SetupResult {
 			channels.POST("", channelHandler.Create)
 			channels.GET("/:id", channelHandler.Get)
 			channels.PUT("/:id", channelHandler.Update)
+			channels.DELETE("/batch", channelHandler.BatchDelete)  // 新增（放在 /:id 之前）
 			channels.DELETE("/:id", channelHandler.Delete)
 			channels.PATCH("/:id/toggle", channelHandler.Toggle)
 			channels.POST("/test-dry", channelHandler.TestDryRun)

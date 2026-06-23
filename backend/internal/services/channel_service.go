@@ -225,6 +225,20 @@ func (s *ChannelService) Delete(id uint) error {
 	return s.DB.Delete(&models.Channel{}, id).Error
 }
 
+// BatchDelete 批量删除通知通道。
+func (s *ChannelService) BatchDelete(ids []uint) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	return s.DB.Transaction(func(tx *gorm.DB) error {
+		// 先清理关联表
+		if err := tx.Where("channel_id IN ?", ids).Delete(&models.ReminderChannel{}).Error; err != nil {
+			return err
+		}
+		return tx.Delete(&models.Channel{}, ids).Error
+	})
+}
+
 // Toggle 切换启用状态。
 func (s *ChannelService) Toggle(id uint) (*ChannelView, error) {
 	ch, err := s.getOrNotFound(id)

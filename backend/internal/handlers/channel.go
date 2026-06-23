@@ -180,6 +180,26 @@ func (h *ChannelHandler) Stats(c *gin.Context) {
 	successJSON(c, stats)
 }
 
+// BatchDelete DELETE /api/channels/batch
+func (h *ChannelHandler) BatchDelete(c *gin.Context) {
+	var in struct {
+		IDs []uint `json:"ids"`
+	}
+	if err := c.ShouldBindJSON(&in); err != nil {
+		abortErr(c, middleware.NewAppError(middleware.CodeValidationFailed, "请求体格式错误"))
+		return
+	}
+	if len(in.IDs) == 0 {
+		abortErr(c, middleware.NewAppError(middleware.CodeValidationFailed, "ids 不能为空"))
+		return
+	}
+	if err := h.Svc.BatchDelete(in.IDs); err != nil {
+		abortErr(c, err)
+		return
+	}
+	successJSON(c, nil)
+}
+
 // TestDryRun POST /api/channels/test-dry
 func (h *ChannelHandler) TestDryRun(c *gin.Context) {
 	var in struct {
