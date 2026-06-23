@@ -217,24 +217,34 @@ func (s *ChannelService) ListPaged(f ChannelListFilter) ([]*ChannelView, int64, 
 	return out, total, nil
 }
 
-// Delete 删除通道。
+// Delete 删除通道。如果有提醒仍在使用该通道则返回错误。
 func (s *ChannelService) Delete(id uint) error {
 	if _, err := s.getOrNotFound(id); err != nil {
 		return err
 	}
+	var count int64
+	if err := s.DB.Model(&models.ReminderChannel{}).Where("channel_id = ?", id).Count(&count).Error; err != nil {
+		return err
+	}
+	if count > 0 {
+		return middleware.NewAppError(middleware.CodeConflict, "该通知被提醒使用中，请先删除或修改相关提醒")
+	}
 	return s.DB.Delete(&models.Channel{}, id).Error
 }
 
-// BatchDelete 批量删除通知通道。
+// BatchDelete 批量删除通知通道。如果有提醒仍在使用任一通道则返回错误。
 func (s *ChannelService) BatchDelete(ids []uint) error {
 	if len(ids) == 0 {
 		return nil
 	}
+	var count int64
+	if err := s.DB.Model(&models.ReminderChannel{}).Where("channel_id IN ?", ids).Count(&count).Error; err != nil {
+		return err
+	}
+	if count > 0 {
+		return middleware.NewAppError(middleware.CodeConflict, "部分通知被提醒使用中，请先删除或修改相关提醒后再试")
+	}
 	return s.DB.Transaction(func(tx *gorm.DB) error {
-		// 先清理关联表
-		if err := tx.Where("channel_id IN ?", ids).Delete(&models.ReminderChannel{}).Error; err != nil {
-			return err
-		}
 		return tx.Delete(&models.Channel{}, ids).Error
 	})
 }

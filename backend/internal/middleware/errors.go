@@ -18,6 +18,7 @@ const (
 	CodeForbidden        ErrorCode = "forbidden"
 	CodeNotFound         ErrorCode = "not_found"
 	CodeValidationFailed ErrorCode = "validation_failed"
+	CodeConflict        ErrorCode = "conflict"
 	CodeRateLimited      ErrorCode = "rate_limited"
 	CodeInternalError    ErrorCode = "internal_error"
 )
@@ -69,6 +70,8 @@ func (e *AppError) httpStatus() int {
 		return http.StatusNotFound
 	case CodeValidationFailed:
 		return http.StatusBadRequest
+	case CodeConflict:
+		return http.StatusConflict
 	case CodeRateLimited:
 		return http.StatusTooManyRequests
 	default:
