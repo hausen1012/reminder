@@ -291,3 +291,17 @@ export async function updateConfig(cfg: Record<string, string>) {
   const res = await api.put<ApiResponse<Record<string, string>>>('/config', cfg)
   return res.data.data ?? {}
 }
+
+// --- 批量删除 ---
+
+export async function batchDeleteReminders(ids: number[]) {
+  await api.delete<ApiResponse<null>>('/reminders/batch', { data: { ids } })
+}
+
+export async function batchDeleteChannels(ids: number[]) {
+  await api.delete<ApiResponse<null>>('/channels/batch', { data: { ids } })
+}
+
+export async function batchDeleteLogs(ids: number[]) {
+  await api.delete<ApiResponse<null>>('/logs/batch', { data: { ids } })
+}
