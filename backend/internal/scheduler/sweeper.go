@@ -116,7 +116,7 @@ func (s *Sweeper) tick() {
 
 	var items []models.Reminder
 	err := s.db.
-		Where("enabled = ? AND deleted_at IS NULL AND next_fire_at IS NOT NULL AND next_fire_at <= ?", true, cutoffDue).
+		Where("enabled = ? AND next_fire_at IS NOT NULL AND next_fire_at <= ?", true, cutoffDue).
 		Find(&items).Error
 	if err != nil {
 		log.Printf("[sweeper] 扫描失败: %v", err)

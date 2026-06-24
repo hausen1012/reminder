@@ -405,7 +405,7 @@ var errSkipped = errors.New("skipped by optimistic lock")
 // LoadAndRegisterAll 启动时一次性把所有 enabled 提醒注册进 Engine。
 func (e *Engine) LoadAndRegisterAll() error {
 	var items []models.Reminder
-	if err := e.db.Where("enabled = ? AND deleted_at IS NULL", true).Find(&items).Error; err != nil {
+	if err := e.db.Where("enabled = ?", true).Find(&items).Error; err != nil {
 		return err
 	}
 	for i := range items {

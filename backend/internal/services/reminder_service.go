@@ -294,7 +294,7 @@ func (s *ReminderService) Upcoming(within time.Duration, limit int) ([]*Reminder
 	}
 	cutoff := time.Now().Add(within)
 	var rows []models.Reminder
-	if err := s.DB.Where("enabled = ? AND deleted_at IS NULL AND next_fire_at IS NOT NULL AND next_fire_at <= ?", true, cutoff).
+	if err := s.DB.Where("enabled = ? AND next_fire_at IS NOT NULL AND next_fire_at <= ?", true, cutoff).
 		Order("next_fire_at ASC").
 		Limit(limit).
 		Find(&rows).Error; err != nil {
@@ -311,7 +311,7 @@ func (s *ReminderService) Upcoming(within time.Duration, limit int) ([]*Reminder
 // UpcomingBetween 返回指定时间范围内待触发的 enabled 提醒（无 limit 限制）。
 func (s *ReminderService) UpcomingBetween(from, to time.Time, limit int) ([]*ReminderView, error) {
 	var rows []models.Reminder
-	q := s.DB.Where("enabled = ? AND deleted_at IS NULL AND next_fire_at IS NOT NULL AND next_fire_at BETWEEN ? AND ?", true, from, to).
+	q := s.DB.Where("enabled = ? AND next_fire_at IS NOT NULL AND next_fire_at BETWEEN ? AND ?", true, from, to).
 		Order("next_fire_at ASC")
 	if limit > 0 {
 		q = q.Limit(limit)
