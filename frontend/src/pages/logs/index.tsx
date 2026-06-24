@@ -556,7 +556,7 @@ export default function LogsPage() {
                     <TabsTrigger value="confirm" className="shrink-0">确认信息</TabsTrigger>
                   )}
                   <TabsTrigger value="attempts" className="shrink-0">
-                    投递尝试
+                    投递详情
                     {detail.attempts && detail.attempts.length > 0 && (
                       <span className="ml-1.5 rounded-full bg-muted-foreground/20 px-1.5 py-0.5 text-xs">
                         {detail.attempts.length}
@@ -594,13 +594,13 @@ export default function LogsPage() {
                   </div>
                 </TabsContent>
 
-                <TabsContent value="content" className="space-y-4">
-                  <div className="text-sm">
-                    <span className="text-muted-foreground">发送标题：</span>
+                <TabsContent value="content" className="space-y-3">
+                  <div className="flex items-center gap-2 text-sm">
+                    <span className="text-muted-foreground min-w-[5rem]">标题：</span>
                     <span className="font-medium">{detail.title || '—'}</span>
                   </div>
                   <div className="text-sm">
-                    <span className="text-muted-foreground">发送内容：</span>
+                    <span className="text-muted-foreground">内容：</span>
                     <pre className="mt-1.5 max-h-80 overflow-y-auto whitespace-pre-wrap rounded-lg border bg-muted p-4 text-xs leading-relaxed">
                       {detail.content || '—'}
                     </pre>
