@@ -117,6 +117,9 @@ func (d *DispatchService) Run(ctx context.Context, r *models.Reminder, deliveryL
 			body += "\n点击确认提醒：" + cu
 		}
 	}
+	// 将渲染后的 body 写回 vars，确保下游（如 webhook BodyTemplate 中的 {{content}}）
+	// 也能拿到展开后的内容（含确认链接）。
+	vars["content"] = body
 	rendered := notifier.Message{
 		Subject: notifier.Render(r.Title, vars),
 		Body:    body,
