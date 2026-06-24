@@ -204,11 +204,13 @@ func (s *LogService) BatchDelete(ids []uint) error {
 		return nil
 	}
 	return s.DB.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Where("delivery_log_id IN ?", ids).Delete(&models.DeliveryAttempt{}).Error; err != nil {
-			return err
-		}
-		if err := tx.Where("id IN ?", ids).Delete(&models.DeliveryLog{}).Error; err != nil {
-			return err
+		for _, batch := range chunkIDs(ids, 500) {
+			if err := tx.Where("delivery_log_id IN ?", batch).Delete(&models.DeliveryAttempt{}).Error; err != nil {
+				return err
+			}
+			if err := tx.Where("id IN ?", batch).Delete(&models.DeliveryLog{}).Error; err != nil {
+				return err
+			}
 		}
 		// 清理孤立的 confirm_tokens
 		return tx.Where("delivery_log_id NOT IN (SELECT id FROM delivery_logs)").
@@ -217,14 +219,6 @@ func (s *LogService) BatchDelete(ids []uint) error {
 }
 
 // Purge 清理日志。
-//
-// olderThan > 0 时删除早于 now-olderThan 的日志；
-// all=true 时删除全部日志（忽略 olderThan）。
-// 返回清理的条数。
-//
-// 额外清理：
-//   - 删除过期/孤立的 confirm_tokens
-//   - all=true 时执行 VACUUM（回收 SQLite 空间）
 func (s *LogService) Purge(olderThan time.Duration, all bool) (int64, error) {
 	q := s.DB.Model(&models.DeliveryLog{})
 	if !all && olderThan > 0 {
@@ -244,14 +238,16 @@ func (s *LogService) Purge(olderThan time.Duration, all bool) (int64, error) {
 
 	var count int64
 	err := s.DB.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Where("delivery_log_id IN ?", ids).Delete(&models.DeliveryAttempt{}).Error; err != nil {
-			return err
+for _, batch := range chunkIDs(ids, 500) {
+			if err := tx.Where("delivery_log_id IN ?", batch).Delete(&models.DeliveryAttempt{}).Error; err != nil {
+				return err
+			}
+			res := tx.Where("id IN ?", batch).Delete(&models.DeliveryLog{})
+			if res.Error != nil {
+				return res.Error
+			}
+			count += res.RowsAffected
 		}
-		res := tx.Where("id IN ?", ids).Delete(&models.DeliveryLog{})
-		if res.Error != nil {
-			return res.Error
-		}
-		count = res.RowsAffected
 
 		// 清理孤立的 confirm_tokens（关联的 delivery_log 已被删）
 		if err := tx.Where("delivery_log_id NOT IN (SELECT id FROM delivery_logs)").
