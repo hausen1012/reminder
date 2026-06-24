@@ -7,6 +7,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Pagination } from '@/components/ui/pagination'
 import { useToast } from '@/components/ui/use-toast'
 import { formatTime } from '@/lib/utils'
+import { extractApiError } from '@/lib/api'
 import { SortIcon } from '@/components/ui/SortIcon'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { FilterToolbar } from '@/components/ui/FilterToolbar'
@@ -99,7 +100,7 @@ export default function ChannelsPage() {
       }
       toast({ title: '通知已删除', variant: 'success' })
     } catch (err) {
-      toast({ title: '删除失败', description: String(err), variant: 'destructive' })
+      toast({ title: '删除失败', description: extractApiError(err, '删除失败'), variant: 'destructive' })
     } finally {
       setDeleting(false)
       setToDelete(null)
@@ -151,7 +152,7 @@ export default function ChannelsPage() {
         await refresh()
       }
     } catch (err) {
-      toast({ title: '批量删除失败', description: String(err), variant: 'destructive' })
+      toast({ title: '批量删除失败', description: extractApiError(err, '批量删除失败'), variant: 'destructive' })
     } finally {
       setBatchDeleting(false)
     }
