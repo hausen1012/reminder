@@ -36,13 +36,18 @@ interface Props {
 }
 
 function defaultInput(): ReminderInput {
+  // 默认时间 = 当前时间 + 5 分钟
+  const d = new Date()
+  d.setMinutes(d.getMinutes() + 5)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const at = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
   return {
     title: '',
     content: '',
     content_format: 'text',
     calendar: 'solar',
     schedule_type: 'once',
-    schedule_spec: { at: '' },
+    schedule_spec: { at },
     timezone: 'Asia/Shanghai',
     source: 'web',
     channel_ids: [],
