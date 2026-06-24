@@ -546,26 +546,7 @@ export default function LogsPage() {
                 <p className="text-sm text-muted-foreground py-4 sm:py-0">加载中…</p>
               ) : detail ? (
                 <>
-                  {/* 顶部概览条 */}
-                  <div className="flex flex-wrap items-center gap-3 pb-2">
-                {(() => {
-                  const Icon = STATUS_ICON[detail.status] ?? Clock
-                  return (
-                    <Badge variant="outline" className={`gap-1.5 px-3 py-1 text-sm ${STATUS_COLOR[detail.status] ?? ''}`}>
-                      <Icon className="h-4 w-4" />
-                      {STATUS_LABEL[detail.status] ?? detail.status}
-                    </Badge>
-                  )
-                })()}
-                <Badge variant="secondary">{detail.source === 'api' ? 'API' : 'Web'}</Badge>
-                {detail.confirmed ? (
-                  <Badge className="bg-green-600">已确认</Badge>
-                ) : detail.confirm_chain_id ? (
-                  <Badge variant="outline" className="text-muted-foreground">待确认</Badge>
-                ) : null}
-                <span className="text-xs text-muted-foreground ml-auto">{new Date(detail.fired_at).toLocaleString()}</span>
-              </div>
-              <Separator className="my-1" />
+                  <Separator className="my-1" />
 
               <Tabs defaultValue="basic" className="mt-2">
                 <TabsList className="w-full justify-start overflow-x-auto flex-nowrap gap-0">
