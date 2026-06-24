@@ -51,6 +51,12 @@ func (n *webhookNotifier) Send(ctx context.Context, configJSON []byte, msg Messa
 	reqCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
 
+	// 提前校验 URL 格式，避免无效 URL 触发无意义重试
+	parsedURL, urlErr := url.Parse(cfg.URL)
+	if urlErr != nil || parsedURL.Scheme == "" || parsedURL.Host == "" {
+		return Permanent(fmt.Errorf("Webhook url 不合法: %s（需要 http:// 或 https:// 开头）", cfg.URL))
+	}
+
 	var req *http.Request
 	var err error
 	switch method {

@@ -98,6 +98,10 @@ func (d *DispatchService) Run(ctx context.Context, r *models.Reminder, deliveryL
 				vars["confirm_url"] = d.ConfirmMgr.ConfirmSvc.BuildURL(tok.Token)
 			}
 		} else {
+			// 新触发：先取消该提醒旧的确认链，避免链堆积
+			if d.ConfirmMgr != nil {
+				d.ConfirmMgr.CancelByReminderID(r.ID)
+			}
 			confirmChainID = uuid.New().String()
 			ttl := 72 * time.Hour // 充足有效期
 			token, err := d.ConfirmMgr.ConfirmSvc.CreateToken(deliveryLogID, ttl)
