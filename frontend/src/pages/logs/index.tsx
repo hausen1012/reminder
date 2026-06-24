@@ -536,16 +536,18 @@ export default function LogsPage() {
 
       {/* 详情对话框 */}
       <Dialog open={detailId != null} onOpenChange={(o) => { if (!o) { setDetailId(null); setDetail(null) } }}>
-        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>日志详情</DialogTitle>
-          </DialogHeader>
-          {detailLoading ? (
-            <p className="text-sm text-muted-foreground">加载中…</p>
-          ) : detail ? (
-            <>
-              {/* 顶部概览条 */}
-              <div className="flex flex-wrap items-center gap-3 pb-2">
+        <DialogContent className="max-w-3xl p-0 sm:p-6">
+          <div className="flex flex-col sm:block max-h-dvh sm:max-h-none overflow-hidden">
+            <DialogHeader className="shrink-0 px-4 pt-4 sm:px-0 sm:pt-0">
+              <DialogTitle>日志详情</DialogTitle>
+            </DialogHeader>
+            <div className="flex-1 overflow-y-auto sm:overflow-visible px-4 pb-4 sm:px-0 sm:pb-0">
+              {detailLoading ? (
+                <p className="text-sm text-muted-foreground py-4 sm:py-0">加载中…</p>
+              ) : detail ? (
+                <>
+                  {/* 顶部概览条 */}
+                  <div className="flex flex-wrap items-center gap-3 pb-2">
                 {(() => {
                   const Icon = STATUS_ICON[detail.status] ?? Clock
                   return (
@@ -566,13 +568,13 @@ export default function LogsPage() {
               <Separator className="my-1" />
 
               <Tabs defaultValue="basic" className="mt-2">
-                <TabsList className="w-full justify-start">
-                  <TabsTrigger value="basic">基本信息</TabsTrigger>
-                  <TabsTrigger value="content">发送内容</TabsTrigger>
+                <TabsList className="w-full justify-start overflow-x-auto flex-nowrap gap-0">
+                  <TabsTrigger value="basic" className="shrink-0">基本信息</TabsTrigger>
+                  <TabsTrigger value="content" className="shrink-0">发送内容</TabsTrigger>
                   {detail.confirm_chain_id && (
-                    <TabsTrigger value="confirm">确认信息</TabsTrigger>
+                    <TabsTrigger value="confirm" className="shrink-0">确认信息</TabsTrigger>
                   )}
-                  <TabsTrigger value="attempts">
+                  <TabsTrigger value="attempts" className="shrink-0">
                     投递尝试
                     {detail.attempts && detail.attempts.length > 0 && (
                       <span className="ml-1.5 rounded-full bg-muted-foreground/20 px-1.5 py-0.5 text-xs">
@@ -583,7 +585,7 @@ export default function LogsPage() {
                 </TabsList>
 
                 <TabsContent value="basic" className="space-y-3">
-                  <div className="grid grid-cols-2 gap-x-6 gap-y-2.5 text-sm">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2.5 text-sm">
                     <div className="flex items-center gap-2">
                       <span className="text-muted-foreground min-w-[5rem]">日志 ID</span>
                       <span className="font-mono">{detail.id}</span>
@@ -626,7 +628,7 @@ export default function LogsPage() {
 
                 {detail.confirm_chain_id && (
                   <TabsContent value="confirm" className="space-y-3">
-                    <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
                       <div className="col-span-2 flex items-center gap-2">
                         <span className="text-muted-foreground min-w-[5rem]">确认链 ID</span>
                         <code className="rounded bg-muted px-2 py-0.5 text-xs font-mono">
@@ -669,8 +671,10 @@ export default function LogsPage() {
 
                 <TabsContent value="attempts">
                   {detail.attempts && detail.attempts.length > 0 ? (
-                    <div className="rounded-lg border">
-                      <table className="w-full text-xs table-fixed">
+                    <>
+                      {/* 桌面端表格 */}
+                      <div className="hidden sm:block rounded-lg border overflow-x-auto">
+                        <table className="w-full text-xs whitespace-nowrap">
                         <thead>
                           <tr className="border-b bg-muted/30 text-left text-muted-foreground">
                             <th className="px-3 py-2">通道</th>
@@ -719,7 +723,47 @@ export default function LogsPage() {
                           )})}
                         </tbody>
                       </table>
-                    </div>
+                      </div>
+
+                      {/* 移动端投递尝试卡片 */}
+                      <div className="sm:hidden space-y-3">
+                        {detail.attempts.map((a) => {
+                          const ChannelIcon = CHANNEL_ICONS[a.channel_type] ?? FileText
+                          return (
+                            <div key={a.id} className="rounded-lg border p-3 text-sm space-y-2">
+                              <div className="flex items-center justify-between">
+                                <span className="font-medium">{a.channel_name}</span>
+                                {a.status === 'success' ? (
+                                  <span className="inline-flex items-center gap-1 text-green-600 text-xs">
+                                    <CheckCircle2 className="h-3 w-3" />
+                                    成功
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 text-red-600 text-xs">
+                                    <XCircle className="h-3 w-3" />
+                                    失败
+                                  </span>
+                                )}
+                              </div>
+                              <div className="grid grid-cols-2 gap-1 text-xs text-muted-foreground">
+                                <div className="flex items-center gap-1">
+                                  <ChannelIcon className="h-3 w-3" />
+                                  {a.channel_type}
+                                </div>
+                                <div>
+                                  尝试 #<span>{a.attempt}</span>
+                                </div>
+                                <div>{new Date(a.created_at).toLocaleString()}</div>
+                                <div className={`font-mono ${latencyColor(a.latency_ms)}`}>{a.latency_ms}ms</div>
+                              </div>
+                              {a.error && (
+                                <p className="text-xs text-destructive mt-1 break-words">{a.error}</p>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </>
                   ) : (
                     <p className="text-sm text-muted-foreground py-4">暂无投递记录。</p>
                   )}
@@ -727,8 +771,10 @@ export default function LogsPage() {
               </Tabs>
             </>
           ) : (
-            <p className="text-sm text-muted-foreground">加载失败。</p>
+            <p className="text-sm text-muted-foreground py-4 sm:py-0">加载失败。</p>
           )}
+          </div> {/* end scrollable content */}
+          </div> {/* end flex container */}
         </DialogContent>
       </Dialog>
 
