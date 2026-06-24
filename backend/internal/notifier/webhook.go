@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"strings"
@@ -35,6 +36,7 @@ func (n *webhookNotifier) Send(ctx context.Context, configJSON []byte, msg Messa
 	if err := json.Unmarshal(configJSON, &cfg); err != nil {
 		return Permanent(fmt.Errorf("解析 Webhook 配置失败: %w", err))
 	}
+	log.Printf("[webhook] 开始发送 method=%s url=%s subject=%q body_len=%d", cfg.Method, cfg.URL, msg.Subject, len(msg.Body))
 	if cfg.URL == "" {
 		return Permanent(fmt.Errorf("Webhook url 未配置"))
 	}
@@ -59,7 +61,9 @@ func (n *webhookNotifier) Send(ctx context.Context, configJSON []byte, msg Messa
 		}
 		q := u.Query()
 		for k, vTmpl := range cfg.QueryTemplate {
-			q.Set(k, Render(vTmpl, msg.Vars))
+			rendered := Render(vTmpl, msg.Vars)
+			log.Printf("[webhook] query param %s=%s", k, rendered)
+			q.Set(k, rendered)
 		}
 		// 没显式配置 query_template 时，把 subject/body 当成默认参数附上
 		if len(cfg.QueryTemplate) == 0 {
@@ -74,12 +78,9 @@ func (n *webhookNotifier) Send(ctx context.Context, configJSON []byte, msg Messa
 			return Permanent(fmt.Errorf("构造 GET 请求失败: %w", err))
 		}
 	case http.MethodPost:
-		var bodyBytes []byte
-		if cfg.BodyTemplate != "" {
-			bodyBytes = []byte(Render(cfg.BodyTemplate, msg.Vars))
-		} else {
-			// 缺省 body：{"subject": "...", "body": "..."}
-			bodyBytes, _ = json.Marshal(map[string]string{"subject": msg.Subject, "body": msg.Body})
+		bodyBytes, err := buildPostBody(cfg.BodyTemplate, msg)
+		if err != nil {
+			return Permanent(fmt.Errorf("构造 Webhook body 失败: %w", err))
 		}
 		req, err = http.NewRequestWithContext(reqCtx, http.MethodPost, cfg.URL, bytes.NewReader(bodyBytes))
 		if err != nil {
@@ -99,13 +100,17 @@ func (n *webhookNotifier) Send(ctx context.Context, configJSON []byte, msg Messa
 		req.Header.Set("Authorization", cfg.AuthorizationEnc)
 	}
 
+	log.Printf("[webhook] 发送请求 method=%s url=%s headers=%v", req.Method, req.URL.String(), req.Header)
+
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
+		log.Printf("[webhook] 请求失败: %v", err)
 		return fmt.Errorf("请求 Webhook 失败: %w", err)
 	}
 	defer resp.Body.Close()
 
 	respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+	log.Printf("[webhook] 响应 status=%d body=%s", resp.StatusCode, string(respBody))
 	if resp.StatusCode >= 500 {
 		return fmt.Errorf("Webhook 5xx %d: %s", resp.StatusCode, respBody)
 	}
@@ -113,4 +118,58 @@ func (n *webhookNotifier) Send(ctx context.Context, configJSON []byte, msg Messa
 		return Permanent(fmt.Errorf("Webhook %d: %s", resp.StatusCode, respBody))
 	}
 	return nil
+}
+
+// buildPostBody 构造 POST 请求体。
+//
+// 如果 BodyTemplate 是合法 JSON，先解析 JSON 树，再逐字符串值替换占位符，
+// 最后 json.Marshal 确保特殊字符正确转义。
+// 如果 BodyTemplate 不是 JSON 或为空，退回到整串渲染或默认 {subject, body} 结构。
+func buildPostBody(bodyTemplate string, msg Message) ([]byte, error) {
+	if bodyTemplate == "" {
+		bodyBytes, _ := json.Marshal(map[string]string{"subject": msg.Subject, "body": msg.Body})
+		log.Printf("[webhook] 缺省 body: %s", string(bodyBytes))
+		return bodyBytes, nil
+	}
+
+	// 尝试解析为 JSON 树，逐字符串值渲染占位符
+	var parsed interface{}
+	if err := json.Unmarshal([]byte(bodyTemplate), &parsed); err == nil {
+		walkAndRender(&parsed, msg.Vars)
+		bodyBytes, _ := json.Marshal(parsed)
+		log.Printf("[webhook] JSON 结构逐字段渲染: %s", string(bodyBytes))
+		return bodyBytes, nil
+	}
+
+	// 不是合法 JSON，回退到整串渲染
+	rendered := Render(bodyTemplate, msg.Vars)
+	log.Printf("[webhook] BodyTemplate 非 JSON，整串渲染: %s", rendered)
+
+	// 尝试把渲染结果当 JSON 发送：如果渲染后成了合法 JSON 就用结构化方式序列化
+	var again interface{}
+	if err := json.Unmarshal([]byte(rendered), &again); err == nil {
+		bodyBytes, _ := json.Marshal(again)
+		return bodyBytes, nil
+	}
+
+	return []byte(rendered), nil
+}
+
+// walkAndRender 递归遍历 JSON 树，对每个字符串值执行占位符渲染。
+func walkAndRender(node *interface{}, vars map[string]string) {
+	switch val := (*node).(type) {
+	case string:
+		rendered := Render(val, vars)
+		*node = rendered
+	case map[string]interface{}:
+		for k, v := range val {
+			walkAndRender(&v, vars)
+			val[k] = v
+		}
+	case []interface{}:
+		for i, v := range val {
+			walkAndRender(&v, vars)
+			val[i] = v
+		}
+	}
 }

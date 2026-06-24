@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"time"
@@ -32,6 +33,7 @@ func (n *dingtalkNotifier) Send(ctx context.Context, configJSON []byte, msg Mess
 	if err := json.Unmarshal(configJSON, &cfg); err != nil {
 		return Permanent(fmt.Errorf("解析钉钉配置失败: %w", err))
 	}
+	log.Printf("[dingtalk] 开始发送 subject=%q body_len=%d format=%s", msg.Subject, len(msg.Body), msg.Format)
 	if cfg.WebhookURL == "" {
 		return Permanent(fmt.Errorf("钉钉 webhook_url 未配置"))
 	}

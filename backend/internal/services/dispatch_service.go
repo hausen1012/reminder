@@ -54,6 +54,7 @@ func (d *DispatchService) Run(ctx context.Context, r *models.Reminder, deliveryL
 	if r == nil || deliveryLogID == 0 {
 		return
 	}
+	log.Printf("[dispatch] 开始投递 reminder=%d log=%d title=%q", r.ID, deliveryLogID, r.Title)
 	channels, err := d.loadChannels(r.ID)
 	if err != nil {
 		log.Printf("[dispatch] 加载通道失败 reminder=%d: %v", r.ID, err)
@@ -65,16 +66,23 @@ func (d *DispatchService) Run(ctx context.Context, r *models.Reminder, deliveryL
 		d.finalize(deliveryLogID, "failed", r.Title, r.Content)
 		return
 	}
+	chNames := make([]string, len(channels))
+	for i, ch := range channels {
+		chNames[i] = ch.Name + "(" + ch.Type + ")"
+	}
+	log.Printf("[dispatch] 已加载通道 reminder=%d channels=%v", r.ID, chNames)
 
 	planned := r.NextFireAt
 	if planned == nil {
 		planned = ptrTime(time.Now())
 	}
 	vars := buildVars(r, time.Now(), *planned, d.Loc)
+	log.Printf("[dispatch] 变量构建完成 reminder=%d vars=%s", r.ID, debugVars(vars))
 
 	// 需要确认时，首发生成 chain_id + token；重发复用已有 chain_id + token
 	var confirmChainID string
 	if r.RequireConfirm && d.ConfirmMgr != nil {
+		log.Printf("[confirm] 提醒需要确认 reminder=%d", r.ID)
 		var currentLog models.DeliveryLog
 		if err := d.DB.First(&currentLog, deliveryLogID).Error; err != nil {
 			log.Printf("[dispatch] 加载确认日志失败 log=%d: %v", deliveryLogID, err)
@@ -106,8 +114,10 @@ func (d *DispatchService) Run(ctx context.Context, r *models.Reminder, deliveryL
 	}
 
 	body := notifier.Render(r.Content, vars)
+	log.Printf("[dispatch] 内容渲染完成 reminder=%d body_len=%d confirm=%v", r.ID, len(body), confirmChainID != "")
 	if confirmChainID != "" && !strings.Contains(r.Content, "{{confirm_url}}") {
 		cu, _ := vars["confirm_url"]
+		log.Printf("[dispatch] content 中无 {{confirm_url}}，自动追加确认链接 reminder=%d", r.ID)
 		switch r.ContentFormat {
 		case "html":
 			body += `<br><a href="` + cu + `">点击确认链接</a>`
