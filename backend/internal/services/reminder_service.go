@@ -333,7 +333,13 @@ func (s *ReminderService) Delete(id uint) error {
 	if err != nil {
 		return err
 	}
-	if err := s.DB.Unscoped().Delete(r).Error; err != nil {
+	if err := s.DB.Transaction(func(tx *gorm.DB) error {
+		// 清理关联表
+		if err := tx.Where("reminder_id = ?", id).Delete(&models.ReminderChannel{}).Error; err != nil {
+			return err
+		}
+		return tx.Unscoped().Delete(r).Error
+	}); err != nil {
 		return err
 	}
 	if s.Engine != nil {
@@ -350,7 +356,11 @@ func (s *ReminderService) BatchDelete(ids []uint) error {
 	if len(ids) == 0 {
 		return nil
 	}
-	// 先删数据库（事务外单条 SQL）
+// 先删关联表
+	if err := s.DB.Where("reminder_id IN ?", ids).Delete(&models.ReminderChannel{}).Error; err != nil {
+		return err
+	}
+	// 再删提醒
 	if err := s.DB.Where("id IN ?", ids).Unscoped().Delete(&models.Reminder{}).Error; err != nil {
 		return err
 	}
