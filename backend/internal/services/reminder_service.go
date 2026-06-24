@@ -350,20 +350,20 @@ func (s *ReminderService) BatchDelete(ids []uint) error {
 	if len(ids) == 0 {
 		return nil
 	}
-	return s.DB.Transaction(func(tx *gorm.DB) error {
-		for _, id := range ids {
-			if err := tx.Unscoped().Delete(&models.Reminder{}, id).Error; err != nil {
-				return err
-			}
-			if s.Engine != nil {
-				s.Engine.Remove(id)
-			}
-			if s.ConfirmMgr != nil {
-				s.ConfirmMgr.CancelByReminderID(id)
-			}
+	// 先删数据库（事务外单条 SQL）
+	if err := s.DB.Where("id IN ?", ids).Unscoped().Delete(&models.Reminder{}).Error; err != nil {
+		return err
+	}
+	// 再清理调度器和确认重试（避免事务内调用 s.DB 造成 SQLite 单连接死锁）
+	for _, id := range ids {
+		if s.Engine != nil {
+			s.Engine.Remove(id)
 		}
-		return nil
-	})
+		if s.ConfirmMgr != nil {
+			s.ConfirmMgr.CancelByReminderID(id)
+		}
+	}
+	return nil
 }
 
 // Toggle 启用 / 禁用。
