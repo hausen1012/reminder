@@ -101,6 +101,9 @@ func (s *ReminderService) Create(in ReminderInput) (*ReminderView, error) {
 	if contentFormat == "" {
 		contentFormat = "text"
 	}
+	if in.Content == "" {
+		in.Content = strings.TrimSpace(in.Title)
+	}
 	r := &models.Reminder{
 		Title:                   strings.TrimSpace(in.Title),
 		Content:                 in.Content,
@@ -392,7 +395,7 @@ func (s *ReminderService) Toggle(id uint) (*ReminderView, error) {
 			if next, cerr := scheduler.Compute(r.Calendar, r.ScheduleType, spec, time.Now(), loc); cerr == nil {
 				updates["next_fire_at"] = next
 				r.NextFireAt = next
-			}
+		}
 		}
 	} else {
 		// 禁用时清空下次触发时间
