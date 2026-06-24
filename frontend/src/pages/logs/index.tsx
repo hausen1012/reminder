@@ -348,6 +348,10 @@ export default function LogsPage() {
                       <tr className="border-b hover:bg-muted/30">
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-1">
+                            <Checkbox
+                              checked={selectedIds.has(main.id)}
+                              onCheckedChange={() => toggleSelect(main.id)}
+                            />
                             {subs.length > 0 && (
                               <button onClick={() => toggleExpand(main.id)} className="p-1">
                                 {expandedRows.has(main.id) ? (
@@ -357,10 +361,6 @@ export default function LogsPage() {
                                 )}
                               </button>
                             )}
-                            <Checkbox
-                              checked={selectedIds.has(main.id)}
-                              onCheckedChange={() => toggleSelect(main.id)}
-                            />
                           </div>
                         </td>
                         <td className="px-4 py-3 max-w-[20rem]">
