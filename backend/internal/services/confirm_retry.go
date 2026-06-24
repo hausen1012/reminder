@@ -63,7 +63,7 @@ func (m *ConfirmRetryManager) Cancel(chainID string) {
 	m.stopChain(chainID)
 }
 
-// CancelByReminderID 取消某条提醒当前所有活动确认链。
+// CancelByReminderID 取消某条提醒当前所有活动确认链（仅在内存中有定时器时记录日志）。
 func (m *ConfirmRetryManager) CancelByReminderID(reminderID uint) {
 	if reminderID == 0 {
 		return
@@ -77,8 +77,9 @@ func (m *ConfirmRetryManager) CancelByReminderID(reminderID uint) {
 		return
 	}
 	for _, chainID := range chainIDs {
-		m.stopChain(chainID)
-		log.Printf("[confirm] 取消 reminder=%d 的确认链 chain=%s", reminderID, chainID)
+		if m.stopChain(chainID) {
+			log.Printf("[confirm] 取消 reminder=%d 的确认链 chain=%s", reminderID, chainID)
+		}
 	}
 }
 
@@ -185,11 +186,14 @@ func (m *ConfirmRetryManager) retry(reminderID uint, chainID string, round int) 
 	m.Schedule(&r, chainID, round)
 }
 
-func (m *ConfirmRetryManager) stopChain(chainID string) {
+// stopChain 停止内存中指定 chain 的定时器。返回 true 表示确实取消了活动定时器。
+func (m *ConfirmRetryManager) stopChain(chainID string) bool {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if t, ok := m.timers[chainID]; ok {
 		t.Stop()
 		delete(m.timers, chainID)
+		return true
 	}
+	return false
 }
