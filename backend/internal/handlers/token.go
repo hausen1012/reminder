@@ -1,4 +1,4 @@
-// apikey 处理面板上 API Key 的 CRUD。
+// token 处理面板上令牌的 CRUD。
 package handlers
 
 import (
@@ -9,13 +9,13 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// ApiKeyHandler 是面板上 API Key 管理接口。
-type ApiKeyHandler struct {
-	Svc *services.ApiKeyService
+// TokenHandler 是面板上令牌管理接口。
+type TokenHandler struct {
+	Svc *services.TokenService
 }
 
-// List GET /api/apikeys
-func (h *ApiKeyHandler) List(c *gin.Context) {
+// List GET /api/tokens
+func (h *TokenHandler) List(c *gin.Context) {
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
 	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
 	search := c.Query("search")
@@ -37,8 +37,8 @@ func (h *ApiKeyHandler) List(c *gin.Context) {
 	})
 }
 
-// Get GET /api/apikeys/:id
-func (h *ApiKeyHandler) Get(c *gin.Context) {
+// Get GET /api/tokens/:id
+func (h *TokenHandler) Get(c *gin.Context) {
 	id, err := parseID(c, "id")
 	if err != nil {
 		abortErr(c, err)
@@ -52,8 +52,8 @@ func (h *ApiKeyHandler) Get(c *gin.Context) {
 	successJSON(c, view)
 }
 
-// GetPlaintext GET /api/apikeys/:id/plaintext
-func (h *ApiKeyHandler) GetPlaintext(c *gin.Context) {
+// GetPlaintext GET /api/tokens/:id/plaintext
+func (h *TokenHandler) GetPlaintext(c *gin.Context) {
 	id, err := parseID(c, "id")
 	if err != nil {
 		abortErr(c, err)
@@ -67,8 +67,8 @@ func (h *ApiKeyHandler) GetPlaintext(c *gin.Context) {
 	successJSON(c, gin.H{"plaintext": plaintext})
 }
 
-// Create POST /api/apikeys
-func (h *ApiKeyHandler) Create(c *gin.Context) {
+// Create POST /api/tokens
+func (h *TokenHandler) Create(c *gin.Context) {
 	var in struct {
 		Name              string `json:"name"`
 		DefaultChannelIDs []uint `json:"default_channel_ids"`
@@ -88,8 +88,8 @@ func (h *ApiKeyHandler) Create(c *gin.Context) {
 	})
 }
 
-// Toggle PATCH /api/apikeys/:id/toggle
-func (h *ApiKeyHandler) Toggle(c *gin.Context) {
+// Toggle PATCH /api/tokens/:id/toggle
+func (h *TokenHandler) Toggle(c *gin.Context) {
 	id, err := parseID(c, "id")
 	if err != nil {
 		abortErr(c, err)
@@ -103,8 +103,8 @@ func (h *ApiKeyHandler) Toggle(c *gin.Context) {
 	successJSON(c, v)
 }
 
-// Delete DELETE /api/apikeys/:id
-func (h *ApiKeyHandler) Delete(c *gin.Context) {
+// Delete DELETE /api/tokens/:id
+func (h *TokenHandler) Delete(c *gin.Context) {
 	id, err := parseID(c, "id")
 	if err != nil {
 		abortErr(c, err)
@@ -117,8 +117,8 @@ func (h *ApiKeyHandler) Delete(c *gin.Context) {
 	successJSON(c, nil)
 }
 
-// UpdateDefaultChannels PUT /api/apikeys/:id/channels
-func (h *ApiKeyHandler) UpdateDefaultChannels(c *gin.Context) {
+// UpdateDefaultChannels PUT /api/tokens/:id/channels
+func (h *TokenHandler) UpdateDefaultChannels(c *gin.Context) {
 	id, err := parseID(c, "id")
 	if err != nil {
 		abortErr(c, err)
@@ -138,8 +138,8 @@ func (h *ApiKeyHandler) UpdateDefaultChannels(c *gin.Context) {
 	successJSON(c, nil)
 }
 
-// Stats GET /api/apikeys/stats
-func (h *ApiKeyHandler) Stats(c *gin.Context) {
+// Stats GET /api/tokens/stats
+func (h *TokenHandler) Stats(c *gin.Context) {
 	views, _, err := h.Svc.ListViews(1000, 0, "")
 	if err != nil {
 		abortErr(c, err)

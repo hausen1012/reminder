@@ -217,7 +217,7 @@ func (s *ChannelService) ListPaged(f ChannelListFilter) ([]*ChannelView, int64, 
 	return out, total, nil
 }
 
-// Delete 删除通道。如果有提醒或 API Key 仍在使用该通道则返回错误。
+// Delete 删除通道。如果有提醒或 令牌仍在使用该通道则返回错误。
 func (s *ChannelService) Delete(id uint) error {
 	if _, err := s.getOrNotFound(id); err != nil {
 		return err
@@ -226,17 +226,17 @@ func (s *ChannelService) Delete(id uint) error {
 	if err := s.DB.Model(&models.ReminderChannel{}).Where("channel_id = ?", id).Count(&reminderCount).Error; err != nil {
 		return err
 	}
-	var apikeyCount int64
-	if err := s.DB.Model(&models.APIKeyDefaultChannel{}).Where("channel_id = ?", id).Count(&apikeyCount).Error; err != nil {
+	var tokenCount int64
+	if err := s.DB.Model(&models.TokenDefaultChannel{}).Where("channel_id = ?", id).Count(&tokenCount).Error; err != nil {
 		return err
 	}
-	if reminderCount+apikeyCount > 0 {
-		return middleware.NewAppError(middleware.CodeConflict, "该通知被提醒或APIKey绑定，请先解除相定")
+	if reminderCount+tokenCount > 0 {
+		return middleware.NewAppError(middleware.CodeConflict, "该通知被提醒或令牌绑定，请先解除相定")
 	}
 	return s.DB.Delete(&models.Channel{}, id).Error
 }
 
-// BatchDelete 批量删除通知通道。如果有提醒或 API Key 仍在使用任一通道则返回错误。
+// BatchDelete 批量删除通知通道。如果有提醒或 令牌仍在使用任一通道则返回错误。
 func (s *ChannelService) BatchDelete(ids []uint) error {
 	if len(ids) == 0 {
 		return nil
@@ -245,12 +245,12 @@ func (s *ChannelService) BatchDelete(ids []uint) error {
 	if err := s.DB.Model(&models.ReminderChannel{}).Where("channel_id IN ?", ids).Count(&reminderCount).Error; err != nil {
 		return err
 	}
-	var apikeyCount int64
-	if err := s.DB.Model(&models.APIKeyDefaultChannel{}).Where("channel_id IN ?", ids).Count(&apikeyCount).Error; err != nil {
+	var tokenCount int64
+	if err := s.DB.Model(&models.TokenDefaultChannel{}).Where("channel_id IN ?", ids).Count(&tokenCount).Error; err != nil {
 		return err
 	}
-	if reminderCount+apikeyCount > 0 {
-		return middleware.NewAppError(middleware.CodeConflict, "部分通知被提醒或APIKey绑定，请先解除绑定")
+	if reminderCount+tokenCount > 0 {
+		return middleware.NewAppError(middleware.CodeConflict, "部分通知被提醒或令牌绑定，请先解除绑定")
 	}
 	return s.DB.Transaction(func(tx *gorm.DB) error {
 		return tx.Delete(&models.Channel{}, ids).Error

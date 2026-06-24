@@ -1,12 +1,12 @@
 import axios from 'axios'
 import type {
-  APIKey,
+  Token,
   ApiResponse,
   Channel,
   ChannelInput,
   ChannelListResp,
   ChannelType,
-  CreateAPIKeyResult,
+  CreateTokenResult,
   DeliveryLog,
   LogFilter,
   LogListResp,
@@ -16,7 +16,7 @@ import type {
   ReminderListResp,
   SchedulerStatus,
   User,
-  ApiKeyListResp,
+  TokenListResp,
 } from '@/types'
 
 const api = axios.create({
@@ -206,39 +206,39 @@ export async function countPurgeLogs(olderThan?: string, all?: boolean) {
   return res.data.data
 }
 
-// --- API Key ---
+// --- 令牌 ---
 
-export async function listApiKeys(params?: { limit?: number; offset?: number; search?: string }) {
-  const res = await api.get<ApiResponse<ApiKeyListResp>>('/apikeys', { params })
+export async function listTokens(params?: { limit?: number; offset?: number; search?: string }) {
+  const res = await api.get<ApiResponse<TokenListResp>>('/tokens', { params })
   return res.data.data ?? { items: [], total: 0 }
 }
 
-export async function getApiKey(id: number) {
-  const res = await api.get<ApiResponse<APIKey>>(`/apikeys/${id}`)
+export async function getToken(id: number) {
+  const res = await api.get<ApiResponse<Token>>(`/tokens/${id}`)
   return res.data.data
 }
 
-export async function getApiKeyPlaintext(id: number) {
-  const res = await api.get<ApiResponse<{ plaintext: string }>>(`/apikeys/${id}/plaintext`)
+export async function getTokenPlaintext(id: number) {
+  const res = await api.get<ApiResponse<{ plaintext: string }>>(`/tokens/${id}/plaintext`)
   return res.data.data?.plaintext ?? ''
 }
 
-export async function createApiKey(name: string, defaultChannelIDs?: number[]) {
-  const res = await api.post<ApiResponse<CreateAPIKeyResult>>('/apikeys', { name, default_channel_ids: defaultChannelIDs ?? [] })
+export async function createToken(name: string, defaultChannelIDs?: number[]) {
+  const res = await api.post<ApiResponse<CreateTokenResult>>('/tokens', { name, default_channel_ids: defaultChannelIDs ?? [] })
   return res.data.data
 }
 
-export async function toggleApiKey(id: number) {
-  const res = await api.patch<ApiResponse<APIKey>>(`/apikeys/${id}/toggle`)
+export async function toggleToken(id: number) {
+  const res = await api.patch<ApiResponse<Token>>(`/tokens/${id}/toggle`)
   return res.data.data
 }
 
-export async function deleteApiKey(id: number) {
-  await api.delete<ApiResponse<null>>(`/apikeys/${id}`)
+export async function deleteToken(id: number) {
+  await api.delete<ApiResponse<null>>(`/tokens/${id}`)
 }
 
-export async function updateApiKeyChannels(id: number, channelIDs: number[]) {
-  await api.put<ApiResponse<null>>(`/apikeys/${id}/channels`, { channel_ids: channelIDs })
+export async function updateTokenChannels(id: number, channelIDs: number[]) {
+  await api.put<ApiResponse<null>>(`/tokens/${id}/channels`, { channel_ids: channelIDs })
 }
 
 // --- 监控 ---
@@ -275,8 +275,8 @@ export async function listChannelStats(window = '24h') {
   return res.data.data ?? []
 }
 
-export async function listApiKeyStats() {
-  const res = await api.get<ApiResponse<{ id: number; name: string; usage_24h: number }[]>>('/apikeys/stats')
+export async function listTokenStats() {
+  const res = await api.get<ApiResponse<{ id: number; name: string; usage_24h: number }[]>>('/tokens/stats')
   return res.data.data ?? []
 }
 

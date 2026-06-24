@@ -14,7 +14,7 @@
 - 可选"需要确认"机制：未点击确认链接前按配置重发
 - 失败通道自动重试
 - 完整发送日志，可按 7 天 / 30 天 / 全部清理
-- 外部 API：通过 API Key 创建提醒，未指定通道则回退到 Key 默认通道
+- 外部 API：通过 令牌 创建提醒，未指定通道则回退到 Key 默认通道
 - 区分手动 / API 来源，列表默认只看手动
 
 明确不做：多用户隔离、国际化、Prometheus 监控、数据备份/导出、集群部署。
@@ -31,8 +31,8 @@ Gin Router
   ├── /api/reminders         提醒 CRUD、启用/禁用、试发、预览下次触发
   ├── /api/channels          通道 CRUD、试发
   ├── /api/logs              日志查询、清理
-  ├── /api/apikeys           API Key 管理
-  ├── /api/ingest/*          外部 API（X-API-Key 鉴权）
+  ├── /api/tokens           令牌 管理
+  ├── /api/ingest/*          外部 API（X-AUTH 鉴权）
   └── /c/:token              确认链接（无需登录，一次性 token）
 
 Service 层
@@ -68,7 +68,7 @@ backend/internal/
     channel.go                       Channel + 加密字段
     delivery.go                      DeliveryLog
     delivery_attempt.go              DeliveryAttempt
-    apikey.go                        APIKey + APIKeyDefaultChannel
+    token.go                        Token + TokenDefaultChannel
     confirm_token.go                 ConfirmToken
   scheduler/
     engine.go                        Engine + Job + Registry
@@ -86,14 +86,14 @@ backend/internal/
     channel_service.go
     dispatch_service.go
     log_service.go
-    apikey_service.go
+    token_service.go
     confirm_service.go
   handlers/
-    reminder.go / channel.go / log.go / apikey.go / ingest.go / confirm.go
+    reminder.go / channel.go / log.go / token.go / ingest.go / confirm.go
   crypto/
     secretbox.go                     AES-GCM，含硬编码 fallback key
   middleware/
-    apikey.go                        X-API-Key 校验 + 限流
+    token.go                        X-AUTH 校验 + 限流
 ```
 
 ### 2.3 前端目录结构（新增）
@@ -108,7 +108,7 @@ frontend/src/pages/
     edit.tsx
   logs/
     index.tsx                        列表 + 详情抽屉 + 清理
-  apikeys/
+  tokens/
     index.tsx                        列表 + 创建对话框（一次性显示明文）
 
 frontend/src/components/
@@ -143,7 +143,7 @@ type Reminder struct {
 
   Enabled       bool           `gorm:"index;default:true"`
   Source        string         `gorm:"size:16;index"`      // manual | api
-  APIKeyID      *uint          `gorm:"index"`
+  TokenID      *uint          `gorm:"index"`
 
   RequireConfirm          bool   `gorm:"default:false"`
   ConfirmRetryIntervalSec int    `gorm:"default:0"`
@@ -257,7 +257,7 @@ type DeliveryAttempt struct {
 ### 3.7 `api_keys` / `api_key_default_channels`
 
 ```go
-type APIKey struct {
+type Token struct {
   ID         uint       `gorm:"primaryKey"`
   Name       string     `gorm:"size:64;not null"`
   KeyHash    string     `gorm:"size:64;uniqueIndex"`  // sha256(明文)
@@ -267,8 +267,8 @@ type APIKey struct {
   CreatedAt  time.Time
 }
 
-type APIKeyDefaultChannel struct {
-  APIKeyID  uint `gorm:"primaryKey"`
+type TokenDefaultChannel struct {
+  TokenID  uint `gorm:"primaryKey"`
   ChannelID uint `gorm:"primaryKey"`
 }
 ```
@@ -558,7 +558,7 @@ Backoff     = [0, 10s, 30s]
 ```
 loadChannels(reminder):
   if reminder.Source == "api" && reminder 没绑通道：
-     return APIKey.DefaultChannels
+     return Token.DefaultChannels
   else:
      return reminder.Channels
 ```
@@ -641,12 +641,12 @@ N 秒后回调：
 
 ### 9.1 鉴权
 
-Header `X-API-Key: bdrk_<24 字符>`。
+Header `X-AUTH: bdrk_<24 字符>`。
 
 中间件流程：
 1. 取 header，sha256 → 查 `api_keys`
 2. 校验 `enabled = true`
-3. 注入 `c.Set("apikey_id", id)`
+3. 注入 `c.Set("token_id", id)`
 4. 异步更新 `last_used_at`（节流：每 Key 每分钟最多 1 次写）
 5. 缺/错/禁用 → 401
 
@@ -714,7 +714,7 @@ per-Key per-minute 内存计数器，默认 60/min。超过 → 429 + Retry-Afte
 
 - `source` 由后端固定写：内部 API → manual，ingest API → api
 - 列表查询 `?source=manual|api|all`（前端默认 manual）
-- API Key 详情可链到"本 Key 创建的提醒"过滤视图
+- 令牌 详情可链到"本 Key 创建的提醒"过滤视图
 
 ### 9.8 文档
 
@@ -733,7 +733,7 @@ per-Key per-minute 内存计数器，默认 60/min。超过 → 429 + Retry-Afte
 提醒              Reminders
 通道              Channels
 日志              Logs
-API               API Keys
+API               令牌s
 ─────
 设置              Profile（原样）
 ```
@@ -746,7 +746,7 @@ API               API Keys
 - 今日待发（未来 24h 下次触发列表，最多 10）
 - 最近发送（最近 10 条 delivery_logs，状态彩点）
 - 通道健康（每个 enabled 通道近 24h 成功率）
-- API Key 调用（每个 Key 近 24h 调用次数）
+- 令牌 调用（每个 Key 近 24h 调用次数）
 
 每卡右上"查看全部"链到对应页。
 
@@ -793,7 +793,7 @@ Type 创建后**不可改**。
 
 **详情抽屉：** 提醒元数据 + 模板渲染后 title/content + delivery_attempts 按 channel 分组列表 + confirm_url 复制按钮（若有）
 
-### 10.6 API Key 页
+### 10.6 令牌 页
 
 列表：名称 · 前缀 · 默认通道 · 最近使用 · 24h 调用次数 · 状态开关 · 操作
 
@@ -906,7 +906,7 @@ WHERE expires_at < datetime('now')
 - `notifier/template.Render`：变量替换、未定义保留、自引用不递归
 - `crypto/secretbox`：加解密往返、`ENCRYPTION_KEY` 缺失时 fallback 行为
 - `scheduler.Engine`：mock store + mock dispatch，验证 Add/Update/Remove 后的 Registry 状态、fire 内乐观锁
-- API Key sha256 + 限流计数器
+- 令牌 sha256 + 限流计数器
 
 ### 13.2 集成测试
 

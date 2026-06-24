@@ -25,7 +25,7 @@ type Reminder struct {
 
 	Enabled  bool   `gorm:"index;default:true" json:"enabled"`
 	Source   string `gorm:"size:16;index" json:"source"` // web | api
-	APIKeyID *uint  `gorm:"index" json:"api_key_id,omitempty"`
+	TokenID *uint  `gorm:"index" json:"token_id,omitempty"`
 
 	RequireConfirm          bool `gorm:"default:false" json:"require_confirm"`
 	ConfirmRetryIntervalSec int  `gorm:"default:0" json:"confirm_retry_interval_sec"`

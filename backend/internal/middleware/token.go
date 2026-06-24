@@ -1,7 +1,7 @@
-// apikey 提供外部 API Key 鉴权的 Gin 中间件。
+// token 提供外部令牌鉴权的 Gin 中间件。
 //
-// 客户端通过 X-API-Key 请求头传递明文 Key，
-// 中间件验 sha256、限流后注入 api_key_id 到 gin.Context。
+// 客户端通过 X-AUTH 请求头传递明文令牌，
+// 中间件验 sha256、限流后注入 token_id 到 gin.Context。
 package middleware
 
 import (
@@ -12,13 +12,13 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// ApiKeyVerifier 是 ApiKeyService.Verify 的函数签名。
-type ApiKeyVerifier func(plain string) (apiKeyID uint, ok bool)
+// TokenVerifier 是 TokenService.Verify 的函数签名。
+type TokenVerifier func(plain string) (tokenID uint, ok bool)
 
-// ApiKeyToucher 是 ApiKeyService.TouchLastUsed 的函数签名。
-type ApiKeyToucher func(apiKeyID uint)
+// TokenToucher 是 TokenService.TouchLastUsed 的函数签名。
+type TokenToucher func(tokenID uint)
 
-// RateLimiter 是 per-Key 的内存限流器。
+// RateLimiter 是 per-令牌的内存限流器。
 type RateLimiter struct {
 	mu    sync.Mutex
 	slots map[uint]*rateSlot
@@ -53,41 +53,41 @@ func (rl *RateLimiter) Allow(keyID uint, limitPerMinute int) bool {
 	return true
 }
 
-// APIKeyAuth 返回中间件。
+// TokenAuth 返回中间件。
 //
-// verify 接收明文返回 keyID；toucher 可选更新 last_used_at；
+// verify 接收明文返回 tokenID；toucher 可选更新 last_used_at；
 // limiter 为空时默认 60/min。
-func APIKeyAuth(verify ApiKeyVerifier, toucher ApiKeyToucher, limiter *RateLimiter) gin.HandlerFunc {
+func TokenAuth(verify TokenVerifier, toucher TokenToucher, limiter *RateLimiter) gin.HandlerFunc {
 	if limiter == nil {
 		limiter = NewRateLimiter()
 	}
 	return func(c *gin.Context) {
-		key := c.GetHeader("X-API-Key")
+		key := c.GetHeader("X-AUTH")
 		if key == "" {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
-				"error": gin.H{"code": CodeUnauthorized, "message": "缺少 X-API-Key 请求头"},
+				"error": gin.H{"code": CodeUnauthorized, "message": "缺少 X-AUTH 请求头"},
 			})
 			return
 		}
 
-		keyID, ok := verify(key)
+		tokenID, ok := verify(key)
 		if !ok {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
-				"error": gin.H{"code": CodeUnauthorized, "message": "API Key 无效"},
+				"error": gin.H{"code": CodeUnauthorized, "message": "令牌无效"},
 			})
 			return
 		}
 
-		if !limiter.Allow(keyID, 60) {
+		if !limiter.Allow(tokenID, 60) {
 			c.AbortWithStatusJSON(http.StatusTooManyRequests, gin.H{
 				"error": gin.H{"code": CodeRateLimited, "message": "请求过于频繁"},
 			})
 			return
 		}
 
-		c.Set("api_key_id", keyID)
+		c.Set("token_id", tokenID)
 		if toucher != nil {
-			toucher(keyID)
+			toucher(tokenID)
 		}
 		c.Next()
 	}

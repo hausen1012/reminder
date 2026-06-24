@@ -1,6 +1,6 @@
 // ingest 处理外部 API 调用（/api/ingest/*）。
 //
-// 与面板使用的 ReminderHandler 共享 ReminderService，但鉴权使用 API Key 而非 JWT。
+// 与面板使用的 ReminderHandler 共享 ReminderService，但鉴权使用令牌而非 JWT。
 // 提醒创建时强制 source=api，未指定通道时回退到 Key 的默认通道。
 package handlers
 
@@ -16,7 +16,7 @@ import (
 // IngestHandler 是外部 Ingest API。
 type IngestHandler struct {
 	ReminderSvc *services.ReminderService
-	ApiKeySvc   *services.ApiKeyService
+	TokenSvc    *services.TokenService
 	ChannelSvc  *services.ChannelService
 }
 
@@ -31,14 +31,14 @@ func (h *IngestHandler) CreateReminder(c *gin.Context) {
 	// 强制 source=api
 	in.Source = "api"
 
-	// 未指定通道时回退到 API Key 默认通道
-	apiKeyID, _ := c.Get("api_key_id")
-	if keyID, ok := apiKeyID.(uint); ok {
-		in.APIKeyID = &keyID
-		if len(in.ChannelIDs) == 0 {
-			in.ChannelIDs = h.ApiKeySvc.DefaultChannelIDs(keyID)
+	// 未指定通道时回退到令牌默认通道
+		tokenID, _ := c.Get("token_id")
+		if keyID, ok := tokenID.(uint); ok {
+			in.TokenID = &keyID
+			if len(in.ChannelIDs) == 0 {
+				in.ChannelIDs = h.TokenSvc.DefaultChannelIDs(keyID)
+			}
 		}
-	}
 
 	v, err := h.ReminderSvc.Create(in)
 	if err != nil {
@@ -61,7 +61,7 @@ func (h *IngestHandler) GetReminder(c *gin.Context) {
 		return
 	}
 	// 限制只能查看本 Key 创建的
-	if !h.belongsToKey(v.APIKeyID, c) {
+	if !h.belongsToKey(v.TokenID, c) {
 		abortErr(c, middleware.NewAppError(middleware.CodeNotFound, "提醒不存在"))
 		return
 	}
@@ -70,7 +70,7 @@ func (h *IngestHandler) GetReminder(c *gin.Context) {
 
 // ListReminders GET /api/ingest/reminders
 func (h *IngestHandler) ListReminders(c *gin.Context) {
-	apiKeyID, _ := c.Get("api_key_id")
+	tokenID, _ := c.Get("token_id")
 	f := services.ListFilter{
 		Search: c.Query("search"),
 	}
@@ -84,8 +84,8 @@ func (h *IngestHandler) ListReminders(c *gin.Context) {
 			f.Offset = n
 		}
 	}
-	if keyID, ok := apiKeyID.(uint); ok {
-		f.APIKeyID = &keyID
+	if keyID, ok := tokenID.(uint); ok {
+		f.TokenID = &keyID
 	}
 
 	items, total, err := h.ReminderSvc.List(f)
@@ -109,7 +109,7 @@ func (h *IngestHandler) DeleteReminder(c *gin.Context) {
 		abortErr(c, err)
 		return
 	}
-	if !h.belongsToKey(v.APIKeyID, c) {
+	if !h.belongsToKey(v.TokenID, c) {
 		abortErr(c, middleware.NewAppError(middleware.CodeNotFound, "提醒不存在"))
 		return
 	}
@@ -138,11 +138,11 @@ func (h *IngestHandler) Docs(c *gin.Context) {
 }
 
 func (h *IngestHandler) belongsToKey(reminderKeyID *uint, c *gin.Context) bool {
-	apiKeyID, exists := c.Get("api_key_id")
+	tokenID, exists := c.Get("token_id")
 	if !exists {
 		return false
 	}
-	keyID, ok := apiKeyID.(uint)
+	keyID, ok := tokenID.(uint)
 	if !ok {
 		return false
 	}
@@ -178,18 +178,18 @@ th{background:#f9fafb;font-weight:600}
 </head>
 <body>
 <h1>Ingest API 文档</h1>
-<p>通过 API Key 鉴权的外部调用接口，用于程序化创建和管理提醒。</p>
+<p>通过令牌鉴权的外部调用接口，用于程序化创建和管理提醒。</p>
 
 <h2>鉴权</h2>
-<p>所有请求需在 HTTP 头携带 API Key：<code>X-API-Key: bdrk_xxxxxxxx</code></p>
-<p>API Key 由面板创建，创建时仅展示一次。</p>
+<p>所有请求需在 HTTP 头携带令牌：<code>X-AUTH: bdrk_xxxxxxxx</code></p>
+<p>令牌由面板创建，创建时仅展示一次。</p>
 
 <h2>端点</h2>
 
 <h3><span class="tag tag-post">POST</span> /api/ingest/reminders</h3>
 <p>创建一条提醒。</p>
 <pre>curl -X POST /api/ingest/reminders \
-  -H "X-API-Key: bdrk_xxx" \
+  -H "X-AUTH: bdrk_xxx" \
   -H "Content-Type: application/json" \
   -d '{
     "title": "每日提醒",
@@ -200,27 +200,27 @@ th{background:#f9fafb;font-weight:600}
     "channel_ids": [1],
     "require_confirm": false
   }'</pre>
-<p>未指定 <code>channel_ids</code> 时将使用 API Key 绑定的默认通道。</p>
+<p>未指定 <code>channel_ids</code> 时将使用令牌绑定的默认通道。</p>
 
 <h3><span class="tag tag-get">GET</span> /api/ingest/reminders</h3>
 <p>列出本 Key 创建的提醒（仅返回 enabled 的）。</p>
 <pre>curl /api/ingest/reminders?limit=20&offset=0 \
-  -H "X-API-Key: bdrk_xxx"</pre>
+  -H "X-AUTH: bdrk_xxx"</pre>
 
 <h3><span class="tag tag-get">GET</span> /api/ingest/reminders/:id</h3>
 <p>查看单条提醒详情。</p>
 <pre>curl /api/ingest/reminders/1 \
-  -H "X-API-Key: bdrk_xxx"</pre>
+  -H "X-AUTH: bdrk_xxx"</pre>
 
 <h3><span class="tag tag-get">GET</span> /api/ingest/channels</h3>
 <p>列出所有通知渠道，用于选择 channel_id。</p>
 <pre>curl /api/ingest/channels \
-  -H "X-API-Key: bdrk_xxx"</pre>
+  -H "X-AUTH: bdrk_xxx"</pre>
 
 <h3><span class="tag tag-delete">DELETE</span> /api/ingest/reminders/:id</h3>
 <p>删除本 Key 创建的提醒。</p>
 <pre>curl -X DELETE /api/ingest/reminders/1 \
-  -H "X-API-Key: bdrk_xxx"</pre>
+  -H "X-AUTH: bdrk_xxx"</pre>
 
 <h2>字段说明</h2>
 <table>

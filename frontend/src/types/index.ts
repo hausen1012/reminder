@@ -72,7 +72,7 @@ export interface Reminder {
   timezone: string
   enabled: boolean
   source: ReminderSource
-  api_key_id?: number
+  token_id?: number
   require_confirm: boolean
   confirm_retry_interval_sec: number
   confirm_max_retries: number
@@ -155,9 +155,9 @@ export interface LogFilter {
   offset?: number
 }
 
-// --- API Key ---
+// --- 令牌 ---
 
-export interface APIKey {
+export interface Token {
   id: number
   name: string
   prefix: string
@@ -168,13 +168,13 @@ export interface APIKey {
   usage_24h: number
 }
 
-export interface CreateAPIKeyResult {
+export interface CreateTokenResult {
   plaintext: string
-  key: APIKey
+  key: Token
 }
 
-export interface ApiKeyListResp {
-  items: APIKey[]
+export interface TokenListResp {
+  items: Token[]
   total: number
 }
 

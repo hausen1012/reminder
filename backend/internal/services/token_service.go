@@ -1,7 +1,7 @@
-// apikey_service 管理 API Key 的全生命周期。
+// token_service 管理令牌的全生命周期。
 //
-// 外部程序通过 X-API-Key 鉴权调用 /api/ingest/*，面板也可以创建/管理 Key。
-// 明文 Key 仅创建时一次性返回，后续默认只展示前缀；如需重复查看则直接读取明文。
+// 外部程序通过 X-AUTH 鉴权调用 /api/ingest/*，面板也可以创建/管理令牌。
+// 明文令牌仅创建时一次性返回，后续默认只展示前缀；如需重复查看则直接读取明文。
 package services
 
 import (
@@ -20,17 +20,17 @@ import (
 	"gorm.io/gorm"
 )
 
-// ApiKeyService 管理 API Key。
-type ApiKeyService struct {
+// TokenService 管理令牌。
+type TokenService struct {
 	DB *gorm.DB
 
 	mu         sync.Mutex
 	lastUsedAt map[uint]time.Time // 节流 TouchLastUsed
 }
 
-// NewApiKeyService 构造服务。
-func NewApiKeyService(db *gorm.DB) *ApiKeyService {
-	return &ApiKeyService{
+// NewTokenService 构造服务。
+func NewTokenService(db *gorm.DB) *TokenService {
+	return &TokenService{
 		DB:         db,
 		lastUsedAt: make(map[uint]time.Time),
 	}
@@ -39,8 +39,8 @@ func NewApiKeyService(db *gorm.DB) *ApiKeyService {
 const keyPrefix = "bdrk_"
 const keyBytes = 24
 
-// Create 生成 API Key，返回明文与模型。
-func (s *ApiKeyService) Create(name string, defaultChannelIDs []uint) (string, *models.APIKey, error) {
+// Create 生成令牌，返回明文与模型。
+func (s *TokenService) Create(name string, defaultChannelIDs []uint) (string, *models.Token, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return "", nil, middleware.NewAppError(middleware.CodeValidationFailed, "名称必填").WithField("name")
@@ -52,7 +52,7 @@ func (s *ApiKeyService) Create(name string, defaultChannelIDs []uint) (string, *
 	}
 
 	hash := sha256Hex(plain)
-	key := &models.APIKey{
+	key := &models.Token{
 		Name:      name,
 		KeyHash:   hash,
 		Prefix:    plain[:len(keyPrefix)+8],
@@ -72,10 +72,10 @@ func (s *ApiKeyService) Create(name string, defaultChannelIDs []uint) (string, *
 	return plain, key, nil
 }
 
-// List 返回所有 Key，支持分页和搜索。
-func (s *ApiKeyService) List(limit, offset int, search string) ([]*models.APIKey, int64, error) {
-	var rows []models.APIKey
-	query := s.DB.Model(&models.APIKey{})
+// List 返回所有令牌，支持分页和搜索。
+func (s *TokenService) List(limit, offset int, search string) ([]*models.Token, int64, error) {
+	var rows []models.Token
+	query := s.DB.Model(&models.Token{})
 	if search != "" {
 		query = query.Where("name LIKE ?", "%"+search+"%")
 	}
@@ -86,7 +86,7 @@ func (s *ApiKeyService) List(limit, offset int, search string) ([]*models.APIKey
 	if err := query.Order("id DESC").Limit(limit).Offset(offset).Find(&rows).Error; err != nil {
 		return nil, 0, err
 	}
-	out := make([]*models.APIKey, len(rows))
+	out := make([]*models.Token, len(rows))
 	for i := range rows {
 		out[i] = &rows[i]
 	}
@@ -94,11 +94,11 @@ func (s *ApiKeyService) List(limit, offset int, search string) ([]*models.APIKey
 }
 
 // Toggle 启用/禁用。
-func (s *ApiKeyService) Toggle(id uint) (*models.APIKey, error) {
-	var key models.APIKey
+func (s *TokenService) Toggle(id uint) (*models.Token, error) {
+	var key models.Token
 	if err := s.DB.First(&key, id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, middleware.NewAppError(middleware.CodeNotFound, "API Key 不存在")
+			return nil, middleware.NewAppError(middleware.CodeNotFound, "令牌不存在")
 		}
 		return nil, err
 	}
@@ -109,25 +109,25 @@ func (s *ApiKeyService) Toggle(id uint) (*models.APIKey, error) {
 	return &key, nil
 }
 
-// Delete 删除 Key。
-func (s *ApiKeyService) Delete(id uint) error {
-	var key models.APIKey
+// Delete 删除令牌。
+func (s *TokenService) Delete(id uint) error {
+	var key models.Token
 	if err := s.DB.First(&key, id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return middleware.NewAppError(middleware.CodeNotFound, "API Key 不存在")
+			return middleware.NewAppError(middleware.CodeNotFound, "令牌不存在")
 		}
 		return err
 	}
 	return s.DB.Delete(&key).Error
 }
 
-// Verify 验证明文 Key 是否有效。
-func (s *ApiKeyService) Verify(plain string) (*models.APIKey, bool) {
+// Verify 验证明文令牌是否有效。
+func (s *TokenService) Verify(plain string) (*models.Token, bool) {
 	if !strings.HasPrefix(plain, keyPrefix) {
 		return nil, false
 	}
 	hash := sha256Hex(plain)
-	var key models.APIKey
+	var key models.Token
 	if err := s.DB.Where("key_hash = ?", hash).First(&key).Error; err != nil {
 		return nil, false
 	}
@@ -137,8 +137,8 @@ func (s *ApiKeyService) Verify(plain string) (*models.APIKey, bool) {
 	return &key, true
 }
 
-// TouchLastUsed 更新 LastUsedAt（节流：每分钟/Key 最多一次）。
-func (s *ApiKeyService) TouchLastUsed(keyID uint) {
+// TouchLastUsed 更新 LastUsedAt（节流：每分钟/令牌最多一次）。
+func (s *TokenService) TouchLastUsed(keyID uint) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if last, ok := s.lastUsedAt[keyID]; ok && time.Since(last) < time.Minute {
@@ -147,72 +147,72 @@ func (s *ApiKeyService) TouchLastUsed(keyID uint) {
 	s.lastUsedAt[keyID] = time.Now()
 	go func() {
 		now := time.Now()
-		_ = s.DB.Model(&models.APIKey{}).Where("id = ?", keyID).Update("last_used_at", now).Error
+		_ = s.DB.Model(&models.Token{}).Where("id = ?", keyID).Update("last_used_at", now).Error
 	}()
 }
 
-// DefaultChannelIDs 返回 Key 绑定的默认通道 ID 列表。
-func (s *ApiKeyService) DefaultChannelIDs(keyID uint) []uint {
+// DefaultChannelIDs 返回令牌绑定的默认通道 ID 列表。
+func (s *TokenService) DefaultChannelIDs(keyID uint) []uint {
 	var ids []uint
-	s.DB.Model(&models.APIKeyDefaultChannel{}).
-		Where("api_key_id = ?", keyID).
+	s.DB.Model(&models.TokenDefaultChannel{}).
+		Where("token_id = ?", keyID).
 		Pluck("channel_id", &ids)
 	return ids
 }
 
-// Stats24h 返回近 24 小时使用次数（按 reminders 表 APIKeyID 统计）。
-func (s *ApiKeyService) Stats24h(keyID uint) int64 {
+// Stats24h 返回近 24 小时使用次数（按 reminders 表 TokenID 统计）。
+func (s *TokenService) Stats24h(keyID uint) int64 {
 	var count int64
 	s.DB.Model(&models.Reminder{}).
-		Where("api_key_id = ? AND created_at > ?", keyID, time.Now().Add(-24*time.Hour)).
+		Where("token_id = ? AND created_at > ?", keyID, time.Now().Add(-24*time.Hour)).
 		Count(&count)
 	return count
 }
 
-// UpdateDefaultChannels 更新 Key 的默认通道绑定。
-func (s *ApiKeyService) UpdateDefaultChannels(id uint, channelIDs []uint) error {
+// UpdateDefaultChannels 更新令牌的默认通道绑定。
+func (s *TokenService) UpdateDefaultChannels(id uint, channelIDs []uint) error {
 	return s.DB.Transaction(func(tx *gorm.DB) error {
 		return s.replaceDefaultChannels(tx, id, channelIDs)
 	})
 }
 
-// GetPlaintext 返回 Key 的明文。
-func (s *ApiKeyService) GetPlaintext(id uint) (string, error) {
-	var key models.APIKey
+// GetPlaintext 返回令牌的明文。
+func (s *TokenService) GetPlaintext(id uint) (string, error) {
+	var key models.Token
 	if err := s.DB.First(&key, id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return "", middleware.NewAppError(middleware.CodeNotFound, "API Key 不存在")
+			return "", middleware.NewAppError(middleware.CodeNotFound, "令牌不存在")
 		}
 		return "", err
 	}
 	if strings.TrimSpace(key.Plaintext) == "" {
-		return "", middleware.NewAppError(middleware.CodeNotFound, "该 API Key 暂无可查看的明文，请重新创建")
+		return "", middleware.NewAppError(middleware.CodeNotFound, "该令牌暂无可查看的明文，请重新创建")
 	}
 	return key.Plaintext, nil
 }
 
 // --- internal ---
 
-func (s *ApiKeyService) replaceDefaultChannels(tx *gorm.DB, keyID uint, ids []uint) error {
-	if err := tx.Where("api_key_id = ?", keyID).Delete(&models.APIKeyDefaultChannel{}).Error; err != nil {
+func (s *TokenService) replaceDefaultChannels(tx *gorm.DB, keyID uint, ids []uint) error {
+	if err := tx.Where("token_id = ?", keyID).Delete(&models.TokenDefaultChannel{}).Error; err != nil {
 		return err
 	}
 	if len(ids) == 0 {
 		return nil
 	}
-	rows := make([]models.APIKeyDefaultChannel, 0, len(ids))
+	rows := make([]models.TokenDefaultChannel, 0, len(ids))
 	seen := map[uint]bool{}
 	for _, id := range ids {
 		if id == 0 || seen[id] {
 			continue
 		}
 		seen[id] = true
-		rows = append(rows, models.APIKeyDefaultChannel{APIKeyID: keyID, ChannelID: id})
+		rows = append(rows, models.TokenDefaultChannel{TokenID: keyID, ChannelID: id})
 	}
 	return tx.Create(&rows).Error
 }
 
-// generateKey 生成 bdrk_ + 24 字节 base62 密钥。
+// generateKey 生成 bdrk_ + 24 字节 base62 令牌。
 func generateKey() (string, error) {
 	b := make([]byte, keyBytes)
 	if _, err := rand.Read(b); err != nil {
@@ -248,23 +248,23 @@ func base62Encode(b []byte) string {
 	return string(out)
 }
 
-// ApiKeyView 是前端的富视图。
-type ApiKeyView struct {
-	models.APIKey
+// TokenView 是前端的富视图。
+type TokenView struct {
+	models.Token
 	DefaultChannelIDs []uint `json:"default_channel_ids"`
 	Usage24h          int64  `json:"usage_24h"`
 }
 
-// ListViews 返回 API Key 富列表，支持分页和搜索。
-func (s *ApiKeyService) ListViews(limit, offset int, search string) ([]*ApiKeyView, int64, error) {
+// ListViews 返回令牌富列表，支持分页和搜索。
+func (s *TokenService) ListViews(limit, offset int, search string) ([]*TokenView, int64, error) {
 	keys, total, err := s.List(limit, offset, search)
 	if err != nil {
 		return nil, 0, err
 	}
-	views := make([]*ApiKeyView, 0, len(keys))
+	views := make([]*TokenView, 0, len(keys))
 	for _, k := range keys {
-		views = append(views, &ApiKeyView{
-			APIKey:            *k,
+		views = append(views, &TokenView{
+			Token:             *k,
 			DefaultChannelIDs: s.DefaultChannelIDs(k.ID),
 			Usage24h:          s.Stats24h(k.ID),
 		})
@@ -272,17 +272,17 @@ func (s *ApiKeyService) ListViews(limit, offset int, search string) ([]*ApiKeyVi
 	return views, total, nil
 }
 
-// GetView 返回单个 Key 的富视图。
-func (s *ApiKeyService) GetView(id uint) (*ApiKeyView, error) {
-	var key models.APIKey
+// GetView 返回单个令牌的富视图。
+func (s *TokenService) GetView(id uint) (*TokenView, error) {
+	var key models.Token
 	if err := s.DB.First(&key, id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, middleware.NewAppError(middleware.CodeNotFound, "API Key 不存在")
+			return nil, middleware.NewAppError(middleware.CodeNotFound, "令牌不存在")
 		}
 		return nil, err
 	}
-	return &ApiKeyView{
-		APIKey:            key,
+	return &TokenView{
+		Token:             key,
 		DefaultChannelIDs: s.DefaultChannelIDs(key.ID),
 		Usage24h:          s.Stats24h(key.ID),
 	}, nil

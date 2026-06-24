@@ -1,4 +1,4 @@
-// API Key 管理页
+// 令牌管理页
 import { useEffect, useMemo, useState } from 'react'
 import { Plus, Trash2, Copy, CheckCircle2, Pencil, Terminal, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -26,18 +26,18 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useToast } from '@/components/ui/use-toast'
-import { CurlUsageDialog } from '@/components/apikeys/CurlUsageDialog'
+import { CurlUsageDialog } from '@/components/tokens/CurlUsageDialog'
 import {
-  listApiKeys,
-  createApiKey,
-  toggleApiKey,
-  deleteApiKey,
+  listTokens,
+  createToken,
+  toggleToken,
+  deleteToken,
   listChannels,
-  getApiKey,
-  getApiKeyPlaintext,
-  updateApiKeyChannels,
+  getToken,
+  getTokenPlaintext,
+  updateTokenChannels,
 } from '@/lib/api'
-import type { APIKey, Channel } from '@/types'
+import type { Token, Channel } from '@/types'
 
 function formatChannelNames(channels: Channel[], ids: number[]): string {
   if (ids.length === 0) return '未设置'
@@ -48,8 +48,8 @@ function formatRecentTime(dateStr?: string): string {
   return dateStr ? new Date(dateStr).toLocaleString() : '—'
 }
 
-export default function ApiKeysPage() {
-  const [items, setItems] = useState<APIKey[]>([])
+export default function TokensPage() {
+  const [items, setItems] = useState<Token[]>([])
   const [channels, setChannels] = useState<Channel[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
@@ -60,13 +60,13 @@ export default function ApiKeysPage() {
   const [newChannelsOpen, setNewChannelsOpen] = useState(false)
   const [creating, setCreating] = useState(false)
   const [createdResult, setCreatedResult] = useState<{ plaintext: string; name: string } | null>(null)
-  const [toDelete, setToDelete] = useState<APIKey | null>(null)
+  const [toDelete, setToDelete] = useState<Token | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [detailOpen, setDetailOpen] = useState(false)
   const [detailLoading, setDetailLoading] = useState(false)
   const [detailSaving, setDetailSaving] = useState(false)
   const [detailChannelsOpen, setDetailChannelsOpen] = useState(false)
-  const [selectedKey, setSelectedKey] = useState<APIKey | null>(null)
+  const [selectedKey, setSelectedKey] = useState<Token | null>(null)
   const [detailChannelIDs, setDetailChannelIDs] = useState<number[]>([])
   const [detailPlaintext, setDetailPlaintext] = useState('')
   const [enabled, setEnabled] = useState<string>('all')
@@ -84,7 +84,7 @@ export default function ApiKeysPage() {
     setLoading(true)
     try {
       const [data, allChannels] = await Promise.all([
-        listApiKeys({ limit, offset, search: search.trim() || undefined }),
+        listTokens({ limit, offset, search: search.trim() || undefined }),
         listChannels(),
       ])
       setItems(data.items ?? [])
@@ -93,7 +93,7 @@ export default function ApiKeysPage() {
       setLoadError('')
     } catch (err) {
       setLoadError(String(err))
-      toast({ title: '加载 API Key 失败', description: String(err), variant: 'destructive' })
+      toast({ title: '加载令牌失败', description: String(err), variant: 'destructive' })
     } finally {
       setLoading(false)
     }
@@ -132,7 +132,7 @@ export default function ApiKeysPage() {
     }
     setCreating(true)
     try {
-      const result = await createApiKey(name, newChannelIDs)
+      const result = await createToken(name, newChannelIDs)
       setCreatedResult({ plaintext: result.plaintext, name: result.key.name })
       setNewKeyName('')
       setNewChannelIDs([])
@@ -144,9 +144,9 @@ export default function ApiKeysPage() {
     }
   }
 
-  async function handleToggle(key: APIKey) {
+  async function handleToggle(key: Token) {
     try {
-      const next = await toggleApiKey(key.id)
+      const next = await toggleToken(key.id)
       setItems((prev) => prev.map((it) => (it.id === key.id ? { ...it, enabled: next.enabled } : it)))
       if (selectedKey?.id === key.id) {
         setSelectedKey((prev) => (prev ? { ...prev, enabled: next.enabled } : prev))
@@ -160,9 +160,9 @@ export default function ApiKeysPage() {
     if (!toDelete) return
     setDeleting(true)
     try {
-      await deleteApiKey(toDelete.id)
+      await deleteToken(toDelete.id)
       setItems((prev) => prev.filter((it) => it.id !== toDelete.id))
-      toast({ title: 'API Key 已删除', variant: 'success' })
+      toast({ title: '令牌已删除', variant: 'success' })
       if (selectedKey?.id === toDelete.id) {
         setDetailOpen(false)
         setSelectedKey(null)
@@ -176,14 +176,14 @@ export default function ApiKeysPage() {
     }
   }
 
-  async function openDetail(key: APIKey) {
+  async function openDetail(key: Token) {
     setDetailOpen(true)
     setDetailLoading(true)
     setDetailPlaintext('')
     try {
       const [detail, plaintext] = await Promise.all([
-        getApiKey(key.id),
-        getApiKeyPlaintext(key.id),
+        getToken(key.id),
+        getTokenPlaintext(key.id),
       ])
       setSelectedKey(detail)
       setDetailChannelIDs(detail.default_channel_ids ?? [])
@@ -210,7 +210,7 @@ export default function ApiKeysPage() {
     if (!selectedKey) return
     setDetailSaving(true)
     try {
-      await updateApiKeyChannels(selectedKey.id, detailChannelIDs)
+      await updateTokenChannels(selectedKey.id, detailChannelIDs)
       const next = { ...selectedKey, default_channel_ids: detailChannelIDs }
       setSelectedKey(next)
       setItems((prev) => prev.map((it) => (it.id === next.id ? next : it)))
@@ -222,12 +222,12 @@ export default function ApiKeysPage() {
     }
   }
 
-  async function openCurl(key: APIKey) {
+  async function openCurl(key: Token) {
     setCurlKeyId(key.id)
     setCurlPlaintext('')
     setCurlLoading(true)
     try {
-      const plaintext = await getApiKeyPlaintext(key.id)
+      const plaintext = await getTokenPlaintext(key.id)
       setCurlPlaintext(plaintext)
     } catch (err) {
       toast({ title: '加载密钥失败', description: String(err), variant: 'destructive' })
@@ -245,7 +245,7 @@ export default function ApiKeysPage() {
   async function handleCopyFromList(keyId: number) {
     setCopyingId(keyId)
     try {
-      const plaintext = await getApiKeyPlaintext(keyId)
+      const plaintext = await getTokenPlaintext(keyId)
       await navigator.clipboard.writeText(plaintext)
       toast({ title: '密钥已复制' })
     } catch (err) {
@@ -257,10 +257,10 @@ export default function ApiKeysPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="API">
+      <PageHeader title="令牌">
         <Button size="sm" onClick={() => setCreateOpen(true)}>
           <Plus className="mr-1 h-4 w-4" />
-          新建 Key
+          新建令牌
         </Button>
       </PageHeader>
 
@@ -302,7 +302,7 @@ export default function ApiKeysPage() {
       ) : filteredItems.length === 0 ? (
         <Card>
           <CardContent className="py-10 text-center text-sm text-muted-foreground">
-            {search.trim() ? '没有匹配的 API Key。' : '还没有 API Key。'}
+            {search.trim() ? '没有匹配的令牌。' : '还没有令牌。'}
           </CardContent>
         </Card>
       ) : (
@@ -438,7 +438,7 @@ export default function ApiKeysPage() {
       <Dialog open={createOpen && !createdResult} onOpenChange={(open) => !open && resetCreateDialog()}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>新建 API Key</DialogTitle>
+            <DialogTitle>新建令牌</DialogTitle>
             <DialogDescription>创建后密钥会立即展示，之后可在详情里查看。</DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
@@ -513,14 +513,14 @@ export default function ApiKeysPage() {
       <Dialog open={detailOpen} onOpenChange={(open) => !open && closeDetail()}>
         <DialogContent className="overflow-visible">
           <DialogHeader>
-            <DialogTitle>API Key 详情</DialogTitle>
+            <DialogTitle>令牌详情</DialogTitle>
           </DialogHeader>
           {detailLoading || !selectedKey ? (
             <p className="text-sm text-muted-foreground">加载中…</p>
           ) : (
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label>明文 Key</Label>
+                <Label>明文字令</Label>
                 <div className="rounded-md border bg-muted p-3">
                   <div className="flex items-start gap-2">
                     <code className="min-w-0 flex-1 select-all break-all text-sm">{detailPlaintext}</code>
@@ -584,9 +584,9 @@ export default function ApiKeysPage() {
       <Dialog open={Boolean(toDelete)} onOpenChange={(open) => !open && setToDelete(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>删除 API Key</DialogTitle>
+            <DialogTitle>删除令牌</DialogTitle>
             <DialogDescription>
-              确认删除 Key「{toDelete?.name}」？使用该 Key 的所有外部调用将立即失败。
+              确认删除令牌「{toDelete?.name}」？使用该令牌的所有外部调用将立即失败。
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -599,7 +599,7 @@ export default function ApiKeysPage() {
       </Dialog>
 
       <CurlUsageDialog
-        apiKey={curlPlaintext}
+        token={curlPlaintext}
         open={curlKeyId !== null && !curlLoading}
         onClose={closeCurl}
       />

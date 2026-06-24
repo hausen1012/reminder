@@ -66,9 +66,9 @@
 | 位置 | 当前 | 目标 |
 |---|---|---|
 | 侧边栏 | 通知通道 | 通知 |
-| 侧边栏 | API Key | API |
+| 侧边栏 | 令牌 | API |
 | 通道列表页标题 | 通知通道 | 通知 |
-| API Key 页标题 | API Key | API |
+| 令牌 页标题 | 令牌 | API |
 
 ## 4. 列表展示通道
 
@@ -87,6 +87,6 @@
 | `frontend/src/components/reminders/LunarPicker.tsx` | **删除**，功能合并到 CalendarPopover |
 | `frontend/src/components/layout/Sidebar.tsx` | 更新标签 |
 | `frontend/src/pages/channels/index.tsx` | 更新标题 |
-| `frontend/src/pages/apikeys/index.tsx` | 更新标题 |
+| `frontend/src/pages/tokens/index.tsx` | 更新标题 |
 | `frontend/src/pages/reminders/index.tsx` | 新增通道列 |
 | `frontend/package.json` | 添加 `lunar-typescript` 依赖 |

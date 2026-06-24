@@ -12,7 +12,7 @@ import Profile from '@/pages/Profile'
 import ChannelsPage from '@/pages/channels'
 import RemindersPage from '@/pages/reminders'
 import LogsPage from '@/pages/logs'
-import ApiKeysPage from '@/pages/apikeys'
+import TokensPage from '@/pages/tokens'
 import SchedulerPage from '@/pages/scheduler'
 
 export default function App() {
@@ -42,7 +42,7 @@ export default function App() {
                   <Route path="reminders" element={<RemindersPage />} />
                   <Route path="logs" element={<LogsPage />} />
                   <Route path="channels" element={<ChannelsPage />} />
-                  <Route path="apikeys" element={<ApiKeysPage />} />
+                  <Route path="tokens" element={<TokensPage />} />
                   <Route path="scheduler" element={<SchedulerPage />} />
                   <Route path="profile" element={<Profile />} />
                 </Route>

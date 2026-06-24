@@ -12,7 +12,7 @@ import {
 import { useToast } from '@/components/ui/use-toast'
 
 interface Props {
-  apiKey: string
+  token: string
   open: boolean
   onClose: () => void
 }
@@ -49,24 +49,24 @@ function CurlBlock({ curl, label }: { curl: string; label: string }) {
   )
 }
 
-export function CurlUsageDialog({ apiKey, open, onClose }: Props) {
+export function CurlUsageDialog({ token, open, onClose }: Props) {
   const at = useMemo(() => oneHourLater(), [open])
 
   const curlSimple = useMemo(
     () => `curl -X POST /api/ingest/reminders \\
-  -H "X-API-Key: ${apiKey}" \\
+  -H "X-AUTH: ${token}" \\
   -H "Content-Type: application/json" \\
   -d '{
   "title": "提醒标题",
   "content": "提醒内容",
   "schedule_spec": {"at": "${at}"}
 }'`,
-    [apiKey, at],
+    [token, at],
   )
 
   const curlOnce = useMemo(
     () => `curl -X POST /api/ingest/reminders \\
-  -H "X-API-Key: ${apiKey}" \\
+  -H "X-AUTH: ${token}" \\
   -H "Content-Type: application/json" \\
   -d '{
   "title": "提醒标题",
@@ -76,12 +76,12 @@ export function CurlUsageDialog({ apiKey, open, onClose }: Props) {
   "channel_ids": [1],
   "require_confirm": false
 }'`,
-    [apiKey, at],
+    [token, at],
   )
 
   const curlInterval = useMemo(
     () => `curl -X POST /api/ingest/reminders \\
-  -H "X-API-Key: ${apiKey}" \\
+  -H "X-AUTH: ${token}" \\
   -H "Content-Type: application/json" \\
   -d '{
   "title": "提醒标题",
@@ -92,12 +92,12 @@ export function CurlUsageDialog({ apiKey, open, onClose }: Props) {
   "channel_ids": [1],
   "require_confirm": false
 }'`,
-    [apiKey],
+    [token],
   )
 
   const curlCron = useMemo(
     () => `curl -X POST /api/ingest/reminders \\
-  -H "X-API-Key: ${apiKey}" \\
+  -H "X-AUTH: ${token}" \\
   -H "Content-Type: application/json" \\
   -d '{
   "title": "提醒标题",
@@ -108,7 +108,7 @@ export function CurlUsageDialog({ apiKey, open, onClose }: Props) {
   "channel_ids": [1],
   "require_confirm": false
 }'`,
-    [apiKey],
+    [token],
   )
 
   return (

@@ -59,7 +59,7 @@ type ReminderInput struct {
 	ConfirmRetryIntervalSec int            `json:"confirm_retry_interval_sec"`
 	ConfirmMaxRetries       int            `json:"confirm_max_retries"`
 	Source                  string         `json:"source,omitempty"`
-	APIKeyID                *uint          `json:"api_key_id,omitempty"`
+	TokenID                *uint          `json:"token_id,omitempty"`
 }
 
 // ReminderView 是返回前端的视图（含 next_fire_at 与绑定的 channel_ids）。
@@ -113,7 +113,7 @@ func (s *ReminderService) Create(in ReminderInput) (*ReminderView, error) {
 		ScheduleSpec:            datatypes.JSON(specRaw),
 		Timezone:                in.Timezone,
 		Source:                  in.Source,
-		APIKeyID:                in.APIKeyID,
+		TokenID:                in.TokenID,
 		Enabled:                 true,
 		NextFireAt:              next,
 		RequireConfirm:          in.RequireConfirm,
@@ -232,7 +232,7 @@ type ListFilter struct {
 	Source    string // manual | api | ""
 	Enabled   *bool
 	Search    string
-	APIKeyID  *uint
+	TokenID  *uint
 	Limit     int
 	Offset    int
 	SortBy    string // created_at | id | next_fire_at
@@ -245,8 +245,8 @@ func (s *ReminderService) List(f ListFilter) ([]*ReminderView, int64, error) {
 	if f.Source != "" && f.Source != "all" {
 		q = q.Where("source = ?", f.Source)
 	}
-	if f.APIKeyID != nil {
-		q = q.Where("api_key_id = ?", *f.APIKeyID)
+	if f.TokenID != nil {
+		q = q.Where("token_id = ?", *f.TokenID)
 	}
 	if f.Enabled != nil {
 		q = q.Where("enabled = ?", *f.Enabled)

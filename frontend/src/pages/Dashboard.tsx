@@ -4,7 +4,7 @@ import { Bell, ScrollText, Send, Key, ArrowRight, CheckCircle2, XCircle, Loader2
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { useAuth } from '@/contexts/AuthContext'
-import { listTodayReminders, listLogs, listChannelStats, listApiKeyStats } from '@/lib/api'
+import { listTodayReminders, listLogs, listChannelStats, listTokenStats } from '@/lib/api'
 import { formatReminderDetail } from '@/lib/utils'
 import { PageHeader } from '@/components/ui/PageHeader'
 import type { Reminder, DeliveryLog } from '@/types'
@@ -24,8 +24,8 @@ export default function Dashboard() {
   const [logsLoading, setLogsLoading] = useState(true)
   const [channelStats, setChannelStats] = useState<ChannelStats[]>([])
   const [channelStatsLoading, setChannelStatsLoading] = useState(true)
-  const [apiKeyStats, setApiKeyStats] = useState<{ id: number; name: string; usage_24h: number }[]>([])
-  const [apiKeyStatsLoading, setApiKeyStatsLoading] = useState(true)
+  const [tokenStats, setTokenStats] = useState<{ id: number; name: string; usage_24h: number }[]>([])
+  const [tokenStatsLoading, setTokenStatsLoading] = useState(true)
 
   useEffect(() => {
     const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
@@ -35,7 +35,7 @@ export default function Dashboard() {
     }).finally(() => setTodayLoading(false))
     listLogs({ limit: 200, since: since24h }).then((r) => setLogs(r.items ?? [])).finally(() => setLogsLoading(false))
     listChannelStats('24h').then(setChannelStats).finally(() => setChannelStatsLoading(false))
-    listApiKeyStats().then(setApiKeyStats).finally(() => setApiKeyStatsLoading(false))
+    listTokenStats().then(setTokenStats).finally(() => setTokenStatsLoading(false))
   }, [])
 
   const totalChannelSend = channelStats.reduce((s, c) => s + c.total, 0)
@@ -131,17 +131,17 @@ export default function Dashboard() {
         {/* API Key 调用 */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">API Key 调用</CardTitle>
+            <CardTitle className="text-sm font-medium">令牌调用</CardTitle>
             <Key className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            {apiKeyStatsLoading ? (
+            {tokenStatsLoading ? (
               <MiniLoader />
             ) : (
               <>
-                <div className="text-2xl font-bold">{apiKeyStats.reduce((s, k) => s + k.usage_24h, 0)}</div>
+                <div className="text-2xl font-bold">{tokenStats.reduce((s, k) => s + k.usage_24h, 0)}</div>
                 <p className="text-xs text-muted-foreground mt-1">过去 24h API 调用次数</p>
-                <Link to="/apikeys" className="text-xs text-primary hover:underline inline-flex items-center gap-1 mt-2">
+                <Link to="/tokens" className="text-xs text-primary hover:underline inline-flex items-center gap-1 mt-2">
                   查看详情 <ArrowRight className="h-3 w-3" />
                 </Link>
               </>

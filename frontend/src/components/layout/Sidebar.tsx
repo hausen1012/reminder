@@ -13,7 +13,7 @@ const navItems = [
   { to: '/reminders', label: '提醒', icon: Bell },
   { to: '/channels', label: '通知', icon: Send },
   { to: '/logs', label: '日志', icon: ScrollText },
-  { to: '/apikeys', label: 'API', icon: Key },
+  { to: '/tokens', label: '令牌', icon: Key },
   { to: '/scheduler', label: '监控', icon: Activity },
   { to: '/profile', label: '设置', icon: User },
 ]

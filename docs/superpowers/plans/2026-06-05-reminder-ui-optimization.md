@@ -42,7 +42,7 @@ export interface CalendarResult {
 }
 ```
 
-在第 161 行 APIKey 接口定义之后添加。
+在第 161 行 Token 接口定义之后添加。
 
 - [ ] **Step 2: 创建 CalendarPopover 组件**
 
@@ -439,19 +439,19 @@ function formatScheduleDate(spec: Record<string, unknown>, calendar: ReminderCal
 **Files:**
 - Modify: `frontend/src/components/layout/Sidebar.tsx`
 - Modify: `frontend/src/pages/channels/index.tsx`
-- Modify: `frontend/src/pages/apikeys/index.tsx`
+- Modify: `frontend/src/pages/tokens/index.tsx`
 
 - [ ] **Step 1: 更新 Sidebar.tsx**
 
 ```typescript
 // 第 13 行：'通知通道' → '通知'
-// 第 14 行：'API Key' → 'API'
+// 第 14 行：'令牌' → 'API'
 const navItems = [
   { to: '/', label: '首页', icon: LayoutDashboard },
   { to: '/reminders', label: '提醒', icon: Bell },
   { to: '/logs', label: '日志', icon: ScrollText },
   { to: '/channels', label: '通知', icon: Send },
-  { to: '/apikeys', label: 'API', icon: Key },
+  { to: '/tokens', label: 'API', icon: Key },
   { to: '/profile', label: '设置', icon: User },
 ]
 ```
@@ -467,7 +467,7 @@ const navItems = [
 </p>
 ```
 
-- [ ] **Step 3: 更新 apikeys/index.tsx 页面标题**
+- [ ] **Step 3: 更新 tokens/index.tsx 页面标题**
 
 ```typescript
 // 第 96 行

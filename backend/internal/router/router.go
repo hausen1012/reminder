@@ -79,7 +79,7 @@ func Setup(staticFS embed.FS, cfg *config.Config) *SetupResult {
 		_, _ = engine.AddPurgeCron(logSvc, purgeAfter)
 	}
 
-	apiKeySvc := services.NewApiKeyService(database.DB)
+	tokenSvc := services.NewTokenService(database.DB)
 	configSvc := services.NewConfigService(database.DB)
 
 	authHandler := &handlers.AuthHandler{JWTSecret: cfg.JWTSecret}
@@ -87,8 +87,8 @@ func Setup(staticFS embed.FS, cfg *config.Config) *SetupResult {
 	reminderHandler := &handlers.ReminderHandler{Svc: reminderSvc}
 	logHandler := &handlers.LogHandler{Svc: logSvc}
 	confirmHandler := &handlers.ConfirmHandler{Svc: confirmSvc}
-	apiKeyHandler := &handlers.ApiKeyHandler{Svc: apiKeySvc}
-	ingestHandler := &handlers.IngestHandler{ReminderSvc: reminderSvc, ApiKeySvc: apiKeySvc, ChannelSvc: channelSvc}
+	tokenHandler := &handlers.TokenHandler{Svc: tokenSvc}
+	ingestHandler := &handlers.IngestHandler{ReminderSvc: reminderSvc, TokenSvc: tokenSvc, ChannelSvc: channelSvc}
 	schedulerHandler := &handlers.SchedulerHandler{Engine: engine, Sweeper: sweeper}
 		configHandler := &handlers.ConfigHandler{Svc: configSvc}
 
@@ -110,16 +110,16 @@ func Setup(staticFS embed.FS, cfg *config.Config) *SetupResult {
 		auth.PUT("/password", handlers.UpdatePassword)
 	}
 
-	// Ingest API（API Key 鉴权，非 JWT）
-	apiKeyVerify := func(plain string) (uint, bool) {
-		k, ok := apiKeySvc.Verify(plain)
+	// Ingest API（令牌鉴权，非 JWT）
+	tokenVerify := func(plain string) (uint, bool) {
+		k, ok := tokenSvc.Verify(plain)
 		if !ok || k == nil {
 			return 0, false
 		}
 		return k.ID, true
 	}
 	ingest := api.Group("/ingest")
-	ingest.Use(middleware.APIKeyAuth(apiKeyVerify, apiKeySvc.TouchLastUsed, nil))
+	ingest.Use(middleware.TokenAuth(tokenVerify, tokenSvc.TouchLastUsed, nil))
 	{
 		ingest.POST("/reminders", ingestHandler.CreateReminder)
 		ingest.GET("/reminders", ingestHandler.ListReminders)
@@ -168,16 +168,16 @@ func Setup(staticFS embed.FS, cfg *config.Config) *SetupResult {
 			logs.DELETE("", logHandler.Purge)
 		}
 
-		apikeys := protected.Group("/apikeys")
+		tokens := protected.Group("/tokens")
 		{
-			apikeys.GET("", apiKeyHandler.List)
-			apikeys.POST("", apiKeyHandler.Create)
-			apikeys.GET("/stats", apiKeyHandler.Stats)
-			apikeys.GET("/:id", apiKeyHandler.Get)
-			apikeys.GET("/:id/plaintext", apiKeyHandler.GetPlaintext)
-			apikeys.DELETE("/:id", apiKeyHandler.Delete)
-			apikeys.PATCH("/:id/toggle", apiKeyHandler.Toggle)
-			apikeys.PUT("/:id/channels", apiKeyHandler.UpdateDefaultChannels)
+			tokens.GET("", tokenHandler.List)
+			tokens.POST("", tokenHandler.Create)
+			tokens.GET("/stats", tokenHandler.Stats)
+			tokens.GET("/:id", tokenHandler.Get)
+			tokens.GET("/:id/plaintext", tokenHandler.GetPlaintext)
+			tokens.DELETE("/:id", tokenHandler.Delete)
+			tokens.PATCH("/:id/toggle", tokenHandler.Toggle)
+			tokens.PUT("/:id/channels", tokenHandler.UpdateDefaultChannels)
 		}
 
 		scheduler := protected.Group("/scheduler")
