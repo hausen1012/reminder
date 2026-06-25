@@ -190,21 +190,34 @@ th{background:#f9fafb;font-weight:600}
 <p>所有请求需在 HTTP 头携带令牌：<code>X-AUTH: bdrk_xxxxxxxx</code></p>
 <p>令牌由面板创建，创建时仅展示一次。</p>
 
-<h2>通用响应格式</h2>
-<p>所有接口返回统一 JSON 结构：</p>
+<h2>响应格式</h2>
+
+<h3>成功响应</h3>
+<p>所有成功接口返回统一 JSON 结构：</p>
 <pre class="res">{
-  "code": 0,         // 0=成功，非0=错误码
-  "message": "ok",   // 成功或错误描述
+  "code": 200,       // 固定 200
+  "message": "ok",
   "data": { ... }    // 业务数据，详见各接口
 }</pre>
 
+<h3>错误响应</h3>
+<p>错误时返回对应的 HTTP 状态码，响应体为：</p>
+<pre class="res">{
+  "error": {
+    "code": "validation_failed",
+    "message": "描述信息"
+  }
+}</pre>
+
 <table>
-<tr><th>错误码</th><th>说明</th></tr>
-<tr><td>0</td><td>成功</td></tr>
-<tr><td>401</td><td>令牌无效或未提供</td></tr>
-<tr><td>429</td><td>请求频率超限</td></tr>
-<tr><td>40001</td><td>参数校验失败</td></tr>
-<tr><td>40401</td><td>资源不存在</td></tr>
+<tr><th>HTTP 状态码</th><th>error.code</th><th>说明</th></tr>
+<tr><td>400</td><td>validation_failed</td><td>参数校验失败</td></tr>
+<tr><td>401</td><td>unauthorized</td><td>令牌无效或未提供</td></tr>
+<tr><td>403</td><td>forbidden</td><td>无权访问</td></tr>
+<tr><td>404</td><td>not_found</td><td>资源不存在</td></tr>
+<tr><td>409</td><td>conflict</td><td>冲突</td></tr>
+<tr><td>429</td><td>rate_limited</td><td>请求频率超限（默认 60/min）</td></tr>
+<tr><td>500</td><td>internal_error</td><td>服务器内部错误</td></tr>
 </table>
 
 <hr style="margin:32px 0">
@@ -219,11 +232,11 @@ th{background:#f9fafb;font-weight:600}
 <pre class="req">{
   "title":        "string",       // 必填，最长 200 字符
   "content":      "string",       // 选填，默认等于 title
+  "content_format": "text",       // 选填，text | markdown | html，默认 text
   "schedule_spec": {
-    "at":    "2026-06-06T09:00:00", // once 类型
-    "expr":  "0 9 * * *",           // cron 类型
-    "every": 1,                     // interval 类型
-    "unit":  "day"                  // interval 类型：day|hour|minute
+    "at":    "2026-06-06T09:00:00",   // solar + once 类型
+    "expr":  "0 9 * * *",            // solar + cron 类型
+    "start_at": "2026-06-06T09:00:00", "every": 1, "unit": "day"  // solar + interval
   },
   "schedule_type":           "once",  // once | interval | cron，默认 once
   "calendar":                "solar", // solar | lunar，默认 solar
@@ -232,6 +245,19 @@ th{background:#f9fafb;font-weight:600}
   "require_confirm":        false,    // 选填
   "confirm_retry_interval_sec": 60,   // 选填
   "confirm_max_retries":         3    // 选填
+}</pre>
+
+<h4>农历请求体示例</h4>
+<pre class="req">{
+  "title": "春节提醒",
+  "calendar": "lunar",
+  "schedule_type": "once",
+  "schedule_spec": {
+    "lunar": {"year": 2027, "month": 1, "day": 1},
+    "hour": 9,
+    "minute": 0
+  },
+  "channel_ids": [1]
 }</pre>
 
 <h4>响应</h4>
@@ -312,7 +338,7 @@ th{background:#f9fafb;font-weight:600}
 
 <h4>响应</h4>
 <pre class="res">{
-  "code": 0,
+  "code": 200,
   "message": "ok",
   "data": null
 }</pre>
@@ -343,10 +369,10 @@ th{background:#f9fafb;font-weight:600}
 <table>
 <tr><th>Calendar</th><th>schedule_type</th><th>schedule_spec 示例</th></tr>
 <tr><td>solar</td><td>once</td><td><code>{"at": "2026-06-06T09:00:00"}</code></td></tr>
-<tr><td>solar</td><td>interval</td><td><code>{"every": 1, "unit": "day"}</code></td></tr>
+<tr><td>solar</td><td>interval</td><td><code>{"start_at": "2026-06-06T09:00:00", "every": 1, "unit": "day"}</code></td></tr>
 <tr><td>solar</td><td>cron</td><td><code>{"expr": "0 9 * * *"}</code></td></tr>
-<tr><td>lunar</td><td>once</td><td><code>{"year": 2026, "month": 1, "day": 1, "hour": 9, "minute": 0}</code></td></tr>
-<tr><td>lunar</td><td>interval</td><td><code>{"start_year": 2026, "start_month": 1, "start_day": 1, "every": 1, "unit": "month"}</code></td></tr>
+<tr><td>lunar</td><td>once</td><td><code>{"lunar": {"year": 2026, "month": 1, "day": 1}, "hour": 9, "minute": 0}</code></td></tr>
+<tr><td>lunar</td><td>interval</td><td><code>{"start_lunar": {"year": 2026, "month": 1, "day": 1}, "every": 1, "unit": "month"}</code></td></tr>
 </table>
 
 <h2>curl 示例</h2>
@@ -358,6 +384,7 @@ th{background:#f9fafb;font-weight:600}
   -d '{
     "title": "会议提醒",
     "content": "15分钟后有会议",
+    "schedule_type": "once",
     "schedule_spec": {"at": "2026-06-25T14:00:00"},
     "channel_ids": [1]
   }'</pre>
@@ -381,12 +408,32 @@ th{background:#f9fafb;font-weight:600}
   -d '{
     "title": "每小时提醒",
     "schedule_type": "interval",
-    "schedule_spec": {"every": 1, "unit": "hour"},
+    "schedule_spec": {"start_at": "2026-06-25T09:00:00", "every": 1, "unit": "hour"},
+    "channel_ids": [1]
+  }'</pre>
+
+<h4>创建农历提醒</h4>
+<pre class="curl">curl -X POST /api/external/v1/reminders \
+  -H "X-AUTH: bdrk_xxx" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "春节提醒",
+    "calendar": "lunar",
+    "schedule_type": "once",
+    "schedule_spec": {"lunar": {"year": 2027, "month": 1, "day": 1}, "hour": 9, "minute": 0},
     "channel_ids": [1]
   }'</pre>
 
 <h4>列出提醒</h4>
 <pre class="curl">curl "/api/external/v1/reminders?limit=10&offset=0" \
+  -H "X-AUTH: bdrk_xxx"</pre>
+
+<h4>查询单条提醒</h4>
+<pre class="curl">curl /api/external/v1/reminders/1 \
+  -H "X-AUTH: bdrk_xxx"</pre>
+
+<h4>删除提醒</h4>
+<pre class="curl">curl -X DELETE /api/external/v1/reminders/1 \
   -H "X-AUTH: bdrk_xxx"</pre>
 
 <h4>获取通知渠道</h4>
