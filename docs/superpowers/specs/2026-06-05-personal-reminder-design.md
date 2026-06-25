@@ -1,8 +1,8 @@
 # 个人提醒助手 / 通知秘书 — 设计文档
 
 - 日期：2026-06-05
-- 基础项目：bedrock（Go + Gin + GORM + SQLite + React + TS + Tailwind + shadcn）
-- 部署形态：单二进制 + 单 SQLite + 单进程，沿用 bedrock 的全栈一体化方式
+- 基础项目：reminder（Go + Gin + GORM + SQLite + React + TS + Tailwind + shadcn）
+- 部署形态：单二进制 + 单 SQLite + 单进程，沿用 reminder 的全栈一体化方式
 
 ## 1. 目标与范围
 
@@ -27,7 +27,7 @@
 
 ```
 Gin Router
-  ├── /api/auth/*            登录、鉴权（沿用 bedrock）
+  ├── /api/auth/*            登录、鉴权（沿用 reminder）
   ├── /api/reminders         提醒 CRUD、启用/禁用、试发、预览下次触发
   ├── /api/channels          通道 CRUD、试发
   ├── /api/logs              日志查询、清理
@@ -726,7 +726,7 @@ per-Key per-minute 内存计数器，默认 60/min。超过 → 429 + Retry-Afte
 
 ### 10.1 侧边栏
 
-在 bedrock 现有 Sidebar 上加菜单：
+在 reminder 现有 Sidebar 上加菜单：
 
 ```
 首页              Dashboard（改造）

@@ -34,7 +34,7 @@ type SetupResult struct {
 
 // Setup 构建路由 + 启动调度器 + Sweeper。
 //
-// 与 bedrock 原版相比：返回值新增 SchedulerHandles 用于优雅停机；
+// 与 reminder 原版相比：返回值新增 SchedulerHandles 用于优雅停机；
 // 旧调用方仍可使用 SetupEngine 取仅 *gin.Engine 的形态。
 func Setup(staticFS embed.FS, cfg *config.Config) *SetupResult {
 	r := gin.Default()

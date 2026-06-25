@@ -33,7 +33,7 @@ func abortErr(c *gin.Context, err error) {
 
 // successJSON 是面向前端的成功响应：直接返回业务数据。
 //
-// 沿用 bedrock 的 `{code, message, data}` 包装，方便前端统一处理。
+// 沿用 reminder 的 `{code, message, data}` 包装，方便前端统一处理。
 func successJSON(c *gin.Context, data any) {
 	c.JSON(http.StatusOK, gin.H{
 		"code":    200,

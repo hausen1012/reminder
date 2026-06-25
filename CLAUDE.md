@@ -22,7 +22,7 @@ dd## 系统
 | Variable | Default | Description |
 |---|---|---|
 | PORT | 8765 | Listen port |
-| DB_PATH | /data/db/bedrock.db | SQLite database path |
+| DB_PATH | /data/db/reminder.db | SQLite database path |
 | JWT_SECRET | auto-generated | HMAC signing key |
 | USERNAME | admin | Seed admin username |
 | PASSWORD | admin123 | Seed admin password |
