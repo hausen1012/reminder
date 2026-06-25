@@ -262,26 +262,31 @@ th{background:#f9fafb;font-weight:600}
 
 <h4>响应</h4>
 <pre class="res">{
-  "id": 1,
-  "title": "每日提醒",
-  "content": "现在是 12:00",
-  "content_format": "text",
-  "calendar": "solar",
-  "schedule_type": "cron",
-  "schedule_spec": {"expr": "0 9 * * *"},
-  "timezone": "Asia/Shanghai",
-  "enabled": true,
-  "source": "api",
-  "token_id": 1,
-  "require_confirm": false,
-  "confirm_retry_interval_sec": 60,
-  "confirm_max_retries": 3,
-  "next_fire_at": "2026-06-25T01:00:00Z",
-  "last_fired_at": null,
-  "fire_count": 0,
-  "channel_ids": [1],
-  "created_at": "2026-06-24T12:00:00Z",
-  "updated_at": "2026-06-24T12:00:00Z"
+  "code": 200,
+  "message": "ok",
+  "data": {
+    "id": 1,
+    "title": "每日提醒",
+    "content": "现在是 12:00",
+    "content_format": "text",
+    "calendar": "solar",
+    "schedule_type": "cron",
+    "schedule_spec": {"expr": "0 9 * * *"},
+    "timezone": "Asia/Shanghai",
+    "enabled": true,
+    "source": "api",
+    "token_id": 1,
+    "require_confirm": false,
+    "confirm_retry_interval_sec": 60,
+    "confirm_max_retries": 3,
+    "next_fire_at": "2026-06-25T01:00:00Z",
+    "last_fired_at": null,
+    "fire_count": 0,
+    "next_fire_at_local": "2026-06-25 09:00",
+    "channel_ids": [1],
+    "created_at": "2026-06-24T12:00:00Z",
+    "updated_at": "2026-06-24T12:00:00Z"
+  }
 }</pre>
 
 <!-- ──────── GET /api/external/v1/reminders ──────── -->
@@ -291,38 +296,43 @@ th{background:#f9fafb;font-weight:600}
 <h4>查询参数</h4>
 <table>
 <tr><th>参数</th><th>类型</th><th>说明</th></tr>
-<tr><td>limit</td><td>int</td><td>每页条数，默认 10</td></tr>
+<tr><td>limit</td><td>int</td><td>每页条数，默认 50</td></tr>
 <tr><td>offset</td><td>int</td><td>偏移量，默认 0</td></tr>
 <tr><td>search</td><td>string</td><td>搜索标题关键字</td></tr>
 </table>
 
 <h4>响应</h4>
 <pre class="res">{
-  "items": [
-    {
-      "id": 1,
-      "title": "每日提醒",
-      "content": "内容",
-      "content_format": "text",
-      "calendar": "solar",
-      "schedule_type": "cron",
-      "schedule_spec": {"expr": "0 9 * * *"},
-      "timezone": "Asia/Shanghai",
-      "enabled": true,
-      "source": "api",
-      "token_id": 1,
-      "require_confirm": false,
-      "confirm_retry_interval_sec": 60,
-      "confirm_max_retries": 3,
-      "next_fire_at": "2026-06-25T01:00:00Z",
-      "last_fired_at": null,
-      "fire_count": 0,
-      "channel_ids": [1],
-      "created_at": "2026-06-24T12:00:00Z",
-      "updated_at": "2026-06-24T12:00:00Z"
-    }
-  ],
-  "total": 1
+  "code": 200,
+  "message": "ok",
+  "data": {
+    "items": [
+      {
+        "id": 1,
+        "title": "每日提醒",
+        "content": "内容",
+        "content_format": "text",
+        "calendar": "solar",
+        "schedule_type": "cron",
+        "schedule_spec": {"expr": "0 9 * * *"},
+        "timezone": "Asia/Shanghai",
+        "enabled": true,
+        "source": "api",
+        "token_id": 1,
+        "require_confirm": false,
+        "confirm_retry_interval_sec": 60,
+        "confirm_max_retries": 3,
+        "next_fire_at": "2026-06-25T01:00:00Z",
+        "last_fired_at": null,
+        "fire_count": 0,
+        "next_fire_at_local": "2026-06-25 09:00",
+        "channel_ids": [1],
+        "created_at": "2026-06-24T12:00:00Z",
+        "updated_at": "2026-06-24T12:00:00Z"
+      }
+    ],
+    "total": 1
+  }
 }</pre>
 
 <!-- ──────── GET /api/external/v1/reminders/:id ──────── -->
@@ -348,20 +358,24 @@ th{background:#f9fafb;font-weight:600}
 <p>获取所有通知渠道列表。</p>
 
 <h4>响应</h4>
-<pre class="res">[
-  {
-    "id": 1,
-    "name": "邮件通知",
-    "type": "smtp",
-    "enabled": true,
-    "config": {
-      "host": "***",
-      "port": "***"
-    },
-    "created_at": "2026-06-24T12:00:00Z",
-    "updated_at": "2026-06-24T12:00:00Z"
-  }
-]</pre>
+<pre class="res">{
+  "code": 200,
+  "message": "ok",
+  "data": [
+    {
+      "id": 1,
+      "name": "邮件通知",
+      "type": "smtp",
+      "enabled": true,
+      "config": {
+        "host": "***",
+        "port": "***"
+      },
+      "created_at": "2026-06-24T12:00:00Z",
+      "updated_at": "2026-06-24T12:00:00Z"
+    }
+  ]
+}</pre>
 
 <p>注意：<code>config</code> 中敏感字段以 <code>_enc</code> 结尾的值会被脱敏为 <code>"***"</code>。</p>
 
@@ -372,7 +386,7 @@ th{background:#f9fafb;font-weight:600}
 <tr><td>solar</td><td>interval</td><td><code>{"start_at": "2026-06-06T09:00:00", "every": 1, "unit": "day"}</code></td></tr>
 <tr><td>solar</td><td>cron</td><td><code>{"expr": "0 9 * * *"}</code></td></tr>
 <tr><td>lunar</td><td>once</td><td><code>{"lunar": {"year": 2026, "month": 1, "day": 1}, "hour": 9, "minute": 0}</code></td></tr>
-<tr><td>lunar</td><td>interval</td><td><code>{"start_lunar": {"year": 2026, "month": 1, "day": 1}, "every": 1, "unit": "month"}</code></td></tr>
+<tr><td>lunar</td><td>interval</td><td><code>{"start_lunar": {"year": 2026, "month": 1, "day": 1}, "hour": 9, "minute": 0, "every": 1, "unit": "month"}</code></td></tr>
 </table>
 
 <h2>curl 示例</h2>
@@ -421,6 +435,18 @@ th{background:#f9fafb;font-weight:600}
     "calendar": "lunar",
     "schedule_type": "once",
     "schedule_spec": {"lunar": {"year": 2027, "month": 1, "day": 1}, "hour": 9, "minute": 0},
+    "channel_ids": [1]
+  }'</pre>
+
+<h4>创建农历重复提醒</h4>
+<pre class="curl">curl -X POST /api/external/v1/reminders \
+  -H "X-AUTH: bdrk_xxx" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "每月初一提醒",
+    "calendar": "lunar",
+    "schedule_type": "interval",
+    "schedule_spec": {"start_lunar": {"year": 2026, "month": 1, "day": 1}, "hour": 9, "minute": 0, "every": 1, "unit": "month"},
     "channel_ids": [1]
   }'</pre>
 
