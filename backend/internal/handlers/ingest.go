@@ -134,7 +134,7 @@ func (h *IngestHandler) ListChannels(c *gin.Context) {
 
 // Docs GET /api/ingest/docs
 func (h *IngestHandler) Docs(c *gin.Context) {
-	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(ingestDocsHTML))
+	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(renderIngestDocs()))
 }
 
 func (h *IngestHandler) belongsToKey(reminderKeyID *uint, c *gin.Context) bool {
@@ -152,7 +152,8 @@ func (h *IngestHandler) belongsToKey(reminderKeyID *uint, c *gin.Context) bool {
 	return *reminderKeyID == keyID
 }
 
-const ingestDocsHTML = `<!DOCTYPE html>
+func renderIngestDocs() string {
+	return `<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
@@ -165,8 +166,12 @@ h1{font-size:28px;margin-bottom:8px}
 p{color:#666;margin-bottom:24px;line-height:1.6}
 h2{font-size:20px;margin:32px 0 12px;padding-bottom:6px;border-bottom:2px solid #e5e7eb}
 h3{font-size:16px;margin:20px 0 8px;color:#444}
+h4{font-size:14px;margin:16px 0 6px;color:#555}
 code{background:#e5e7eb;padding:2px 6px;border-radius:4px;font-size:13px}
 pre{background:#1e293b;color:#e2e8f0;padding:16px;border-radius:8px;overflow-x:auto;font-size:13px;line-height:1.5;margin:8px 0}
+pre.req{background:#0f3b2e;border-left:3px solid #22c55e}
+pre.res{background:#1e1a33;border-left:3px solid #a78bfa}
+pre.curl{background:#1e293b}
 table{width:100%;border-collapse:collapse;margin:12px 0;font-size:14px}
 th,td{text-align:left;padding:8px 12px;border-bottom:1px solid #e5e7eb}
 th{background:#f9fafb;font-weight:600}
@@ -174,6 +179,7 @@ th{background:#f9fafb;font-weight:600}
 .tag-post{background:#22c55e;color:#fff}
 .tag-get{background:#3b82f6;color:#fff}
 .tag-delete{background:#ef4444;color:#fff}
+.field-opt{color:#999;font-size:12px}
 </style>
 </head>
 <body>
@@ -184,67 +190,209 @@ th{background:#f9fafb;font-weight:600}
 <p>所有请求需在 HTTP 头携带令牌：<code>X-AUTH: bdrk_xxxxxxxx</code></p>
 <p>令牌由面板创建，创建时仅展示一次。</p>
 
+<h2>通用响应格式</h2>
+<p>所有接口返回统一 JSON 结构：</p>
+<pre class="res">{
+  "code": 0,         // 0=成功，非0=错误码
+  "message": "ok",   // 成功或错误描述
+  "data": { ... }    // 业务数据，详见各接口
+}</pre>
+
+<table>
+<tr><th>错误码</th><th>说明</th></tr>
+<tr><td>0</td><td>成功</td></tr>
+<tr><td>401</td><td>令牌无效或未提供</td></tr>
+<tr><td>429</td><td>请求频率超限</td></tr>
+<tr><td>40001</td><td>参数校验失败</td></tr>
+<tr><td>40401</td><td>资源不存在</td></tr>
+</table>
+
+<hr style="margin:32px 0">
+
 <h2>端点</h2>
 
+<!-- ──────── POST /api/ingest/reminders ──────── -->
 <h3><span class="tag tag-post">POST</span> /api/ingest/reminders</h3>
 <p>创建一条提醒。</p>
-<pre>curl -X POST /api/ingest/reminders \
-  -H "X-AUTH: bdrk_xxx" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "title": "每日提醒",
-    "content": "现在是 {{now}}",
-    "schedule_type": "cron",
-    "schedule_spec": {"expr": "0 9 * * *"},
-    "timezone": "Asia/Shanghai",
-    "channel_ids": [1],
-    "require_confirm": false
-  }'</pre>
-<p>未指定 <code>channel_ids</code> 时将使用令牌绑定的默认通道。</p>
 
+<h4>请求体</h4>
+<pre class="req">{
+  "title":        "string",       // 必填，最长 200 字符
+  "content":      "string",       // 选填，默认等于 title
+  "schedule_spec": {
+    "at":    "2026-06-06T09:00:00", // once 类型
+    "expr":  "0 9 * * *",           // cron 类型
+    "every": 1,                     // interval 类型
+    "unit":  "day"                  // interval 类型：day|hour|minute
+  },
+  "schedule_type":           "once",  // once | interval | cron，默认 once
+  "calendar":                "solar", // solar | lunar，默认 solar
+  "timezone":       "Asia/Shanghai",  // 选填，默认 Asia/Shanghai
+  "channel_ids":            [1, 2],   // 选填，为空时使用令牌默认通道
+  "require_confirm":        false,    // 选填
+  "confirm_retry_interval_sec": 60,   // 选填
+  "confirm_max_retries":         3    // 选填
+}</pre>
+
+<h4>响应</h4>
+<pre class="res">{
+  "id": 1,
+  "title": "每日提醒",
+  "content": "现在是 12:00",
+  "content_format": "text",
+  "calendar": "solar",
+  "schedule_type": "cron",
+  "schedule_spec": {"expr": "0 9 * * *"},
+  "timezone": "Asia/Shanghai",
+  "enabled": true,
+  "source": "api",
+  "token_id": 1,
+  "require_confirm": false,
+  "confirm_retry_interval_sec": 60,
+  "confirm_max_retries": 3,
+  "next_fire_at": "2026-06-25T01:00:00Z",
+  "last_fired_at": null,
+  "fire_count": 0,
+  "channel_ids": [1],
+  "created_at": "2026-06-24T12:00:00Z",
+  "updated_at": "2026-06-24T12:00:00Z"
+}</pre>
+
+<!-- ──────── GET /api/ingest/reminders ──────── -->
 <h3><span class="tag tag-get">GET</span> /api/ingest/reminders</h3>
-<p>列出本 Key 创建的提醒（仅返回 enabled 的）。</p>
-<pre>curl /api/ingest/reminders?limit=20&offset=0 \
-  -H "X-AUTH: bdrk_xxx"</pre>
+<p>列出本令牌创建的提醒。</p>
 
-<h3><span class="tag tag-get">GET</span> /api/ingest/reminders/:id</h3>
-<p>查看单条提醒详情。</p>
-<pre>curl /api/ingest/reminders/1 \
-  -H "X-AUTH: bdrk_xxx"</pre>
-
-<h3><span class="tag tag-get">GET</span> /api/ingest/channels</h3>
-<p>列出所有通知渠道，用于选择 channel_id。</p>
-<pre>curl /api/ingest/channels \
-  -H "X-AUTH: bdrk_xxx"</pre>
-
-<h3><span class="tag tag-delete">DELETE</span> /api/ingest/reminders/:id</h3>
-<p>删除本 Key 创建的提醒。</p>
-<pre>curl -X DELETE /api/ingest/reminders/1 \
-  -H "X-AUTH: bdrk_xxx"</pre>
-
-<h2>字段说明</h2>
+<h4>查询参数</h4>
 <table>
-<tr><th>字段</th><th>类型</th><th>必填</th><th>说明</th></tr>
-<tr><td>title</td><td>string</td><td>是</td><td>提醒标题，最长 200 字符</td></tr>
-<tr><td>content</td><td>string</td><td>否</td><td>提醒内容，支持 <code>{{var}}</code> 模板</td></tr>
-<tr><td>calendar</td><td>string</td><td>否</td><td><code>solar</code> 或 <code>lunar</code>，默认 solar</td></tr>
-<tr><td>schedule_type</td><td>string</td><td>否</td><td><code>once</code> / <code>interval</code> / <code>cron</code>，默认 once</td></tr>
-<tr><td>schedule_spec</td><td>object</td><td>是</td><td>调度参数，参见下文</td></tr>
-<tr><td>timezone</td><td>string</td><td>否</td><td>时区，默认 Asia/Shanghai</td></tr>
-<tr><td>channel_ids</td><td>int[]</td><td>否</td><td>通知通道 ID，为空时用 Key 默认通道</td></tr>
-<tr><td>require_confirm</td><td>bool</td><td>否</td><td>是否需要确认</td></tr>
-<tr><td>confirm_retry_interval_sec</td><td>int</td><td>否</td><td>重发间隔（秒）</td></tr>
-<tr><td>confirm_max_retries</td><td>int</td><td>否</td><td>最大重发次数</td></tr>
+<tr><th>参数</th><th>类型</th><th>说明</th></tr>
+<tr><td>limit</td><td>int</td><td>每页条数，默认 10</td></tr>
+<tr><td>offset</td><td>int</td><td>偏移量，默认 0</td></tr>
+<tr><td>search</td><td>string</td><td>搜索标题关键字</td></tr>
 </table>
+
+<h4>响应</h4>
+<pre class="res">{
+  "items": [
+    {
+      "id": 1,
+      "title": "每日提醒",
+      "content": "内容",
+      "content_format": "text",
+      "calendar": "solar",
+      "schedule_type": "cron",
+      "schedule_spec": {"expr": "0 9 * * *"},
+      "timezone": "Asia/Shanghai",
+      "enabled": true,
+      "source": "api",
+      "token_id": 1,
+      "require_confirm": false,
+      "confirm_retry_interval_sec": 60,
+      "confirm_max_retries": 3,
+      "next_fire_at": "2026-06-25T01:00:00Z",
+      "last_fired_at": null,
+      "fire_count": 0,
+      "channel_ids": [1],
+      "created_at": "2026-06-24T12:00:00Z",
+      "updated_at": "2026-06-24T12:00:00Z"
+    }
+  ],
+  "total": 1
+}</pre>
+
+<!-- ──────── GET /api/ingest/reminders/:id ──────── -->
+<h3><span class="tag tag-get">GET</span> /api/ingest/reminders/:id</h3>
+<p>查看单条提醒详情。只能查看本令牌创建的提醒。</p>
+
+<h4>响应</h4>
+<p>同 <code>POST&nbsp;/api/ingest/reminders</code> 的响应结构。</p>
+
+<!-- ──────── DELETE /api/ingest/reminders/:id ──────── -->
+<h3><span class="tag tag-delete">DELETE</span> /api/ingest/reminders/:id</h3>
+<p>删除本令牌创建的提醒。</p>
+
+<h4>响应</h4>
+<pre class="res">{
+  "code": 0,
+  "message": "ok",
+  "data": null
+}</pre>
+
+<!-- ──────── GET /api/ingest/channels ──────── -->
+<h3><span class="tag tag-get">GET</span> /api/ingest/channels</h3>
+<p>获取所有通知渠道列表。</p>
+
+<h4>响应</h4>
+<pre class="res">[
+  {
+    "id": 1,
+    "name": "邮件通知",
+    "type": "smtp",
+    "enabled": true,
+    "config": {
+      "host": "***",
+      "port": "***"
+    },
+    "created_at": "2026-06-24T12:00:00Z",
+    "updated_at": "2026-06-24T12:00:00Z"
+  }
+]</pre>
+
+<p>注意：<code>config</code> 中敏感字段以 <code>_enc</code> 结尾的值会被脱敏为 <code>"***"</code>。</p>
 
 <h2>schedule_spec 格式</h2>
 <table>
-<tr><th>Calendar</th><th>Type</th><th>schedule_spec 示例</th></tr>
+<tr><th>Calendar</th><th>schedule_type</th><th>schedule_spec 示例</th></tr>
 <tr><td>solar</td><td>once</td><td><code>{"at": "2026-06-06T09:00:00"}</code></td></tr>
 <tr><td>solar</td><td>interval</td><td><code>{"every": 1, "unit": "day"}</code></td></tr>
 <tr><td>solar</td><td>cron</td><td><code>{"expr": "0 9 * * *"}</code></td></tr>
 <tr><td>lunar</td><td>once</td><td><code>{"year": 2026, "month": 1, "day": 1, "hour": 9, "minute": 0}</code></td></tr>
 <tr><td>lunar</td><td>interval</td><td><code>{"start_year": 2026, "start_month": 1, "start_day": 1, "every": 1, "unit": "month"}</code></td></tr>
 </table>
+
+<h2>curl 示例</h2>
+
+<h4>创建一次性提醒</h4>
+<pre class="curl">curl -X POST /api/ingest/reminders \
+  -H "X-AUTH: bdrk_xxx" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "会议提醒",
+    "content": "15分钟后有会议",
+    "schedule_spec": {"at": "2026-06-25T14:00:00"},
+    "channel_ids": [1]
+  }'</pre>
+
+<h4>创建 CRON 提醒</h4>
+<pre class="curl">curl -X POST /api/ingest/reminders \
+  -H "X-AUTH: bdrk_xxx" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "每日站会",
+    "schedule_type": "cron",
+    "schedule_spec": {"expr": "0 9 * * 1-5"},
+    "timezone": "Asia/Shanghai",
+    "channel_ids": [1, 2]
+  }'</pre>
+
+<h4>创建间隔重复提醒</h4>
+<pre class="curl">curl -X POST /api/ingest/reminders \
+  -H "X-AUTH: bdrk_xxx" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "每小时提醒",
+    "schedule_type": "interval",
+    "schedule_spec": {"every": 1, "unit": "hour"},
+    "channel_ids": [1]
+  }'</pre>
+
+<h4>列出提醒</h4>
+<pre class="curl">curl "/api/ingest/reminders?limit=10&offset=0" \
+  -H "X-AUTH: bdrk_xxx"</pre>
+
+<h4>获取通知渠道</h4>
+<pre class="curl">curl /api/ingest/channels \
+  -H "X-AUTH: bdrk_xxx"</pre>
+
 </body>
 </html>`
+}
