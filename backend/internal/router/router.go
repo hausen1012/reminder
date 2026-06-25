@@ -126,8 +126,10 @@ func Setup(staticFS embed.FS, cfg *config.Config) *SetupResult {
 		ingest.GET("/reminders/:id", ingestHandler.GetReminder)
 		ingest.DELETE("/reminders/:id", ingestHandler.DeleteReminder)
 		ingest.GET("/channels", ingestHandler.ListChannels)
-		ingest.GET("/docs", ingestHandler.Docs)
 	}
+
+	// 文档页对外开放，无需鉴权
+	api.GET("/ingest/docs", ingestHandler.Docs)
 
 	protected := api.Group("")
 	protected.Use(middleware.JWTAuth(cfg.JWTSecret))
