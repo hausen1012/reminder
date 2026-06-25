@@ -53,7 +53,7 @@ export function CurlUsageDialog({ token, open, onClose }: Props) {
   const at = useMemo(() => oneHourLater(), [open])
 
   const curlSimple = useMemo(
-    () => `curl -X POST /api/ingest/reminders \\
+    () => `curl -X POST /api/external/v1/reminders \\
   -H "X-AUTH: ${token}" \\
   -H "Content-Type: application/json" \\
   -d '{
@@ -65,7 +65,7 @@ export function CurlUsageDialog({ token, open, onClose }: Props) {
   )
 
   const curlOnce = useMemo(
-    () => `curl -X POST /api/ingest/reminders \\
+    () => `curl -X POST /api/external/v1/reminders \\
   -H "X-AUTH: ${token}" \\
   -H "Content-Type: application/json" \\
   -d '{
@@ -80,7 +80,7 @@ export function CurlUsageDialog({ token, open, onClose }: Props) {
   )
 
   const curlInterval = useMemo(
-    () => `curl -X POST /api/ingest/reminders \\
+    () => `curl -X POST /api/external/v1/reminders \\
   -H "X-AUTH: ${token}" \\
   -H "Content-Type: application/json" \\
   -d '{
@@ -96,7 +96,7 @@ export function CurlUsageDialog({ token, open, onClose }: Props) {
   )
 
   const curlCron = useMemo(
-    () => `curl -X POST /api/ingest/reminders \\
+    () => `curl -X POST /api/external/v1/reminders \\
   -H "X-AUTH: ${token}" \\
   -H "Content-Type: application/json" \\
   -d '{

@@ -21,7 +21,7 @@
 
 ## API 变更
 
-POST/PUT `/api/reminders` 和 GET 响应中增加 `content_format` 字段，Ingest API 同样支持。
+POST/PUT `/api/reminders` 和 GET 响应中增加 `content_format` 字段，External API 同样支持。
 
 ## Notifier 格式适配规则
 

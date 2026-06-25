@@ -88,7 +88,7 @@ func Setup(staticFS embed.FS, cfg *config.Config) *SetupResult {
 	logHandler := &handlers.LogHandler{Svc: logSvc}
 	confirmHandler := &handlers.ConfirmHandler{Svc: confirmSvc}
 	tokenHandler := &handlers.TokenHandler{Svc: tokenSvc}
-	ingestHandler := &handlers.IngestHandler{ReminderSvc: reminderSvc, TokenSvc: tokenSvc, ChannelSvc: channelSvc}
+	externalHandler := &handlers.ExternalHandler{ReminderSvc: reminderSvc, TokenSvc: tokenSvc, ChannelSvc: channelSvc}
 	schedulerHandler := &handlers.SchedulerHandler{Engine: engine, Sweeper: sweeper}
 		configHandler := &handlers.ConfigHandler{Svc: configSvc}
 
@@ -110,7 +110,7 @@ func Setup(staticFS embed.FS, cfg *config.Config) *SetupResult {
 		auth.PUT("/password", handlers.UpdatePassword)
 	}
 
-	// Ingest API（令牌鉴权，非 JWT）
+	// 外部 API v1（令牌鉴权，非 JWT）
 	tokenVerify := func(plain string) (uint, bool) {
 		k, ok := tokenSvc.Verify(plain)
 		if !ok || k == nil {
@@ -118,18 +118,18 @@ func Setup(staticFS embed.FS, cfg *config.Config) *SetupResult {
 		}
 		return k.ID, true
 	}
-	ingest := api.Group("/ingest")
-	ingest.Use(middleware.TokenAuth(tokenVerify, tokenSvc.TouchLastUsed, nil))
+	externalV1 := api.Group("/external/v1")
+	externalV1.Use(middleware.TokenAuth(tokenVerify, tokenSvc.TouchLastUsed, nil))
 	{
-		ingest.POST("/reminders", ingestHandler.CreateReminder)
-		ingest.GET("/reminders", ingestHandler.ListReminders)
-		ingest.GET("/reminders/:id", ingestHandler.GetReminder)
-		ingest.DELETE("/reminders/:id", ingestHandler.DeleteReminder)
-		ingest.GET("/channels", ingestHandler.ListChannels)
+		externalV1.POST("/reminders", externalHandler.CreateReminder)
+		externalV1.GET("/reminders", externalHandler.ListReminders)
+		externalV1.GET("/reminders/:id", externalHandler.GetReminder)
+		externalV1.DELETE("/reminders/:id", externalHandler.DeleteReminder)
+		externalV1.GET("/channels", externalHandler.ListChannels)
 	}
 
 	// 文档页对外开放，无需鉴权
-	api.GET("/ingest/docs", ingestHandler.Docs)
+	api.GET("/external/v1/docs", externalHandler.Docs)
 
 	protected := api.Group("")
 	protected.Use(middleware.JWTAuth(cfg.JWTSecret))

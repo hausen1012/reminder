@@ -1,6 +1,6 @@
 // token_service 管理令牌的全生命周期。
 //
-// 外部程序通过 X-AUTH 鉴权调用 /api/ingest/*，面板也可以创建/管理令牌。
+// 外部程序通过 X-AUTH 鉴权调用 /api/external/v1/*，面板也可以创建/管理令牌。
 // 明文令牌仅创建时一次性返回，后续默认只展示前缀；如需重复查看则直接读取明文。
 package services
 

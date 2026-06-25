@@ -1,4 +1,4 @@
-// ingest 处理外部 API 调用（/api/ingest/*）。
+// external 处理外部 API v1 调用。
 //
 // 与面板使用的 ReminderHandler 共享 ReminderService，但鉴权使用令牌而非 JWT。
 // 提醒创建时强制 source=api，未指定通道时回退到 Key 的默认通道。
@@ -13,15 +13,15 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// IngestHandler 是外部 Ingest API。
-type IngestHandler struct {
+// ExternalHandler 是外部 API v1 的处理器。
+type ExternalHandler struct {
 	ReminderSvc *services.ReminderService
 	TokenSvc    *services.TokenService
 	ChannelSvc  *services.ChannelService
 }
 
-// CreateReminder POST /api/ingest/reminders
-func (h *IngestHandler) CreateReminder(c *gin.Context) {
+// CreateReminder POST /api/external/v1/reminders
+func (h *ExternalHandler) CreateReminder(c *gin.Context) {
 	var in services.ReminderInput
 	if err := c.ShouldBindJSON(&in); err != nil {
 		abortErr(c, middleware.NewAppError(middleware.CodeValidationFailed, "请求体格式错误"))
@@ -48,8 +48,8 @@ func (h *IngestHandler) CreateReminder(c *gin.Context) {
 	successJSON(c, v)
 }
 
-// GetReminder GET /api/ingest/reminders/:id
-func (h *IngestHandler) GetReminder(c *gin.Context) {
+// GetReminder GET /api/external/v1/reminders/:id
+func (h *ExternalHandler) GetReminder(c *gin.Context) {
 	id, err := parseID(c, "id")
 	if err != nil {
 		abortErr(c, err)
@@ -68,8 +68,8 @@ func (h *IngestHandler) GetReminder(c *gin.Context) {
 	successJSON(c, v)
 }
 
-// ListReminders GET /api/ingest/reminders
-func (h *IngestHandler) ListReminders(c *gin.Context) {
+// ListReminders GET /api/external/v1/reminders
+func (h *ExternalHandler) ListReminders(c *gin.Context) {
 	tokenID, _ := c.Get("token_id")
 	f := services.ListFilter{
 		Search: c.Query("search"),
@@ -96,8 +96,8 @@ func (h *IngestHandler) ListReminders(c *gin.Context) {
 	successJSON(c, gin.H{"items": items, "total": total})
 }
 
-// DeleteReminder DELETE /api/ingest/reminders/:id
-func (h *IngestHandler) DeleteReminder(c *gin.Context) {
+// DeleteReminder DELETE /api/external/v1/reminders/:id
+func (h *ExternalHandler) DeleteReminder(c *gin.Context) {
 	id, err := parseID(c, "id")
 	if err != nil {
 		abortErr(c, err)
@@ -120,10 +120,10 @@ func (h *IngestHandler) DeleteReminder(c *gin.Context) {
 	successJSON(c, nil)
 }
 
-// ListChannels GET /api/ingest/channels
+// ListChannels GET /api/external/v1/channels
 //
 // 返回所有通知渠道列表，供外部调用方选择 channel_id。
-func (h *IngestHandler) ListChannels(c *gin.Context) {
+func (h *ExternalHandler) ListChannels(c *gin.Context) {
 	views, err := h.ChannelSvc.List()
 	if err != nil {
 		abortErr(c, err)
@@ -132,12 +132,12 @@ func (h *IngestHandler) ListChannels(c *gin.Context) {
 	successJSON(c, views)
 }
 
-// Docs GET /api/ingest/docs
-func (h *IngestHandler) Docs(c *gin.Context) {
-	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(renderIngestDocs()))
+// Docs GET /api/external/v1/docs
+func (h *ExternalHandler) Docs(c *gin.Context) {
+	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(renderExternalV1Docs()))
 }
 
-func (h *IngestHandler) belongsToKey(reminderKeyID *uint, c *gin.Context) bool {
+func (h *ExternalHandler) belongsToKey(reminderKeyID *uint, c *gin.Context) bool {
 	tokenID, exists := c.Get("token_id")
 	if !exists {
 		return false
@@ -152,13 +152,13 @@ func (h *IngestHandler) belongsToKey(reminderKeyID *uint, c *gin.Context) bool {
 	return *reminderKeyID == keyID
 }
 
-func renderIngestDocs() string {
+func renderExternalV1Docs() string {
 	return `<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Ingest API 文档</title>
+<title>外部 API v1 文档</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#f5f5f5;color:#333;padding:40px;max-width:960px;margin:0 auto}
@@ -183,7 +183,7 @@ th{background:#f9fafb;font-weight:600}
 </style>
 </head>
 <body>
-<h1>Ingest API 文档</h1>
+<h1>外部 API v1 文档</h1>
 <p>通过令牌鉴权的外部调用接口，用于程序化创建和管理提醒。</p>
 
 <h2>鉴权</h2>
@@ -211,8 +211,8 @@ th{background:#f9fafb;font-weight:600}
 
 <h2>端点</h2>
 
-<!-- ──────── POST /api/ingest/reminders ──────── -->
-<h3><span class="tag tag-post">POST</span> /api/ingest/reminders</h3>
+<!-- ──────── POST /api/external/v1/reminders ──────── -->
+<h3><span class="tag tag-post">POST</span> /api/external/v1/reminders</h3>
 <p>创建一条提醒。</p>
 
 <h4>请求体</h4>
@@ -258,8 +258,8 @@ th{background:#f9fafb;font-weight:600}
   "updated_at": "2026-06-24T12:00:00Z"
 }</pre>
 
-<!-- ──────── GET /api/ingest/reminders ──────── -->
-<h3><span class="tag tag-get">GET</span> /api/ingest/reminders</h3>
+<!-- ──────── GET /api/external/v1/reminders ──────── -->
+<h3><span class="tag tag-get">GET</span> /api/external/v1/reminders</h3>
 <p>列出本令牌创建的提醒。</p>
 
 <h4>查询参数</h4>
@@ -299,15 +299,15 @@ th{background:#f9fafb;font-weight:600}
   "total": 1
 }</pre>
 
-<!-- ──────── GET /api/ingest/reminders/:id ──────── -->
-<h3><span class="tag tag-get">GET</span> /api/ingest/reminders/:id</h3>
+<!-- ──────── GET /api/external/v1/reminders/:id ──────── -->
+<h3><span class="tag tag-get">GET</span> /api/external/v1/reminders/:id</h3>
 <p>查看单条提醒详情。只能查看本令牌创建的提醒。</p>
 
 <h4>响应</h4>
-<p>同 <code>POST&nbsp;/api/ingest/reminders</code> 的响应结构。</p>
+<p>同 <code>POST&nbsp;/api/external/v1/reminders</code> 的响应结构。</p>
 
-<!-- ──────── DELETE /api/ingest/reminders/:id ──────── -->
-<h3><span class="tag tag-delete">DELETE</span> /api/ingest/reminders/:id</h3>
+<!-- ──────── DELETE /api/external/v1/reminders/:id ──────── -->
+<h3><span class="tag tag-delete">DELETE</span> /api/external/v1/reminders/:id</h3>
 <p>删除本令牌创建的提醒。</p>
 
 <h4>响应</h4>
@@ -317,8 +317,8 @@ th{background:#f9fafb;font-weight:600}
   "data": null
 }</pre>
 
-<!-- ──────── GET /api/ingest/channels ──────── -->
-<h3><span class="tag tag-get">GET</span> /api/ingest/channels</h3>
+<!-- ──────── GET /api/external/v1/channels ──────── -->
+<h3><span class="tag tag-get">GET</span> /api/external/v1/channels</h3>
 <p>获取所有通知渠道列表。</p>
 
 <h4>响应</h4>
@@ -352,7 +352,7 @@ th{background:#f9fafb;font-weight:600}
 <h2>curl 示例</h2>
 
 <h4>创建一次性提醒</h4>
-<pre class="curl">curl -X POST /api/ingest/reminders \
+<pre class="curl">curl -X POST /api/external/v1/reminders \
   -H "X-AUTH: bdrk_xxx" \
   -H "Content-Type: application/json" \
   -d '{
@@ -363,7 +363,7 @@ th{background:#f9fafb;font-weight:600}
   }'</pre>
 
 <h4>创建 CRON 提醒</h4>
-<pre class="curl">curl -X POST /api/ingest/reminders \
+<pre class="curl">curl -X POST /api/external/v1/reminders \
   -H "X-AUTH: bdrk_xxx" \
   -H "Content-Type: application/json" \
   -d '{
@@ -375,7 +375,7 @@ th{background:#f9fafb;font-weight:600}
   }'</pre>
 
 <h4>创建间隔重复提醒</h4>
-<pre class="curl">curl -X POST /api/ingest/reminders \
+<pre class="curl">curl -X POST /api/external/v1/reminders \
   -H "X-AUTH: bdrk_xxx" \
   -H "Content-Type: application/json" \
   -d '{
@@ -386,11 +386,11 @@ th{background:#f9fafb;font-weight:600}
   }'</pre>
 
 <h4>列出提醒</h4>
-<pre class="curl">curl "/api/ingest/reminders?limit=10&offset=0" \
+<pre class="curl">curl "/api/external/v1/reminders?limit=10&offset=0" \
   -H "X-AUTH: bdrk_xxx"</pre>
 
 <h4>获取通知渠道</h4>
-<pre class="curl">curl /api/ingest/channels \
+<pre class="curl">curl /api/external/v1/channels \
   -H "X-AUTH: bdrk_xxx"</pre>
 
 </body>

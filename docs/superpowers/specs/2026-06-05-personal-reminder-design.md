@@ -32,7 +32,7 @@ Gin Router
   ├── /api/channels          通道 CRUD、试发
   ├── /api/logs              日志查询、清理
   ├── /api/tokens           令牌 管理
-  ├── /api/ingest/*          外部 API（X-AUTH 鉴权）
+  ├── /api/external/v1/*          外部 API（X-AUTH 鉴权）
   └── /c/:token              确认链接（无需登录，一次性 token）
 
 Service 层
@@ -89,7 +89,7 @@ backend/internal/
     token_service.go
     confirm_service.go
   handlers/
-    reminder.go / channel.go / log.go / token.go / ingest.go / confirm.go
+    reminder.go / channel.go / log.go / token.go / external.go / confirm.go
   crypto/
     secretbox.go                     AES-GCM，含硬编码 fallback key
   middleware/
@@ -653,10 +653,10 @@ Header `X-AUTH: bdrk_<24 字符>`。
 ### 9.2 端点
 
 ```
-POST   /api/ingest/reminders      创建提醒
-GET    /api/ingest/reminders/:id  查询单条
-GET    /api/ingest/reminders      列出本 Key 创建的提醒（分页）
-DELETE /api/ingest/reminders/:id  删除（仅本 Key 创建的）
+POST   /api/external/v1/reminders      创建提醒
+GET    /api/external/v1/reminders/:id  查询单条
+GET    /api/external/v1/reminders      列出本 Key 创建的提醒（分页）
+DELETE /api/external/v1/reminders/:id  删除（仅本 Key 创建的）
 ```
 
 初版不开放 PUT、不开放通道/Key 管理、不开放日志查询。
@@ -712,13 +712,13 @@ per-Key per-minute 内存计数器，默认 60/min。超过 → 429 + Retry-Afte
 
 ### 9.7 来源区分
 
-- `source` 由后端固定写：内部 API → manual，ingest API → api
+- `source` 由后端固定写：内部 API → manual，external API → api
 - 列表查询 `?source=manual|api|all`（前端默认 manual）
 - 令牌 详情可链到"本 Key 创建的提醒"过滤视图
 
 ### 9.8 文档
 
-启动时挂 `/api/ingest/docs`（无鉴权）静态 HTML，列 4 个端点 + 示例 curl + 字段表。手写，不引 Swagger。
+启动时挂 `/api/external/v1/docs`（无鉴权）静态 HTML，列 4 个端点 + 示例 curl + 字段表。手写，不引 Swagger。
 
 ---
 
@@ -912,7 +912,7 @@ WHERE expires_at < datetime('now')
 
 - 创建提醒 → cron 时间推进 → 触发 → mock notifier 调用 → 日志
 - RequireConfirm 链：触发 → 未确认 → 重发 → 点 confirm → 链终止
-- API ingest 创建提醒、Key 默认通道回退
+- API external/v1 创建提醒、Key 默认通道回退
 - 通道试发不写日志
 
 ### 13.3 测试技术栈
