@@ -14,7 +14,7 @@ import (
 	"time"
 
 	"github.com/6tail/lunar-go/calendar"
-	"github.com/bedrock/backend/internal/models"
+	"github.com/reminder/backend/internal/models"
 )
 
 var weekdays = []string{"周日", "周一", "周二", "周三", "周四", "周五", "周六"}

@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/bedrock/backend/internal/config"
-	"github.com/bedrock/backend/internal/models"
+	"github.com/reminder/backend/internal/config"
+	"github.com/reminder/backend/internal/models"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )

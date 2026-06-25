@@ -1,4 +1,4 @@
-module github.com/bedrock/backend
+module github.com/reminder/backend
 
 go 1.25.0
 

@@ -8,8 +8,8 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/bedrock/backend/internal/middleware"
-	"github.com/bedrock/backend/internal/services"
+	"github.com/reminder/backend/internal/middleware"
+	"github.com/reminder/backend/internal/services"
 	"github.com/gin-gonic/gin"
 )
 

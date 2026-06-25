@@ -1,7 +1,7 @@
 package services
 
 import (
-	"github.com/bedrock/backend/internal/models"
+	"github.com/reminder/backend/internal/models"
 	"gorm.io/gorm"
 )
 

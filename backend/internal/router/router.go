@@ -8,13 +8,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/bedrock/backend/internal/config"
-	"github.com/bedrock/backend/internal/crypto/secretbox"
-	"github.com/bedrock/backend/internal/database"
-	"github.com/bedrock/backend/internal/handlers"
-	"github.com/bedrock/backend/internal/middleware"
-	"github.com/bedrock/backend/internal/scheduler"
-	"github.com/bedrock/backend/internal/services"
+	"github.com/reminder/backend/internal/config"
+	"github.com/reminder/backend/internal/crypto/secretbox"
+	"github.com/reminder/backend/internal/database"
+	"github.com/reminder/backend/internal/handlers"
+	"github.com/reminder/backend/internal/middleware"
+	"github.com/reminder/backend/internal/scheduler"
+	"github.com/reminder/backend/internal/services"
 	"github.com/gin-gonic/gin"
 )
 

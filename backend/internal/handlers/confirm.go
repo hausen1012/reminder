@@ -9,8 +9,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/bedrock/backend/internal/models"
-	"github.com/bedrock/backend/internal/services"
+	"github.com/reminder/backend/internal/models"
+	"github.com/reminder/backend/internal/services"
 	"github.com/gin-gonic/gin"
 )
 

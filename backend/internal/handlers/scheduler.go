@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/bedrock/backend/internal/scheduler"
+	"github.com/reminder/backend/internal/scheduler"
 	"github.com/gin-gonic/gin"
 )
 

@@ -13,9 +13,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/bedrock/backend/internal/config"
-	"github.com/bedrock/backend/internal/database"
-	"github.com/bedrock/backend/internal/router"
+	"github.com/reminder/backend/internal/config"
+	"github.com/reminder/backend/internal/database"
+	"github.com/reminder/backend/internal/router"
 )
 
 //go:embed web/*

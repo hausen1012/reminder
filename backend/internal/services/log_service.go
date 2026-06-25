@@ -8,8 +8,8 @@ import (
 	"sort"
 	"time"
 
-	"github.com/bedrock/backend/internal/middleware"
-	"github.com/bedrock/backend/internal/models"
+	"github.com/reminder/backend/internal/middleware"
+	"github.com/reminder/backend/internal/models"
 	"gorm.io/gorm"
 )
 

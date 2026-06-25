@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/bedrock/backend/internal/database"
-	"github.com/bedrock/backend/internal/scheduler"
+	"github.com/reminder/backend/internal/database"
+	"github.com/reminder/backend/internal/scheduler"
 	"github.com/gin-gonic/gin"
 )
 

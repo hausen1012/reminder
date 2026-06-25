@@ -3,8 +3,8 @@ package services
 import (
 	"testing"
 
-	"github.com/bedrock/backend/internal/crypto/secretbox"
-	"github.com/bedrock/backend/internal/models"
+	"github.com/reminder/backend/internal/crypto/secretbox"
+	"github.com/reminder/backend/internal/models"
 )
 
 func TestChannelUpdateRejectsMissingSMTPFieldsAfterMerge(t *testing.T) {

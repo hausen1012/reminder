@@ -17,7 +17,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/bedrock/backend/internal/models"
+	"github.com/reminder/backend/internal/models"
 	"github.com/robfig/cron/v3"
 	"gorm.io/gorm"
 )

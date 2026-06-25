@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/bedrock/backend/internal/database"
-	"github.com/bedrock/backend/internal/models"
+	"github.com/reminder/backend/internal/database"
+	"github.com/reminder/backend/internal/models"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"

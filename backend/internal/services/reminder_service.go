@@ -13,10 +13,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/bedrock/backend/internal/middleware"
-	"github.com/bedrock/backend/internal/models"
-	"github.com/bedrock/backend/internal/notifier"
-	"github.com/bedrock/backend/internal/scheduler"
+	"github.com/reminder/backend/internal/middleware"
+	"github.com/reminder/backend/internal/models"
+	"github.com/reminder/backend/internal/notifier"
+	"github.com/reminder/backend/internal/scheduler"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )

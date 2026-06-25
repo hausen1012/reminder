@@ -3,8 +3,8 @@ package handlers
 import (
 	"net/http"
 
-	"github.com/bedrock/backend/internal/database"
-	"github.com/bedrock/backend/internal/models"
+	"github.com/reminder/backend/internal/database"
+	"github.com/reminder/backend/internal/models"
 	"github.com/gin-gonic/gin"
 	"golang.org/x/crypto/bcrypt"
 )
