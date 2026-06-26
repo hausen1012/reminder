@@ -3,7 +3,7 @@ package router
 import (
 	"embed"
 	"io/fs"
-	"log"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -37,14 +37,16 @@ type SetupResult struct {
 // 与 reminder 原版相比：返回值新增 SchedulerHandles 用于优雅停机；
 // 旧调用方仍可使用 SetupEngine 取仅 *gin.Engine 的形态。
 func Setup(staticFS embed.FS, cfg *config.Config) *SetupResult {
-	r := gin.Default()
+	r := gin.New()
+	r.Use(gin.Recovery())
+	r.Use(middleware.SlogLogger())
 	r.Use(middleware.ErrorHandler())
-	r.Use(middleware.Logger())
 	r.Use(middleware.CORS())
 
 	box, err := secretbox.New(cfg.EncryptionKey)
 	if err != nil {
-		log.Fatalf("初始化 secretbox 失败: %v", err)
+		slog.Error("初始化 secretbox 失败", "error", err)
+			panic(err)
 	}
 
 	channelSvc := services.NewChannelService(database.DB, box)
@@ -60,7 +62,7 @@ func Setup(staticFS embed.FS, cfg *config.Config) *SetupResult {
 	// 启动调度器并把已 enabled 的提醒注册一遍
 	engine.Start()
 	if err := engine.LoadAndRegisterAll(); err != nil {
-		log.Printf("调度器加载已有提醒失败: %v", err)
+		slog.Error("调度器加载已有提醒失败", "error", err)
 	}
 
 	// 启动 sweeper
@@ -204,7 +206,7 @@ func Setup(staticFS embed.FS, cfg *config.Config) *SetupResult {
 func serveStaticFiles(r *gin.Engine, staticFS embed.FS) {
 	static, err := fs.Sub(staticFS, "web")
 	if err != nil {
-		log.Printf("WARN: embedded web directory not found, static file serving disabled")
+		slog.Warn("嵌入式 web 目录不存在，静态文件服务已禁用")
 		return
 	}
 	fileServer := http.FileServer(http.FS(static))

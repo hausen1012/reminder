@@ -8,7 +8,7 @@ package scheduler
 import (
 	"context"
 	"errors"
-	"log"
+	"log/slog"
 	"time"
 
 	"github.com/reminder/backend/internal/models"
@@ -119,7 +119,7 @@ func (s *Sweeper) tick() {
 		Where("enabled = ? AND next_fire_at IS NOT NULL AND next_fire_at <= ?", true, cutoffDue).
 		Find(&items).Error
 	if err != nil {
-		log.Printf("[sweeper] 扫描失败: %v", err)
+		slog.Info("扫描失败", "error", err)
 		return
 	}
 
@@ -130,7 +130,7 @@ func (s *Sweeper) tick() {
 		}
 		if r.NextFireAt.Before(cutoffExpire) {
 			if err := s.markExpired(r, now); err != nil {
-				log.Printf("[sweeper] 标记 reminder=%d expired 失败: %v", r.ID, err)
+				slog.Info("标记 reminder expired 失败", "reminder", r.ID, "error", err)
 			}
 			continue
 		}

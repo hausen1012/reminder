@@ -3,7 +3,7 @@ package config
 import (
 	"crypto/rand"
 	"encoding/hex"
-	"log"
+	"log/slog"
 	"os"
 	"strconv"
 	"time"
@@ -49,12 +49,12 @@ func Load() *Config {
 	// JWTSecret 如果留空就自动生成，保持向下兼容
 	if cfg.JWTSecret == "" {
 		cfg.JWTSecret = randomSecret()
-		log.Printf("JWT_SECRET 未配置，已自动生成")
+		slog.Warn("JWT_SECRET 未配置，已自动生成")
 	}
 
 	loc, err := time.LoadLocation(cfg.Timezone)
 	if err != nil {
-		log.Printf("时区 %q 解析失败，回退到 Asia/Shanghai：%v", cfg.Timezone, err)
+		slog.Warn("时区解析失败，回退到 Asia/Shanghai", "timezone", cfg.Timezone, "error", err)
 		loc, _ = time.LoadLocation("Asia/Shanghai")
 	}
 	cfg.Location = loc
@@ -76,7 +76,7 @@ func getEnvInt(key string, fallback int) int {
 	}
 	n, err := strconv.Atoi(v)
 	if err != nil {
-		log.Printf("环境变量 %s 解析为整数失败 %q，使用默认值 %d", key, v, fallback)
+		slog.Warn("环境变量解析为整数失败，使用默认值", "key", key, "value", v, "fallback", fallback)
 		return fallback
 	}
 	return n

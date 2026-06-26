@@ -9,7 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -293,7 +293,7 @@ func (s *ChannelService) DryRun(ctx context.Context, chType string, config map[s
 		Vars:    vars,
 	}
 	if err := n.Send(ctx, plainConfig, rendered); err != nil {
-		log.Printf("[channel-dryrun] 试发失败 type=%s: %v", chType, err)
+		slog.Info("试发失败", "type", chType, "error", err)
 		return err
 	}
 	return nil
@@ -441,7 +441,6 @@ func requireFields(typ string, cfg map[string]any) error {
 		if asString(cfg["url"]) == "" {
 			return missing("config.url")
 		}
-	case "log":
 		// 日志通道无需配置
 	}
 	return nil

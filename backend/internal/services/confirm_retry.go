@@ -6,9 +6,9 @@ package services
 
 import (
 	"context"
-	"log"
 	"sync"
 	"time"
+	"log/slog"
 
 	"github.com/reminder/backend/internal/models"
 	"github.com/reminder/backend/internal/notifier"
@@ -45,11 +45,11 @@ func NewConfirmRetryManager(db *gorm.DB, dispatch *DispatchService, confirmSvc *
 // round 是已完成的轮次数（0 = 首次触发已发出，下次是第 1 次重发）。
 func (m *ConfirmRetryManager) Schedule(r *models.Reminder, chainID string, round int) {
 	if round >= r.ConfirmMaxRetries {
-		log.Printf("[confirm] 跳过调度 chain=%s：round=%d 已达到上限 %d", chainID, round, r.ConfirmMaxRetries)
+		slog.Info("跳过调度", "chain", chainID, "round", round, "max_retries", r.ConfirmMaxRetries)
 		return
 	}
 	delay := time.Duration(r.ConfirmRetryIntervalSec) * time.Second
-	log.Printf("[confirm] 注册重试定时器 chain=%s reminder=%d next_round=%d delay=%s", chainID, r.ID, round+1, delay)
+	slog.Info("注册重试定时器", "chain", chainID, "reminder", r.ID, "next_round", round+1, "delay", delay)
 	timer := time.AfterFunc(delay, func() {
 		m.retry(r.ID, chainID, round+1)
 	})
@@ -73,12 +73,12 @@ func (m *ConfirmRetryManager) CancelByReminderID(reminderID uint) {
 		Distinct("confirm_chain_id").
 		Where("reminder_id = ? AND confirm_chain_id IS NOT NULL AND confirm_chain_id != '' AND confirmed = ?", reminderID, false).
 		Pluck("confirm_chain_id", &chainIDs).Error; err != nil {
-		log.Printf("[confirm] 查询 reminder=%d 活动确认链失败: %v", reminderID, err)
+		slog.Info("查询活动确认链失败", "reminder", reminderID, "error", err)
 		return
 	}
 	for _, chainID := range chainIDs {
 		if m.stopChain(chainID) {
-			log.Printf("[confirm] 取消 reminder=%d 的确认链 chain=%s", reminderID, chainID)
+			slog.Info("取消确认链", "reminder", reminderID, "chain", chainID)
 		}
 	}
 }
@@ -97,22 +97,22 @@ func (m *ConfirmRetryManager) StopAll() {
 func (m *ConfirmRetryManager) retry(reminderID uint, chainID string, round int) {
 	var r models.Reminder
 	if err := m.DB.First(&r, reminderID).Error; err != nil {
-		log.Printf("[confirm] 停止确认链 chain=%s：提醒不存在", chainID)
+		slog.Info("停止确认链", "chain", chainID, "reason", "提醒不存在")
 		m.stopChain(chainID)
 		return
 	}
 	if !r.Enabled {
-		log.Printf("[confirm] 停止确认链 chain=%s：提醒已禁用", chainID)
+		slog.Info("停止确认链", "chain", chainID, "reason", "提醒已禁用")
 		m.stopChain(chainID)
 		return
 	}
 	if !r.RequireConfirm {
-		log.Printf("[confirm] 停止确认链 chain=%s：提醒已关闭确认", chainID)
+		slog.Info("停止确认链", "chain", chainID, "reason", "提醒已关闭确认")
 		m.stopChain(chainID)
 		return
 	}
 	if round > r.ConfirmMaxRetries {
-		log.Printf("[confirm] 停止确认链 chain=%s：已达到最大重试次数 %d", chainID, r.ConfirmMaxRetries)
+		slog.Info("停止确认链", "chain", chainID, "reason", "已达到最大重试次数", "max_retries", r.ConfirmMaxRetries)
 		m.stopChain(chainID)
 		return
 	}
@@ -122,7 +122,7 @@ func (m *ConfirmRetryManager) retry(reminderID uint, chainID string, round int) 
 		Where("confirm_chain_id = ? AND confirmed = ?", chainID, true).
 		Count(&confirmed)
 	if confirmed > 0 {
-		log.Printf("[confirm] 停止确认链 chain=%s：用户已确认", chainID)
+		slog.Info("停止确认链", "chain", chainID, "reason", "用户已确认")
 		m.stopChain(chainID)
 		return
 	}
@@ -132,17 +132,17 @@ func (m *ConfirmRetryManager) retry(reminderID uint, chainID string, round int) 
 		Where("delivery_logs.confirm_chain_id = ?", chainID).
 		First(&tok).Error
 	if err != nil {
-		log.Printf("[confirm] 停止确认链 chain=%s：查找 token 失败: %v", chainID, err)
+		slog.Info("停止确认链", "chain", chainID, "reason", "查找 token 失败", "error", err)
 		m.stopChain(chainID)
 		return
 	}
 	if tok.UsedAt != nil {
-		log.Printf("[confirm] 停止确认链 chain=%s：确认链接已使用", chainID)
+		slog.Info("停止确认链", "chain", chainID, "reason", "确认链接已使用")
 		m.stopChain(chainID)
 		return
 	}
 	if time.Now().After(tok.ExpiresAt) {
-		log.Printf("[confirm] 停止确认链 chain=%s：确认链接已过期", chainID)
+		slog.Info("停止确认链", "chain", chainID, "reason", "确认链接已过期")
 		m.stopChain(chainID)
 		return
 	}
@@ -171,11 +171,11 @@ func (m *ConfirmRetryManager) retry(reminderID uint, chainID string, round int) 
 		ConfirmChainID: &chainID,
 	}
 	if err := m.DB.Create(newLog).Error; err != nil {
-		log.Printf("[confirm] 创建重发日志失败 chain=%s: %v", chainID, err)
+		slog.Info("创建重发日志失败", "chain", chainID, "error", err)
 		m.stopChain(chainID)
 		return
 	}
-	log.Printf("[confirm] 触发第 %d 次重发 chain=%s reminder=%d log=%d", round, chainID, r.ID, newLog.ID)
+	slog.Info("触发重发", "round", round, "chain", chainID, "reminder", r.ID, "log", newLog.ID)
 
 	go func(r models.Reminder, logID uint) {
 		ctx, cancel := context.WithTimeout(context.Background(), 70*time.Second)

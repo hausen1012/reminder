@@ -5,13 +5,13 @@ package notifier
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 )
 
 type logNotifier struct{}
 
-func (n *logNotifier) Type() string { return "log" }
+func (n *logNotifier) Type() string { return "log/slog" }
 
 func (n *logNotifier) Send(_ context.Context, _ []byte, msg Message) error {
 	body := msg.Body
@@ -21,12 +21,7 @@ func (n *logNotifier) Send(_ context.Context, _ []byte, msg Message) error {
 	case "markdown":
 		body = StripMarkdown(msg.Body)
 	}
-	log.Printf(
-		"[log-notifier] %s | subject=%s | body=%s",
-		time.Now().Format(time.RFC3339),
-		msg.Subject,
-		body,
-	)
+	slog.Info("通知", "time", time.Now().Format(time.RFC3339), "subject", msg.Subject, "body", body)
 	fmt.Printf(
 		"=== LOG NOTIFICATION ===\nTime: %s\nSubject: %s\nBody:\n%s\n========================\n",
 		time.Now().Format(time.RFC3339),

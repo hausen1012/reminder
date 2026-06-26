@@ -12,7 +12,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"log"
+	"log/slog"
 	"sort"
 	"sync"
 	"time"
@@ -309,7 +309,7 @@ func (e *Engine) fire(id uint) {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return
 		}
-		log.Printf("[scheduler] 读取 reminder=%d 失败: %v", id, err)
+		slog.Info("读取 reminder 失败", "reminder", id, "error", err)
 		return
 	}
 	if !r.Enabled {
@@ -318,7 +318,7 @@ func (e *Engine) fire(id uint) {
 
 	spec, err := ParseSpec(r.ScheduleSpec)
 	if err != nil {
-		log.Printf("[scheduler] 解析 reminder=%d spec 失败: %v", id, err)
+		slog.Info("解析 reminder spec 失败", "reminder", id, "error", err)
 		return
 	}
 
@@ -326,7 +326,7 @@ func (e *Engine) fire(id uint) {
 	// 算出新的 next_fire_at（cron 也要算，用于持久化展示）
 	newNext, err := Compute(r.Calendar, r.ScheduleType, spec, now, e.loc)
 	if err != nil {
-		log.Printf("[scheduler] 计算下次触发失败 reminder=%d: %v", id, err)
+		slog.Info("计算下次触发失败", "reminder", id, "error", err)
 	}
 
 	var logID uint
@@ -374,7 +374,7 @@ func (e *Engine) fire(id uint) {
 		if errors.Is(err, errSkipped) {
 			return
 		}
-		log.Printf("[scheduler] fire 事务失败 reminder=%d: %v", id, err)
+		slog.Info("fire 事务失败", "reminder", id, "error", err)
 		return
 	}
 
@@ -393,7 +393,7 @@ func (e *Engine) fire(id uint) {
 		var rr models.Reminder
 		if err := e.db.First(&rr, id).Error; err == nil {
 			if err := e.addAfterFunc(&rr, spec); err != nil {
-				log.Printf("[scheduler] reschedule reminder=%d 失败: %v", id, err)
+				slog.Info("reschedule reminder 失败", "reminder", id, "error", err)
 			}
 		}
 	}
@@ -410,7 +410,7 @@ func (e *Engine) LoadAndRegisterAll() error {
 	}
 	for i := range items {
 		if err := e.Add(&items[i]); err != nil {
-			log.Printf("[scheduler] 注册 reminder=%d 失败: %v", items[i].ID, err)
+			slog.Info("注册 reminder 失败", "reminder", items[i].ID, "error", err)
 		}
 	}
 	return nil
@@ -421,9 +421,9 @@ func (e *Engine) AddPurgeCron(logSrv interface{ Purge(olderThan time.Duration, a
 	return e.cron.AddFunc("0 0 3 * * *", func() {
 		n, err := logSrv.Purge(purgeAfter, false)
 		if err != nil {
-			log.Printf("[scheduler] 自动清理日志失败: %v", err)
+			slog.Info("自动清理日志失败", "error", err)
 		} else if n > 0 {
-			log.Printf("[scheduler] 自动清理日志 %d 条", n)
+			slog.Info("自动清理日志", "count", n)
 		}
 	})
 }

@@ -3,7 +3,7 @@ package middleware
 import (
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"runtime/debug"
 
@@ -86,7 +86,7 @@ func ErrorHandler() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		defer func() {
 			if r := recover(); r != nil {
-				log.Printf("[ERROR] panic: %v\n%s", r, debug.Stack())
+				slog.Error("panic", "recover", r, "stack", debug.Stack())
 				if !c.Writer.Written() {
 					c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
 						"error": gin.H{
@@ -115,7 +115,7 @@ func ErrorHandler() gin.HandlerFunc {
 			return
 		}
 		// 未知错误，统一 500
-		log.Printf("[ERROR] unhandled error: %v", err)
+		slog.Error("未处理的错误", "error", err)
 		if !c.Writer.Written() {
 			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
 				"error": gin.H{

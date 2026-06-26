@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"time"
 )
@@ -28,7 +28,7 @@ func (n *wecomNotifier) Send(ctx context.Context, configJSON []byte, msg Message
 	if err := json.Unmarshal(configJSON, &cfg); err != nil {
 		return Permanent(fmt.Errorf("解析企微配置失败: %w", err))
 	}
-	log.Printf("[wecom] 开始发送 subject=%q body_len=%d format=%s", msg.Subject, len(msg.Body), msg.Format)
+	slog.Info("开始发送", "subject", msg.Subject, "body_len", len(msg.Body), "format", msg.Format)
 	if cfg.WebhookURL == "" {
 		return Permanent(fmt.Errorf("企微 webhook_url 未配置"))
 	}
