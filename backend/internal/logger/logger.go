@@ -19,6 +19,8 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -41,19 +43,35 @@ func Init(logDir string) {
 
 	multi := io.MultiWriter(writers...)
 
+	// 统一时间格式：xxxx-xx-xx HH:mm:ss，source 缩短为 package/file.go:N
+	replace := func(groups []string, a slog.Attr) slog.Attr {
+		switch a.Key {
+		case slog.TimeKey:
+			return slog.String("time", a.Value.Time().Format("2006-01-02 15:04:05"))
+		case slog.SourceKey:
+			src := a.Value.Any().(*slog.Source)
+			if src != nil {
+				if idx := strings.Index(src.File, "internal/"); idx >= 0 {
+					return slog.String("src", src.File[idx:]+":"+strconv.Itoa(src.Line))
+				}
+				return slog.String("src", src.File+":"+strconv.Itoa(src.Line))
+			}
+		}
+		return a
+	}
+	opts := &slog.HandlerOptions{
+		Level:      slog.LevelInfo,
+		AddSource:  true,
+		ReplaceAttr: replace,
+	}
+
 	// 默认 TextHandler（开发友好），LOG_FORMAT=json 时切换 JSONHandler
 	var h slog.Handler
 	switch os.Getenv("LOG_FORMAT") {
 	case "json":
-		h = slog.NewJSONHandler(multi, &slog.HandlerOptions{
-			Level:     slog.LevelInfo,
-			AddSource: true,
-		})
+		h = slog.NewJSONHandler(multi, opts)
 	default:
-		h = slog.NewTextHandler(multi, &slog.HandlerOptions{
-			Level:     slog.LevelInfo,
-			AddSource: true,
-		})
+		h = slog.NewTextHandler(multi, opts)
 	}
 
 	slog.SetDefault(slog.New(h))
