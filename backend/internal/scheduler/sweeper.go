@@ -212,6 +212,3 @@ func (s *Sweeper) markExpired(r *models.Reminder, now time.Time) error {
 }
 
 var errSweepSkipped = errors.New("sweep skipped by optimistic lock")
-
-// 让 sweeper 在调度器停止时也能感知到（目前仅为可读性占位）。
-var _ = context.Canceled

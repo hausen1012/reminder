@@ -9,7 +9,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
-	"fmt"
 	"math/big"
 	"strings"
 	"sync"
@@ -288,4 +287,3 @@ func (s *TokenService) GetView(id uint) (*TokenView, error) {
 	}, nil
 }
 
-var _ = fmt.Sprintf
