@@ -9,9 +9,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"strings"
 	"time"
+	"log/slog"
 
 	"github.com/reminder/backend/internal/middleware"
 	"github.com/reminder/backend/internal/models"
@@ -135,7 +135,7 @@ func (s *ReminderService) Create(in ReminderInput) (*ReminderView, error) {
 	if s.Engine != nil {
 		if err := s.Engine.Add(r); err != nil {
 			// 调度器失败不应导致 CRUD 失败：用户保存的数据已落库
-			fmt.Printf("[reminder] 注册到调度器失败 id=%d: %v\n", r.ID, err)
+			slog.Info("注册到调度器失败", "id", r.ID, "error", err)
 		}
 	}
 	return s.toView(r, in.ChannelIDs), nil
@@ -204,7 +204,7 @@ func (s *ReminderService) Update(id uint, in ReminderInput) (*ReminderView, erro
 	}
 	if s.Engine != nil {
 		if err := s.Engine.Update(r); err != nil {
-			fmt.Printf("[reminder] 更新调度器失败 id=%d: %v\n", id, err)
+			slog.Info("更新调度器失败", "id", id, "error", err)
 		}
 	}
 	if s.ConfirmMgr != nil {

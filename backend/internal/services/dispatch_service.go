@@ -7,7 +7,6 @@ package services
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -369,9 +368,3 @@ func debugVars(vars map[string]string) string {
 	b, _ := json.Marshal(vars)
 	return string(b)
 }
-
-// 显式引用以避免 "imported and not used" 的潜在告警。
-var _ = strings.TrimSpace
-var _ = errors.New
-var _ = fmt.Sprintf
-var _ = debugVars
