@@ -145,7 +145,7 @@ export function ReminderEditDialog({ reminder, open, onClose, onSaved }: Props) 
       })
       toast({ title: '测试提醒已触发', description: '请检查通知渠道是否收到消息。', variant: 'success' })
     } catch (err) {
-      toast({ title: '测试失败', description: String(err), variant: 'destructive' })
+      toast({ title: '测试失败', description: extractApiError(err), variant: 'destructive' })
     } finally {
       setTesting(false)
     }

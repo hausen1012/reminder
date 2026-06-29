@@ -21,7 +21,7 @@ export function formatChineseLunarMonth(month: number): string {
 }
 
 export function formatChineseLunarDay(day: number): string {
-  if (day <= 0 || day > 30) return ''
+  if (!Number.isFinite(day) || day <= 0 || day > 30) return ''
   if (day <= 10) return day === 10 ? '初十' : `初${CHINESE_DIGITS[day]}`
   if (day < 20) return '十' + CHINESE_DIGITS[day - 10]
   if (day === 20) return '二十'
