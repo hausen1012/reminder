@@ -120,6 +120,46 @@ func (h *ExternalHandler) DeleteReminder(c *gin.Context) {
 	successJSON(c, nil)
 }
 
+// UpdateReminder PUT /api/external/v1/reminders/:id
+func (h *ExternalHandler) UpdateReminder(c *gin.Context) {
+	id, err := parseID(c, "id")
+	if err != nil {
+		abortErr(c, err)
+		return
+	}
+
+	// 确认是本 Key 创建的
+	v, err := h.ReminderSvc.Get(id)
+	if err != nil {
+		abortErr(c, err)
+		return
+	}
+	if !h.belongsToKey(v.TokenID, c) {
+		abortErr(c, middleware.NewAppError(middleware.CodeNotFound, "提醒不存在"))
+		return
+	}
+
+	var in services.ReminderInput
+	if err := c.ShouldBindJSON(&in); err != nil {
+		abortErr(c, middleware.NewAppError(middleware.CodeValidationFailed, "请求体格式错误"))
+		return
+	}
+
+	// 强制 source=api，保留原 token
+	in.Source = "api"
+	tokenID, _ := c.Get("token_id")
+	if keyID, ok := tokenID.(uint); ok {
+		in.TokenID = &keyID
+	}
+
+	updated, err := h.ReminderSvc.Update(id, in)
+	if err != nil {
+		abortErr(c, err)
+		return
+	}
+	successJSON(c, updated)
+}
+
 // ListChannels GET /api/external/v1/channels
 //
 // 返回所有通知渠道列表，供外部调用方选择 channel_id。
@@ -177,6 +217,7 @@ th,td{text-align:left;padding:8px 12px;border-bottom:1px solid #e5e7eb}
 th{background:#f9fafb;font-weight:600}
 .tag{display:inline-block;padding:2px 8px;border-radius:4px;font-size:12px;font-weight:600;margin-right:6px}
 .tag-post{background:#22c55e;color:#fff}
+.tag-put{background:#f59e0b;color:#fff}
 .tag-get{background:#3b82f6;color:#fff}
 .tag-delete{background:#ef4444;color:#fff}
 .field-opt{color:#999;font-size:12px}
@@ -342,6 +383,16 @@ th{background:#f9fafb;font-weight:600}
 <h4>响应</h4>
 <p>同 <code>POST&nbsp;/api/external/v1/reminders</code> 的响应结构。</p>
 
+<!-- ──────── PUT /api/external/v1/reminders/:id ──────── -->
+<h3><span class="tag tag-put">PUT</span> /api/external/v1/reminders/:id</h3>
+<p>编辑本令牌创建的提醒。请求体与 POST 创建相同，所有字段均可修改。</p>
+
+<h4>请求体</h4>
+<p>同 <code>POST&nbsp;/api/external/v1/reminders</code> 的请求体结构。</p>
+
+<h4>响应</h4>
+<p>同 <code>POST&nbsp;/api/external/v1/reminders</code> 的响应结构（返回更新后的完整提醒数据）。</p>
+
 <!-- ──────── DELETE /api/external/v1/reminders/:id ──────── -->
 <h3><span class="tag tag-delete">DELETE</span> /api/external/v1/reminders/:id</h3>
 <p>删除本令牌创建的提醒。</p>
@@ -461,6 +512,17 @@ th{background:#f9fafb;font-weight:600}
 <h4>删除提醒</h4>
 <pre class="curl">curl -X DELETE /api/external/v1/reminders/1 \
   -H "X-AUTH: bdrk_xxx"</pre>
+
+<h4>编辑提醒</h4>
+<pre class="curl">curl -X PUT /api/external/v1/reminders/1 \
+  -H "X-AUTH: bdrk_xxx" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "修改后的标题",
+    "schedule_type": "cron",
+    "schedule_spec": {"expr": "0 10 * * *"},
+    "channel_ids": [1]
+  }'</pre>
 
 <h4>获取通知渠道</h4>
 <pre class="curl">curl /api/external/v1/channels \

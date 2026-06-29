@@ -126,6 +126,7 @@ func Setup(staticFS embed.FS, cfg *config.Config) *SetupResult {
 		externalV1.POST("/reminders", externalHandler.CreateReminder)
 		externalV1.GET("/reminders", externalHandler.ListReminders)
 		externalV1.GET("/reminders/:id", externalHandler.GetReminder)
+		externalV1.PUT("/reminders/:id", externalHandler.UpdateReminder)
 		externalV1.DELETE("/reminders/:id", externalHandler.DeleteReminder)
 		externalV1.GET("/channels", externalHandler.ListChannels)
 	}
