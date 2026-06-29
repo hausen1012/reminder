@@ -9,6 +9,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"sync"
 	"time"
 
 	"github.com/reminder/backend/internal/models"
@@ -123,20 +124,37 @@ func (s *Sweeper) tick() {
 		return
 	}
 
-	for i := range items {
-		r := &items[i]
-		if r.NextFireAt == nil {
-			continue
-		}
-		if r.NextFireAt.Before(cutoffExpire) {
-			if err := s.markExpired(r, now); err != nil {
-				slog.Info("标记 reminder expired 失败", "reminder", r.ID, "error", err)
-			}
-			continue
-		}
-		// 在 missTol 内：交给 engine.fire 走正常路径
-		s.engine.fire(r.ID)
+	// 用 worker pool 并发处理，避免大量过期提醒串行阻塞
+	workerCount := 4
+	if n := len(items); n < workerCount {
+		workerCount = n
 	}
+	ch := make(chan *models.Reminder, len(items))
+	var wg sync.WaitGroup
+	for w := 0; w < workerCount; w++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for r := range ch {
+				if r.NextFireAt == nil {
+					continue
+				}
+				if r.NextFireAt.Before(cutoffExpire) {
+					if err := s.markExpired(r, now); err != nil {
+						slog.Info("标记 reminder expired 失败", "reminder", r.ID, "error", err)
+					}
+					continue
+				}
+				// 在 missTol 内：交给 engine.fire 走正常路径
+				s.engine.fire(r.ID)
+			}
+		}()
+	}
+	for i := range items {
+		ch <- &items[i]
+	}
+	close(ch)
+	wg.Wait()
 }
 
 // markExpired 把一条已严重过期的提醒推进到下一次：
