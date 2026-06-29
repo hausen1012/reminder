@@ -14,7 +14,8 @@ export function formatChineseLunarYear(year: number): string {
 }
 
 export function formatChineseLunarMonth(month: number): string {
-  if (month <= 10) return CHINESE_DIGITS[month] + '月'
+  if (month >= 1 && month <= 9) return CHINESE_DIGITS[month] + '月'
+  if (month === 10) return '十月'
   if (month === 11) return '十一月'
   return '十二月'
 }
