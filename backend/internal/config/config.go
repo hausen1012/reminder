@@ -33,7 +33,7 @@ func Load() *Config {
 	cfg := &Config{
 		Port:         getEnv("PORT", "8765"),
 		DBPath:       getEnv("DB_PATH", "/data/db/reminder.db"),
-		JWTSecret:    getEnv("JWT_SECRET", "changeme"),
+		JWTSecret:    getEnv("JWT_SECRET", ""),
 		Username: getEnv("USERNAME", "admin"),
 		Password: getEnv("PASSWORD", "admin123"),
 

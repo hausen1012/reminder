@@ -154,6 +154,11 @@ func (d *DispatchService) Run(ctx context.Context, r *models.Reminder, deliveryL
 		ch := channels[i]
 		wg.Add(1)
 		go func() {
+				defer func() {
+					if r := recover(); r != nil {
+						slog.Error("dispatch goroutine panic", "recover", r, "log", deliveryLogID)
+					}
+				}()
 			defer wg.Done()
 			ok := d.sendWithRetry(ctx, ch, deliveryLogID, rendered)
 			results[i] = result{

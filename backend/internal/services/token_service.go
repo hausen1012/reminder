@@ -9,6 +9,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"log/slog"
 	"math/big"
 	"strings"
 	"sync"
@@ -145,6 +146,11 @@ func (s *TokenService) TouchLastUsed(keyID uint) {
 	}
 	s.lastUsedAt[keyID] = time.Now()
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				slog.Error("TouchLastUsed goroutine panic", "recover", r)
+			}
+		}()
 		now := time.Now()
 		_ = s.DB.Model(&models.Token{}).Where("id = ?", keyID).Update("last_used_at", now).Error
 	}()

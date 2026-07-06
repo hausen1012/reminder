@@ -93,7 +93,11 @@ func parsePurgeParams(c *gin.Context) (time.Duration, bool) {
 	all := c.Query("all") == "true"
 	var olderThan time.Duration
 	if v := c.Query("older_than"); v != "" {
-		olderThan, _ = time.ParseDuration(v)
+		var err error
+		olderThan, err = time.ParseDuration(v)
+		if err != nil {
+			olderThan = 0
+		}
 	}
 	return olderThan, all
 }

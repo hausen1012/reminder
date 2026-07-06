@@ -178,6 +178,11 @@ func (m *ConfirmRetryManager) retry(reminderID uint, chainID string, round int) 
 	slog.Info("触发重发", "round", round, "chain", chainID, "reminder", r.ID, "log", newLog.ID)
 
 	go func(r models.Reminder, logID uint) {
+		defer func() {
+			if r := recover(); r != nil {
+				slog.Error("confirm retry goroutine panic", "recover", r, "log", logID)
+			}
+		}()
 		ctx, cancel := context.WithTimeout(context.Background(), 70*time.Second)
 		defer cancel()
 		m.Dispatch.Run(ctx, &r, logID)

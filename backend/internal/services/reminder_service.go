@@ -395,7 +395,16 @@ func (s *ReminderService) Toggle(id uint) (*ReminderView, error) {
 			if next, cerr := scheduler.Compute(r.Calendar, r.ScheduleType, spec, time.Now(), loc); cerr == nil {
 				updates["next_fire_at"] = next
 				r.NextFireAt = next
-		}
+			} else {
+				// 计算失败时回退到旧值，保持禁用
+				r.Enabled = false
+				updates["enabled"] = false
+				slog.Warn("重新计算下次触发时间失败，保持禁用", "id", id, "error", cerr)
+			}
+		} else {
+			r.Enabled = false
+			updates["enabled"] = false
+			slog.Warn("解析 schedule_spec 失败，保持禁用", "id", id, "error", perr)
 		}
 	} else {
 		// 禁用时清空下次触发时间
