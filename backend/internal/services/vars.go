@@ -15,6 +15,7 @@ import (
 
 	"github.com/6tail/lunar-go/calendar"
 	"github.com/reminder/backend/internal/models"
+	"github.com/reminder/backend/internal/notifier"
 )
 
 var weekdays = []string{"周日", "周一", "周二", "周三", "周四", "周五", "周六"}
@@ -48,6 +49,27 @@ func buildVars(r *models.Reminder, firedAt, planned time.Time, loc *time.Locatio
 		"source":          r.Source,
 	}
 	return vars
+}
+
+// buildRenderedMessage 是渲染提醒内容的唯一入口。
+//
+// 要点（也是常被遗漏的坑）：
+//  1. 用 vars 渲染 body（展开 {{now_date}} {{lunar_date}}  占位符）
+//  2. 用渲染后的 body 覆盖 vars["content"]，
+//     保证下游各通道（尤其是 Webhook BodyTemplate）中的 {{content}} 拿到的是渲染结果而非原始模板
+//  3. 渲染结束后 vars 是最终态，所有后续的二次渲染（如 Webhook 的 body_template 二次渲染）
+//     都基于这套 vars
+//
+// 所有构造 notifier.Message 的调用方都应走此函数，禁止手拼 notifier.Message{}。
+func buildRenderedMessage(title, content, contentFormat string, vars map[string]string) notifier.Message {
+	body := notifier.Render(content, vars)
+	vars["content"] = body
+	return notifier.Message{
+		Subject: notifier.Render(title, vars),
+		Body:    body,
+		Format:  contentFormat,
+		Vars:    vars,
+	}
 }
 
 // formatLunar 把公历时间转成"农历xxxx年x月初x"中文串，方便用户阅读。

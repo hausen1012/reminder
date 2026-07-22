@@ -11,7 +11,6 @@ import (
 	"log/slog"
 
 	"github.com/reminder/backend/internal/models"
-	"github.com/reminder/backend/internal/notifier"
 	"gorm.io/gorm"
 )
 
@@ -154,11 +153,7 @@ func (m *ConfirmRetryManager) retry(reminderID uint, chainID string, round int) 
 	vars := buildVars(&r, time.Now(), planned, m.Loc)
 	vars["confirm_url"] = m.ConfirmSvc.BuildURL(tok.Token)
 
-	rendered := notifier.Message{
-		Subject: notifier.Render(r.Title, vars),
-		Body:    notifier.Render(r.Content, vars),
-		Vars:    vars,
-	}
+	rendered := buildRenderedMessage(r.Title, r.Content, r.ContentFormat, vars)
 
 	newLog := &models.DeliveryLog{
 		ReminderID:     r.ID,

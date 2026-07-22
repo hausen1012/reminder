@@ -15,7 +15,6 @@ import (
 
 	"github.com/reminder/backend/internal/middleware"
 	"github.com/reminder/backend/internal/models"
-	"github.com/reminder/backend/internal/notifier"
 	"github.com/reminder/backend/internal/scheduler"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
@@ -473,13 +472,7 @@ func (s *ReminderService) TestDryRun(ctx context.Context, title, content, conten
 		NextFireAt:  &now,
 	}, now, now, s.Loc)
 
-	body := notifier.Render(content, vars)
-	rendered := notifier.Message{
-		Subject: notifier.Render(title, vars),
-		Body:    body,
-		Format:  contentFormat,
-		Vars:    vars,
-	}
+	rendered := buildRenderedMessage(title, content, contentFormat, vars)
 	return s.Dispatch.DryRun(ctx, channels, rendered)
 }
 
