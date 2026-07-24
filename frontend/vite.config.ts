@@ -46,6 +46,7 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,svg}'],
+        navigateFallbackDenylist: [/^\/api\//, /^\/c\//],
         runtimeCaching: [
           {
             urlPattern: /^\/api\//,

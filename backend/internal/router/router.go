@@ -217,6 +217,11 @@ func serveStaticFiles(r *gin.Engine, staticFS embed.FS) {
 			c.Next()
 			return
 		}
+		// 确认链接路径直接交由路由处理，不返回 SPA
+		if strings.HasPrefix(c.Request.URL.Path, "/c/") {
+			c.Next()
+			return
+		}
 		fileServer.ServeHTTP(c.Writer, c.Request)
 		c.Abort()
 	})
