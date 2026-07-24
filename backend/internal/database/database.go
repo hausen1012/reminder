@@ -33,7 +33,8 @@ func Init(cfg *config.Config) error {
 	if err != nil {
 		return fmt.Errorf("get sql.DB: %w", err)
 	}
-	sqlDB.SetMaxOpenConns(1)
+	sqlDB.SetMaxOpenConns(4)
+	sqlDB.SetMaxIdleConns(2)
 
 	if err := db.AutoMigrate(
 		&models.User{},
