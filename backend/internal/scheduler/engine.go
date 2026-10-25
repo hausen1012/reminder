@@ -417,7 +417,9 @@ func (e *Engine) LoadAndRegisterAll() error {
 }
 
 // AddPurgeCron 注册一个每天凌晨 3 点的定时清理任务。
-func (e *Engine) AddPurgeCron(logSrv interface{ Purge(olderThan time.Duration, all bool) (int64, error) }, purgeAfter time.Duration) (cron.EntryID, error) {
+func (e *Engine) AddPurgeCron(logSrv interface {
+	Purge(olderThan time.Duration, all bool) (int64, error)
+}, purgeAfter time.Duration) (cron.EntryID, error) {
 	return e.cron.AddFunc("0 0 3 * * *", func() {
 		n, err := logSrv.Purge(purgeAfter, false)
 		if err != nil {

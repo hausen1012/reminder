@@ -1,5 +1,9 @@
 
-  - 用户一旦确认，整条链立即停止.PHONY: dev dev-backend dev-frontend build build-linux build-macos build-windows docker clean
+.PHONY: dev dev-backend dev-frontend build build-frontend build-linux build-macos build-windows docker clean test lint fmt
+
+# 一键启动前后端开发环境（依赖 bash；Windows 图形终端可直接运行 dev.ps1）
+dev:
+	./dev.sh
 
 # Local development
 dev-backend:
@@ -32,6 +36,18 @@ build-windows: build-frontend
 # Docker
 docker:
 	docker-compose up --build
+
+# 质量门禁：格式检查 + 静态检查 + 单元测试
+fmt:
+	cd backend && gofmt -w .
+
+lint:
+	cd backend && go vet ./...
+	@cd backend && test -z "$$(gofmt -l .)" || (echo "以下文件未格式化，请运行 make fmt:"; gofmt -l .; exit 1)
+
+test:
+	cd backend && go test ./...
+	cd frontend && npm test
 
 # Clean
 clean:

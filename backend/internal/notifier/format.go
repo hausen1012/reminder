@@ -8,16 +8,16 @@ import (
 var (
 	htmlTagRe = regexp.MustCompile(`<[^>]*>`)
 	// markdown 标记清理
-	mdHeaderRe    = regexp.MustCompile(`(?m)^#{1,6}\s+`)
-	mdBoldRe      = regexp.MustCompile(`\*\*(.+?)\*\*`)
-	mdItalicRe    = regexp.MustCompile(`\*(.+?)\*`)
-	mdCodeRe      = regexp.MustCompile("`{1,3}[^`\n]+`{1,3}")
-	mdLinkRe      = regexp.MustCompile(`\[([^\]]+)\]\([^)]+\)`)
-	mdImageRe     = regexp.MustCompile(`!\[([^\]]*)\]\([^)]+\)`)
+	mdHeaderRe     = regexp.MustCompile(`(?m)^#{1,6}\s+`)
+	mdBoldRe       = regexp.MustCompile(`\*\*(.+?)\*\*`)
+	mdItalicRe     = regexp.MustCompile(`\*(.+?)\*`)
+	mdCodeRe       = regexp.MustCompile("`{1,3}[^`\n]+`{1,3}")
+	mdLinkRe       = regexp.MustCompile(`\[([^\]]+)\]\([^)]+\)`)
+	mdImageRe      = regexp.MustCompile(`!\[([^\]]*)\]\([^)]+\)`)
 	mdBlockquoteRe = regexp.MustCompile(`(?m)^>\s+`)
-	mdHrRe        = regexp.MustCompile(`(?m)^[-*_]{3,}\s*$`)
-	mdListRe      = regexp.MustCompile(`(?m)^[\s]*[-*+]\s+`)
-	mdNumListRe   = regexp.MustCompile(`(?m)^\s*\d+\.\s+`)
+	mdHrRe         = regexp.MustCompile(`(?m)^[-*_]{3,}\s*$`)
+	mdListRe       = regexp.MustCompile(`(?m)^[\s]*[-*+]\s+`)
+	mdNumListRe    = regexp.MustCompile(`(?m)^\s*\d+\.\s+`)
 )
 
 // StripHTML 去除所有 HTML 标签，返回纯文本。

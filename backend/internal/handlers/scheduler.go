@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/reminder/backend/internal/scheduler"
 	"github.com/gin-gonic/gin"
+	"github.com/reminder/backend/internal/scheduler"
 )
 
 // SchedulerHandler 返回调度器（Engine + Sweeper）运行时状态。

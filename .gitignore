@@ -3,13 +3,15 @@ node_modules/
 
 # Build output
 frontend/dist/
-backend/cmd/server/web/index.html
-backend/cmd/server/web/assets/
 build/
 backend/build/
 backend/server
 backend/server.exe
 backend/server-*
+
+# 前端构建产物（由 make build-frontend 生成并嵌入后端）
+backend/cmd/server/web/*
+!backend/cmd/server/web/.gitkeep
 
 # Environment
 .env
@@ -27,4 +29,11 @@ Thumbs.db
 
 # Logs
 logs/
+*.log
+
+# 本地数据库与临时文件
+*.db
+*.db-wal
+*.db-shm
+.tmp/
 

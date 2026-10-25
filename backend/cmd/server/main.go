@@ -29,12 +29,20 @@ func main() {
 		os.Exit(1)
 	}
 
-	res := router.Setup(staticFS, cfg)
+	res, err := router.Setup(staticFS, cfg)
+	if err != nil {
+		slog.Error("路由初始化失败", "error", err)
+		os.Exit(1)
+	}
 	addr := ":" + cfg.Port
 
 	srv := &http.Server{
-		Addr:    addr,
-		Handler: res.Engine,
+		Addr:              addr,
+		Handler:           res.Engine,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      120 * time.Second,
+		IdleTimeout:       120 * time.Second,
 	}
 
 	go func() {

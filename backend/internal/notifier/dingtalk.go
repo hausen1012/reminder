@@ -17,11 +17,11 @@ import (
 
 // DingTalkConfig 是钉钉机器人 Webhook 的配置。
 type DingTalkConfig struct {
-	WebhookURL string `json:"webhook_url"`
-	Secret     string `json:"secret_enc"` // 可选，启用了加签时必填；传入时已是明文
-	MsgType    string `json:"msg_type"`   // text | markdown，默认 text
+	WebhookURL string   `json:"webhook_url"`
+	Secret     string   `json:"secret_enc"` // 可选，启用了加签时必填；传入时已是明文
+	MsgType    string   `json:"msg_type"`   // text | markdown，默认 text
 	AtMobiles  []string `json:"at_mobiles,omitempty"`
-	AtAll      bool   `json:"at_all,omitempty"`
+	AtAll      bool     `json:"at_all,omitempty"`
 }
 
 type dingtalkNotifier struct{}

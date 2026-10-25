@@ -15,8 +15,8 @@ import (
 
 // LogService 负责 DeliveryLog 的查询与清理。
 type LogService struct {
-	DB          *gorm.DB
-	PublicURL   string // 用于拼接 confirm_url
+	DB        *gorm.DB
+	PublicURL string // 用于拼接 confirm_url
 }
 
 // NewLogService 构造日志服务。
@@ -33,7 +33,7 @@ type LogFilter struct {
 	ReminderID uint   // 指定提醒
 	Status     string // pending | success | partial | failed | expired
 	Source     string
-	Search     string // 搜索日志标题
+	Search     string     // 搜索日志标题
 	Since      *time.Time // 只返回 fired_at >= 该时间的日志
 	Limit      int
 	Offset     int
@@ -141,16 +141,16 @@ func (s *LogService) List(f LogFilter) ([]*LogView, int64, error) {
 	for _, id := range ids {
 		main := mainByID[id]
 		views = append(views, &LogView{
-			DeliveryLog:     main.DeliveryLog,
-			ReminderTitle:   main.ReminderTitle,
+			DeliveryLog:   main.DeliveryLog,
+			ReminderTitle: main.ReminderTitle,
 		})
 		if main.ConfirmChainID == nil || *main.ConfirmChainID == "" {
 			continue
 		}
 		for _, sub := range groupedSubs[*main.ConfirmChainID] {
 			views = append(views, &LogView{
-				DeliveryLog:     sub.DeliveryLog,
-				ReminderTitle:   sub.ReminderTitle,
+				DeliveryLog:   sub.DeliveryLog,
+				ReminderTitle: sub.ReminderTitle,
 			})
 		}
 	}
@@ -191,10 +191,10 @@ func (s *LogService) GetDetail(id uint) (*LogView, error) {
 	}
 
 	return &LogView{
-		DeliveryLog:     dl,
-		ReminderTitle:   reminderTitle,
-		Attempts:        attempts,
-		ConfirmURL:      confirmURL,
+		DeliveryLog:   dl,
+		ReminderTitle: reminderTitle,
+		Attempts:      attempts,
+		ConfirmURL:    confirmURL,
 	}, nil
 }
 
@@ -238,7 +238,7 @@ func (s *LogService) Purge(olderThan time.Duration, all bool) (int64, error) {
 
 	var count int64
 	err := s.DB.Transaction(func(tx *gorm.DB) error {
-for _, batch := range chunkIDs(ids, 500) {
+		for _, batch := range chunkIDs(ids, 500) {
 			if err := tx.Where("delivery_log_id IN ?", batch).Delete(&models.DeliveryAttempt{}).Error; err != nil {
 				return err
 			}

@@ -13,8 +13,10 @@ services:
       - USERNAME=${USERNAME:-admin}
       - PASSWORD=${PASSWORD:-admin123}
       - DB_PATH=/data/db/reminder.db
-      - JWT_SECRET=${JWT_SECRET:-changeme}
-      - ENCRYPTION_KEY=${ENCRYPTION_KEY:-changeme}
+      # JWT_SECRET 留空时由程序随机生成；不要填 changeme 之类的弱值
+      - JWT_SECRET=${JWT_SECRET:-}
+      # 留空时使用内置 fallback（等同于不加密），生产环境务必配置
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:-}
       - BASE_URL=${BASE_URL:-http://localhost:8765}
       - TIMEZONE=${TIMEZONE:-Asia/Shanghai}
       - SWEEP_INTERVAL_SEC=${SWEEP_INTERVAL_SEC:-60}

@@ -8,14 +8,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"strings"
 	"sync"
 	"time"
-	"log/slog"
 
+	"github.com/google/uuid"
 	"github.com/reminder/backend/internal/models"
 	"github.com/reminder/backend/internal/notifier"
-	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -56,7 +56,7 @@ func (d *DispatchService) Run(ctx context.Context, r *models.Reminder, deliveryL
 	slog.Info("开始投递", "reminder", r.ID, "log", deliveryLogID, "title", r.Title)
 	channels, err := d.loadChannels(r.ID)
 	if err != nil {
-		slog.Info("加载通道失败", "reminder", r.ID, "error", err)
+		slog.Warn("加载通道失败", "reminder", r.ID, "error", err)
 		d.finalize(deliveryLogID, "failed", r.Title, r.Content)
 		return
 	}
@@ -84,7 +84,7 @@ func (d *DispatchService) Run(ctx context.Context, r *models.Reminder, deliveryL
 		slog.Info("提醒需要确认", "reminder", r.ID)
 		var currentLog models.DeliveryLog
 		if err := d.DB.First(&currentLog, deliveryLogID).Error; err != nil {
-			slog.Info("加载确认日志失败", "log", deliveryLogID, "error", err)
+			slog.Warn("加载确认日志失败", "log", deliveryLogID, "error", err)
 		} else if currentLog.ConfirmChainID != nil && *currentLog.ConfirmChainID != "" {
 			confirmChainID = *currentLog.ConfirmChainID
 			var tok models.ConfirmToken
@@ -92,7 +92,7 @@ func (d *DispatchService) Run(ctx context.Context, r *models.Reminder, deliveryL
 				Where("delivery_logs.confirm_chain_id = ?", confirmChainID).
 				First(&tok).Error
 			if err != nil {
-				slog.Info("复用确认 token 失败", "chain", confirmChainID, "log", deliveryLogID, "error", err)
+				slog.Warn("复用确认 token 失败", "chain", confirmChainID, "log", deliveryLogID, "error", err)
 			} else {
 				vars["confirm_url"] = d.ConfirmMgr.ConfirmSvc.BuildURL(tok.Token)
 			}
@@ -110,7 +110,7 @@ func (d *DispatchService) Run(ctx context.Context, r *models.Reminder, deliveryL
 					Update("confirm_chain_id", confirmChainID)
 				slog.Info("创建确认链", "chain", confirmChainID, "reminder", r.ID, "log", deliveryLogID)
 			} else {
-				slog.Info("创建确认 token 失败", "log", deliveryLogID, "error", err)
+				slog.Warn("创建确认 token 失败", "log", deliveryLogID, "error", err)
 				confirmChainID = ""
 			}
 		}
@@ -154,11 +154,11 @@ func (d *DispatchService) Run(ctx context.Context, r *models.Reminder, deliveryL
 		ch := channels[i]
 		wg.Add(1)
 		go func() {
-				defer func() {
-					if r := recover(); r != nil {
-						slog.Error("dispatch goroutine panic", "recover", r, "log", deliveryLogID)
-					}
-				}()
+			defer func() {
+				if r := recover(); r != nil {
+					slog.Error("dispatch goroutine panic", "recover", r, "log", deliveryLogID)
+				}
+			}()
 			defer wg.Done()
 			ok := d.sendWithRetry(ctx, ch, deliveryLogID, rendered)
 			results[i] = result{
@@ -192,13 +192,13 @@ func (d *DispatchService) Run(ctx context.Context, r *models.Reminder, deliveryL
 	if confirmChainID != "" && d.ConfirmMgr != nil {
 		var currentLog models.DeliveryLog
 		if err := d.DB.First(&currentLog, deliveryLogID).Error; err != nil {
-			slog.Info("读取当前日志失败", "log", deliveryLogID, "error", err)
+			slog.Warn("读取当前日志失败", "log", deliveryLogID, "error", err)
 		} else if currentLog.RetryRound != 0 {
 			slog.Info("跳过首发调度", "chain", confirmChainID, "retry_round", currentLog.RetryRound)
 		} else {
 			var refreshed models.Reminder
 			if err := d.DB.First(&refreshed, r.ID).Error; err != nil {
-				slog.Info("重读 reminder 失败", "reminder", r.ID, "error", err)
+				slog.Warn("重读 reminder 失败", "reminder", r.ID, "error", err)
 			} else {
 				slog.Info("调度确认重发", "chain", confirmChainID, "reminder", refreshed.ID, "interval_sec", refreshed.ConfirmRetryIntervalSec, "max_retries", refreshed.ConfirmMaxRetries)
 				d.ConfirmMgr.Schedule(&refreshed, confirmChainID, 0)
@@ -214,13 +214,13 @@ func (d *DispatchService) Run(ctx context.Context, r *models.Reminder, deliveryL
 func (d *DispatchService) sendWithRetry(ctx context.Context, ch *models.Channel, deliveryLogID uint, msg notifier.Message) bool {
 	n, err := notifier.Get(ch.Type)
 	if err != nil {
-		slog.Info("获取通道发送器失败", "log", deliveryLogID, "channel", ch.ID, "name", ch.Name, "type", ch.Type, "error", err)
+		slog.Warn("获取通道发送器失败", "log", deliveryLogID, "channel", ch.ID, "name", ch.Name, "type", ch.Type, "error", err)
 		d.writeAttempt(deliveryLogID, ch, 1, "failed", err.Error(), 0)
 		return false
 	}
 	plainConfig, err := d.ChannelSvc.DecryptedConfig(ch)
 	if err != nil {
-		slog.Info("解密通道配置失败", "log", deliveryLogID, "channel", ch.ID, "name", ch.Name, "type", ch.Type, "error", err)
+		slog.Warn("解密通道配置失败", "log", deliveryLogID, "channel", ch.ID, "name", ch.Name, "type", ch.Type, "error", err)
 		d.writeAttempt(deliveryLogID, ch, 1, "failed", "decrypt config: "+err.Error(), 0)
 		return false
 	}
@@ -240,8 +240,8 @@ func (d *DispatchService) sendWithRetry(ctx context.Context, ch *models.Channel,
 			d.writeAttempt(deliveryLogID, ch, i+1, "success", "", latency)
 			return true
 		}
-		slog.Info("通道发送失败", "log", deliveryLogID, "channel", ch.ID, "name", ch.Name, "type", ch.Type, "attempt", i+1, "latency_ms", latency, "error", err)
-			d.writeAttempt(deliveryLogID, ch, i+1, "failed", err.Error(), latency)
+		slog.Warn("通道发送失败", "log", deliveryLogID, "channel", ch.ID, "name", ch.Name, "type", ch.Type, "attempt", i+1, "latency_ms", latency, "error", err)
+		d.writeAttempt(deliveryLogID, ch, i+1, "failed", err.Error(), latency)
 		if notifier.IsPermanent(err) {
 			return false
 		}
@@ -265,7 +265,7 @@ func (d *DispatchService) writeAttempt(deliveryLogID uint, ch *models.Channel, a
 		LatencyMs:     latencyMs,
 	}
 	if err := d.DB.Create(row).Error; err != nil {
-		slog.Info("写 attempt 失败", "log", deliveryLogID, "channel", ch.ID, "error", err)
+		slog.Error("写 attempt 失败", "log", deliveryLogID, "channel", ch.ID, "error", err)
 	}
 }
 
@@ -277,7 +277,7 @@ func (d *DispatchService) finalize(deliveryLogID uint, status, renderedTitle, re
 		"content": renderedContent,
 	}
 	if err := d.DB.Model(&models.DeliveryLog{}).Where("id = ?", deliveryLogID).Updates(updates).Error; err != nil {
-		slog.Info("finalize 失败", "log", deliveryLogID, "error", err)
+		slog.Error("finalize 失败", "log", deliveryLogID, "error", err)
 	}
 }
 
@@ -355,7 +355,7 @@ func (d *DispatchService) sendDryRun(ctx context.Context, ch *models.Channel, ms
 		if sendErr := n.Send(ctx, plainConfig, msg); sendErr == nil {
 			return nil
 		} else {
-			slog.Info("通道发送失败", "channel", ch.ID, "name", ch.Name, "attempt", i+1, "error", sendErr)
+			slog.Warn("通道发送失败", "channel", ch.ID, "name", ch.Name, "attempt", i+1, "error", sendErr)
 			if notifier.IsPermanent(sendErr) {
 				return sendErr
 			}

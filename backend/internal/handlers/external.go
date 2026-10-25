@@ -8,9 +8,9 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/gin-gonic/gin"
 	"github.com/reminder/backend/internal/middleware"
 	"github.com/reminder/backend/internal/services"
-	"github.com/gin-gonic/gin"
 )
 
 // ExternalHandler 是外部 API v1 的处理器。
@@ -32,13 +32,13 @@ func (h *ExternalHandler) CreateReminder(c *gin.Context) {
 	in.Source = "api"
 
 	// 未指定通道时回退到令牌默认通道
-		tokenID, _ := c.Get("token_id")
-		if keyID, ok := tokenID.(uint); ok {
-			in.TokenID = &keyID
-			if len(in.ChannelIDs) == 0 {
-				in.ChannelIDs = h.TokenSvc.DefaultChannelIDs(keyID)
-			}
+	tokenID, _ := c.Get("token_id")
+	if keyID, ok := tokenID.(uint); ok {
+		in.TokenID = &keyID
+		if len(in.ChannelIDs) == 0 {
+			in.ChannelIDs = h.TokenSvc.DefaultChannelIDs(keyID)
 		}
+	}
 
 	v, err := h.ReminderSvc.Create(in)
 	if err != nil {

@@ -1,0 +1,33 @@
+# 依赖与构建产物不应进入构建上下文
+node_modules/
+frontend/node_modules/
+frontend/dist/
+build/
+backend/build/
+backend/cmd/server/web/
+backend/server
+backend/server.exe
+backend/server-*
+
+# 本地数据与日志
+*.db
+*.db-wal
+*.db-shm
+logs/
+backend/logs/
+.tmp/
+reminder/
+
+# 版本控制与编辑器
+.git/
+.github/
+.idea/
+.vscode/
+.trae/
+docs/
+
+# 杂项
+*.log
+*.md
+.DS_Store
+Thumbs.db

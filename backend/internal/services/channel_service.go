@@ -197,15 +197,8 @@ func (s *ChannelService) ListPaged(f ChannelListFilter) ([]*ChannelView, int64, 
 	}
 
 	var rows []models.Channel
-	orderClause := "created_at DESC"
-	if f.SortBy != "" {
-		orderClause = f.SortBy
-		if f.SortOrder == "asc" {
-			orderClause += " ASC"
-		} else {
-			orderClause += " DESC"
-		}
-	}
+	orderClause := buildOrderClause(f.SortBy, f.SortOrder, "created_at DESC",
+		[]string{"id", "created_at", "name"})
 	if err := q.Order(orderClause).Limit(f.Limit).Offset(f.Offset).Find(&rows).Error; err != nil {
 		return nil, 0, err
 	}

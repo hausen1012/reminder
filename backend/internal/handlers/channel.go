@@ -1,45 +1,17 @@
 package handlers
 
 import (
-	"net/http"
 	"strconv"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"github.com/reminder/backend/internal/middleware"
 	"github.com/reminder/backend/internal/services"
-	"github.com/gin-gonic/gin"
 )
 
 // ChannelHandler 是通道相关 HTTP 接口的入口。
 type ChannelHandler struct {
 	Svc *services.ChannelService
-}
-
-// 内部统一从路径取 id 的辅助。
-func parseID(c *gin.Context, key string) (uint, error) {
-	idStr := c.Param(key)
-	id, err := strconv.ParseUint(idStr, 10, 64)
-	if err != nil || id == 0 {
-		return 0, middleware.NewAppError(middleware.CodeValidationFailed, "id 不合法").WithField(key)
-	}
-	return uint(id), nil
-}
-
-// abortErr 是处理 service 错误的统一入口：AppError 走中间件，其余作为 unknown error。
-func abortErr(c *gin.Context, err error) {
-	_ = c.Error(err)
-	c.Abort()
-}
-
-// successJSON 是面向前端的成功响应：直接返回业务数据。
-//
-// 沿用 reminder 的 `{code, message, data}` 包装，方便前端统一处理。
-func successJSON(c *gin.Context, data any) {
-	c.JSON(http.StatusOK, gin.H{
-		"code":    200,
-		"message": "ok",
-		"data":    data,
-	})
 }
 
 // List GET /api/channels

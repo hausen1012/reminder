@@ -19,13 +19,13 @@ func TestChannelUpdateRejectsMissingSMTPFieldsAfterMerge(t *testing.T) {
 		Name: "smtp-test",
 		Type: "smtp",
 		Config: map[string]any{
-			"host": "smtp.example.com",
-			"port": 587,
-			"username": "user@example.com",
+			"host":         "smtp.example.com",
+			"port":         587,
+			"username":     "user@example.com",
 			"password_enc": "secret",
-			"from_addr": "sender@example.com",
-			"from_name": "提醒助手",
-			"to": []string{"receiver@example.com"},
+			"from_addr":    "sender@example.com",
+			"from_name":    "提醒助手",
+			"to":           []string{"receiver@example.com"},
 			"use_starttls": true,
 		},
 	})
@@ -76,13 +76,13 @@ func TestChannelUpdateKeepsEncryptedPasswordWhenPlaceholderIsUsed(t *testing.T) 
 		Name: "smtp-secret",
 		Type: "smtp",
 		Config: map[string]any{
-			"host": "smtp.example.com",
-			"port": 587,
-			"username": "user@example.com",
+			"host":         "smtp.example.com",
+			"port":         587,
+			"username":     "user@example.com",
 			"password_enc": "secret",
-			"from_addr": "sender@example.com",
-			"from_name": "提醒助手",
-			"to": []string{"receiver@example.com"},
+			"from_addr":    "sender@example.com",
+			"from_name":    "提醒助手",
+			"to":           []string{"receiver@example.com"},
 			"use_starttls": true,
 		},
 	})
@@ -103,7 +103,7 @@ func TestChannelUpdateKeepsEncryptedPasswordWhenPlaceholderIsUsed(t *testing.T) 
 		Name: "smtp-secret-updated",
 		Config: map[string]any{
 			"password_enc": "***",
-			"from_name": "新提醒助手",
+			"from_name":    "新提醒助手",
 		},
 	})
 	if err != nil {

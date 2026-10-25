@@ -119,7 +119,7 @@ func TestComputeSolarInterval_FirstFireIsStartAt(t *testing.T) {
 
 func TestComputeSolarCron(t *testing.T) {
 	loc := mustLoc(t, "Asia/Shanghai")
-	spec := &ScheduleSpec{Expr: "0 9 * * 1-5"} // 工作日早 9 点
+	spec := &ScheduleSpec{Expr: "0 9 * * 1-5"}       // 工作日早 9 点
 	after := time.Date(2026, 6, 5, 10, 0, 0, 0, loc) // 周五 10:00
 	got, err := Compute("solar", "cron", spec, after, loc)
 	if err != nil {

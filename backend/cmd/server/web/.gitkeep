@@ -1,0 +1,2 @@
+# 该目录由 make build-frontend 生成前端产物后填充。
+# //go:embed web/* 要求目录存在且非空，因此保留这个占位文件。

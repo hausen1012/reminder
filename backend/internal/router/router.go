@@ -2,12 +2,14 @@ package router
 
 import (
 	"embed"
+	"fmt"
 	"io/fs"
 	"log/slog"
 	"net/http"
 	"strings"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"github.com/reminder/backend/internal/config"
 	"github.com/reminder/backend/internal/crypto/secretbox"
 	"github.com/reminder/backend/internal/database"
@@ -15,7 +17,6 @@ import (
 	"github.com/reminder/backend/internal/middleware"
 	"github.com/reminder/backend/internal/scheduler"
 	"github.com/reminder/backend/internal/services"
-	"github.com/gin-gonic/gin"
 )
 
 // SchedulerHandles 把 scheduler 相关启动后实例返回给 main，
@@ -34,9 +35,9 @@ type SetupResult struct {
 
 // Setup 构建路由 + 启动调度器 + Sweeper。
 //
-// 与 reminder 原版相比：返回值新增 SchedulerHandles 用于优雅停机；
-// 旧调用方仍可使用 SetupEngine 取仅 *gin.Engine 的形态。
-func Setup(staticFS embed.FS, cfg *config.Config) *SetupResult {
+// 返回值包含 gin.Engine 与 SchedulerHandles（供 main 在优雅停机时 Stop 各后台组件）。
+// 初始化失败时返回 error，由调用方决定如何退出，避免在库内 panic。
+func Setup(staticFS embed.FS, cfg *config.Config) (*SetupResult, error) {
 	r := gin.New()
 	r.Use(gin.Recovery())
 	r.Use(middleware.SlogLogger())
@@ -45,8 +46,7 @@ func Setup(staticFS embed.FS, cfg *config.Config) *SetupResult {
 
 	box, err := secretbox.New(cfg.EncryptionKey)
 	if err != nil {
-		slog.Error("初始化 secretbox 失败", "error", err)
-			panic(err)
+		return nil, fmt.Errorf("初始化 secretbox 失败: %w", err)
 	}
 
 	channelSvc := services.NewChannelService(database.DB, box)
@@ -83,8 +83,10 @@ func Setup(staticFS embed.FS, cfg *config.Config) *SetupResult {
 
 	tokenSvc := services.NewTokenService(database.DB)
 	configSvc := services.NewConfigService(database.DB)
+	userSvc := services.NewUserService(database.DB)
 
-	authHandler := &handlers.AuthHandler{JWTSecret: cfg.JWTSecret}
+	authHandler := &handlers.AuthHandler{JWTSecret: cfg.JWTSecret, UserSvc: userSvc}
+	userHandler := &handlers.UserHandler{Svc: userSvc}
 	channelHandler := &handlers.ChannelHandler{Svc: channelSvc}
 	reminderHandler := &handlers.ReminderHandler{Svc: reminderSvc}
 	logHandler := &handlers.LogHandler{Svc: logSvc}
@@ -92,14 +94,14 @@ func Setup(staticFS embed.FS, cfg *config.Config) *SetupResult {
 	tokenHandler := &handlers.TokenHandler{Svc: tokenSvc}
 	externalHandler := &handlers.ExternalHandler{ReminderSvc: reminderSvc, TokenSvc: tokenSvc, ChannelSvc: channelSvc}
 	schedulerHandler := &handlers.SchedulerHandler{Engine: engine, Sweeper: sweeper}
-		configHandler := &handlers.ConfigHandler{Svc: configSvc}
+	configHandler := &handlers.ConfigHandler{Svc: configSvc}
 
 	// 确认链接（无需认证）
 	r.GET("/c/:token", confirmHandler.Confirm)
 
 	api := r.Group("/api")
 	{
-		healthHandler := &handlers.HealthHandler{Engine: engine, Sweeper: sweeper}
+		healthHandler := &handlers.HealthHandler{DB: database.DB, Engine: engine, Sweeper: sweeper}
 		api.GET("/health", healthHandler.Check)
 		api.POST("/auth/login", authHandler.Login)
 	}
@@ -109,7 +111,7 @@ func Setup(staticFS embed.FS, cfg *config.Config) *SetupResult {
 	{
 		auth.GET("/me", authHandler.Me)
 		auth.POST("/logout", authHandler.Logout)
-		auth.PUT("/password", handlers.UpdatePassword)
+		auth.PUT("/password", userHandler.UpdatePassword)
 	}
 
 	// 外部 API v1（令牌鉴权，非 JWT）
@@ -143,7 +145,7 @@ func Setup(staticFS embed.FS, cfg *config.Config) *SetupResult {
 			channels.POST("", channelHandler.Create)
 			channels.GET("/:id", channelHandler.Get)
 			channels.PUT("/:id", channelHandler.Update)
-			channels.DELETE("/batch", channelHandler.BatchDelete)  // 新增（放在 /:id 之前）
+			channels.DELETE("/batch", channelHandler.BatchDelete) // 新增（放在 /:id 之前）
 			channels.DELETE("/:id", channelHandler.Delete)
 			channels.PATCH("/:id/toggle", channelHandler.Toggle)
 			channels.POST("/test-dry", channelHandler.TestDryRun)
@@ -201,7 +203,7 @@ func Setup(staticFS embed.FS, cfg *config.Config) *SetupResult {
 			Sweeper:    sweeper,
 			ConfirmMgr: confirmMgr,
 		},
-	}
+	}, nil
 }
 
 func serveStaticFiles(r *gin.Engine, staticFS embed.FS) {

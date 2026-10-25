@@ -292,4 +292,3 @@ func (s *TokenService) GetView(id uint) (*TokenView, error) {
 		Usage24h:          s.Stats24h(key.ID),
 	}, nil
 }
-

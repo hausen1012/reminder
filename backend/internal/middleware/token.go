@@ -22,11 +22,12 @@ type TokenToucher func(tokenID uint)
 type RateLimiter struct {
 	mu    sync.Mutex
 	slots map[uint]*rateSlot
+	calls uint64 // 用于触发惰性清理
 }
 
 type rateSlot struct {
-	count    int
-	resetAt  time.Time
+	count   int
+	resetAt time.Time
 }
 
 // NewRateLimiter 构造限流器。
@@ -36,12 +37,24 @@ func NewRateLimiter() *RateLimiter {
 
 // Allow 检查是否允许请求通过。
 // limitPerMinute = 每分钟最大请求数。
+//
+// 顺手清理已过窗口的空闲槽位，避免长期运行时 slots 只增不减。
 func (rl *RateLimiter) Allow(keyID uint, limitPerMinute int) bool {
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
 
-	s, ok := rl.slots[keyID]
 	now := time.Now()
+	// 每处理 256 次请求做一次惰性清理，成本可忽略
+	rl.calls++
+	if rl.calls%256 == 0 {
+		for id, slot := range rl.slots {
+			if now.After(slot.resetAt) {
+				delete(rl.slots, id)
+			}
+		}
+	}
+
+	s, ok := rl.slots[keyID]
 	if !ok || now.After(s.resetAt) {
 		rl.slots[keyID] = &rateSlot{count: 1, resetAt: now.Add(time.Minute)}
 		return true

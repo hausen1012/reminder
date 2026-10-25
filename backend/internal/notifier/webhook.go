@@ -18,13 +18,13 @@ import (
 // Method=GET：subject/body/vars 一律按 query_template 拼到 query string；
 // Method=POST：直接把 body_template 渲染后作为请求体发送，Content-Type 默认 application/json。
 type WebhookConfig struct {
-	Method        string            `json:"method"` // GET | POST
-	URL           string            `json:"url"`
-	Headers       map[string]string `json:"headers,omitempty"`        // 普通 header
-	AuthorizationEnc string         `json:"authorization_enc,omitempty"` // 可选，落库加密；传入时已是明文
-	BodyTemplate  string            `json:"body_template,omitempty"`  // POST 时使用
-	QueryTemplate map[string]string `json:"query_template,omitempty"` // GET 时使用，value 内允许占位符
-	ContentType   string            `json:"content_type,omitempty"`   // 默认 application/json
+	Method           string            `json:"method"` // GET | POST
+	URL              string            `json:"url"`
+	Headers          map[string]string `json:"headers,omitempty"`           // 普通 header
+	AuthorizationEnc string            `json:"authorization_enc,omitempty"` // 可选，落库加密；传入时已是明文
+	BodyTemplate     string            `json:"body_template,omitempty"`     // POST 时使用
+	QueryTemplate    map[string]string `json:"query_template,omitempty"`    // GET 时使用，value 内允许占位符
+	ContentType      string            `json:"content_type,omitempty"`      // 默认 application/json
 }
 
 type webhookNotifier struct{}

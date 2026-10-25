@@ -4,9 +4,9 @@ package handlers
 import (
 	"strconv"
 
+	"github.com/gin-gonic/gin"
 	"github.com/reminder/backend/internal/middleware"
 	"github.com/reminder/backend/internal/services"
-	"github.com/gin-gonic/gin"
 )
 
 // TokenHandler 是面板上令牌管理接口。

@@ -9,9 +9,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"strings"
 	"time"
-	"log/slog"
 
 	"github.com/reminder/backend/internal/middleware"
 	"github.com/reminder/backend/internal/models"
@@ -58,7 +58,7 @@ type ReminderInput struct {
 	ConfirmRetryIntervalSec int            `json:"confirm_retry_interval_sec"`
 	ConfirmMaxRetries       int            `json:"confirm_max_retries"`
 	Source                  string         `json:"source,omitempty"`
-	TokenID                *uint          `json:"token_id,omitempty"`
+	TokenID                 *uint          `json:"token_id,omitempty"`
 }
 
 // ReminderView 是返回前端的视图（含 next_fire_at 与绑定的 channel_ids）。
@@ -112,7 +112,7 @@ func (s *ReminderService) Create(in ReminderInput) (*ReminderView, error) {
 		ScheduleSpec:            datatypes.JSON(specRaw),
 		Timezone:                in.Timezone,
 		Source:                  in.Source,
-		TokenID:                in.TokenID,
+		TokenID:                 in.TokenID,
 		Enabled:                 true,
 		NextFireAt:              next,
 		RequireConfirm:          in.RequireConfirm,
@@ -231,7 +231,7 @@ type ListFilter struct {
 	Source    string // manual | api | ""
 	Enabled   *bool
 	Search    string
-	TokenID  *uint
+	TokenID   *uint
 	Limit     int
 	Offset    int
 	SortBy    string // created_at | id | next_fire_at
@@ -265,15 +265,8 @@ func (s *ReminderService) List(f ListFilter) ([]*ReminderView, int64, error) {
 		f.Limit = 200
 	}
 
-	orderClause := "created_at DESC"
-	if f.SortBy != "" {
-		orderClause = f.SortBy
-		if f.SortOrder == "asc" {
-			orderClause += " ASC"
-		} else {
-			orderClause += " DESC"
-		}
-	}
+	orderClause := buildOrderClause(f.SortBy, f.SortOrder, "created_at DESC",
+		[]string{"id", "created_at", "next_fire_at", "title"})
 	var rows []models.Reminder
 	if err := q.Order(orderClause).Limit(f.Limit).Offset(f.Offset).Find(&rows).Error; err != nil {
 		return nil, 0, err
@@ -358,7 +351,7 @@ func (s *ReminderService) BatchDelete(ids []uint) error {
 	if len(ids) == 0 {
 		return nil
 	}
-// 先删关联表
+	// 先删关联表
 	if err := s.DB.Where("reminder_id IN ?", ids).Delete(&models.ReminderChannel{}).Error; err != nil {
 		return err
 	}
@@ -467,9 +460,9 @@ func (s *ReminderService) TestDryRun(ctx context.Context, title, content, conten
 
 	now := time.Now()
 	vars := buildVars(&models.Reminder{
-		Title:       title,
-		Content:     content,
-		NextFireAt:  &now,
+		Title:      title,
+		Content:    content,
+		NextFireAt: &now,
 	}, now, now, s.Loc)
 
 	rendered := buildRenderedMessage(title, content, contentFormat, vars)

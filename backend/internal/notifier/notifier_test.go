@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -72,9 +73,14 @@ func TestWebhook_POST_TemplateBody(t *testing.T) {
 	if err != nil {
 		t.Fatalf("send 失败: %v", err)
 	}
-	want := `{"title":"提醒标题","msg":"提醒正文"}`
-	if captured != want {
-		t.Errorf("body = %s, want %s", captured, want)
+	// 逐字段渲染后走 json.Marshal，map 键顺序不确定，故比较解析后的结构而非原始字符串
+	var got map[string]string
+	if err := json.Unmarshal([]byte(captured), &got); err != nil {
+		t.Fatalf("响应体不是合法 JSON: %v, body=%s", err, captured)
+	}
+	want := map[string]string{"title": "提醒标题", "msg": "提醒正文"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("body = %s, want %v", captured, want)
 	}
 }
 

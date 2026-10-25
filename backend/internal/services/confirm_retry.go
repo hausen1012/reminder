@@ -6,9 +6,9 @@ package services
 
 import (
 	"context"
+	"log/slog"
 	"sync"
 	"time"
-	"log/slog"
 
 	"github.com/reminder/backend/internal/models"
 	"gorm.io/gorm"
@@ -72,7 +72,7 @@ func (m *ConfirmRetryManager) CancelByReminderID(reminderID uint) {
 		Distinct("confirm_chain_id").
 		Where("reminder_id = ? AND confirm_chain_id IS NOT NULL AND confirm_chain_id != '' AND confirmed = ?", reminderID, false).
 		Pluck("confirm_chain_id", &chainIDs).Error; err != nil {
-		slog.Info("查询活动确认链失败", "reminder", reminderID, "error", err)
+		slog.Warn("查询活动确认链失败", "reminder", reminderID, "error", err)
 		return
 	}
 	for _, chainID := range chainIDs {
@@ -166,7 +166,7 @@ func (m *ConfirmRetryManager) retry(reminderID uint, chainID string, round int) 
 		ConfirmChainID: &chainID,
 	}
 	if err := m.DB.Create(newLog).Error; err != nil {
-		slog.Info("创建重发日志失败", "chain", chainID, "error", err)
+		slog.Warn("创建重发日志失败", "chain", chainID, "error", err)
 		m.stopChain(chainID)
 		return
 	}

@@ -18,7 +18,7 @@ const (
 	CodeForbidden        ErrorCode = "forbidden"
 	CodeNotFound         ErrorCode = "not_found"
 	CodeValidationFailed ErrorCode = "validation_failed"
-	CodeConflict        ErrorCode = "conflict"
+	CodeConflict         ErrorCode = "conflict"
 	CodeRateLimited      ErrorCode = "rate_limited"
 	CodeInternalError    ErrorCode = "internal_error"
 )

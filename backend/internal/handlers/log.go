@@ -4,9 +4,9 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"github.com/reminder/backend/internal/middleware"
 	"github.com/reminder/backend/internal/services"
-	"github.com/gin-gonic/gin"
 )
 
 // LogHandler 是日志相关接口。

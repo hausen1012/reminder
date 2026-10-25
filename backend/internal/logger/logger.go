@@ -60,8 +60,8 @@ func Init(logDir string) {
 		return a
 	}
 	opts := &slog.HandlerOptions{
-		Level:      slog.LevelInfo,
-		AddSource:  true,
+		Level:       slog.LevelInfo,
+		AddSource:   true,
 		ReplaceAttr: replace,
 	}
 

@@ -9,9 +9,9 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"github.com/reminder/backend/internal/models"
 	"github.com/reminder/backend/internal/services"
-	"github.com/gin-gonic/gin"
 )
 
 // ConfirmHandler 处理确认链接。

@@ -13,9 +13,9 @@ import (
 
 // WeComConfig 是企业微信群机器人的配置。
 type WeComConfig struct {
-	WebhookURL    string   `json:"webhook_url"` // 完整的 https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=xxx
-	MsgType       string   `json:"msg_type"`    // text | markdown，默认 text
-	MentionedList []string `json:"mentioned_list,omitempty"`
+	WebhookURL          string   `json:"webhook_url"` // 完整的 https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=xxx
+	MsgType             string   `json:"msg_type"`    // text | markdown，默认 text
+	MentionedList       []string `json:"mentioned_list,omitempty"`
 	MentionedMobileList []string `json:"mentioned_mobile_list,omitempty"`
 }
 

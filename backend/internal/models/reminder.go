@@ -13,8 +13,8 @@ import (
 //   - solar + once / interval / cron
 //   - lunar + once / interval
 type Reminder struct {
-	ID      uint   `gorm:"primaryKey" json:"id"`
-	Title   string `gorm:"size:200;not null" json:"title"`
+	ID            uint   `gorm:"primaryKey" json:"id"`
+	Title         string `gorm:"size:200;not null" json:"title"`
 	Content       string `gorm:"type:text" json:"content"`
 	ContentFormat string `gorm:"size:8;default:text" json:"content_format"`
 
@@ -23,8 +23,8 @@ type Reminder struct {
 	ScheduleSpec datatypes.JSON `gorm:"type:text" json:"schedule_spec"`
 	Timezone     string         `gorm:"size:48" json:"timezone"`
 
-	Enabled  bool   `gorm:"index;default:true" json:"enabled"`
-	Source   string `gorm:"size:16;index" json:"source"` // web | api
+	Enabled bool   `gorm:"index;default:true" json:"enabled"`
+	Source  string `gorm:"size:16;index" json:"source"` // web | api
 	TokenID *uint  `gorm:"index" json:"token_id,omitempty"`
 
 	RequireConfirm          bool `gorm:"default:false" json:"require_confirm"`
