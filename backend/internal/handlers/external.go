@@ -242,13 +242,15 @@ th{background:#f9fafb;font-weight:600}
 }</pre>
 
 <h3>错误响应</h3>
-<p>错误时返回对应的 HTTP 状态码，响应体为：</p>
+<p>错误时返回对应的 HTTP 状态码，响应体统一为：</p>
 <pre class="res">{
   "error": {
     "code": "validation_failed",
-    "message": "描述信息"
+    "message": "描述信息",
+    "field": "schedule_spec"   // 可选：指出具体出错字段
   }
 }</pre>
+<p>所有错误出口（含鉴权失败、服务器异常）都返回同一结构，客户端只需实现一套解析逻辑。</p>
 
 <table>
 <tr><th>HTTP 状态码</th><th>error.code</th><th>说明</th></tr>

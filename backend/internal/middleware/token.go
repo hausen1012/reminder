@@ -77,24 +77,21 @@ func TokenAuth(verify TokenVerifier, toucher TokenToucher, limiter *RateLimiter)
 	return func(c *gin.Context) {
 		key := c.GetHeader("X-AUTH")
 		if key == "" {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
-				"error": gin.H{"code": CodeUnauthorized, "message": "缺少 X-AUTH 请求头"},
-			})
+			c.AbortWithStatusJSON(http.StatusUnauthorized,
+				ErrorBody(CodeUnauthorized, "缺少 X-AUTH 请求头", ""))
 			return
 		}
 
 		tokenID, ok := verify(key)
 		if !ok {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
-				"error": gin.H{"code": CodeUnauthorized, "message": "令牌无效"},
-			})
+			c.AbortWithStatusJSON(http.StatusUnauthorized,
+				ErrorBody(CodeUnauthorized, "令牌无效", ""))
 			return
 		}
 
 		if !limiter.Allow(tokenID, 60) {
-			c.AbortWithStatusJSON(http.StatusTooManyRequests, gin.H{
-				"error": gin.H{"code": CodeRateLimited, "message": "请求过于频繁"},
-			})
+			c.AbortWithStatusJSON(http.StatusTooManyRequests,
+				ErrorBody(CodeRateLimited, "请求过于频繁", ""))
 			return
 		}
 

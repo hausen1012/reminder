@@ -52,11 +52,11 @@ func JWTAuth(secret string) gin.HandlerFunc {
 	}
 }
 
-// abortUnauthorized 以统一格式结束请求。
+// abortUnauthorized 以统一错误格式结束请求。
+//
+// 必须走 ErrorBody：早期这里手写了 {"code","message","data"} 包装，
+// 与业务层的 {"error":{...}} 形成两套格式，前端被迫兼容两种解析。
 func abortUnauthorized(c *gin.Context, message string) {
-	c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
-		"code":    401,
-		"message": message,
-		"data":    nil,
-	})
+	c.AbortWithStatusJSON(http.StatusUnauthorized,
+		ErrorBody(CodeUnauthorized, message, ""))
 }

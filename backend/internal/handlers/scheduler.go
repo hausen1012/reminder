@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -41,20 +40,16 @@ func (h *SchedulerHandler) Status(c *gin.Context) {
 		entriesTotal = registeredCount
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"code":    200,
-		"message": "ok",
-		"data": gin.H{
-			"engine": gin.H{
-				"running":          h.Engine.IsRunning(),
-				"registered_count": registeredCount,
-				"entries":          entries,
-				"entries_total":    entriesTotal,
-			},
-			"sweeper": gin.H{
-				"running":          h.Sweeper.IsRunning(),
-				"interval_seconds": int(h.Sweeper.Interval().Seconds()),
-			},
+	successJSON(c, gin.H{
+		"engine": gin.H{
+			"running":          h.Engine.IsRunning(),
+			"registered_count": registeredCount,
+			"entries":          entries,
+			"entries_total":    entriesTotal,
+		},
+		"sweeper": gin.H{
+			"running":          h.Sweeper.IsRunning(),
+			"interval_seconds": int(h.Sweeper.Interval().Seconds()),
 		},
 	})
 }

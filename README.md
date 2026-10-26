@@ -70,12 +70,18 @@ make docker
 | USERNAME | admin | 初始管理员用户名 |
 | PASSWORD | admin123 | 初始管理员密码 |
 
+## API 响应格式
+
+所有成功响应统一为 `{code, message, data}`；所有错误响应统一为 `{error: {code, message, field?}}`。
+
+详见 `GET /api/external/v1/docs` 或 `backend/internal/handlers/external.go`。
+
 ## 测试
 
 | 范围 | 命令 | 覆盖率 |
 |------|------|--------|
 | 后端 | `cd backend && go test ./...` | middleware 100% / services 83.3% / notifier 83.2% / secretbox 83.3% / scheduler 80.3% / handlers 70.3% |
-| 前端 | `cd frontend && npm test` | 168 个用例；contexts 97% / components 71~100% / lib 79.6% |
+| 前端 | `cd frontend && npm test` | 177 个用例；contexts 97% / components 71~100% / lib 79.6% |
 
 前端覆盖率用 `npm run test:coverage` 查看，按模块统计：
 

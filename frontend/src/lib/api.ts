@@ -43,19 +43,60 @@ api.interceptors.response.use(
   },
 )
 
-/** 从 axios error 中提取服务端返回的消息，路径兼容 data.message 和 data.error.message */
+/**
+ * 从 axios error 中提取服务端返回的提示文案。
+ *
+ * 后端所有错误出口（业务 handler / 鉴权中间件 / panic 恢复）都经由
+ * `middleware.ErrorBody` 渲染，统一格式为：
+ *
+ *   { "error": { "code": "not_found", "message": "提醒不存在", "field": "title" } }
+ *
+ * 因此正常路径只需读 `data.error.message`。
+ * `data.message` 分支仅作灰度期兼容（旧版后端曾返回 {code,message,data}），
+ * 待全量升级后可删除。
+ */
 export function extractApiError(err: unknown, fallback = '操作失败'): string {
   const data: unknown = (err as { response?: { data?: unknown } })?.response?.data
   if (data && typeof data === 'object') {
     const obj = data as Record<string, unknown>
-    if (typeof obj.message === 'string') return obj.message
+
+    // 统一格式：{ error: { code, message, field? } }
     if (obj.error && typeof obj.error === 'object') {
       const errObj = obj.error as Record<string, unknown>
-      if (typeof errObj.message === 'string') return errObj.message
+      if (typeof errObj.message === 'string' && errObj.message) return errObj.message
     }
+
+    // 兼容旧格式（迁移期保留）
+    if (typeof obj.message === 'string' && obj.message) return obj.message
   }
   if (err instanceof Error) return err.message
   return fallback
+}
+
+/** 从 axios error 中取出后端错误码（如 not_found / validation_failed）。 */
+export function extractApiErrorCode(err: unknown): string {
+  const data: unknown = (err as { response?: { data?: unknown } })?.response?.data
+  if (data && typeof data === 'object') {
+    const obj = data as Record<string, unknown>
+    if (obj.error && typeof obj.error === 'object') {
+      const code = (obj.error as Record<string, unknown>).code
+      if (typeof code === 'string') return code
+    }
+  }
+  return ''
+}
+
+/** 从 axios error 中取出出错字段名（用于表单定位），无则为空串。 */
+export function extractApiErrorField(err: unknown): string {
+  const data: unknown = (err as { response?: { data?: unknown } })?.response?.data
+  if (data && typeof data === 'object') {
+    const obj = data as Record<string, unknown>
+    if (obj.error && typeof obj.error === 'object') {
+      const field = (obj.error as Record<string, unknown>).field
+      if (typeof field === 'string') return field
+    }
+  }
+  return ''
 }
 
 export async function login(username: string, password: string) {

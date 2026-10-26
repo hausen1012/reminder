@@ -79,6 +79,23 @@ func (e *AppError) httpStatus() int {
 	}
 }
 
+// ErrorBody 构造统一的错误响应体：
+//
+//	{"error": {"code": "not_found", "message": "...", "field": "..."}}
+//
+// 这是整个后端唯一的错误响应格式。所有错误出口（业务 handler、鉴权中间件、
+// panic 恢复）都必须经由本函数构造响应体，避免出现「有的接口返回 error 包裹、
+// 有的直接返回 code」的两套格式，前端也就只需要实现一套解析逻辑。
+//
+// field 为空时省略该字段。
+func ErrorBody(code ErrorCode, message, field string) gin.H {
+	body := gin.H{"code": code, "message": message}
+	if field != "" {
+		body["field"] = field
+	}
+	return gin.H{"error": body}
+}
+
 // ErrorHandler 是顶层中间件：
 //  1. recover panic 并以 internal_error 响应；
 //  2. 把 handler 通过 c.Error 注册的 AppError 统一渲染为 JSON 错误体。
@@ -88,12 +105,8 @@ func ErrorHandler() gin.HandlerFunc {
 			if r := recover(); r != nil {
 				slog.Error("panic", "recover", r, "stack", debug.Stack())
 				if !c.Writer.Written() {
-					c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
-						"error": gin.H{
-							"code":    CodeInternalError,
-							"message": "服务器内部错误",
-						},
-					})
+					c.AbortWithStatusJSON(http.StatusInternalServerError,
+						ErrorBody(CodeInternalError, "服务器内部错误", ""))
 				}
 			}
 		}()
@@ -107,22 +120,14 @@ func ErrorHandler() gin.HandlerFunc {
 		err := c.Errors[0].Err
 		var ae *AppError
 		if errors.As(err, &ae) {
-			body := gin.H{"code": ae.Code, "message": ae.Message}
-			if ae.Field != "" {
-				body["field"] = ae.Field
-			}
-			c.AbortWithStatusJSON(ae.httpStatus(), gin.H{"error": body})
+			c.AbortWithStatusJSON(ae.httpStatus(), ErrorBody(ae.Code, ae.Message, ae.Field))
 			return
 		}
-		// 未知错误，统一 500
+		// 未知错误，统一 500，且不泄露内部细节
 		slog.Error("未处理的错误", "error", err)
 		if !c.Writer.Written() {
-			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
-				"error": gin.H{
-					"code":    CodeInternalError,
-					"message": "服务器内部错误",
-				},
-			})
+			c.AbortWithStatusJSON(http.StatusInternalServerError,
+				ErrorBody(CodeInternalError, "服务器内部错误", ""))
 		}
 	}
 }
