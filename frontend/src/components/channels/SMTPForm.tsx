@@ -1,5 +1,5 @@
 // SMTP 通知表单
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
@@ -34,7 +34,12 @@ function getSecurityMode(config: Record<string, unknown>): SMTPSecurityMode {
 
 export function SMTPForm({ config, onChange, isEdit }: SubFormProps) {
   const [toText, setToText] = useState(cfgArr<string>(config, 'to').join(', '))
-  const hasOriginalSecret = config.password_enc === '***'
+  // 用 ref 在首次渲染时锁定「是否已有原密码」。
+  // 不能用 config.password_enc === '***' 实时计算：用户一旦输入，config 里的值
+  // 就变成新密码，hasOriginalSecret 会翻转为 false，之后清空输入框会被判成
+  // 「清空密码」而不是「保持不修改」，导致原密码被误删。
+  const hasOriginalSecretRef = useRef(config.password_enc === '***')
+  const hasOriginalSecret = hasOriginalSecretRef.current
   const [pwdInput, setPwdInput] = useState(hasOriginalSecret ? '' : cfgStr(config, 'password_enc'))
   const securityMode = getSecurityMode(config)
 

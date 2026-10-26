@@ -319,6 +319,7 @@ func openTestDB(t *testing.T) *gorm.DB {
 		&models.Token{},
 		&models.TokenDefaultChannel{},
 		&models.ConfirmToken{},
+		&models.Config{},
 	); err != nil {
 		t.Fatalf("迁移测试数据库失败: %v", err)
 	}

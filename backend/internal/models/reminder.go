@@ -23,7 +23,12 @@ type Reminder struct {
 	ScheduleSpec datatypes.JSON `gorm:"type:text" json:"schedule_spec"`
 	Timezone     string         `gorm:"size:48" json:"timezone"`
 
-	Enabled bool   `gorm:"index;default:true" json:"enabled"`
+	// 注意：不能写 gorm:"default:true"。GORM 在 Create 时会跳过带默认值的零值字段，
+	// 导致 Enabled=false 被数据库默认值覆盖成 true（"创建即禁用"会静默失效）。
+	// 默认启用由业务代码（ReminderService.Create）显式赋值保证。
+	// 也不加 not null：历史库若存在 enabled 为 NULL 的行，AutoMigrate 重建表会因
+	// NOT NULL 约束失败而启动不了；本字段的修复只需要去掉 default，不需要加约束。
+	Enabled bool   `gorm:"index" json:"enabled"`
 	Source  string `gorm:"size:16;index" json:"source"` // web | api
 	TokenID *uint  `gorm:"index" json:"token_id,omitempty"`
 

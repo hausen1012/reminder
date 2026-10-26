@@ -1,5 +1,5 @@
 // 钉钉机器人通知表单
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
@@ -12,7 +12,9 @@ import {
 import { type SubFormProps, updateField, cfgStr } from './form-utils'
 
 export function DingTalkForm({ config, onChange, isEdit }: SubFormProps) {
-  const hasOriginalSecret = config.secret_enc === '***'
+  // 同 SMTPForm：用 ref 锁定初始状态，避免用户输入后判定翻转。
+  const hasOriginalSecretRef = useRef(config.secret_enc === '***')
+  const hasOriginalSecret = hasOriginalSecretRef.current
   const [secretInput, setSecretInput] = useState(hasOriginalSecret ? '' : cfgStr(config, 'secret_enc'))
 
   return (

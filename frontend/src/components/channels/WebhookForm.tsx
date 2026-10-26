@@ -1,5 +1,5 @@
 // 通用 Webhook 通知表单
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
@@ -36,7 +36,9 @@ export function WebhookForm({ config, onChange, isEdit }: SubFormProps) {
   const method = cfgStr(config, 'method', 'POST').toUpperCase()
   const [headersText, setHeadersText] = useState(kvToText(cfgObj(config, 'headers')))
   const [queryText, setQueryText] = useState(kvToText(cfgObj(config, 'query_template')))
-  const hasOriginalAuth = config.authorization_enc === '***'
+  // 同 SMTPForm/DingTalkForm：用 ref 锁定初始状态，避免用户输入后判定翻转。
+  const hasOriginalAuthRef = useRef(config.authorization_enc === '***')
+  const hasOriginalAuth = hasOriginalAuthRef.current
   const [authInput, setAuthInput] = useState(hasOriginalAuth ? '' : cfgStr(config, 'authorization_enc'))
 
   return (

@@ -40,6 +40,7 @@ type Engine struct {
 	reg map[uint]*registered
 
 	stopped    bool
+	started    bool
 	lastFireMu sync.Mutex
 	lastFireAt time.Time
 }
@@ -75,6 +76,9 @@ func NewEngine(db *gorm.DB, disp Dispatcher, loc *time.Location) *Engine {
 
 // Start 启动内部 cron 循环。Sweeper 由外层独立启动。
 func (e *Engine) Start() {
+	e.mu.Lock()
+	e.started = true
+	e.mu.Unlock()
 	e.cron.Start()
 }
 
@@ -94,6 +98,7 @@ func (e *Engine) Stop() {
 	}
 	e.reg = make(map[uint]*registered)
 	e.stopped = true
+	e.started = false
 }
 
 // Add 注册一条提醒到调度器。
@@ -278,11 +283,11 @@ func (e *Engine) ListRegisteredSorted(offset, limit int) (entries []RegisteredEn
 	return all[offset:end], total
 }
 
-// IsRunning 返回 cron 实例是否正在运行（Engine 是否已 Start）。
+// IsRunning 返回调度器是否已启动且未停止。
 func (e *Engine) IsRunning() bool {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	return !e.stopped
+	return e.started && !e.stopped
 }
 
 // LastFireTime 返回最近一次 fire 的时间。

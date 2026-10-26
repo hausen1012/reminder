@@ -121,17 +121,29 @@ func (s *ChannelService) Update(id uint, in ChannelInput) (*ChannelView, error) 
 		return nil, err
 	}
 
-	// 取旧的 Config（密文形态），用于占位符回填
-	var oldEnc map[string]any
+	// 取旧的 Config（密文形态），用于占位符回填与保留未提交字段
+	oldEnc := map[string]any{}
 	if len(ch.Config) > 0 {
 		_ = json.Unmarshal(ch.Config, &oldEnc)
 	}
 
-	encConfig, err := s.encryptConfig(in.Config, oldEnc)
+	// 只对 patch 里的字段做加密，再叠加到旧配置上，实现部分更新。
+	//
+	// 不能先 mergeConfig 再整体 encryptConfig：旧配置里 _enc 字段已是密文，
+	// 整体加密会把密文再加密一次（二次加密）；也不能只写 in.Config，
+	// 那样未提交的字段会被静默丢弃（而 validateInput 校验的是合并后的结果）。
+	patchEnc, err := s.encryptConfig(in.Config, oldEnc)
 	if err != nil {
 		return nil, middleware.NewAppError(middleware.CodeValidationFailed, err.Error())
 	}
-	raw, _ := json.Marshal(encConfig)
+	merged := make(map[string]any, len(oldEnc)+len(patchEnc))
+	for k, v := range oldEnc {
+		merged[k] = v
+	}
+	for k, v := range patchEnc {
+		merged[k] = v
+	}
+	raw, _ := json.Marshal(merged)
 
 	updates := map[string]any{
 		"name":   strings.TrimSpace(in.Name),

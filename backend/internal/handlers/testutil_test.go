@@ -37,6 +37,7 @@ func newTestDB(t *testing.T) *gorm.DB {
 		&models.Token{},
 		&models.TokenDefaultChannel{},
 		&models.ConfirmToken{},
+		&models.Config{},
 	); err != nil {
 		t.Fatalf("迁移失败: %v", err)
 	}

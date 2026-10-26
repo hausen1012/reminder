@@ -100,7 +100,8 @@ func (s *ReminderService) Create(in ReminderInput) (*ReminderView, error) {
 	if contentFormat == "" {
 		contentFormat = "text"
 	}
-	if in.Content == "" {
+	// 与 Update 保持一致：正文留空时回退为标题。
+	if strings.TrimSpace(in.Content) == "" {
 		in.Content = strings.TrimSpace(in.Title)
 	}
 	r := &models.Reminder{
@@ -111,7 +112,7 @@ func (s *ReminderService) Create(in ReminderInput) (*ReminderView, error) {
 		ScheduleType:            in.ScheduleType,
 		ScheduleSpec:            datatypes.JSON(specRaw),
 		Timezone:                in.Timezone,
-		Source:                  in.Source,
+		Source:                  source,
 		TokenID:                 in.TokenID,
 		Enabled:                 true,
 		NextFireAt:              next,
@@ -164,9 +165,15 @@ func (s *ReminderService) Update(id uint, in ReminderInput) (*ReminderView, erro
 	if contentFormat == "" {
 		contentFormat = "text"
 	}
+	// 与 Create 保持一致：正文留空时回退为标题，
+	// 否则「只改标题」的更新会把正文清空。
+	content := in.Content
+	if strings.TrimSpace(content) == "" {
+		content = strings.TrimSpace(in.Title)
+	}
 	updates := map[string]any{
 		"title":                      strings.TrimSpace(in.Title),
-		"content":                    in.Content,
+		"content":                    content,
 		"content_format":             contentFormat,
 		"calendar":                   in.Calendar,
 		"schedule_type":              in.ScheduleType,

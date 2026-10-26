@@ -53,11 +53,14 @@ type Notifier interface {
 // Registry 把通道类型字符串映射到具体的 Notifier 实例。
 //
 // 新增通道类型时在本文件注册即可，dispatch 与 channel_service 都从这里查询。
+// 注意：Registration 的 key 必须与 ChannelService.validType 允许的类型、
+// 以及前端 ChannelType 完全一致，否则通道会在发送时报"未知通道类型"。
 var Registry = map[string]Notifier{
 	"smtp":     &smtpNotifier{},
 	"dingtalk": &dingtalkNotifier{},
 	"wecom":    &wecomNotifier{},
 	"webhook":  &webhookNotifier{},
+	"log":      &logNotifier{},
 }
 
 // Get 按类型查找 Notifier，未注册返回 nil + 错误。

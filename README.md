@@ -66,18 +66,34 @@ make docker
 | SWEEP_INTERVAL_SEC | 60 | 兜底扫描间隔（秒） |
 | MISS_TOLERANCE_MINUTES | 60 | 漏触发容忍窗口（超过标记过期） |
 | LOG_AUTO_PURGE_DAYS | 0 | 日志自动清理天数（0=不自动清理） |
-| LOG_FILE | /var/log/reminder | 日志目录，留空时使用该默认值 |
+| LOG_FILE | /var/log/reminder | 日志目录；未配置时写入该目录，同时输出到 stderr |
 | USERNAME | admin | 初始管理员用户名 |
 | PASSWORD | admin123 | 初始管理员密码 |
 
 ## 测试
 
-| 范围 | 命令 | 覆盖情况 |
-|------|------|----------|
-| 后端 | `cd backend && go test ./...` | secretbox / notifier / scheduler / services / handlers / middleware |
-| 前端 | `cd frontend && npm test` | `lib/utils`、`lib/api` 等纯逻辑模块 |
+| 范围 | 命令 | 覆盖率 |
+|------|------|--------|
+| 后端 | `cd backend && go test ./...` | middleware 100% / services 83.3% / notifier 83.2% / secretbox 83.3% / scheduler 80.3% / handlers 70.3% |
+| 前端 | `cd frontend && npm test` | 168 个用例；contexts 97% / components 71~100% / lib 79.6% |
 
-前后端均未覆盖 UI 交互与真实发送链路，服务类中的调度/投递状态机建议继续补充用例。
+前端覆盖率用 `npm run test:coverage` 查看，按模块统计：
+
+| 模块 | 语句覆盖 |
+|------|----------|
+| `components/guards` | 100% |
+| `components/layout` | 100% |
+| `contexts` | 97% |
+| `lib`（api / utils） | 79.6% |
+| `components/channels` | 71.7% |
+| `pages` / `App.tsx` | 0%（未测，见下方说明） |
+
+CI 会用 `-race` 跑后端测试，覆盖调度乐观锁、sweeper 补漏与过期、通道投递状态机、确认重发链、
+外部 API 令牌隔离、确认链接 XSS 转义等核心路径。
+
+未覆盖的部分：整页组件（`pages/*`，单文件 200~800 行、依赖大量接口调用与路由状态）、
+真实外部通道（SMTP/钉钉/企微）的网络调用。这两类改动成本高、收益低，
+如需覆盖建议先用 `@testing-library/react` 配 MSW 做接口 mock 后再拆页。
 
 ## 技术栈
 
