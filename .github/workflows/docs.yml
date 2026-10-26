@@ -28,15 +28,15 @@ jobs:
         working-directory: docs-site
     steps:
       - name: 检出代码
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           # VitePress 的 lastUpdated 依赖 git 提交时间
           fetch-depth: 0
 
       - name: 安装 Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
-          node-version: '20'
+          node-version: '22'
           cache: npm
           cache-dependency-path: docs-site/package-lock.json
 
@@ -46,8 +46,13 @@ jobs:
       - name: 构建站点
         run: npm run docs:build
 
+      # enablement: true 让 Actions 尝试自动创建 Pages 站点。
+      # 若仓库 Settings → Pages 的 Source 尚未设为 "GitHub Actions"，
+      # 且 GITHUB_TOKEN 无仓库管理员权限，这一步会失败，需要到设置页手动开启一次。
       - name: 配置 Pages
         uses: actions/configure-pages@v5
+        with:
+          enablement: true
 
       - name: 上传产物
         uses: actions/upload-pages-artifact@v3
