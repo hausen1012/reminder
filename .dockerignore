@@ -25,6 +25,7 @@ reminder/
 .vscode/
 .trae/
 docs/
+docs-site/
 
 # 杂项
 *.log

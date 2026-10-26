@@ -59,4 +59,11 @@ make docker        # 或使用 Docker 部署
 
 ## 文档
 
-设计与实现记录见 `docs/` 目录；接口说明可在服务启动后访问 `/api/external/v1/docs`。
+完整文档（指南、参考手册、外部 API）见文档站点：[hausen1012.github.io/reminder](https://hausen1012.github.io/reminder/)
+
+本地预览文档：
+
+```bash
+cd docs-site && npm install
+npm run docs:dev
+```

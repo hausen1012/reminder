@@ -1,5 +1,5 @@
 
-.PHONY: dev dev-backend dev-frontend build build-frontend build-linux build-macos build-windows docker clean test lint fmt
+.PHONY: dev dev-backend dev-frontend build build-frontend build-linux build-macos build-windows docker clean test lint fmt docs docs-build
 
 # 一键启动前后端开发环境（依赖 bash；Windows 图形终端可直接运行 dev.ps1）
 dev:
@@ -49,6 +49,14 @@ test:
 	cd backend && go test ./...
 	cd frontend && npm test
 
+# 文档站点：本地预览（热更新）
+docs:
+	cd docs-site && npm run docs:dev
+
+# 文档站点：构建静态文件到 docs-site/.vitepress/dist
+docs-build:
+	cd docs-site && npm run docs:build
+
 # Clean
 clean:
-	rm -rf frontend/dist backend/cmd/server/web/* build
+	rm -rf frontend/dist backend/cmd/server/web/* build docs-site/.vitepress/dist
