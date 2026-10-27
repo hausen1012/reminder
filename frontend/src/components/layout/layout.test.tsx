@@ -96,6 +96,29 @@ describe('Sidebar', () => {
     await user.click(screen.getByText('提醒'))
     expect(onNavClick).toHaveBeenCalled()
   })
+
+  it('渲染文档与 GitHub 站外链接，均在新窗口打开', () => {
+    renderSidebar()
+
+    const docs = screen.getByRole('link', { name: /文档/ })
+    expect(docs).toHaveAttribute('href', 'https://hausen1012.github.io/reminder/')
+    expect(docs).toHaveAttribute('target', '_blank')
+    expect(docs).toHaveAttribute('rel', 'noreferrer noopener')
+
+    const github = screen.getByRole('link', { name: /GitHub/ })
+    expect(github).toHaveAttribute('href', 'https://github.com/hausen1012/reminder')
+    expect(github).toHaveAttribute('target', '_blank')
+    expect(github).toHaveAttribute('rel', 'noreferrer noopener')
+  })
+
+  it('点击站外链接触发 onNavClick（用于关闭移动端抽屉）', async () => {
+    const onNavClick = vi.fn()
+    const user = userEvent.setup()
+    renderSidebar(onNavClick)
+
+    await user.click(screen.getByRole('link', { name: /文档/ }))
+    expect(onNavClick).toHaveBeenCalled()
+  })
 })
 
 describe('AppLayout', () => {

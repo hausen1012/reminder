@@ -1,8 +1,9 @@
 import { useState, useEffect, type FormEvent } from 'react'
-import { Loader2 } from 'lucide-react'
+import { Loader2, Github, BookOpen, ExternalLink } from 'lucide-react'
 import { extractApiError, updatePassword } from '@/lib/api'
 import { useConfig } from '@/contexts/ConfigContext'
 import { COMMON_TIMEZONES } from '@/lib/timezones'
+import { DOCS_URL, GITHUB_URL } from '@/lib/links'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -219,6 +220,39 @@ export default function Profile() {
                 {savingTz ? '保存中...' : '保存'}
               </Button>
             </form>
+          </CardContent>
+        </Card>
+
+        {/* 关于项目 */}
+        <Card>
+          <CardHeader>
+            <CardTitle>关于项目</CardTitle>
+            <CardDescription>开源仓库与完整文档</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <a
+              href={GITHUB_URL}
+              target="_blank"
+              rel="noreferrer noopener"
+              className="flex items-center gap-2 text-sm text-primary hover:underline"
+            >
+              <Github className="h-4 w-4" />
+              github.com/hausen1012/reminder
+              <ExternalLink className="h-3 w-3" />
+            </a>
+            <a
+              href={DOCS_URL}
+              target="_blank"
+              rel="noreferrer noopener"
+              className="flex items-center gap-2 text-sm text-primary hover:underline"
+            >
+              <BookOpen className="h-4 w-4" />
+              hausen1012.github.io/reminder
+              <ExternalLink className="h-3 w-3" />
+            </a>
+            <p className="text-xs text-muted-foreground">
+              遇到问题或有建议，欢迎到 GitHub 提 Issue；具体用法见文档站点。
+            </p>
           </CardContent>
         </Card>
       </div>

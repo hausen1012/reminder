@@ -1,5 +1,8 @@
 # Reminder — 个人提醒助手
 
+开源地址：[github.com/hausen1012/reminder](https://github.com/hausen1012/reminder) ｜
+文档地址：[hausen1012.github.io/reminder](https://hausen1012.github.io/reminder/)
+
 一套自托管的全栈提醒系统：把要做的事写进去，到点自动通过你配置的渠道通知你，
 你在手机上点一下确认即完成闭环。前后端一体打包为单个可执行文件，运行即服务。
 

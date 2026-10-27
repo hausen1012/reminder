@@ -18,6 +18,9 @@ hero:
     - theme: alt
       text: 外部 API
       link: /api/external
+    - theme: alt
+      text: GitHub
+      link: https://github.com/hausen1012/reminder
 
 features:
   - icon: ⏰

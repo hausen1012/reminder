@@ -1,11 +1,27 @@
 import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, User, Moon, Sun, LogOut, BellRing, Send, Bell, ScrollText, Key, Activity } from 'lucide-react'
+import {
+  LayoutDashboard,
+  User,
+  Moon,
+  Sun,
+  LogOut,
+  BellRing,
+  Send,
+  Bell,
+  ScrollText,
+  Key,
+  Activity,
+  Github,
+  BookOpen,
+  ArrowUpRight,
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useAuth } from '@/contexts/AuthContext'
 import { useConfig } from '@/contexts/ConfigContext'
 import { AppLogo } from '@/components/ui/AppLogo'
+import { DOCS_URL, GITHUB_URL } from '@/lib/links'
 import { cn } from '@/lib/utils'
 
 const navItems = [
@@ -16,6 +32,12 @@ const navItems = [
   { to: '/tokens', label: '令牌', icon: Key },
   { to: '/scheduler', label: '监控', icon: Activity },
   { to: '/profile', label: '设置', icon: User },
+]
+
+// 站外链接：放在导航区末尾，用分隔线与功能页区分，右侧箭头提示会打开新窗口
+const externalLinks = [
+  { href: DOCS_URL, label: '文档', icon: BookOpen },
+  { href: GITHUB_URL, label: 'GitHub', icon: Github },
 ]
 
 interface SidebarProps {
@@ -59,6 +81,24 @@ export function Sidebar({ onNavClick }: SidebarProps) {
           </NavLink>
         ))}
       </nav>
+      <Separator />
+      {/* 站外链接：文档与开源仓库，样式与导航项一致但右侧带外链箭头 */}
+      <div className="space-y-1 p-3">
+        {externalLinks.map((item) => (
+          <a
+            key={item.href}
+            href={item.href}
+            target="_blank"
+            rel="noreferrer noopener"
+            onClick={onNavClick}
+            className="group flex items-center gap-3 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-secondary/50 hover:text-foreground"
+          >
+            <item.icon className="h-4 w-4" />
+            {item.label}
+            <ArrowUpRight className="ml-auto h-3 w-3 opacity-40 transition-opacity group-hover:opacity-100" />
+          </a>
+        ))}
+      </div>
       <Separator />
       <div className="flex items-center justify-between p-3">
         <span className="truncate text-sm text-muted-foreground">{user?.username}</span>
