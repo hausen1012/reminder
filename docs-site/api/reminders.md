@@ -29,7 +29,6 @@ curl -X POST http://localhost:8765/api/external/v1/reminders \
     "title": "每日站会",
     "schedule_type": "cron",
     "schedule_spec": { "expr": "0 9 * * 1-5" },
-    "timezone": "Asia/Shanghai",
     "channel_ids": [1, 2]
   }'
 ```

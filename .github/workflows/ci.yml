@@ -38,6 +38,8 @@ jobs:
         working-directory: backend
         run: go vet ./...
 
+      # 刻意不设置 TZ：runner 默认 UTC，与生产容器一致，
+      # 能暴露"依赖进程时区"的隐藏缺陷（站点时区应走 timezone.Provider）
       - name: 单元测试
         working-directory: backend
         run: go test ./... -race -count=1

@@ -35,7 +35,7 @@ func newCronReminder(t *testing.T, db *gorm.DB, expr string, enabled bool) *mode
 func TestEngineStartStop(t *testing.T) {
 	db := openSchedulerTestDB(t)
 	loc := time.FixedZone("CST", 8*3600)
-	e := NewEngine(db, &fakeDispatcher{}, loc)
+	e := NewEngine(db, &fakeDispatcher{}, testTZ(loc))
 
 	if e.IsRunning() {
 		t.Fatal("未 Start 前不应是 running")
@@ -59,7 +59,7 @@ func TestEngineStartStop(t *testing.T) {
 func TestEngineAddCron(t *testing.T) {
 	db := openSchedulerTestDB(t)
 	loc := time.FixedZone("CST", 8*3600)
-	e := NewEngine(db, &fakeDispatcher{}, loc)
+	e := NewEngine(db, &fakeDispatcher{}, testTZ(loc))
 	e.Start()
 	t.Cleanup(e.Stop)
 
@@ -92,7 +92,7 @@ func TestEngineAddCron(t *testing.T) {
 func TestEngineAddCron_InvalidExpr(t *testing.T) {
 	db := openSchedulerTestDB(t)
 	loc := time.FixedZone("CST", 8*3600)
-	e := NewEngine(db, &fakeDispatcher{}, loc)
+	e := NewEngine(db, &fakeDispatcher{}, testTZ(loc))
 	t.Cleanup(e.Stop)
 
 	r := newCronReminder(t, db, "not a cron", true)
@@ -105,7 +105,7 @@ func TestEngineAddCron_InvalidExpr(t *testing.T) {
 func TestEngineAdd_NilAndEmpty(t *testing.T) {
 	db := openSchedulerTestDB(t)
 	loc := time.FixedZone("CST", 8*3600)
-	e := NewEngine(db, &fakeDispatcher{}, loc)
+	e := NewEngine(db, &fakeDispatcher{}, testTZ(loc))
 	t.Cleanup(e.Stop)
 
 	if err := e.Add(nil); err == nil {
@@ -117,7 +117,7 @@ func TestEngineAdd_NilAndEmpty(t *testing.T) {
 func TestEngineAddAfterFunc_ExpiredOnce(t *testing.T) {
 	db := openSchedulerTestDB(t)
 	loc := time.FixedZone("CST", 8*3600)
-	e := NewEngine(db, &fakeDispatcher{}, loc)
+	e := NewEngine(db, &fakeDispatcher{}, testTZ(loc))
 	t.Cleanup(e.Stop)
 
 	r := &models.Reminder{
@@ -144,7 +144,7 @@ func TestEngineAddAfterFunc_ExpiredOnce(t *testing.T) {
 func TestEngineListRegistered(t *testing.T) {
 	db := openSchedulerTestDB(t)
 	loc := time.FixedZone("CST", 8*3600)
-	e := NewEngine(db, &fakeDispatcher{}, loc)
+	e := NewEngine(db, &fakeDispatcher{}, testTZ(loc))
 	e.Start()
 	t.Cleanup(e.Stop)
 
@@ -184,7 +184,7 @@ func TestEngineListRegistered(t *testing.T) {
 func TestEngineListRegisteredSorted(t *testing.T) {
 	db := openSchedulerTestDB(t)
 	loc := time.FixedZone("CST", 8*3600)
-	e := NewEngine(db, &fakeDispatcher{}, loc)
+	e := NewEngine(db, &fakeDispatcher{}, testTZ(loc))
 	e.Start()
 	t.Cleanup(e.Stop)
 
@@ -245,7 +245,7 @@ func TestEngineListRegisteredSorted(t *testing.T) {
 func TestEngineLastFireTime(t *testing.T) {
 	db := openSchedulerTestDB(t)
 	loc := time.FixedZone("CST", 8*3600)
-	e := NewEngine(db, &fakeDispatcher{}, loc)
+	e := NewEngine(db, &fakeDispatcher{}, testTZ(loc))
 
 	if !e.LastFireTime().IsZero() {
 		t.Fatal("初始应为零值")
@@ -276,7 +276,7 @@ func TestEngineLastFireTime(t *testing.T) {
 func TestEngineLoadAndRegisterAll(t *testing.T) {
 	db := openSchedulerTestDB(t)
 	loc := time.FixedZone("CST", 8*3600)
-	e := NewEngine(db, &fakeDispatcher{}, loc)
+	e := NewEngine(db, &fakeDispatcher{}, testTZ(loc))
 	e.Start()
 	t.Cleanup(e.Stop)
 
@@ -297,7 +297,7 @@ func TestEngineLoadAndRegisterAll(t *testing.T) {
 func TestEngineAddPurgeCron(t *testing.T) {
 	db := openSchedulerTestDB(t)
 	loc := time.FixedZone("CST", 8*3600)
-	e := NewEngine(db, &fakeDispatcher{}, loc)
+	e := NewEngine(db, &fakeDispatcher{}, testTZ(loc))
 	e.Start()
 	t.Cleanup(e.Stop)
 
@@ -314,14 +314,14 @@ func (f *fakePurger) Purge(olderThan time.Duration, all bool) (int64, error) {
 	return 0, nil
 }
 
-// NewEngine 传 nil 时区应回退到 Local。
+// NewEngine 传 nil 时区应回退到默认站点时区。
 func TestNewEngine_NilLocation(t *testing.T) {
 	db := openSchedulerTestDB(t)
 	e := NewEngine(db, &fakeDispatcher{}, nil)
 	if e == nil {
 		t.Fatal("应返回非 nil")
 	}
-	if e.loc == nil {
-		t.Fatal("loc 应回退到 Local")
+	if e.tz == nil || e.tz.Get() == nil {
+		t.Fatal("tz 应回退到默认时区")
 	}
 }

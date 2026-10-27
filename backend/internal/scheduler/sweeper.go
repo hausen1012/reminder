@@ -3,6 +3,9 @@
 //   - 超出 MISS_TOLERANCE_MINUTES 的过期触发，直接标记 expired 并向前推进 next_fire_at。
 //
 // 与 Engine.fire 共享同一套乐观锁，所以二者并发不会重复触发。
+//
+// 注意：next_fire_at 一律以 UTC 落库。SQLite 把时间存成带偏移的文本并按字典序
+// 比较，如果写入是 +08:00 而查询边界是 +00:00，扫描将一条也命中不了。
 package scheduler
 
 import (
@@ -13,6 +16,7 @@ import (
 	"time"
 
 	"github.com/reminder/backend/internal/models"
+	"github.com/reminder/backend/internal/timezone"
 	"gorm.io/gorm"
 )
 
@@ -20,7 +24,7 @@ import (
 type Sweeper struct {
 	db          *gorm.DB
 	engine      *Engine
-	loc         *time.Location
+	tz          *timezone.Provider
 	interval    time.Duration
 	missTol     time.Duration
 	skewSeconds time.Duration
@@ -33,9 +37,10 @@ type Sweeper struct {
 //
 // interval 决定扫描间隔；missTol 决定漏触发的容忍上限，超过即标记 expired。
 // skewSeconds 用来避免与正常触发器抢同一秒，建议给 30s 以上。
-func NewSweeper(db *gorm.DB, engine *Engine, loc *time.Location, interval, missTol, skew time.Duration) *Sweeper {
-	if loc == nil {
-		loc = time.Local
+// tz 为空时回退到默认站点时区。
+func NewSweeper(db *gorm.DB, engine *Engine, tz *timezone.Provider, interval, missTol, skew time.Duration) *Sweeper {
+	if tz == nil {
+		tz = timezone.New("")
 	}
 	if interval <= 0 {
 		interval = 60 * time.Second
@@ -49,7 +54,7 @@ func NewSweeper(db *gorm.DB, engine *Engine, loc *time.Location, interval, missT
 	return &Sweeper{
 		db:          db,
 		engine:      engine,
-		loc:         loc,
+		tz:          tz,
 		interval:    interval,
 		missTol:     missTol,
 		skewSeconds: skew,
@@ -112,12 +117,13 @@ func (s *Sweeper) loop(ctx context.Context) {
 //     - 否则：在事务里写一条 expired 日志并把 next_fire_at 推进
 func (s *Sweeper) tick() {
 	now := time.Now()
-	cutoffDue := now.Add(-s.skewSeconds)
-	cutoffExpire := now.Add(-s.missTol)
+	// 边界值转 UTC：库里存的是 +00:00 文本，用本地时区格式化会因偏移而错序
+	cutoffDue := now.Add(-s.skewSeconds).UTC()
+	cutoffExpire := now.Add(-s.missTol).UTC()
 
 	var items []models.Reminder
 	err := s.db.
-		Where("enabled = ? AND next_fire_at IS NOT NULL AND next_fire_at <= ?", true, cutoffDue).
+		Where("enabled = ? AND next_fire_at IS NOT NULL AND julianday(next_fire_at) <= julianday(?)", true, cutoffDue).
 		Find(&items).Error
 	if err != nil {
 		slog.Info("扫描失败", "error", err)
@@ -139,7 +145,7 @@ func (s *Sweeper) tick() {
 				if r.NextFireAt == nil {
 					continue
 				}
-				if r.NextFireAt.Before(cutoffExpire) {
+				if r.NextFireAt.UTC().Before(cutoffExpire) {
 					if err := s.markExpired(r, now); err != nil {
 						slog.Info("标记 reminder expired 失败", "reminder", r.ID, "error", err)
 					}
@@ -167,16 +173,18 @@ func (s *Sweeper) markExpired(r *models.Reminder, now time.Time) error {
 	if err != nil {
 		return err
 	}
-	newNext, err := Compute(r.Calendar, r.ScheduleType, spec, now, s.loc)
+	newNext, err := Compute(r.Calendar, r.ScheduleType, spec, now, s.tz.Get())
 	if err != nil {
 		return err
 	}
+	newNext = timezone.UTCPtr(newNext)
 
 	return s.db.Transaction(func(tx *gorm.DB) error {
 		oldNext := r.NextFireAt
 		q := tx.Model(&models.Reminder{}).Where("id = ?", r.ID)
 		if oldNext != nil {
-			q = q.Where("next_fire_at = ?", oldNext)
+			// 同 engine.fire：用 julianday 比较，兼容历史 +08:00 数据
+			q = q.Where("julianday(next_fire_at) = julianday(?)", *oldNext)
 		} else {
 			q = q.Where("next_fire_at IS NULL")
 		}
@@ -197,7 +205,7 @@ func (s *Sweeper) markExpired(r *models.Reminder, now time.Time) error {
 		}
 		dlog := &models.DeliveryLog{
 			ReminderID: r.ID,
-			FiredAt:    *r.NextFireAt,
+			FiredAt:    timezone.UTC(*r.NextFireAt),
 			Title:      r.Title,
 			Content:    r.Content,
 			Status:     "expired",

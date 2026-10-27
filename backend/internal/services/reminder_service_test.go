@@ -12,7 +12,7 @@ import (
 func newReminderStack(t *testing.T, db *gorm.DB) *ReminderService {
 	t.Helper()
 	loc := time.FixedZone("CST", 8*3600)
-	return NewReminderService(db, noopEngine{}, loc, newDispatchStack(t, db), nil)
+	return NewReminderService(db, noopEngine{}, testTZ(loc), newDispatchStack(t, db), nil)
 }
 
 // 最小合法入参：未来的一次性提醒。

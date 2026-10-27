@@ -2,9 +2,17 @@ import { useState, useEffect, type FormEvent } from 'react'
 import { Loader2 } from 'lucide-react'
 import { extractApiError, updatePassword } from '@/lib/api'
 import { useConfig } from '@/contexts/ConfigContext'
+import { COMMON_TIMEZONES } from '@/lib/timezones'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useToast } from '@/components/ui/use-toast'
 import { AppLogo } from '@/components/ui/AppLogo'
@@ -46,11 +54,14 @@ export default function Profile() {
   const { toast } = useToast()
   const [appName, setAppName] = useState('')
   const [logoSvg, setLogoSvg] = useState('')
+  const [timezone, setTimezone] = useState('Asia/Shanghai')
   const [saving, setSaving] = useState(false)
+  const [savingTz, setSavingTz] = useState(false)
 
   useEffect(() => {
     setAppName(config.app_name ?? '')
     setLogoSvg(config.logo_svg ?? '')
+    setTimezone(config.timezone ?? 'Asia/Shanghai')
   }, [config])
 
   async function handleBrandSave(e: FormEvent) {
@@ -66,6 +77,19 @@ export default function Profile() {
       toast({ title: '保存失败', variant: 'destructive' })
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function handleTimezoneSave(e: FormEvent) {
+    e.preventDefault()
+    setSavingTz(true)
+    try {
+      await updateConfig({ timezone })
+      toast({ title: '时区已更新', description: '所有提醒将按新时区重新计算下次触发时间' })
+    } catch (err) {
+      toast({ title: '保存失败', description: extractApiError(err), variant: 'destructive' })
+    } finally {
+      setSavingTz(false)
     }
   }
 
@@ -160,6 +184,39 @@ export default function Profile() {
               </div>
               <Button type="submit" size="sm" disabled={saving}>
                 {saving ? '保存中...' : '保存'}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+
+        {/* 时区 */}
+        <Card>
+          <CardHeader>
+            <CardTitle>时区</CardTitle>
+            <CardDescription>决定所有提醒的时间如何解释与展示</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleTimezoneSave} className="max-w-sm space-y-5">
+              <div className="space-y-2">
+                <Label htmlFor="site-tz">站点时区</Label>
+                <Select value={timezone} onValueChange={setTimezone}>
+                  <SelectTrigger id="site-tz">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {COMMON_TIMEZONES.map((tz) => (
+                      <SelectItem key={tz} value={tz}>
+                        {tz}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  提醒里填写的时间（如 09:00）按此时区解释。修改后所有提醒的下次触发时间会立即重算，无需重启。
+                </p>
+              </div>
+              <Button type="submit" size="sm" disabled={savingTz}>
+                {savingTz ? '保存中...' : '保存'}
               </Button>
             </form>
           </CardContent>

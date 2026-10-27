@@ -20,7 +20,7 @@ func newChannelTestEngine(t *testing.T) *gin.Engine {
 	if err != nil {
 		t.Fatalf("构造 secretbox 失败: %v", err)
 	}
-	h := &ChannelHandler{Svc: services.NewChannelService(db, box)}
+	h := &ChannelHandler{Svc: services.NewChannelService(db, box, testTZ(cstZone()))}
 
 	r := gin.New()
 	r.Use(gin.Recovery())

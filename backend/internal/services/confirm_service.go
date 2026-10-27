@@ -40,7 +40,7 @@ func (s *ConfirmService) CreateToken(deliveryLogID uint, ttl time.Duration) (str
 	ct := &models.ConfirmToken{
 		Token:         token,
 		DeliveryLogID: deliveryLogID,
-		ExpiresAt:     time.Now().Add(ttl),
+		ExpiresAt:     time.Now().Add(ttl).UTC(),
 	}
 	if err := s.DB.Create(ct).Error; err != nil {
 		return "", err
@@ -76,7 +76,7 @@ func (s *ConfirmService) ConsumeToken(token string) (*models.DeliveryLog, error)
 		return nil, err
 	}
 
-	now := time.Now()
+	now := time.Now().UTC()
 	err := s.DB.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Model(&ct).Update("used_at", now).Error; err != nil {
 			return err

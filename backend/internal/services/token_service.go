@@ -169,7 +169,7 @@ func (s *TokenService) DefaultChannelIDs(keyID uint) []uint {
 func (s *TokenService) Stats24h(keyID uint) int64 {
 	var count int64
 	s.DB.Model(&models.Reminder{}).
-		Where("token_id = ? AND created_at > ?", keyID, time.Now().Add(-24*time.Hour)).
+		Where("token_id = ? AND julianday(created_at) > julianday(?)", keyID, time.Now().Add(-24*time.Hour).UTC()).
 		Count(&count)
 	return count
 }

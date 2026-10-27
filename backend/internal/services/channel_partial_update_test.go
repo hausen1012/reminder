@@ -14,7 +14,7 @@ import (
 func TestChannelUpdate_PartialKeepsOtherFields(t *testing.T) {
 	db := openTestDB(t)
 	box, _ := secretbox.New("")
-	svc := NewChannelService(db, box)
+	svc := NewChannelService(db, box, testTZ(cstZone()))
 
 	created, err := svc.Create(ChannelInput{
 		Name: "partial", Type: "smtp",

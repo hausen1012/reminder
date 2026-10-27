@@ -17,6 +17,7 @@ import (
 	"github.com/reminder/backend/internal/middleware"
 	"github.com/reminder/backend/internal/models"
 	"github.com/reminder/backend/internal/notifier"
+	"github.com/reminder/backend/internal/timezone"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
@@ -25,11 +26,15 @@ import (
 type ChannelService struct {
 	DB  *gorm.DB
 	Box *secretbox.Box
+	TZ  *timezone.Provider
 }
 
 // NewChannelService 构造服务实例。
-func NewChannelService(db *gorm.DB, box *secretbox.Box) *ChannelService {
-	return &ChannelService{DB: db, Box: box}
+func NewChannelService(db *gorm.DB, box *secretbox.Box, tz *timezone.Provider) *ChannelService {
+	if tz == nil {
+		tz = timezone.New("")
+	}
+	return &ChannelService{DB: db, Box: box, TZ: tz}
 }
 
 // ChannelInput 是 Create/Update 的入参。
@@ -288,7 +293,7 @@ func (s *ChannelService) DryRun(ctx context.Context, chType string, config map[s
 	body := "这是来自 reminder2 的通道试发消息。\n类型：{{channel_type}}\n时间：{{now}}"
 	vars := map[string]string{
 		"channel_type": chType,
-		"now":          time.Now().Format("2006-01-02 15:04:05"),
+		"now":          time.Now().In(s.TZ.Get()).Format("2006-01-02 15:04:05"),
 		"title":        subject,
 		"content":      body,
 	}
@@ -332,7 +337,7 @@ type ChannelStats struct {
 //
 // 没有发送记录的通道也包含在结果中（total=0）。
 func (s *ChannelService) Stats(window time.Duration) ([]*ChannelStats, error) {
-	cutoff := time.Now().Add(-window)
+	cutoff := time.Now().Add(-window).UTC()
 
 	type aggRow struct {
 		ChannelID   uint
@@ -344,7 +349,7 @@ func (s *ChannelService) Stats(window time.Duration) ([]*ChannelStats, error) {
 	var rows []aggRow
 	s.DB.Model(&models.DeliveryAttempt{}).
 		Select("channel_id, channel_name, channel_type, COUNT(*) AS total, SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END) AS success").
-		Where("created_at >= ?", cutoff).
+		Where("julianday(created_at) >= julianday(?)", cutoff).
 		Group("channel_id").
 		Scan(&rows)
 

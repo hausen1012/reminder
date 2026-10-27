@@ -72,7 +72,6 @@ export function CurlUsageDialog({ token, open, onClose }: Props) {
   "title": "提醒标题",
   "content": "提醒内容",
   "schedule_spec": {"at": "${at}"},
-  "timezone": "Asia/Shanghai",
   "channel_ids": [1],
   "require_confirm": false
 }'`,
@@ -88,7 +87,6 @@ export function CurlUsageDialog({ token, open, onClose }: Props) {
   "content": "提醒内容",
   "schedule_type": "interval",
   "schedule_spec": {"every": 1, "unit": "hour"},
-  "timezone": "Asia/Shanghai",
   "channel_ids": [1],
   "require_confirm": false
 }'`,
@@ -104,7 +102,6 @@ export function CurlUsageDialog({ token, open, onClose }: Props) {
   "content": "提醒内容",
   "schedule_type": "cron",
   "schedule_spec": {"expr": "0 * * * *"},
-  "timezone": "Asia/Shanghai",
   "channel_ids": [1],
   "require_confirm": false
 }'`,

@@ -146,7 +146,6 @@ export default function RemindersPage() {
         calendar: r.calendar,
         schedule_type: r.schedule_type,
         schedule_spec: r.schedule_spec,
-        timezone: r.timezone,
         channel_ids: r.channel_ids,
         require_confirm: r.require_confirm,
         confirm_retry_interval_sec: r.confirm_retry_interval_sec,

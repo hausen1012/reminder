@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/reminder/backend/internal/models"
+	"github.com/reminder/backend/internal/timezone"
 	"gorm.io/gorm"
 )
 
@@ -22,19 +23,22 @@ type ConfirmRetryManager struct {
 	DB         *gorm.DB
 	Dispatch   *DispatchService
 	ConfirmSvc *ConfirmService
-	Loc        *time.Location
+	TZ         *timezone.Provider
 
 	mu     sync.Mutex
 	timers map[string]*time.Timer
 }
 
 // NewConfirmRetryManager 构造重发管理器。
-func NewConfirmRetryManager(db *gorm.DB, dispatch *DispatchService, confirmSvc *ConfirmService, loc *time.Location) *ConfirmRetryManager {
+func NewConfirmRetryManager(db *gorm.DB, dispatch *DispatchService, confirmSvc *ConfirmService, tz *timezone.Provider) *ConfirmRetryManager {
+	if tz == nil {
+		tz = timezone.New("")
+	}
 	return &ConfirmRetryManager{
 		DB:         db,
 		Dispatch:   dispatch,
 		ConfirmSvc: confirmSvc,
-		Loc:        loc,
+		TZ:         tz,
 		timers:     make(map[string]*time.Timer),
 	}
 }
@@ -150,14 +154,14 @@ func (m *ConfirmRetryManager) retry(reminderID uint, chainID string, round int) 
 	if r.NextFireAt != nil {
 		planned = *r.NextFireAt
 	}
-	vars := buildVars(&r, time.Now(), planned, m.Loc)
+	vars := buildVars(&r, time.Now(), planned, m.TZ.Get())
 	vars["confirm_url"] = m.ConfirmSvc.BuildURL(tok.Token)
 
 	rendered := buildRenderedMessage(r.Title, r.Content, r.ContentFormat, vars)
 
 	newLog := &models.DeliveryLog{
 		ReminderID:     r.ID,
-		FiredAt:        time.Now(),
+		FiredAt:        time.Now().UTC(),
 		Title:          rendered.Subject,
 		Content:        rendered.Body,
 		Status:         "pending",

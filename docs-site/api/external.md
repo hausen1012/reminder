@@ -20,7 +20,7 @@ X-AUTH: bdrk_xxxxxxxx
 ## 通用约定
 
 - 请求与响应都是 JSON，`Content-Type: application/json`
-- 时间字段使用 `YYYY-MM-DDTHH:mm:ss` 的本地时间（按提醒的 `timezone` 解释）
+- 时间字段使用 `YYYY-MM-DDTHH:mm:ss` 的本地时间（按**站点时区**解释，站点时区在面板「设置」页配置）
 - 只能访问**本令牌创建的**提醒，访问其他提醒一律返回「提醒不存在」
 - 分页用 `limit` / `offset`
 
@@ -53,7 +53,6 @@ X-AUTH: bdrk_xxxxxxxx
 | `calendar` | string | 否 | `solar` / `lunar`，默认 `solar` |
 | `schedule_type` | string | 否 | `once` / `interval` / `cron`，默认 `once` |
 | `schedule_spec` | object | 是 | 调度规则，结构随类型变化 |
-| `timezone` | string | 否 | 默认取系统时区 |
 | `channel_ids` | number[] | 否 | 留空时使用令牌的默认通道 |
 | `enabled` | boolean | 否 | 默认 `true` |
 | `require_confirm` | boolean | 否 | 是否需要确认，默认 `false` |
@@ -76,7 +75,6 @@ X-AUTH: bdrk_xxxxxxxx
     "calendar": "solar",
     "schedule_type": "cron",
     "schedule_spec": { "expr": "0 9 * * *" },
-    "timezone": "Asia/Shanghai",
     "enabled": true,
     "source": "api",
     "token_id": 1,
@@ -95,4 +93,4 @@ X-AUTH: bdrk_xxxxxxxx
 ```
 
 `source` 恒为 `api`，`token_id` 是创建它的令牌 ID。`next_fire_at` 是 UTC 时间，
-`next_fire_at_local` 是同一时刻在提醒时区下的展示形式。
+`next_fire_at_local` 是同一时刻在站点时区下的展示形式。

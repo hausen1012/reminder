@@ -16,6 +16,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/reminder/backend/internal/models"
 	"github.com/reminder/backend/internal/notifier"
+	"github.com/reminder/backend/internal/timezone"
 	"gorm.io/gorm"
 )
 
@@ -23,7 +24,7 @@ import (
 type DispatchService struct {
 	DB         *gorm.DB
 	ChannelSvc *ChannelService
-	Loc        *time.Location
+	TZ         *timezone.Provider
 
 	// 确认机制（可选）；为空时跳过确认逻辑
 	ConfirmMgr *ConfirmRetryManager
@@ -33,11 +34,14 @@ type DispatchService struct {
 }
 
 // NewDispatchService 构造 dispatch 服务。
-func NewDispatchService(db *gorm.DB, channelSvc *ChannelService, loc *time.Location) *DispatchService {
+func NewDispatchService(db *gorm.DB, channelSvc *ChannelService, tz *timezone.Provider) *DispatchService {
+	if tz == nil {
+		tz = timezone.New("")
+	}
 	return &DispatchService{
 		DB:          db,
 		ChannelSvc:  channelSvc,
-		Loc:         loc,
+		TZ:          tz,
 		RetryDelays: []time.Duration{0, 10 * time.Second, 30 * time.Second},
 	}
 }
@@ -75,7 +79,7 @@ func (d *DispatchService) Run(ctx context.Context, r *models.Reminder, deliveryL
 	if planned == nil {
 		planned = ptrTime(time.Now())
 	}
-	vars := buildVars(r, time.Now(), *planned, d.Loc)
+	vars := buildVars(r, time.Now(), *planned, d.TZ.Get())
 	slog.Info("变量构建完成", "reminder", r.ID, "vars", debugVars(vars))
 
 	// 需要确认时，首发生成 chain_id + token；重发复用已有 chain_id + token

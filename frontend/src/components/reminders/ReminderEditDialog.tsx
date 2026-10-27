@@ -12,16 +12,10 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/switch'
 import { useToast } from '@/components/ui/use-toast'
+import { useConfig } from '@/contexts/ConfigContext'
 import { ChannelMultiSelect } from '@/components/channels/ChannelMultiSelect'
 import { ScheduleForm, type ScheduleValue } from './ScheduleForm'
 import { createReminder, extractApiError, listChannels, testReminderDryRun, updateReminder } from '@/lib/api'
@@ -48,7 +42,6 @@ function defaultInput(): ReminderInput {
     calendar: 'solar',
     schedule_type: 'once',
     schedule_spec: { at },
-    timezone: 'Asia/Shanghai',
     source: 'web',
     channel_ids: [],
     require_confirm: false,
@@ -56,30 +49,6 @@ function defaultInput(): ReminderInput {
     confirm_max_retries: 3,
   }
 }
-
-
-const COMMON_TIMEZONES = [
-  'Asia/Shanghai',
-  'Asia/Tokyo',
-  'Asia/Hong_Kong',
-  'Asia/Singapore',
-  'Asia/Seoul',
-  'Asia/Taipei',
-  'Asia/Kolkata',
-  'Asia/Dubai',
-  'Europe/London',
-  'Europe/Paris',
-  'Europe/Berlin',
-  'Europe/Moscow',
-  'America/New_York',
-  'America/Chicago',
-  'America/Denver',
-  'America/Los_Angeles',
-  'America/Sao_Paulo',
-  'Australia/Sydney',
-  'Pacific/Auckland',
-  'UTC',
-]
 
 export function ReminderEditDialog({ reminder, open, onClose, onSaved }: Props) {
   const isEdit = Boolean(reminder)
@@ -89,6 +58,9 @@ export function ReminderEditDialog({ reminder, open, onClose, onSaved }: Props) 
   const [channelOpen, setChannelOpen] = useState(false)
   const [channels, setChannels] = useState<Channel[]>([])
   const { toast } = useToast()
+  // 站点时区是全局设置，只用于提示用户时间按哪个时区解释
+  const { config } = useConfig()
+  const siteTimezone = config.timezone || 'Asia/Shanghai'
 
   useEffect(() => {
     listChannels()
@@ -105,7 +77,6 @@ export function ReminderEditDialog({ reminder, open, onClose, onSaved }: Props) 
         calendar: reminder.calendar,
         schedule_type: reminder.schedule_type,
         schedule_spec: reminder.schedule_spec,
-        timezone: reminder.timezone || 'Asia/Shanghai',
         channel_ids: reminder.channel_ids,
         require_confirm: reminder.require_confirm,
         confirm_retry_interval_sec: reminder.confirm_retry_interval_sec || 300,
@@ -281,33 +252,18 @@ export function ReminderEditDialog({ reminder, open, onClose, onSaved }: Props) 
             onChange={patchSchedule}
           />
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <Label>通知</Label>
-              <ChannelMultiSelect
-                channels={channels}
-                value={input.channel_ids}
-                open={channelOpen}
-                onOpenChange={setChannelOpen}
-                onChange={(channelIds) => patch('channel_ids', channelIds)}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="r-tz">时区</Label>
-              <Select value={input.timezone || 'Asia/Shanghai'} onValueChange={(v) => patch('timezone', v)}>
-                <SelectTrigger id="r-tz">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {COMMON_TIMEZONES.map((tz) => (
-                    <SelectItem key={tz} value={tz}>
-                      {tz}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="space-y-2">
+            <Label>通知</Label>
+            <ChannelMultiSelect
+              channels={channels}
+              value={input.channel_ids}
+              open={channelOpen}
+              onOpenChange={setChannelOpen}
+              onChange={(channelIds) => patch('channel_ids', channelIds)}
+            />
+            <p className="text-xs text-muted-foreground">
+              时间按站点时区（{siteTimezone}）解释；如需更换请到「设置」页修改。
+            </p>
           </div>
 
           <div className="rounded-md border p-3">

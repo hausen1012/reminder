@@ -283,7 +283,6 @@ th{background:#f9fafb;font-weight:600}
   },
   "schedule_type":           "once",  // once | interval | cron，默认 once
   "calendar":                "solar", // solar | lunar，默认 solar
-  "timezone":       "Asia/Shanghai",  // 选填，默认 Asia/Shanghai
   "channel_ids":            [1, 2],   // 选填，为空时使用令牌默认通道
   "require_confirm":        false,    // 选填
   "confirm_retry_interval_sec": 60,   // 选填
@@ -315,7 +314,6 @@ th{background:#f9fafb;font-weight:600}
     "calendar": "solar",
     "schedule_type": "cron",
     "schedule_spec": {"expr": "0 9 * * *"},
-    "timezone": "Asia/Shanghai",
     "enabled": true,
     "source": "api",
     "token_id": 1,
@@ -358,7 +356,6 @@ th{background:#f9fafb;font-weight:600}
         "calendar": "solar",
         "schedule_type": "cron",
         "schedule_spec": {"expr": "0 9 * * *"},
-        "timezone": "Asia/Shanghai",
         "enabled": true,
         "source": "api",
         "token_id": 1,
@@ -433,6 +430,8 @@ th{background:#f9fafb;font-weight:600}
 <p>注意：<code>config</code> 中敏感字段以 <code>_enc</code> 结尾的值会被脱敏为 <code>"***"</code>。</p>
 
 <h2>schedule_spec 格式</h2>
+<p>所有 <code>schedule_spec</code> 里的时间都是<b>站点时区</b>下的本地时间（站点时区在面板「设置」页配置），
+返回体里的 <code>next_fire_at</code> 为 UTC，<code>next_fire_at_local</code> 已按站点时区格式化。</p>
 <table>
 <tr><th>Calendar</th><th>schedule_type</th><th>schedule_spec 示例</th></tr>
 <tr><td>solar</td><td>once</td><td><code>{"at": "2026-06-06T09:00:00"}</code></td></tr>
@@ -464,7 +463,6 @@ th{background:#f9fafb;font-weight:600}
     "title": "每日站会",
     "schedule_type": "cron",
     "schedule_spec": {"expr": "0 9 * * 1-5"},
-    "timezone": "Asia/Shanghai",
     "channel_ids": [1, 2]
   }'</pre>
 

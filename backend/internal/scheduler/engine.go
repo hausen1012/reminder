@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/reminder/backend/internal/models"
+	"github.com/reminder/backend/internal/timezone"
 	"github.com/robfig/cron/v3"
 	"gorm.io/gorm"
 )
@@ -34,7 +35,7 @@ type Engine struct {
 	db   *gorm.DB
 	cron *cron.Cron
 	disp Dispatcher
-	loc  *time.Location
+	tz   *timezone.Provider
 
 	mu  sync.Mutex
 	reg map[uint]*registered
@@ -60,17 +61,54 @@ type registered struct {
 }
 
 // NewEngine 构造 Engine；时区用于 cron 解析与 AfterFunc 计算。
-func NewEngine(db *gorm.DB, disp Dispatcher, loc *time.Location) *Engine {
-	if loc == nil {
-		loc = time.Local
+//
+// 传入 Provider 而不是固定的 *time.Location：站点时区可以在设置页热更新，
+// 每次计算都会读取当时的时区。
+func NewEngine(db *gorm.DB, disp Dispatcher, tz *timezone.Provider) *Engine {
+	if tz == nil {
+		tz = timezone.New("")
 	}
-	c := cron.New(cron.WithLocation(loc), cron.WithSeconds())
+	c := cron.New(cron.WithLocation(tz.Get()), cron.WithSeconds())
 	return &Engine{
 		db:   db,
 		cron: c,
 		disp: disp,
-		loc:  loc,
+		tz:   tz,
 		reg:  make(map[uint]*registered),
+	}
+}
+
+// ReloadTimezone 在站点时区变更后重建 cron 实例并重新注册全部提醒。
+//
+// robfig/cron 的时区在构造时固定，改时区只能重建实例；
+// 已注册的 AfterFunc 也要按新时区重算下次触发时间。
+func (e *Engine) ReloadTimezone() {
+	e.mu.Lock()
+	wasStarted := e.started && !e.stopped
+	old := e.cron
+	// 先摘掉所有注册项，避免旧的 AfterFunc 在新时区下继续触发
+	for _, r := range e.reg {
+		if r.timer != nil {
+			r.timer.Stop()
+		}
+	}
+	e.reg = make(map[uint]*registered)
+	e.cron = cron.New(cron.WithLocation(e.tz.Get()), cron.WithSeconds())
+	e.mu.Unlock()
+
+	// cron.Stop 会等待正在执行的 job 结束，其中可能回调 fire 去拿 e.mu，
+	// 因此必须在释放锁之后调用。
+	if wasStarted && old != nil {
+		if ctx := old.Stop(); ctx != nil {
+			<-ctx.Done()
+		}
+	}
+
+	if wasStarted {
+		e.cron.Start()
+	}
+	if err := e.LoadAndRegisterAll(); err != nil {
+		slog.Warn("时区变更后重新注册提醒失败", "error", err)
 	}
 }
 
@@ -164,15 +202,16 @@ func (e *Engine) addCron(r *models.Reminder, spec *ScheduleSpec) error {
 		return errors.New("cron 表达式为空")
 	}
 	id := r.ID
+	// 持锁操作 cron 实例：ReloadTimezone 会整体替换 e.cron
+	e.mu.Lock()
+	defer e.mu.Unlock()
 	entryID, err := e.cron.AddFunc("0 "+spec.Expr, func() {
 		e.fire(id)
 	})
 	if err != nil {
 		return err
 	}
-	e.mu.Lock()
 	e.reg[id] = &registered{kind: kindCron, entryID: entryID}
-	e.mu.Unlock()
 	return nil
 }
 
@@ -188,7 +227,7 @@ func (e *Engine) addAfterFunc(r *models.Reminder, spec *ScheduleSpec) error {
 		return nil
 	}
 	now := time.Now()
-	next, err := Compute(r.Calendar, r.ScheduleType, spec, now, e.loc)
+	next, err := Compute(r.Calendar, r.ScheduleType, spec, now, e.tz.Get())
 	if err != nil {
 		return err
 	}
@@ -329,23 +368,28 @@ func (e *Engine) fire(id uint) {
 
 	now := time.Now()
 	// 算出新的 next_fire_at（cron 也要算，用于持久化展示）
-	newNext, err := Compute(r.Calendar, r.ScheduleType, spec, now, e.loc)
+	newNext, err := Compute(r.Calendar, r.ScheduleType, spec, now, e.tz.Get())
 	if err != nil {
 		slog.Info("计算下次触发失败", "reminder", id, "error", err)
 	}
+	// 统一以 UTC 落库：SQLite 按文本比较时间，偏移不同的行会被排错位置
+	nowUTC := timezone.UTC(now)
+	newNext = timezone.UTCPtr(newNext)
 
 	var logID uint
 	err = e.db.Transaction(func(tx *gorm.DB) error {
-		// 乐观锁：用旧 next_fire_at 防止重复触发
+		// 乐观锁：用旧 next_fire_at 防止重复触发。
+		// 用 julianday() 比较而不是文本等值：升级前写入的行是 +08:00 偏移，
+		// 文本与 UTC 边界永远不相等，会让老提醒既不触发也不报错。
 		oldNext := r.NextFireAt
 		q := tx.Model(&models.Reminder{}).Where("id = ? AND enabled = ?", id, true)
 		if oldNext != nil {
-			q = q.Where("next_fire_at = ?", oldNext)
+			q = q.Where("julianday(next_fire_at) = julianday(?)", *oldNext)
 		} else {
 			q = q.Where("next_fire_at IS NULL")
 		}
 		updates := map[string]any{
-			"last_fired_at": now,
+			"last_fired_at": nowUTC,
 			"next_fire_at":  newNext,
 			"fire_count":    gorm.Expr("fire_count + 1"),
 		}
@@ -362,7 +406,7 @@ func (e *Engine) fire(id uint) {
 		contentSnapshot := r.Content
 		dlog := &models.DeliveryLog{
 			ReminderID: r.ID,
-			FiredAt:    now,
+			FiredAt:    nowUTC,
 			Title:      titleSnapshot,
 			Content:    contentSnapshot,
 			Status:     "pending",

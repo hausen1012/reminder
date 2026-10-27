@@ -125,13 +125,14 @@ func (h *ReminderHandler) Toggle(c *gin.Context) {
 }
 
 // Preview POST /api/reminders/preview
-// Body：{ calendar, schedule_type, schedule_spec, timezone?, count? }
+// Body：{ calendar, schedule_type, schedule_spec, count? }
+//
+// 时区固定取站点设置，不再接受 per-reminder 的 timezone 覆盖。
 func (h *ReminderHandler) Preview(c *gin.Context) {
 	var in struct {
 		Calendar     string         `json:"calendar"`
 		ScheduleType string         `json:"schedule_type"`
 		ScheduleSpec map[string]any `json:"schedule_spec"`
-		Timezone     string         `json:"timezone"`
 		Count        int            `json:"count"`
 	}
 	if err := c.ShouldBindJSON(&in); err != nil {
@@ -140,7 +141,7 @@ func (h *ReminderHandler) Preview(c *gin.Context) {
 	}
 	in.Calendar = strings.TrimSpace(in.Calendar)
 	in.ScheduleType = strings.TrimSpace(in.ScheduleType)
-	times, err := h.Svc.Preview(in.Calendar, in.ScheduleType, in.ScheduleSpec, in.Timezone, in.Count)
+	times, err := h.Svc.Preview(in.Calendar, in.ScheduleType, in.ScheduleSpec, in.Count)
 	if err != nil {
 		abortErr(c, err)
 		return
@@ -172,10 +173,11 @@ func (h *ReminderHandler) TestDryRun(c *gin.Context) {
 func (h *ReminderHandler) Upcoming(c *gin.Context) {
 	scope := c.Query("scope")
 	if scope == "today" {
-		now := time.Now().In(h.Svc.Loc)
+		now := h.Svc.Now()
 		year, month, day := now.Date()
-		todayStart := time.Date(year, month, day, 0, 0, 0, 0, h.Svc.Loc)
-		todayEnd := time.Date(year, month, day, 23, 59, 59, 999999999, h.Svc.Loc)
+		// 站点时区下的"今天"边界；查询内部会转成 UTC 与库里文本对齐
+		todayStart := time.Date(year, month, day, 0, 0, 0, 0, now.Location())
+		todayEnd := time.Date(year, month, day, 23, 59, 59, 999999999, now.Location())
 		items, err := h.Svc.UpcomingBetween(todayStart, todayEnd, 0)
 		if err != nil {
 			abortErr(c, err)

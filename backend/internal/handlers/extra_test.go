@@ -23,11 +23,11 @@ func newTestScheduler(t *testing.T) (*scheduler.Engine, *scheduler.Sweeper) {
 	db := newTestDB(t)
 	loc := time.FixedZone("CST", 8*3600)
 
-	engine := scheduler.NewEngine(db, noopDispatcher{}, loc)
+	engine := scheduler.NewEngine(db, noopDispatcher{}, testTZ(loc))
 	engine.Start()
 	t.Cleanup(engine.Stop)
 
-	sweeper := scheduler.NewSweeper(db, engine, loc, time.Minute, time.Hour, 30*time.Second)
+	sweeper := scheduler.NewSweeper(db, engine, testTZ(loc), time.Minute, time.Hour, 30*time.Second)
 	return engine, sweeper
 }
 
@@ -95,11 +95,11 @@ func TestSchedulerStatus(t *testing.T) {
 	db := newTestDB(t)
 	loc := time.FixedZone("CST", 8*3600)
 
-	engine := scheduler.NewEngine(db, noopDispatcher{}, loc)
+	engine := scheduler.NewEngine(db, noopDispatcher{}, testTZ(loc))
 	engine.Start()
 	t.Cleanup(engine.Stop)
 
-	sweeper := scheduler.NewSweeper(db, engine, loc, time.Minute, time.Hour, 30*time.Second)
+	sweeper := scheduler.NewSweeper(db, engine, testTZ(loc), time.Minute, time.Hour, 30*time.Second)
 	h := &SchedulerHandler{Engine: engine, Sweeper: sweeper}
 
 	r := gin.New()
@@ -139,10 +139,10 @@ func TestSchedulerStatus_Paged(t *testing.T) {
 	db := newTestDB(t)
 	loc := time.FixedZone("CST", 8*3600)
 
-	engine := scheduler.NewEngine(db, noopDispatcher{}, loc)
+	engine := scheduler.NewEngine(db, noopDispatcher{}, testTZ(loc))
 	engine.Start()
 	t.Cleanup(engine.Stop)
-	sweeper := scheduler.NewSweeper(db, engine, loc, time.Minute, time.Hour, 30*time.Second)
+	sweeper := scheduler.NewSweeper(db, engine, testTZ(loc), time.Minute, time.Hour, 30*time.Second)
 	h := &SchedulerHandler{Engine: engine, Sweeper: sweeper}
 
 	r := gin.New()

@@ -83,7 +83,7 @@
 | 场景 | 格式 |
 |---|---|
 | JSON 时间字段（`created_at`、`next_fire_at` 等） | RFC3339，UTC，如 `2026-07-01T01:00:00Z` |
-| 给前端直接展示的便捷字段（如 `next_fire_at_local`） | `YYYY-MM-DD HH:mm`，已转成提醒自身时区 |
-| 调度规则里的时间（`schedule_spec.at`） | `YYYY-MM-DDTHH:mm:ss`，按提醒时区解释 |
+| 给前端直接展示的便捷字段（如 `next_fire_at_local`） | `YYYY-MM-DD HH:mm`，已转成站点时区 |
+| 调度规则里的时间（`schedule_spec.at`） | `YYYY-MM-DDTHH:mm:ss`，按站点时区解释 |
 
-数据库统一存 UTC，时区只影响计算与展示。
+数据库统一存 UTC，时区只影响计算与展示。站点时区是全局设置，可在面板「设置」页修改。

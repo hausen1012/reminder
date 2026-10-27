@@ -17,6 +17,7 @@ import (
 	"github.com/reminder/backend/internal/middleware"
 	"github.com/reminder/backend/internal/scheduler"
 	"github.com/reminder/backend/internal/services"
+	"github.com/reminder/backend/internal/timezone"
 )
 
 // SchedulerHandles 把 scheduler 相关启动后实例返回给 main，
@@ -25,6 +26,7 @@ type SchedulerHandles struct {
 	Engine     *scheduler.Engine
 	Sweeper    *scheduler.Sweeper
 	ConfirmMgr *services.ConfirmRetryManager
+	TZ         *timezone.Provider
 }
 
 // SetupResult 包装路由与调度器实例。
@@ -49,15 +51,28 @@ func Setup(staticFS embed.FS, cfg *config.Config) (*SetupResult, error) {
 		return nil, fmt.Errorf("初始化 secretbox 失败: %w", err)
 	}
 
-	channelSvc := services.NewChannelService(database.DB, box)
-	dispatchSvc := services.NewDispatchService(database.DB, channelSvc, cfg.Location)
-	engine := scheduler.NewEngine(database.DB, dispatchSvc, cfg.Location)
+	// 站点时区：先用环境变量 TIMEZONE 给出的默认值，随后由库里的设置覆盖。
+	// 这一层是可变引用，设置页改时区后所有服务立刻读到新值。
+	tz := timezone.New(cfg.Timezone)
+
+	channelSvc := services.NewChannelService(database.DB, box, tz)
+	dispatchSvc := services.NewDispatchService(database.DB, channelSvc, tz)
+	engine := scheduler.NewEngine(database.DB, dispatchSvc, tz)
 
 	// 确认机制
 	confirmSvc := services.NewConfirmService(database.DB, cfg)
-	confirmMgr := services.NewConfirmRetryManager(database.DB, dispatchSvc, confirmSvc, cfg.Location)
+	confirmMgr := services.NewConfirmRetryManager(database.DB, dispatchSvc, confirmSvc, tz)
 	dispatchSvc.ConfirmMgr = confirmMgr
-	reminderSvc := services.NewReminderService(database.DB, engine, cfg.Location, dispatchSvc, confirmMgr)
+	reminderSvc := services.NewReminderService(database.DB, engine, tz, dispatchSvc, confirmMgr)
+
+	configSvc := services.NewConfigService(database.DB, tz)
+	configSvc.OnTimezoneChanged = engine.ReloadTimezone
+	// 读库里的站点时区（若存在）并应用，必须早于调度器注册
+	configSvc.LoadTimezone()
+
+	// 同步进程默认时区，供日志按天切分、确认页时间展示等零星用途。
+	// 只在启动阶段赋一次值：time.Local 是全局变量，运行期写入会是数据竞争。
+	time.Local = tz.Get()
 
 	// 启动调度器并把已 enabled 的提醒注册一遍
 	engine.Start()
@@ -67,7 +82,7 @@ func Setup(staticFS embed.FS, cfg *config.Config) (*SetupResult, error) {
 
 	// 启动 sweeper
 	sweeper := scheduler.NewSweeper(
-		database.DB, engine, cfg.Location,
+		database.DB, engine, tz,
 		time.Duration(cfg.SweepIntervalSec)*time.Second,
 		time.Duration(cfg.MissToleranceMinutes)*time.Minute,
 		30*time.Second,
@@ -82,7 +97,6 @@ func Setup(staticFS embed.FS, cfg *config.Config) (*SetupResult, error) {
 	}
 
 	tokenSvc := services.NewTokenService(database.DB)
-	configSvc := services.NewConfigService(database.DB)
 	userSvc := services.NewUserService(database.DB)
 
 	authHandler := &handlers.AuthHandler{JWTSecret: cfg.JWTSecret, UserSvc: userSvc}
@@ -202,6 +216,7 @@ func Setup(staticFS embed.FS, cfg *config.Config) (*SetupResult, error) {
 			Engine:     engine,
 			Sweeper:    sweeper,
 			ConfirmMgr: confirmMgr,
+			TZ:         tz,
 		},
 	}, nil
 }

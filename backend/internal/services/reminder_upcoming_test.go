@@ -103,7 +103,7 @@ func TestReminderPreview(t *testing.T) {
 	svc := newReminderStack(t, db)
 
 	spec := map[string]any{"expr": "0 9 * * *"}
-	times, err := svc.Preview("solar", "cron", spec, "", 3)
+	times, err := svc.Preview("solar", "cron", spec, 3)
 	if err != nil {
 		t.Fatalf("Preview 失败: %v", err)
 	}
@@ -112,7 +112,7 @@ func TestReminderPreview(t *testing.T) {
 	}
 
 	// n=0 走默认 5
-	times, err = svc.Preview("solar", "cron", spec, "", 0)
+	times, err = svc.Preview("solar", "cron", spec, 0)
 	if err != nil {
 		t.Fatalf("Preview 失败: %v", err)
 	}
@@ -121,7 +121,7 @@ func TestReminderPreview(t *testing.T) {
 	}
 
 	// n 超过 20 应截断
-	times, err = svc.Preview("solar", "cron", spec, "", 100)
+	times, err = svc.Preview("solar", "cron", spec, 100)
 	if err != nil {
 		t.Fatalf("Preview 失败: %v", err)
 	}
@@ -130,27 +130,42 @@ func TestReminderPreview(t *testing.T) {
 	}
 
 	// 非法 spec 应报错
-	if _, err := svc.Preview("solar", "cron", map[string]any{"expr": "not a cron"}, "", 3); err == nil {
+	if _, err := svc.Preview("solar", "cron", map[string]any{"expr": "not a cron"}, 3); err == nil {
 		t.Fatal("非法 cron 应报错")
 	}
 }
 
-// Preview 使用指定时区计算。
-func TestReminderPreview_Timezone(t *testing.T) {
+// Preview 按站点时区计算：改动 Provider 后结果随之变化。
+func TestReminderPreview_UsesSiteTimezone(t *testing.T) {
 	db := openTestDB(t)
 	svc := newReminderStack(t, db)
 
-	times, err := svc.Preview("solar", "cron", map[string]any{"expr": "0 9 * * *"}, "America/New_York", 2)
+	// 默认测试栈是东八区：09:00 应落在 CST 的 9 点
+	times, err := svc.Preview("solar", "cron", map[string]any{"expr": "0 9 * * *"}, 2)
 	if err != nil {
 		t.Fatalf("Preview 失败: %v", err)
+	}
+	for _, tm := range times {
+		if h := tm.In(cstZone()).Hour(); h != 9 {
+			t.Fatalf("应按站点时区 9 点触发，实际 %d 点 (%s)", h, tm)
+		}
+	}
+
+	// 切换站点时区后，同一条表达式应按新时区解释
+	if err := svc.TZ.Set("America/New_York"); err != nil {
+		t.Fatalf("切换时区失败: %v", err)
 	}
 	loc, err := time.LoadLocation("America/New_York")
 	if err != nil {
 		t.Fatalf("加载时区失败: %v", err)
 	}
+	times, err = svc.Preview("solar", "cron", map[string]any{"expr": "0 9 * * *"}, 2)
+	if err != nil {
+		t.Fatalf("Preview 失败: %v", err)
+	}
 	for _, tm := range times {
 		if h := tm.In(loc).Hour(); h != 9 {
-			t.Fatalf("应按纽约时区 9 点触发，实际 %d 点 (%s)", h, tm)
+			t.Fatalf("切换后应按纽约时区 9 点触发，实际 %d 点 (%s)", h, tm)
 		}
 	}
 }

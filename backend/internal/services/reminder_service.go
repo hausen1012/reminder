@@ -16,6 +16,7 @@ import (
 	"github.com/reminder/backend/internal/middleware"
 	"github.com/reminder/backend/internal/models"
 	"github.com/reminder/backend/internal/scheduler"
+	"github.com/reminder/backend/internal/timezone"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
@@ -30,20 +31,28 @@ type SchedulerHook interface {
 }
 
 // ReminderService 提供提醒的 CRUD 与调度器同步。
+//
+// 时区不再按提醒保存：站点时区由 timezone.Provider 统一提供（设置页可改），
+// 调度计算与展示都读当时的站点时区。落库时间一律 UTC。
 type ReminderService struct {
 	DB         *gorm.DB
 	Engine     SchedulerHook
-	Loc        *time.Location
+	TZ         *timezone.Provider
 	Dispatch   *DispatchService
 	ConfirmMgr *ConfirmRetryManager
 }
 
 // NewReminderService 构造服务。
-func NewReminderService(db *gorm.DB, engine SchedulerHook, loc *time.Location, disp *DispatchService, confirmMgr *ConfirmRetryManager) *ReminderService {
-	return &ReminderService{DB: db, Engine: engine, Loc: loc, Dispatch: disp, ConfirmMgr: confirmMgr}
+func NewReminderService(db *gorm.DB, engine SchedulerHook, tz *timezone.Provider, disp *DispatchService, confirmMgr *ConfirmRetryManager) *ReminderService {
+	if tz == nil {
+		tz = timezone.New("")
+	}
+	return &ReminderService{DB: db, Engine: engine, TZ: tz, Dispatch: disp, ConfirmMgr: confirmMgr}
 }
 
 // ReminderInput 是 Create / Update 的入参。
+//
+// 没有 timezone 字段：站点时区是全局设置（设置页可改），不按提醒保存。
 type ReminderInput struct {
 	Title                   string         `json:"title"`
 	Content                 string         `json:"content"`
@@ -51,7 +60,6 @@ type ReminderInput struct {
 	Calendar                string         `json:"calendar"`      // solar | lunar
 	ScheduleType            string         `json:"schedule_type"` // once | interval | cron
 	ScheduleSpec            map[string]any `json:"schedule_spec"`
-	Timezone                string         `json:"timezone"`
 	Enabled                 *bool          `json:"enabled,omitempty"`
 	ChannelIDs              []uint         `json:"channel_ids"`
 	RequireConfirm          bool           `json:"require_confirm"`
@@ -86,7 +94,7 @@ func (s *ReminderService) Create(in ReminderInput) (*ReminderView, error) {
 	if err != nil {
 		return nil, middleware.NewAppError(middleware.CodeValidationFailed, err.Error()).WithField("schedule_spec")
 	}
-	loc := s.locFor(in.Timezone)
+	loc := s.TZ.Get()
 	next, err := scheduler.Compute(in.Calendar, in.ScheduleType, spec, time.Now(), loc)
 	if err != nil {
 		return nil, middleware.NewAppError(middleware.CodeValidationFailed, err.Error()).WithField("schedule_spec")
@@ -111,11 +119,10 @@ func (s *ReminderService) Create(in ReminderInput) (*ReminderView, error) {
 		Calendar:                in.Calendar,
 		ScheduleType:            in.ScheduleType,
 		ScheduleSpec:            datatypes.JSON(specRaw),
-		Timezone:                in.Timezone,
 		Source:                  source,
 		TokenID:                 in.TokenID,
 		Enabled:                 true,
-		NextFireAt:              next,
+		NextFireAt:              timezone.UTCPtr(next),
 		RequireConfirm:          in.RequireConfirm,
 		ConfirmRetryIntervalSec: in.ConfirmRetryIntervalSec,
 		ConfirmMaxRetries:       in.ConfirmMaxRetries,
@@ -155,7 +162,7 @@ func (s *ReminderService) Update(id uint, in ReminderInput) (*ReminderView, erro
 	if err != nil {
 		return nil, middleware.NewAppError(middleware.CodeValidationFailed, err.Error()).WithField("schedule_spec")
 	}
-	loc := s.locFor(in.Timezone)
+	loc := s.TZ.Get()
 	next, err := scheduler.Compute(in.Calendar, in.ScheduleType, spec, time.Now(), loc)
 	if err != nil {
 		return nil, middleware.NewAppError(middleware.CodeValidationFailed, err.Error()).WithField("schedule_spec")
@@ -178,7 +185,6 @@ func (s *ReminderService) Update(id uint, in ReminderInput) (*ReminderView, erro
 		"calendar":                   in.Calendar,
 		"schedule_type":              in.ScheduleType,
 		"schedule_spec":              datatypes.JSON(specRaw),
-		"timezone":                   in.Timezone,
 		"require_confirm":            in.RequireConfirm,
 		"confirm_retry_interval_sec": in.ConfirmRetryIntervalSec,
 		"confirm_max_retries":        in.ConfirmMaxRetries,
@@ -188,10 +194,10 @@ func (s *ReminderService) Update(id uint, in ReminderInput) (*ReminderView, erro
 		if !*in.Enabled {
 			updates["next_fire_at"] = nil
 		} else {
-			updates["next_fire_at"] = next
+			updates["next_fire_at"] = timezone.UTCPtr(next)
 		}
 	} else {
-		updates["next_fire_at"] = next
+		updates["next_fire_at"] = timezone.UTCPtr(next)
 	}
 
 	err = s.DB.Transaction(func(tx *gorm.DB) error {
@@ -274,6 +280,10 @@ func (s *ReminderService) List(f ListFilter) ([]*ReminderView, int64, error) {
 
 	orderClause := buildOrderClause(f.SortBy, f.SortOrder, "created_at DESC",
 		[]string{"id", "created_at", "next_fire_at", "title"})
+	// next_fire_at 排序用 julianday：历史行带本地偏移，按文本排会错位置
+	if field, dir, ok := splitOrderClause(orderClause); ok && field == "next_fire_at" {
+		orderClause = "julianday(next_fire_at) " + dir
+	}
 	var rows []models.Reminder
 	if err := q.Order(orderClause).Limit(f.Limit).Offset(f.Offset).Find(&rows).Error; err != nil {
 		return nil, 0, err
@@ -294,10 +304,11 @@ func (s *ReminderService) Upcoming(within time.Duration, limit int) ([]*Reminder
 	if limit > 50 {
 		limit = 50
 	}
-	cutoff := time.Now().Add(within)
+	// 用 julianday 比较而非文本：兼容升级前以本地时区偏移写入的历史行
+	cutoff := time.Now().Add(within).UTC()
 	var rows []models.Reminder
-	if err := s.DB.Where("enabled = ? AND next_fire_at IS NOT NULL AND next_fire_at <= ?", true, cutoff).
-		Order("next_fire_at ASC").
+	if err := s.DB.Where("enabled = ? AND next_fire_at IS NOT NULL AND julianday(next_fire_at) <= julianday(?)", true, cutoff).
+		Order("julianday(next_fire_at) ASC").
 		Limit(limit).
 		Find(&rows).Error; err != nil {
 		return nil, err
@@ -313,8 +324,9 @@ func (s *ReminderService) Upcoming(within time.Duration, limit int) ([]*Reminder
 // UpcomingBetween 返回指定时间范围内待触发的 enabled 提醒（无 limit 限制）。
 func (s *ReminderService) UpcomingBetween(from, to time.Time, limit int) ([]*ReminderView, error) {
 	var rows []models.Reminder
-	q := s.DB.Where("enabled = ? AND next_fire_at IS NOT NULL AND next_fire_at BETWEEN ? AND ?", true, from, to).
-		Order("next_fire_at ASC")
+	q := s.DB.Where("enabled = ? AND next_fire_at IS NOT NULL AND julianday(next_fire_at) BETWEEN julianday(?) AND julianday(?)",
+		true, from.UTC(), to.UTC()).
+		Order("julianday(next_fire_at) ASC")
 	if limit > 0 {
 		q = q.Limit(limit)
 	}
@@ -390,10 +402,9 @@ func (s *ReminderService) Toggle(id uint) (*ReminderView, error) {
 		// 重新启用时重新计算 next_fire_at
 		spec, perr := scheduler.ParseSpec(r.ScheduleSpec)
 		if perr == nil {
-			loc := s.locFor(r.Timezone)
-			if next, cerr := scheduler.Compute(r.Calendar, r.ScheduleType, spec, time.Now(), loc); cerr == nil {
-				updates["next_fire_at"] = next
-				r.NextFireAt = next
+			if next, cerr := scheduler.Compute(r.Calendar, r.ScheduleType, spec, time.Now(), s.TZ.Get()); cerr == nil {
+				updates["next_fire_at"] = timezone.UTCPtr(next)
+				r.NextFireAt = timezone.UTCPtr(next)
 			} else {
 				// 计算失败时回退到旧值，保持禁用
 				r.Enabled = false
@@ -428,7 +439,9 @@ func (s *ReminderService) Toggle(id uint) (*ReminderView, error) {
 }
 
 // Preview 计算给定 spec 的下 n 次触发时间。
-func (s *ReminderService) Preview(calendar, scheduleType string, specMap map[string]any, tz string, n int) ([]time.Time, error) {
+//
+// 时区固定取当前站点时区（不再接受按提醒覆盖），与创建/更新时的计算保持一致。
+func (s *ReminderService) Preview(calendar, scheduleType string, specMap map[string]any, n int) ([]time.Time, error) {
 	if n <= 0 {
 		n = 5
 	}
@@ -440,9 +453,13 @@ func (s *ReminderService) Preview(calendar, scheduleType string, specMap map[str
 	if err != nil {
 		return nil, middleware.NewAppError(middleware.CodeValidationFailed, err.Error())
 	}
-	loc := s.locFor(tz)
 	from := time.Now()
-	return scheduler.PreviewSolar(calendar, scheduleType, spec, from, loc, n)
+	return scheduler.PreviewSolar(calendar, scheduleType, spec, from, s.TZ.Get(), n)
+}
+
+// Now 返回当前站点时区下的时间，供 handler 计算"今天"的边界。
+func (s *ReminderService) Now() time.Time {
+	return time.Now().In(s.TZ.Get())
 }
 
 // TestDryRun 用表单数据试发提醒，不写 delivery_log / delivery_attempt。
@@ -470,7 +487,7 @@ func (s *ReminderService) TestDryRun(ctx context.Context, title, content, conten
 		Title:      title,
 		Content:    content,
 		NextFireAt: &now,
-	}, now, now, s.Loc)
+	}, now, now, s.TZ.Get())
 
 	rendered := buildRenderedMessage(title, content, contentFormat, vars)
 	return s.Dispatch.DryRun(ctx, channels, rendered)
@@ -574,18 +591,6 @@ func (s *ReminderService) getOrNotFound(id uint) (*models.Reminder, error) {
 	return &r, nil
 }
 
-func (s *ReminderService) locFor(tz string) *time.Location {
-	if tz != "" {
-		if loc, err := time.LoadLocation(tz); err == nil {
-			return loc
-		}
-	}
-	if s.Loc != nil {
-		return s.Loc
-	}
-	return time.Local
-}
-
 func (s *ReminderService) toView(r *models.Reminder, chIDs []uint) *ReminderView {
 	specMap := map[string]any{}
 	if len(r.ScheduleSpec) > 0 {
@@ -599,7 +604,7 @@ func (s *ReminderService) toView(r *models.Reminder, chIDs []uint) *ReminderView
 		ScheduleSpec: specMap,
 		ChannelIDs:   chIDs,
 	}
-	loc := s.locFor(r.Timezone)
+	loc := s.TZ.Get()
 	if r.NextFireAt != nil {
 		v.NextFireAtLocal = r.NextFireAt.In(loc).Format("2006-01-02 15:04")
 	}

@@ -13,7 +13,7 @@ func TestChannelUpdateRejectsMissingSMTPFieldsAfterMerge(t *testing.T) {
 	if err != nil {
 		t.Fatalf("构造 secretbox 失败: %v", err)
 	}
-	service := NewChannelService(db, box)
+	service := NewChannelService(db, box, testTZ(cstZone()))
 
 	created, err := service.Create(ChannelInput{
 		Name: "smtp-test",
@@ -70,7 +70,7 @@ func TestChannelUpdateKeepsEncryptedPasswordWhenPlaceholderIsUsed(t *testing.T) 
 	if err != nil {
 		t.Fatalf("构造 secretbox 失败: %v", err)
 	}
-	service := NewChannelService(db, box)
+	service := NewChannelService(db, box, testTZ(cstZone()))
 
 	created, err := service.Create(ChannelInput{
 		Name: "smtp-secret",

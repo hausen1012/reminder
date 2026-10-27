@@ -22,15 +22,16 @@ func newReminderTestEngine(t *testing.T) (*gin.Engine, *gorm.DB) {
 	db := newTestDB(t)
 
 	loc := time.FixedZone("CST", 8*3600)
+	tz := testTZ(loc)
 	box, err := secretbox.New("")
 	if err != nil {
 		t.Fatalf("构造 secretbox 失败: %v", err)
 	}
-	channelSvc := services.NewChannelService(db, box)
-	dispatch := services.NewDispatchService(db, channelSvc, loc)
+	channelSvc := services.NewChannelService(db, box, tz)
+	dispatch := services.NewDispatchService(db, channelSvc, tz)
 	dispatch.RetryDelays = []time.Duration{0}
 
-	reminderSvc := services.NewReminderService(db, noopScheduler{}, loc, dispatch, nil)
+	reminderSvc := services.NewReminderService(db, noopScheduler{}, tz, dispatch, nil)
 	h := &ReminderHandler{Svc: reminderSvc}
 
 	r := gin.New()

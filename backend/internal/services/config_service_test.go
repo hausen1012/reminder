@@ -2,12 +2,13 @@ package services
 
 import (
 	"testing"
+	"time"
 )
 
 // 写入后读取应一致。
 func TestConfigService_UpsertAndGet(t *testing.T) {
 	db := openTestDB(t)
-	svc := NewConfigService(db)
+	svc := NewConfigService(db, testTZ(time.FixedZone("CST", 8*3600)))
 
 	if err := svc.UpsertMap(map[string]string{"a": "1", "b": "2"}); err != nil {
 		t.Fatalf("写入失败: %v", err)
@@ -33,7 +34,7 @@ func TestConfigService_UpsertAndGet(t *testing.T) {
 // 空值应删除对应 key。
 func TestConfigService_EmptyValueDeletes(t *testing.T) {
 	db := openTestDB(t)
-	svc := NewConfigService(db)
+	svc := NewConfigService(db, testTZ(time.FixedZone("CST", 8*3600)))
 
 	if err := svc.UpsertMap(map[string]string{"keep": "v", "drop": "v"}); err != nil {
 		t.Fatalf("写入失败: %v", err)

@@ -12,10 +12,10 @@ import (
 func TestSweeperStartStop(t *testing.T) {
 	db := openSchedulerTestDB(t)
 	loc := time.FixedZone("CST", 8*3600)
-	engine := NewEngine(db, &fakeDispatcher{}, loc)
+	engine := NewEngine(db, &fakeDispatcher{}, testTZ(loc))
 	t.Cleanup(engine.Stop)
 
-	s := NewSweeper(db, engine, loc, 100*time.Millisecond, time.Hour, 30*time.Second)
+	s := NewSweeper(db, engine, testTZ(loc), 100*time.Millisecond, time.Hour, 30*time.Second)
 
 	if s.IsRunning() {
 		t.Fatal("未 Start 前不应 running")
@@ -65,7 +65,7 @@ func TestNewSweeper_Defaults(t *testing.T) {
 func TestSweeperLoop_RunsPeriodically(t *testing.T) {
 	db := openSchedulerTestDB(t)
 	loc := time.FixedZone("CST", 8*3600)
-	engine := NewEngine(db, &fakeDispatcher{}, loc)
+	engine := NewEngine(db, &fakeDispatcher{}, testTZ(loc))
 	t.Cleanup(engine.Stop)
 
 	// 插入一条严重过期的提醒，sweeper 第一次 tick 就会处理它
@@ -83,7 +83,7 @@ func TestSweeperLoop_RunsPeriodically(t *testing.T) {
 		t.Fatalf("创建失败: %v", err)
 	}
 
-	s := NewSweeper(db, engine, loc, 20*time.Millisecond, time.Hour, 0)
+	s := NewSweeper(db, engine, testTZ(loc), 20*time.Millisecond, time.Hour, 0)
 	s.Start()
 	defer s.Stop()
 

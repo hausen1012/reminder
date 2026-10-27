@@ -15,7 +15,7 @@ func TestEngineFire_WritesLogAndAdvances(t *testing.T) {
 	db := openSchedulerTestDB(t)
 	loc := time.FixedZone("CST", 8*3600)
 	disp := &fakeDispatcher{}
-	e := NewEngine(db, disp, loc)
+	e := NewEngine(db, disp, testTZ(loc))
 
 	next := time.Now().Add(-time.Second).In(loc)
 	r := &models.Reminder{
@@ -74,7 +74,7 @@ func TestEngineFire_OptimisticLockSkipsDuplicate(t *testing.T) {
 	db := openSchedulerTestDB(t)
 	loc := time.FixedZone("CST", 8*3600)
 	disp := &fakeDispatcher{}
-	e := NewEngine(db, disp, loc)
+	e := NewEngine(db, disp, testTZ(loc))
 
 	stale := time.Now().Add(-time.Minute).In(loc)
 	r := &models.Reminder{
@@ -116,7 +116,7 @@ func TestEngineFire_ConcurrentOnlyOneWins(t *testing.T) {
 	db := openSchedulerTestDB(t)
 	loc := time.FixedZone("CST", 8*3600)
 	disp := &fakeDispatcher{}
-	e := NewEngine(db, disp, loc)
+	e := NewEngine(db, disp, testTZ(loc))
 
 	next := time.Now().Add(-time.Second).In(loc)
 	r := &models.Reminder{
@@ -159,7 +159,7 @@ func TestEngineFire_ConcurrentOnlyOneWins(t *testing.T) {
 func TestEngineFire_DisabledReminderIgnored(t *testing.T) {
 	db := openSchedulerTestDB(t)
 	loc := time.FixedZone("CST", 8*3600)
-	e := NewEngine(db, &fakeDispatcher{}, loc)
+	e := NewEngine(db, &fakeDispatcher{}, testTZ(loc))
 
 	next := time.Now().Add(-time.Second).In(loc)
 	r := &models.Reminder{
@@ -186,7 +186,7 @@ func TestEngineFire_DisabledReminderIgnored(t *testing.T) {
 func TestEngineAddRemove(t *testing.T) {
 	db := openSchedulerTestDB(t)
 	loc := time.FixedZone("CST", 8*3600)
-	e := NewEngine(db, &fakeDispatcher{}, loc)
+	e := NewEngine(db, &fakeDispatcher{}, testTZ(loc))
 	t.Cleanup(e.Stop)
 
 	future := time.Now().Add(24 * time.Hour).In(loc)

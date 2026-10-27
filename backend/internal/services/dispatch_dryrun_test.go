@@ -13,7 +13,7 @@ import (
 func newDispatchForDryRun(t *testing.T, db *gorm.DB) *DispatchService {
 	t.Helper()
 	loc := time.FixedZone("CST", 8*3600)
-	d := NewDispatchService(db, &ChannelService{DB: db}, loc)
+	d := NewDispatchService(db, &ChannelService{DB: db, TZ: testTZ(loc)}, testTZ(loc))
 	d.RetryDelays = []time.Duration{0}
 	return d
 }

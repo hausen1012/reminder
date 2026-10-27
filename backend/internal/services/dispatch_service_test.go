@@ -61,7 +61,7 @@ func newDispatchStack(t *testing.T, db *gorm.DB) *DispatchService {
 	if err != nil {
 		t.Fatalf("构造 secretbox 失败: %v", err)
 	}
-	dispatch := NewDispatchService(db, NewChannelService(db, box), loc)
+	dispatch := NewDispatchService(db, NewChannelService(db, box, testTZ(loc)), testTZ(loc))
 	dispatch.RetryDelays = []time.Duration{0} // 测试中不等待
 	return dispatch
 }

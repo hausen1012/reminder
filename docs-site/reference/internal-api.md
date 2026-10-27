@@ -49,7 +49,6 @@ JWT 有效期为 72 小时。改密码后旧 JWT 仍然有效直到过期——�
   "calendar": "solar",
   "schedule_type": "cron",
   "schedule_spec": { "expr": "0 9 * * *" },
-  "timezone": "Asia/Shanghai",
   "count": 5
 }
 ```

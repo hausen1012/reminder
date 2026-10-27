@@ -4,11 +4,18 @@ import (
 	"context"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/reminder/backend/internal/models"
+	"github.com/reminder/backend/internal/timezone"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
+
+// testTZ 把固定时区包装成 timezone.Provider，供测试注入。
+func testTZ(loc *time.Location) *timezone.Provider {
+	return timezone.NewFixed(loc)
+}
 
 // fakeDispatcher 记录 Engine 交出去的投递任务，便于断言。
 type fakeDispatcher struct {

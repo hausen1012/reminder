@@ -17,6 +17,7 @@ RUN go build -o server ./cmd/server
 
 # Stage 3: Runtime
 FROM alpine:3.19
+# tzdata 必须安装：站点时区（设置页可改）与 TIMEZONE 都依赖时区数据库
 RUN apk --no-cache add tzdata
 WORKDIR /app
 COPY --from=backend /app/server .

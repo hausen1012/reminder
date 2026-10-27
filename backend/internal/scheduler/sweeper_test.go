@@ -13,7 +13,7 @@ func TestSweeperTick_FiresWithinTolerance(t *testing.T) {
 	db := openSchedulerTestDB(t)
 	loc := time.FixedZone("CST", 8*3600)
 	disp := &fakeDispatcher{}
-	engine := NewEngine(db, disp, loc)
+	engine := NewEngine(db, disp, testTZ(loc))
 	t.Cleanup(engine.Stop)
 
 	// 10 分钟前触发，容忍窗口 60 分钟 → 应补发
@@ -31,7 +31,7 @@ func TestSweeperTick_FiresWithinTolerance(t *testing.T) {
 		t.Fatalf("创建提醒失败: %v", err)
 	}
 
-	s := NewSweeper(db, engine, loc, time.Minute, 60*time.Minute, 0)
+	s := NewSweeper(db, engine, testTZ(loc), time.Minute, 60*time.Minute, 0)
 	s.tick()
 
 	var logs []models.DeliveryLog
@@ -50,7 +50,7 @@ func TestSweeperTick_FiresWithinTolerance(t *testing.T) {
 func TestSweeperTick_MarksExpiredBeyondTolerance(t *testing.T) {
 	db := openSchedulerTestDB(t)
 	loc := time.FixedZone("CST", 8*3600)
-	engine := NewEngine(db, &fakeDispatcher{}, loc)
+	engine := NewEngine(db, &fakeDispatcher{}, testTZ(loc))
 	t.Cleanup(engine.Stop)
 
 	// 2 小时前触发，容忍窗口 60 分钟 → 应标记 expired
@@ -68,7 +68,7 @@ func TestSweeperTick_MarksExpiredBeyondTolerance(t *testing.T) {
 		t.Fatalf("创建提醒失败: %v", err)
 	}
 
-	s := NewSweeper(db, engine, loc, time.Minute, 60*time.Minute, 0)
+	s := NewSweeper(db, engine, testTZ(loc), time.Minute, 60*time.Minute, 0)
 	s.tick()
 
 	var logs []models.DeliveryLog
@@ -96,7 +96,7 @@ func TestSweeperTick_MarksExpiredBeyondTolerance(t *testing.T) {
 func TestSweeperTick_OnceExpiredDisables(t *testing.T) {
 	db := openSchedulerTestDB(t)
 	loc := time.FixedZone("CST", 8*3600)
-	engine := NewEngine(db, &fakeDispatcher{}, loc)
+	engine := NewEngine(db, &fakeDispatcher{}, testTZ(loc))
 	t.Cleanup(engine.Stop)
 
 	missed := time.Now().Add(-48 * time.Hour).In(loc)
@@ -113,7 +113,7 @@ func TestSweeperTick_OnceExpiredDisables(t *testing.T) {
 		t.Fatalf("创建提醒失败: %v", err)
 	}
 
-	s := NewSweeper(db, engine, loc, time.Minute, 60*time.Minute, 0)
+	s := NewSweeper(db, engine, testTZ(loc), time.Minute, 60*time.Minute, 0)
 	s.tick()
 
 	var after models.Reminder
@@ -132,7 +132,7 @@ func TestSweeperTick_OnceExpiredDisables(t *testing.T) {
 func TestSweeperTick_IgnoresFutureReminders(t *testing.T) {
 	db := openSchedulerTestDB(t)
 	loc := time.FixedZone("CST", 8*3600)
-	engine := NewEngine(db, &fakeDispatcher{}, loc)
+	engine := NewEngine(db, &fakeDispatcher{}, testTZ(loc))
 	t.Cleanup(engine.Stop)
 
 	future := time.Now().Add(time.Hour).In(loc)
@@ -149,7 +149,7 @@ func TestSweeperTick_IgnoresFutureReminders(t *testing.T) {
 		t.Fatalf("创建提醒失败: %v", err)
 	}
 
-	s := NewSweeper(db, engine, loc, time.Minute, 60*time.Minute, 0)
+	s := NewSweeper(db, engine, testTZ(loc), time.Minute, 60*time.Minute, 0)
 	s.tick()
 
 	if n := countReminderLogs(t, db, r.ID); n != 0 {

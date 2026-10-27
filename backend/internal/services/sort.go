@@ -26,3 +26,18 @@ func buildOrderClause(sortBy, sortOrder, fallback string, allowed []string) stri
 	}
 	return field + " DESC"
 }
+
+// splitOrderClause 把 "field DIR" 拆成 (field, DIR, true)。
+//
+// 只接受 buildOrderClause 产出的形态（白名单字段 + ASC/DESC），
+// 解析失败时返回 ok=false，调用方应原样使用原片段。
+func splitOrderClause(clause string) (field, dir string, ok bool) {
+	parts := strings.Fields(clause)
+	if len(parts) != 2 {
+		return "", "", false
+	}
+	if !strings.EqualFold(parts[1], "ASC") && !strings.EqualFold(parts[1], "DESC") {
+		return "", "", false
+	}
+	return parts[0], strings.ToUpper(parts[1]), true
+}

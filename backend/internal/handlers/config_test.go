@@ -15,7 +15,7 @@ func newConfigTestEngine(t *testing.T) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	db := newTestDB(t)
 
-	h := &ConfigHandler{Svc: services.NewConfigService(db)}
+	h := &ConfigHandler{Svc: services.NewConfigService(db, testTZ(cstZone()))}
 
 	r := gin.New()
 	r.Use(gin.Recovery())
@@ -35,10 +35,10 @@ func TestConfigUpsertAndDelete(t *testing.T) {
 		Data map[string]string `json:"data"`
 	}
 
-	// 初始为空对象
+	// 初始只有时区默认值（站点时区未在库里设置过时也会回显当前生效值）
 	decodeJSON(t, doJSON(r, http.MethodGet, "/config", nil), &getResp)
-	if len(getResp.Data) != 0 {
-		t.Fatalf("初始应为空，实际 %v", getResp.Data)
+	if len(getResp.Data) != 1 || getResp.Data["timezone"] == "" {
+		t.Fatalf("初始应只有 timezone 默认值，实际 %v", getResp.Data)
 	}
 
 	// 写入两个 key

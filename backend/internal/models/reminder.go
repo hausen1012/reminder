@@ -12,6 +12,9 @@ import (
 // 合法组合：
 //   - solar + once / interval / cron
 //   - lunar + once / interval
+//
+// 时区不在提醒上：站点时区是全局设置（设置页可改），由 config 表 key=timezone 保存。
+// 所有时间字段以 UTC 落库——SQLite 按带偏移的文本比较时间，混合偏移会错序。
 type Reminder struct {
 	ID            uint   `gorm:"primaryKey" json:"id"`
 	Title         string `gorm:"size:200;not null" json:"title"`
@@ -21,7 +24,6 @@ type Reminder struct {
 	Calendar     string         `gorm:"size:8;index" json:"calendar"`
 	ScheduleType string         `gorm:"size:16;index" json:"schedule_type"`
 	ScheduleSpec datatypes.JSON `gorm:"type:text" json:"schedule_spec"`
-	Timezone     string         `gorm:"size:48" json:"timezone"`
 
 	// 注意：不能写 gorm:"default:true"。GORM 在 Create 时会跳过带默认值的零值字段，
 	// 导致 Enabled=false 被数据库默认值覆盖成 true（"创建即禁用"会静默失效）。
@@ -37,7 +39,7 @@ type Reminder struct {
 	ConfirmMaxRetries       int  `gorm:"default:0" json:"confirm_max_retries"`
 
 	NextFireAt  *time.Time `gorm:"index" json:"next_fire_at,omitempty"` // 始终为公历 UTC
-	LastFiredAt *time.Time `json:"last_fired_at,omitempty"`
+	LastFiredAt *time.Time `json:"last_fired_at,omitempty"`             // 始终为公历 UTC
 	FireCount   int        `json:"fire_count"`
 
 	CreatedAt time.Time `json:"created_at"`

@@ -17,7 +17,7 @@ func newChannelSvcForTest(t *testing.T) (*ChannelService, *gorm.DB) {
 	if err != nil {
 		t.Fatalf("构造 secretbox 失败: %v", err)
 	}
-	return NewChannelService(db, box), db
+	return NewChannelService(db, box, testTZ(cstZone())), db
 }
 
 // 各通道类型的必填字段校验。

@@ -272,13 +272,14 @@ type confirmTestStack struct {
 func newConfirmTestStack(t *testing.T, db *gorm.DB) *confirmTestStack {
 	t.Helper()
 	loc := time.FixedZone("CST", 8*3600)
-	channelSvc := &ChannelService{DB: db}
-	dispatch := NewDispatchService(db, channelSvc, loc)
+	tz := testTZ(loc)
+	channelSvc := &ChannelService{DB: db, TZ: tz}
+	dispatch := NewDispatchService(db, channelSvc, tz)
 	dispatch.RetryDelays = []time.Duration{0}
 	confirmSvc := NewConfirmService(db, &config.Config{BaseURL: "http://example.test"})
-	confirmMgr := NewConfirmRetryManager(db, dispatch, confirmSvc, loc)
+	confirmMgr := NewConfirmRetryManager(db, dispatch, confirmSvc, tz)
 	dispatch.ConfirmMgr = confirmMgr
-	reminderSvc := NewReminderService(db, noopEngine{}, loc, dispatch, confirmMgr)
+	reminderSvc := NewReminderService(db, noopEngine{}, tz, dispatch, confirmMgr)
 	stack := &confirmTestStack{
 		dispatch:    dispatch,
 		confirmSvc:  confirmSvc,
@@ -337,13 +338,12 @@ func createConfirmReminder(t *testing.T, db *gorm.DB, intervalSec, maxRetries in
 	if err := db.Create(channel).Error; err != nil {
 		t.Fatalf("创建测试通道失败: %v", err)
 	}
-	next := time.Now().Add(time.Hour)
+	next := time.Now().Add(time.Hour).UTC()
 	reminder := &models.Reminder{
 		Title:                   "确认机制测试",
 		Content:                 "请点击 {{confirm_url}} 完成确认",
 		Calendar:                "solar",
 		ScheduleType:            "once",
-		Timezone:                "Asia/Shanghai",
 		Enabled:                 true,
 		RequireConfirm:          true,
 		ConfirmRetryIntervalSec: intervalSec,

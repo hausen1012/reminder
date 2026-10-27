@@ -230,7 +230,7 @@ func TestIsUniqueErr(t *testing.T) {
 	}
 
 	db := openTestDB(t)
-	svc := NewChannelService(db, nil)
+	svc := NewChannelService(db, nil, testTZ(cstZone()))
 	if _, err := svc.Create(ChannelInput{Name: "dup", Type: "log", Config: map[string]any{}}); err != nil {
 		t.Fatalf("创建失败: %v", err)
 	}

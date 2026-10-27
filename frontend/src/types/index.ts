@@ -69,7 +69,6 @@ export interface Reminder {
   calendar: ReminderCalendar
   schedule_type: ReminderScheduleType
   schedule_spec: Record<string, unknown>
-  timezone: string
   enabled: boolean
   source: ReminderSource
   token_id?: number
@@ -91,7 +90,6 @@ export interface ReminderInput {
   calendar: ReminderCalendar
   schedule_type: ReminderScheduleType
   schedule_spec: Record<string, unknown>
-  timezone?: string
   enabled?: boolean
   source?: 'web' | 'api'
   channel_ids: number[]

@@ -55,7 +55,8 @@ cd frontend && npm run build && npm test
 
 - 错误统一走 `middleware.AppError` + `abortErr`，响应格式 `{"error":{code,message,field?}}`；成功响应为 `{"code":200,"message":"ok","data":...}`。
 - 日志用 `log/slog` 结构化输出。
-- 时间以 UTC 入库，本地时间计算用 `cfg.Location`。
+- 时间以 UTC 入库（`timezone.UTC` / `UTCPtr` 归一化），本地时间计算统一取 `timezone.Provider`（站点时区，设置页可改，存在 `config` 表 `key=timezone`），不按提醒保存。
+- SQLite 的时间列是带偏移的文本，按字典序比较；时间范围比较一律用 `julianday(col)`，避免混合偏移错序。
 - 前端请求统一走 `src/lib/api.ts`，不在组件里直接 `axios`。
 - 敏感配置加密后入库，密钥与口令不得写进代码、日志、文档、提交信息。
 - 提交信息用中文 + `feat/fix/refactor/docs/test/chore(scope):` 前缀。
