@@ -39,10 +39,26 @@ type Engine struct {
 	mu  sync.Mutex
 	reg map[uint]*registered
 
+	// reloadMu 串行化 ReloadTimezone。
+	// 两次并发改时区（多标签页同时保存）若交错执行，会出现一个把另一个刚重建的
+	// cron 实例整替换掉、而 RecomputeNextFire 又用着中间态时区的乱象。
+	reloadMu sync.Mutex
+
+	// purgeJobs 记录通过 AddPurgeCron 注册的维护型定时任务。
+	// 它们不属于任何提醒，ReloadTimezone 整体替换 cron 实例时必须一并恢复，
+	// 否则改一次时区，每日清理任务就永久消失，直到进程重启。
+	purgeJobs []purgeJob
+
 	stopped    bool
 	started    bool
 	lastFireMu sync.Mutex
 	lastFireAt time.Time
+}
+
+// purgeJob 是一条维护型 cron 任务的重建信息。
+type purgeJob struct {
+	expr string
+	job  func()
 }
 
 type registeredKind string
@@ -77,11 +93,19 @@ func NewEngine(db *gorm.DB, disp Dispatcher, tz *timezone.Provider) *Engine {
 	}
 }
 
-// ReloadTimezone 在站点时区变更后重建 cron 实例并重新注册全部提醒。
+// ReloadTimezone 在站点时区变更后重建 cron 实例、回写下次触发时间并重新注册全部提醒。
 //
 // robfig/cron 的时区在构造时固定，改时区只能重建实例；
 // 已注册的 AfterFunc 也要按新时区重算下次触发时间。
+//
+// 除了内存里的注册项，库里持久化的 next_fire_at 也必须按新时区重算：
+// sweeper 是拿库里的值判断补漏的（next_fire_at <= now），时区往前移之后
+// 旧值会变成过去时间，落在容忍窗口内会被立刻补发一次、超出窗口则被标记 expired，
+// 都不该发生在"用户只是改了个时区"的时候。
 func (e *Engine) ReloadTimezone() {
+	e.reloadMu.Lock()
+	defer e.reloadMu.Unlock()
+
 	e.mu.Lock()
 	wasStarted := e.started && !e.stopped
 	old := e.cron
@@ -93,6 +117,12 @@ func (e *Engine) ReloadTimezone() {
 	}
 	e.reg = make(map[uint]*registered)
 	e.cron = cron.New(cron.WithLocation(e.tz.Get()), cron.WithSeconds())
+	// 维护型任务（如每日日志清理）也要在新实例上恢复
+	for _, job := range e.purgeJobs {
+		if _, err := e.cron.AddFunc(job.expr, job.job); err != nil {
+			slog.Warn("时区变更后恢复维护任务失败", "expr", job.expr, "error", err)
+		}
+	}
 	e.mu.Unlock()
 
 	// cron.Stop 会等待正在执行的 job 结束，其中可能回调 fire 去拿 e.mu，
@@ -106,9 +136,81 @@ func (e *Engine) ReloadTimezone() {
 	if wasStarted {
 		e.cron.Start()
 	}
+	// 先回写库里的下次触发时间，再注册：addAfterFunc 会重算并覆盖内存中的定时器，
+	// 但 cron 条目的触发时间由 cron 实例按新时区解析，不依赖库里的值。
+	if n, err := e.RecomputeNextFire(); err != nil {
+		slog.Warn("时区变更后重算下次触发时间失败", "error", err)
+	} else {
+		slog.Info("时区变更后已重算下次触发时间", "count", n, "timezone", e.tz.Name())
+	}
 	if err := e.LoadAndRegisterAll(); err != nil {
 		slog.Warn("时区变更后重新注册提醒失败", "error", err)
 	}
+}
+
+// RecomputeNextFire 按当前站点时区重算所有 enabled 提醒的 next_fire_at 并回写。
+//
+// after 基准取 now 而不是 last_fired_at：时区变更只应改变"当地几点触发"，
+// 不应把时区前移后已成过去的旧计划当作漏触发补上一串。
+// 单次提醒若在新时区下已过期，next_fire_at 写空——与"已触发过的 once"同一形态，
+// 但不动 enabled：开关是用户的意图，不该因为改时区被悄悄改掉。
+//
+// 返回实际更新的行数。
+func (e *Engine) RecomputeNextFire() (int, error) {
+	var items []models.Reminder
+	if err := e.db.Where("enabled = ?", true).Find(&items).Error; err != nil {
+		return 0, err
+	}
+	now := time.Now()
+	loc := e.tz.Get()
+	updated := 0
+	for i := range items {
+		r := &items[i]
+		spec, err := ParseSpec(r.ScheduleSpec)
+		if err != nil {
+			slog.Warn("重算时解析 schedule_spec 失败", "reminder", r.ID, "error", err)
+			continue
+		}
+		next, err := Compute(r.Calendar, r.ScheduleType, spec, now, loc)
+		if err != nil {
+			slog.Warn("重算下次触发失败", "reminder", r.ID, "error", err)
+			continue
+		}
+		// 显式用 any(nil)：直接传 *time.Time(nil) 到 GORM 的 Update 里
+		// 类型断言路径不稳，容易把 NULL 写成零值时间。
+		var val any
+		if next != nil {
+			val = timezone.UTC(*next)
+		}
+		if err := e.db.Model(&models.Reminder{}).Where("id = ?", r.ID).
+			Update("next_fire_at", val).Error; err != nil {
+			slog.Warn("回写下次触发时间失败", "reminder", r.ID, "error", err)
+			continue
+		}
+		updated++
+	}
+	return updated, nil
+}
+
+// ExtraEntryCount 返回 cron 实例里除提醒之外的任务数量（如每日日志清理）。
+//
+// 用于断言时区变更重建后维护型任务没有丢失。
+func (e *Engine) ExtraEntryCount() int {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	reminderEntries := make(map[cron.EntryID]struct{}, len(e.reg))
+	for _, r := range e.reg {
+		if r.kind == kindCron {
+			reminderEntries[r.entryID] = struct{}{}
+		}
+	}
+	extra := 0
+	for _, ent := range e.cron.Entries() {
+		if _, ok := reminderEntries[ent.ID]; !ok {
+			extra++
+		}
+	}
+	return extra
 }
 
 // Start 启动内部 cron 循环。Sweeper 由外层独立启动。
@@ -465,15 +567,29 @@ func (e *Engine) LoadAndRegisterAll() error {
 }
 
 // AddPurgeCron 注册一个每天凌晨 3 点的定时清理任务。
+//
+// 任务会记进 purgeJobs，这样 ReloadTimezone 重建 cron 实例后能自动恢复；
+// 调用方无需（也不应该）在时区变更后手动重注册。
 func (e *Engine) AddPurgeCron(logSrv interface {
 	Purge(olderThan time.Duration, all bool) (int64, error)
 }, purgeAfter time.Duration) (cron.EntryID, error) {
-	return e.cron.AddFunc("0 0 3 * * *", func() {
+	const expr = "0 0 3 * * *"
+	job := func() {
 		n, err := logSrv.Purge(purgeAfter, false)
 		if err != nil {
 			slog.Info("自动清理日志失败", "error", err)
 		} else if n > 0 {
 			slog.Info("自动清理日志", "count", n)
 		}
-	})
+	}
+	// 持锁登记与注册：ReloadTimezone 会整体替换 e.cron，
+	// 若这里不加锁，可能出现"登记到已废弃的实例上"导致清理任务丢失。
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	id, err := e.cron.AddFunc(expr, job)
+	if err != nil {
+		return id, err
+	}
+	e.purgeJobs = append(e.purgeJobs, purgeJob{expr: expr, job: job})
+	return id, nil
 }

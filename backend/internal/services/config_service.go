@@ -47,6 +47,8 @@ func (s *ConfigService) GetAll() (map[string]string, error) {
 // value 为空字符串时删除对应 key。
 //
 // timezone 会先校验：非法时区直接返回校验错误，保证落库的永远是能解析的值。
+// 时区只有在值确实变化时才触发重建：设置页每次保存都会把全部配置回传，
+// 没改时区却重注册全部提醒会产生无谓的调度抖动。
 func (s *ConfigService) UpsertMap(cfg map[string]string) error {
 	if v, ok := cfg[KeyTimezone]; ok && v != "" && !timezone.Valid(v) {
 		return middleware.NewAppError(middleware.CodeValidationFailed, "未知时区: "+v).WithField(KeyTimezone)
@@ -80,6 +82,10 @@ func (s *ConfigService) UpsertMap(cfg map[string]string) error {
 // 库中没有该配置时保留环境变量 TIMEZONE 给出的默认值。
 // 启动阶段调度器尚未开始注册，这里不触发 OnTimezoneChanged，
 // 由调用方随后统一 Start + LoadAndRegisterAll。
+//
+// 启动时不重算 next_fire_at：库里有配置时，重启前后时区必然一致，重算纯属多余；
+// 库里没有配置而 TIMEZONE 被改动的情况属于一次性迁移场景，交给 sweeper 按容忍窗口处理
+// （超出窗口标 expired，用户能在日志里看到，不会静默消失）。
 func (s *ConfigService) LoadTimezone() {
 	if s.TZ == nil {
 		return
@@ -100,6 +106,9 @@ func (s *ConfigService) LoadTimezone() {
 }
 
 // applyTimezone 把新时区应用到 Provider，并通知调度器重建。
+//
+// 传入值就是最终值（空字符串已在此按回退时区处理）。
+// 与当前生效时区相同时直接返回：重复保存同一个时区不该重建调度器。
 func (s *ConfigService) applyTimezone(name string) {
 	if s.TZ == nil {
 		return
@@ -107,6 +116,10 @@ func (s *ConfigService) applyTimezone(name string) {
 	if name == "" {
 		// 清空配置 = 回到默认时区，仍然要刷新调度器
 		name = timezone.Fallback
+	}
+	if s.TZ.Name() == name {
+		slog.Debug("站点时区未变化，跳过调度器重建", "timezone", name)
+		return
 	}
 	if err := s.TZ.Set(name); err != nil {
 		slog.Warn("应用时区失败", "timezone", name, "error", err)

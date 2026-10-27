@@ -8,6 +8,42 @@ import (
 	"github.com/reminder/backend/internal/timezone"
 )
 
+// 重复保存同一个时区不应反复重建调度器：
+// 设置页每次保存都会回传全部配置，未改时区时不该打扰调度器。
+func TestConfigService_SameTimezoneSkipsCallback(t *testing.T) {
+	db := openTestDB(t)
+	// 必须用能被 time.LoadLocation 解析的时区名：这里要真的走一遍校验
+	tz := timezone.New("Asia/Shanghai")
+	svc := NewConfigService(db, tz)
+
+	called := 0
+	svc.OnTimezoneChanged = func() { called++ }
+
+	// 与当前生效值相同（首次写入也算"没变化"）
+	if err := svc.UpsertMap(map[string]string{KeyTimezone: "Asia/Shanghai"}); err != nil {
+		t.Fatalf("写入失败: %v", err)
+	}
+	if called != 0 {
+		t.Fatalf("时区未变化时不应触发重建，实际 %d 次", called)
+	}
+
+	// 只改其他配置也不该触发
+	if err := svc.UpsertMap(map[string]string{KeyTimezone: "Asia/Shanghai", "app_name": "提醒"}); err != nil {
+		t.Fatalf("写入失败: %v", err)
+	}
+	if called != 0 {
+		t.Fatalf("未改时区不应触发重建，实际 %d 次", called)
+	}
+
+	// 真改了才触发
+	if err := svc.UpsertMap(map[string]string{KeyTimezone: "America/New_York"}); err != nil {
+		t.Fatalf("写入失败: %v", err)
+	}
+	if called != 1 {
+		t.Fatalf("时区变化应触发 1 次重建，实际 %d", called)
+	}
+}
+
 // 未在库里设置过时区时，GetAll 补上当前生效值，让设置页有可编辑的初始值。
 func TestConfigService_GetAllIncludesTimezoneDefault(t *testing.T) {
 	db := openTestDB(t)

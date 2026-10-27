@@ -111,7 +111,11 @@ Engine 定时器到期
 - 时区是**站点级全局设置**（面板「设置」页，按 `config` 表 `key=timezone` 保存），不按提醒保存
 - 调度计算时按站点时区解释 `schedule_spec` 里的本地时间（如 `09:00` 表示当地 9 点）
 - 展示时前端按站点时区渲染（`lib/datetime.ts` 的 `formatInZone`），不依赖浏览器本地时区
-- 在设置页改时区会立刻重建 cron 实例并按新时区重算全部提醒，无需重启
+- 在设置页改时区会立刻重建 cron 实例、按新时区重算并回写所有启用提醒的 `next_fire_at`，无需重启
+  （`Engine.ReloadTimezone` → `Engine.RecomputeNextFire`）。只重建不重算是不够的：
+  sweeper 依据库里的 `next_fire_at` 判断补漏，旧值在新时区下会变成过去时间，
+  导致错误补发或被误标 `expired`
+- 重建 cron 实例时，每日日志清理等维护型任务会一并恢复（`Engine.purgeJobs`）
 
 ::: warning SQLite 按文本比较时间
 `next_fire_at` 是带偏移的文本（如 `2026-10-26 18:23:02+08:00`）。
