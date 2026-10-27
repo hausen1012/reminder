@@ -1,6 +1,7 @@
 import { describe, expect, it, beforeEach, vi } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
-import { ConfigProvider, useConfig } from '@/contexts/ConfigContext'
+import { ConfigProvider, useConfig, useSiteTimezone } from '@/contexts/ConfigContext'
+import { DEFAULT_SITE_TIMEZONE } from '@/lib/datetime'
 
 // 只 mock API 层，context 自身的逻辑不 mock
 const getConfig = vi.fn()
@@ -18,6 +19,10 @@ function ConfigProbe() {
       <span data-testid="app-name">{config.app_name ?? ''}</span>
     </div>
   )
+}
+
+function TimezoneProbe() {
+  return <span data-testid="tz">{useSiteTimezone()}</span>
 }
 
 function renderWithProvider() {
@@ -101,5 +106,43 @@ describe('ConfigContext', () => {
     const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
     expect(() => render(<ConfigProbe />)).toThrow('useConfig must be used within ConfigProvider')
     spy.mockRestore()
+  })
+})
+
+describe('useSiteTimezone', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    getConfig.mockReset()
+    updateConfigApi.mockReset()
+  })
+
+  it('未配置时回退到默认站点时区', async () => {
+    localStorage.setItem('token', 'tk')
+    getConfig.mockResolvedValue({})
+
+    render(
+      <ConfigProvider>
+        <TimezoneProbe />
+      </ConfigProvider>,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByTestId('tz')).toHaveTextContent(DEFAULT_SITE_TIMEZONE)
+    })
+  })
+
+  it('返回配置里的站点时区', async () => {
+    localStorage.setItem('token', 'tk')
+    getConfig.mockResolvedValue({ timezone: 'Europe/Berlin' })
+
+    render(
+      <ConfigProvider>
+        <TimezoneProbe />
+      </ConfigProvider>,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByTestId('tz')).toHaveTextContent('Europe/Berlin')
+    })
   })
 })

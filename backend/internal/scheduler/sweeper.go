@@ -29,8 +29,11 @@ type Sweeper struct {
 	missTol     time.Duration
 	skewSeconds time.Duration
 
+	// mu 保护下面两个字段：IsRunning 会被 HTTP 请求 goroutine 调用，
+	// 而 Start/Stop 来自 main 的启动与停机流程，不加锁读是数据竞争。
+	mu     sync.Mutex
 	cancel context.CancelFunc
-	done   chan struct{}
+	done   chan struct{} // 与 cancel 一同在 Start 里重建，Stop 靠它等待 goroutine 退出
 }
 
 // NewSweeper 构造一个 Sweeper。
@@ -58,22 +61,31 @@ func NewSweeper(db *gorm.DB, engine *Engine, tz *timezone.Provider, interval, mi
 		interval:    interval,
 		missTol:     missTol,
 		skewSeconds: skew,
-		done:        make(chan struct{}),
 	}
 }
 
 // Start 启动后台 goroutine 周期扫描，可重复调用幂等。
 func (s *Sweeper) Start() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if s.cancel != nil {
 		return
 	}
 	ctx, cancel := context.WithCancel(context.Background())
+	// done 与 cancel 成对重建：Stop 之后再次 Start 需要一个新的信号 channel，
+	// 复用旧 channel（已 close）会让新 goroutine 的 defer close 直接 panic。
+	s.done = make(chan struct{})
 	s.cancel = cancel
-	go s.loop(ctx)
+	go s.loop(ctx, s.done)
 }
 
 // IsRunning 返回 sweeper 是否在运行。
+//
+// 加锁读：/api/health 与 /api/scheduler/status 会在请求 goroutine 里调它，
+// 而 Start/Stop 可能来自 main 的启动与停机流程，无锁读 cancel 是数据竞争。
 func (s *Sweeper) IsRunning() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	return s.cancel != nil
 }
 
@@ -83,17 +95,24 @@ func (s *Sweeper) Interval() time.Duration {
 }
 
 // Stop 通知 sweeper 退出，并等待清理完成。
+//
+// 先把 cancel/done 摘下来再释放锁，然后才等待 goroutine 退出：
+// 若持锁等待，正在执行的 tick 可能卡住；若等完再清空 s.cancel，
+// 并发 Start 新建的 cancel 会被误清。
 func (s *Sweeper) Stop() {
-	if s.cancel == nil {
+	s.mu.Lock()
+	cancel, done := s.cancel, s.done
+	s.cancel, s.done = nil, nil
+	s.mu.Unlock()
+	if cancel == nil {
 		return
 	}
-	s.cancel()
-	<-s.done
-	s.cancel = nil
+	cancel()
+	<-done
 }
 
-func (s *Sweeper) loop(ctx context.Context) {
-	defer close(s.done)
+func (s *Sweeper) loop(ctx context.Context, done chan struct{}) {
+	defer close(done)
 	t := time.NewTicker(s.interval)
 	defer t.Stop()
 	// 启动后先立即跑一次，便于重启时尽快补漏

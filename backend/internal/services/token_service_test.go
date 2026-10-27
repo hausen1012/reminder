@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/reminder/backend/internal/crypto/secretbox"
 	"github.com/reminder/backend/internal/models"
 	"gorm.io/gorm"
 )
@@ -12,7 +13,11 @@ import (
 func newTokenSvc(t *testing.T) (*TokenService, *gorm.DB) {
 	t.Helper()
 	db := openTestDB(t)
-	return NewTokenService(db), db
+	box, err := secretbox.New("")
+	if err != nil {
+		t.Fatalf("构造 secretbox 失败: %v", err)
+	}
+	return NewTokenService(db, box), db
 }
 
 // 创建的令牌应带 bdrk_ 前缀，且可用明文通过校验。

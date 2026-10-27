@@ -60,7 +60,11 @@ func buildVars(r *models.Reminder, firedAt, planned time.Time, loc *time.Locatio
 //  3. 渲染结束后 vars 是最终态，所有后续的二次渲染（如 Webhook 的 body_template 二次渲染）
 //     都基于这套 vars
 //
-// 所有构造 notifier.Message 的调用方都应走此函数，禁止手拼 notifier.Message{}。
+// 除两处例外，所有构造 notifier.Message 的调用方都应走此函数，不要手拼 notifier.Message{}：
+//   - DispatchService.Run：需要先注入 confirm_url、把确认链接追加到正文之后再渲染
+//   - ChannelService.DryRun：纯试发，没有确认链，变量集也不同
+//
+// 这两处若改用本函数，会改变渲染顺序或引入不相关的占位符，属于有意保留的分叉。
 func buildRenderedMessage(title, content, contentFormat string, vars map[string]string) notifier.Message {
 	body := notifier.Render(content, vars)
 	vars["content"] = body

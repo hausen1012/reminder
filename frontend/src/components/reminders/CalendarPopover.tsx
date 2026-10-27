@@ -12,6 +12,8 @@ import {
 } from '@/components/ui/select'
 import { ChevronLeft, ChevronRight, Clock3 } from 'lucide-react'
 import { Solar } from 'lunar-typescript'
+import { nowInZone } from '@/lib/datetime'
+import { useSiteTimezone } from '@/contexts/ConfigContext'
 import type { CalendarResult } from '@/types'
 
 interface Props {
@@ -31,7 +33,7 @@ function toMondayBase(jsWeekday: number): number {
   return jsWeekday === 0 ? 6 : jsWeekday - 1
 }
 
-// 年份从今年开始，往后 70 年
+// 年份从今年开始，往后 70 年（模块级常量，用浏览器本地年份即可，差一年不影响可用性）
 const YEAR_OPTIONS = Array.from({ length: 70 }, (_, i) => new Date().getFullYear() + i)
 
 interface DayCell {
@@ -44,7 +46,10 @@ interface DayCell {
 }
 
 export function CalendarPopover({ date, hour: initHour, minute: initMin, initialCalendar = 'solar', triggerRef, onSelect, onClose }: Props) {
-  const now = new Date()
+  // "今天/现在"必须按站点时区取：浏览器时区可能和站点时区不同，
+  // 直接用 new Date() 会在跨时区的日子里选错日期。
+  const tz = useSiteTimezone()
+  const now = useMemo(() => nowInZone(tz), [tz])
   const popoverRef = useRef<HTMLDivElement>(null)
   const [position, setPosition] = useState<{ top: number; left: number } | null>(null)
   const hourListRef = useRef<HTMLDivElement>(null)
@@ -54,18 +59,18 @@ export function CalendarPopover({ date, hour: initHour, minute: initMin, initial
   const [showLunar, setShowLunar] = useState(initialCalendar === 'lunar')
   const [solarYear, setSolarYear] = useState(() => {
     if (date) return new Date(date).getFullYear()
-    return now.getFullYear()
+    return now.year
   })
   const [solarMonth, setSolarMonth] = useState(() => {
     if (date) return new Date(date).getMonth() + 1
-    return now.getMonth() + 1
+    return now.month
   })
   const [selectedDay, setSelectedDay] = useState<number | null>(() => {
     if (date) return new Date(date).getDate()
-    return now.getDate()
+    return now.day
   })
-  const [hour, setHour] = useState(initHour ?? now.getHours())
-  const [minute, setMinute] = useState(initMin ?? now.getMinutes())
+  const [hour, setHour] = useState(initHour ?? now.hour)
+  const [minute, setMinute] = useState(initMin ?? now.minute)
   const [timePanelOpen, setTimePanelOpen] = useState(false)
 
   // 计算 fixed 位置（使用 useLayoutEffect 避免首次渲染时位置闪烁）
@@ -271,12 +276,13 @@ export function CalendarPopover({ date, hour: initHour, minute: initMin, initial
   }
 
   function goToday() {
-    const n = new Date()
-    setSolarYear(n.getFullYear())
-    setSolarMonth(n.getMonth() + 1)
-    setSelectedDay(n.getDate())
-    setHour(n.getHours())
-    setMinute(n.getMinutes())
+    // same as 上面的 "今天"：按站点时区取当前墙上时间
+    const n = nowInZone(tz)
+    setSolarYear(n.year)
+    setSolarMonth(n.month)
+    setSelectedDay(n.day)
+    setHour(n.hour)
+    setMinute(n.minute)
   }
 
   function toggleTimePanel() {

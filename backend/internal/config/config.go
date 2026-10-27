@@ -15,7 +15,7 @@ import (
 // 可在面板「设置」页热更新，由 internal/timezone.Provider 持有。
 // 这里的 Timezone 仅是首次启动、库里还没有该配置时的环境变量默认值。
 type Config struct {
-	// 沿用 bedrock 的基础配置
+	// 基础配置
 	Port      string
 	DBPath    string
 	JWTSecret string

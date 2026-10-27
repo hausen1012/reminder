@@ -42,18 +42,21 @@
 
 | HTTP | `error.code` | 含义 |
 |---|---|---|
-| 400 | `validation_failed` | 参数校验失败，通常是请求体不合法 |
+| 400 | `validation_failed` | 参数校验失败、试发失败，或敏感字段因换过 `ENCRYPTION_KEY` 无法解密 |
 | 401 | `unauthorized` | 未登录、登录已过期，或令牌无效 / 缺失 |
 | 403 | `forbidden` | 已鉴权但无权访问 |
 | 404 | `not_found` | 资源不存在，或不属于当前调用方 |
 | 409 | `conflict` | 与现有数据冲突（如名称重复） |
 | 429 | `rate_limited` | 请求过于频繁，外部 API 默认每令牌 60 次/分钟 |
-| 500 | `internal_error` | 服务器内部错误 |
+| 500 | `internal_error` | 服务器内部错误。只在程序 bug 或环境异常时出现，配置类问题一律不用 500 |
 
 ::: tip 所有错误出口都统一
-业务错误、鉴权中间件拒绝、路由不存在、panic 恢复，返回的都是上面这个结构。
+业务错误、鉴权中间件拒绝、`/api` 下不存在的路由、panic 恢复，返回的都是上面这个结构。
 因此客户端只需读 `response.data.error.message` 就能拿到可展示的文案，
 读 `response.data.error.field` 就能定位出错字段。
+
+`/api` 之外不存在的路径（如写错的静态资源）仍返回纯文本 404，
+因为这些请求不走前端交互，不需要统一错误体。
 :::
 
 ## 分页约定
@@ -82,8 +85,9 @@
 
 | 场景 | 格式 |
 |---|---|
-| JSON 时间字段（`created_at`、`next_fire_at` 等） | RFC3339，UTC，如 `2026-07-01T01:00:00Z` |
+| JSON 时间字段（`created_at`、`fired_at`、`next_fire_at` 等） | RFC3339，UTC，如 `2026-07-01T01:00:00Z` |
 | 给前端直接展示的便捷字段（如 `next_fire_at_local`） | `YYYY-MM-DD HH:mm`，已转成站点时区 |
 | 调度规则里的时间（`schedule_spec.at`） | `YYYY-MM-DDTHH:mm:ss`，按站点时区解释 |
 
 数据库统一存 UTC，时区只影响计算与展示。站点时区是全局设置，可在面板「设置」页修改。
+面板界面按站点时区渲染时间（不跟随浏览器时区），因此同一套数据在不同设备上看到的时间一致。

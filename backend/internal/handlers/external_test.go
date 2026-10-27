@@ -41,7 +41,7 @@ func newExternalTestEngine(t *testing.T) *externalTestStack {
 	dispatch := services.NewDispatchService(db, channelSvc, tz)
 	dispatch.RetryDelays = []time.Duration{0}
 	reminderSvc := services.NewReminderService(db, noopScheduler{}, tz, dispatch, nil)
-	tokenSvc := services.NewTokenService(db)
+	tokenSvc := services.NewTokenService(db, box)
 
 	h := &ExternalHandler{
 		ReminderSvc: reminderSvc,

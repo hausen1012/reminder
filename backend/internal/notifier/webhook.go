@@ -36,7 +36,7 @@ func (n *webhookNotifier) Send(ctx context.Context, configJSON []byte, msg Messa
 	if err := json.Unmarshal(configJSON, &cfg); err != nil {
 		return Permanent(fmt.Errorf("解析 Webhook 配置失败: %w", err))
 	}
-	slog.Info("开始发送", "method", cfg.Method, "url", cfg.URL, "subject", msg.Subject, "body_len", len(msg.Body))
+	slog.Info("开始发送", "method", cfg.Method, "url", redactURLString(cfg.URL), "subject", msg.Subject, "body_len", len(msg.Body))
 	if cfg.URL == "" {
 		return Permanent(fmt.Errorf("Webhook url 未配置"))
 	}
@@ -68,7 +68,8 @@ func (n *webhookNotifier) Send(ctx context.Context, configJSON []byte, msg Messa
 		q := u.Query()
 		for k, vTmpl := range cfg.QueryTemplate {
 			rendered := Render(vTmpl, msg.Vars)
-			slog.Info("query param", "key", k, "value", rendered)
+			// 渲染结果可能带 {{confirm_url}} 之类的凭据，只记长度
+			slog.Info("query param", "key", k, "value_len", len(rendered))
 			q.Set(k, rendered)
 		}
 		// 没显式配置 query_template 时，把 subject/body 当成默认参数附上
@@ -106,7 +107,9 @@ func (n *webhookNotifier) Send(ctx context.Context, configJSON []byte, msg Messa
 		req.Header.Set("Authorization", cfg.AuthorizationEnc)
 	}
 
-	slog.Info("发送请求", "method", req.Method, "url", req.URL.String(), "headers", req.Header)
+	// 只记录 header 名，不记录取值：Authorization 等字段是解密后的凭据，
+	// 一旦写进日志就等于把 token 落到磁盘上。
+	slog.Info("发送请求", "method", req.Method, "url", redactURL(req.URL), "header_keys", headerKeys(req.Header))
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -131,10 +134,13 @@ func (n *webhookNotifier) Send(ctx context.Context, configJSON []byte, msg Messa
 // 如果 BodyTemplate 是合法 JSON，先解析 JSON 树，再逐字符串值替换占位符，
 // 最后 json.Marshal 确保特殊字符正确转义。
 // 如果 BodyTemplate 不是 JSON 或为空，退回到整串渲染或默认 {subject, body} 结构。
+//
+// 注意：请求体里可能带 {{confirm_url}} 这类一次性凭据，函数内只记录长度，
+// 不把内容写进日志。
 func buildPostBody(bodyTemplate string, msg Message) ([]byte, error) {
 	if bodyTemplate == "" {
 		bodyBytes, _ := json.Marshal(map[string]string{"subject": msg.Subject, "body": msg.Body})
-		slog.Info("缺省 body", "body", string(bodyBytes))
+		slog.Info("缺省 body", "body_len", len(bodyBytes))
 		return bodyBytes, nil
 	}
 
@@ -143,13 +149,13 @@ func buildPostBody(bodyTemplate string, msg Message) ([]byte, error) {
 	if err := json.Unmarshal([]byte(bodyTemplate), &parsed); err == nil {
 		walkAndRender(&parsed, msg.Vars)
 		bodyBytes, _ := json.Marshal(parsed)
-		slog.Info("JSON 结构逐字段渲染", "body", string(bodyBytes))
+		slog.Info("JSON 结构逐字段渲染", "body_len", len(bodyBytes))
 		return bodyBytes, nil
 	}
 
 	// 不是合法 JSON，回退到整串渲染
 	rendered := Render(bodyTemplate, msg.Vars)
-	slog.Info("BodyTemplate 非 JSON，整串渲染", "rendered", rendered)
+	slog.Info("BodyTemplate 非 JSON，整串渲染", "rendered_len", len(rendered))
 
 	// 尝试把渲染结果当 JSON 发送：如果渲染后成了合法 JSON 就用结构化方式序列化
 	var again interface{}

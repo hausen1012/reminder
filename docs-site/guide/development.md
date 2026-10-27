@@ -47,6 +47,10 @@ docs-site/             文档站点（VitePress）
 docs/                  设计与实施记录
 ```
 
+前端展示时间统一走 `src/lib/datetime.ts`（`formatInZone` / `formatNextFireInZone`），
+时区取自 `useSiteTimezone()`（站点全局设置）。不要直接用 `new Date(x).toLocaleString()`：
+那会跟随浏览器本地时区，用户换设备后看到的时间会整体偏移。
+
 ## 后端测试
 
 ```bash
@@ -97,6 +101,24 @@ cd frontend && npm run test:coverage
 ```
 
 handler 里只需 `abortErr(c, err)`，不要自己拼错误响应体。这样前端只需要实现一套错误解析逻辑。
+
+`/api` 下未注册的路径由 `router.registerNotFound` 统一补成同样的结构，
+因此新增路由时不需要额外处理 404。前端取值统一用 `lib/api.ts` 的
+`extractApiError` / `extractApiErrorCode` / `extractApiErrorField`，不要自己读
+`err.response.data.message`（那是旧格式，永远取不到值）。
+
+## 日志与凭据
+
+日志会落到文件和容器 stdout，因此**不得写入任何凭据**。已在用的脱敏工具：
+
+| 场景 | 做法 |
+|---|---|
+| 要记 URL | `notifier.redactURL` / `redactURLString`，会抹掉 query 取值与 userinfo |
+| 要记 header | `notifier.headerKeys`，只出名字不出值 |
+| 要记渲染后的正文 / 变量 | 只记长度（`body_len`、`vars_count`），不记内容 |
+
+正文里可能带 `{{confirm_url}}`（一次性确认令牌），变量里还可能带用户内容，
+记全文等于把令牌与隐私一起写进日志。`log` 通道是唯一例外——它的用途就是把正文打出来。
 
 ## 文档站点
 

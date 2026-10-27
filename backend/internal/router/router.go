@@ -96,7 +96,7 @@ func Setup(staticFS embed.FS, cfg *config.Config) (*SetupResult, error) {
 		_, _ = engine.AddPurgeCron(logSvc, purgeAfter)
 	}
 
-	tokenSvc := services.NewTokenService(database.DB)
+	tokenSvc := services.NewTokenService(database.DB, box)
 	userSvc := services.NewUserService(database.DB)
 
 	authHandler := &handlers.AuthHandler{JWTSecret: cfg.JWTSecret, UserSvc: userSvc}
@@ -146,9 +146,6 @@ func Setup(staticFS embed.FS, cfg *config.Config) (*SetupResult, error) {
 		externalV1.DELETE("/reminders/:id", externalHandler.DeleteReminder)
 		externalV1.GET("/channels", externalHandler.ListChannels)
 	}
-
-	// 文档页对外开放，无需鉴权
-	api.GET("/external/v1/docs", externalHandler.Docs)
 
 	protected := api.Group("")
 	protected.Use(middleware.JWTAuth(cfg.JWTSecret))
@@ -210,6 +207,7 @@ func Setup(staticFS embed.FS, cfg *config.Config) (*SetupResult, error) {
 	}
 
 	serveStaticFiles(r, staticFS)
+	registerNotFound(r)
 	return &SetupResult{
 		Engine: r,
 		Handles: &SchedulerHandles{
@@ -219,6 +217,25 @@ func Setup(staticFS embed.FS, cfg *config.Config) (*SetupResult, error) {
 			TZ:         tz,
 		},
 	}, nil
+}
+
+// registerNotFound 给未命中的路由补上统一错误体。
+//
+// gin 默认返回纯文本 "404 page not found"，与后端「所有错误都是
+// {"error":{code,message,field?}}」的约定不一致，前端 extractApiError 读不到
+// message，只能退化成 "Request failed with status code 404"。
+// 这里只覆盖 /api 前缀：其余路径由静态文件中间件处理并已经 Abort，
+// 万一走到这里也保持 gin 原本的纯文本输出，避免改变既有行为。
+func registerNotFound(r *gin.Engine) {
+	r.NoRoute(func(c *gin.Context) {
+		if !strings.HasPrefix(c.Request.URL.Path, "/api") {
+			// 必须自己写 body：只设状态码时 gin 仍会补上默认的 404 文本
+			c.Data(http.StatusNotFound, "text/plain", []byte("404 page not found"))
+			return
+		}
+		c.AbortWithStatusJSON(http.StatusNotFound,
+			middleware.ErrorBody(middleware.CodeNotFound, "接口不存在", ""))
+	})
 }
 
 func serveStaticFiles(r *gin.Engine, staticFS embed.FS) {

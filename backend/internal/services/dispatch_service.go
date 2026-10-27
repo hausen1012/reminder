@@ -6,7 +6,7 @@ package services
 
 import (
 	"context"
-	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/reminder/backend/internal/middleware"
 	"github.com/reminder/backend/internal/models"
 	"github.com/reminder/backend/internal/notifier"
 	"github.com/reminder/backend/internal/timezone"
@@ -80,7 +81,9 @@ func (d *DispatchService) Run(ctx context.Context, r *models.Reminder, deliveryL
 		planned = ptrTime(time.Now())
 	}
 	vars := buildVars(r, time.Now(), *planned, d.TZ.Get())
-	slog.Info("变量构建完成", "reminder", r.ID, "vars", debugVars(vars))
+	// 不打印 vars 内容：其中的 confirm_url 带确认令牌，拿到即可替用户确认提醒。
+	// 排查时关心的是"渲染了多少变量、正文多长"，长度信息已经足够。
+	slog.Info("变量构建完成", "reminder", r.ID, "vars_count", len(vars))
 
 	// 需要确认时，首发生成 chain_id + token；重发复用已有 chain_id + token
 	var confirmChainID string
@@ -225,7 +228,8 @@ func (d *DispatchService) sendWithRetry(ctx context.Context, ch *models.Channel,
 	plainConfig, err := d.ChannelSvc.DecryptedConfig(ch)
 	if err != nil {
 		slog.Warn("解密通道配置失败", "log", deliveryLogID, "channel", ch.ID, "name", ch.Name, "type", ch.Type, "error", err)
-		d.writeAttempt(deliveryLogID, ch, 1, "failed", "decrypt config: "+err.Error(), 0)
+		// 落库的提示文案去掉 AppError 的 code/field 前缀，方便用户直接读
+		d.writeAttempt(deliveryLogID, ch, 1, "failed", friendlyErr(err), 0)
 		return false
 	}
 
@@ -311,6 +315,10 @@ func (d *DispatchService) loadChannels(reminderID uint) ([]*models.Channel, erro
 }
 
 // DryRun 发送测试消息，不落任何 delivery_log / delivery_attempt。
+//
+// 失败时返回 AppError（validation_failed）而不是裸 error：试发失败的原因
+// （密码错、地址不通、配置解不开）都是用户能自己处理的，应该拿到 400 + 可读文案，
+// 而不是 500「服务器内部错误」。
 func (d *DispatchService) DryRun(ctx context.Context, channels []*models.Channel, msg notifier.Message) error {
 	var wg sync.WaitGroup
 	errCh := make(chan error, len(channels))
@@ -321,7 +329,7 @@ func (d *DispatchService) DryRun(ctx context.Context, channels []*models.Channel
 		go func() {
 			defer wg.Done()
 			if err := d.sendDryRun(ctx, ch, msg); err != nil {
-				errCh <- fmt.Errorf("channel=%d name=%s type=%s: %w", ch.ID, ch.Name, ch.Type, err)
+				errCh <- fmt.Errorf("%s: %w", ch.Name, err)
 			}
 		}()
 	}
@@ -333,7 +341,7 @@ func (d *DispatchService) DryRun(ctx context.Context, channels []*models.Channel
 		errs = append(errs, err.Error())
 	}
 	if len(errs) > 0 {
-		return fmt.Errorf("试发失败: %s", strings.Join(errs, "; "))
+		return middleware.NewAppError(middleware.CodeValidationFailed, "试发失败: "+strings.Join(errs, "; "))
 	}
 	return nil
 }
@@ -372,8 +380,14 @@ func (d *DispatchService) sendDryRun(ctx context.Context, ch *models.Channel, ms
 
 func ptrTime(t time.Time) *time.Time { return &t }
 
-// debugVars 仅供测试观察渲染结果。
-func debugVars(vars map[string]string) string {
-	b, _ := json.Marshal(vars)
-	return string(b)
+// friendlyErr 取错误里适合直接展示给用户的那部分文案。
+//
+// AppError 的 Error() 是 "code: message (field=x)" 形式，落进 delivery_attempt.error
+// 后会在日志页显示出一堆技术细节；用户真正需要的是 message 本身。
+func friendlyErr(err error) string {
+	var ae *middleware.AppError
+	if errors.As(err, &ae) {
+		return ae.Message
+	}
+	return err.Error()
 }

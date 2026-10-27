@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react'
 import { getConfig, updateConfig as apiUpdateConfig } from '@/lib/api'
+import { DEFAULT_SITE_TIMEZONE } from '@/lib/datetime'
 
 interface ConfigContextValue {
   config: Record<string, string>
@@ -66,4 +67,16 @@ export function useConfig() {
   const ctx = useContext(ConfigContext)
   if (!ctx) throw new Error('useConfig must be used within ConfigProvider')
   return ctx
+}
+
+/**
+ * 取当前站点时区，供时间格式化使用。
+ *
+ * 站点时区是全局设置（config 表 key=timezone），后端时间字段一律返回 UTC；
+ * 展示时必须显式按站点时区渲染，不能依赖浏览器本地时区，
+ * 否则换了设备看到的时间会整体偏移。
+ */
+export function useSiteTimezone(): string {
+  const { config } = useConfig()
+  return config.timezone || DEFAULT_SITE_TIMEZONE
 }

@@ -36,7 +36,10 @@ import {
   getToken,
   getTokenPlaintext,
   updateTokenChannels,
+  extractApiError,
 } from '@/lib/api'
+import { formatInZone } from '@/lib/datetime'
+import { useSiteTimezone } from '@/contexts/ConfigContext'
 import type { Token, Channel } from '@/types'
 
 function formatChannelNames(channels: Channel[], ids: number[]): string {
@@ -44,11 +47,10 @@ function formatChannelNames(channels: Channel[], ids: number[]): string {
   return ids.map((id) => channels.find((c) => c.id === id)?.name ?? `#${id}`).join(', ')
 }
 
-function formatRecentTime(dateStr?: string): string {
-  return dateStr ? new Date(dateStr).toLocaleString() : '—'
-}
-
 export default function TokensPage() {
+  const tz = useSiteTimezone()
+  // 令牌的"最近使用"时间按站点时区展示，避免换设备后时间偏移
+  const formatRecentTime = (dateStr?: string) => formatInZone(dateStr, tz)
   const [items, setItems] = useState<Token[]>([])
   const [channels, setChannels] = useState<Channel[]>([])
   const [loading, setLoading] = useState(true)
@@ -92,8 +94,8 @@ export default function TokensPage() {
       setChannels(allChannels)
       setLoadError('')
     } catch (err) {
-      setLoadError(String(err))
-      toast({ title: '加载令牌失败', description: String(err), variant: 'destructive' })
+      setLoadError(extractApiError(err, '加载失败'))
+      toast({ title: '加载令牌失败', description: extractApiError(err), variant: 'destructive' })
     } finally {
       setLoading(false)
     }
@@ -138,7 +140,7 @@ export default function TokensPage() {
       setNewChannelIDs([])
       await refresh()
     } catch (err) {
-      toast({ title: '创建失败', description: String(err), variant: 'destructive' })
+      toast({ title: '创建失败', description: extractApiError(err), variant: 'destructive' })
     } finally {
       setCreating(false)
     }
@@ -152,7 +154,7 @@ export default function TokensPage() {
         setSelectedKey((prev) => (prev ? { ...prev, enabled: next.enabled } : prev))
       }
     } catch (err) {
-      toast({ title: '切换状态失败', description: String(err), variant: 'destructive' })
+      toast({ title: '切换状态失败', description: extractApiError(err), variant: 'destructive' })
     }
   }
 
@@ -169,7 +171,7 @@ export default function TokensPage() {
         setDetailPlaintext('')
       }
     } catch (err) {
-      toast({ title: '删除失败', description: String(err), variant: 'destructive' })
+      toast({ title: '删除失败', description: extractApiError(err), variant: 'destructive' })
     } finally {
       setDeleting(false)
       setToDelete(null)
@@ -189,7 +191,7 @@ export default function TokensPage() {
       setDetailChannelIDs(detail.default_channel_ids ?? [])
       setDetailPlaintext(plaintext)
     } catch (err) {
-      toast({ title: '加载详情失败', description: String(err), variant: 'destructive' })
+      toast({ title: '加载详情失败', description: extractApiError(err), variant: 'destructive' })
       setDetailOpen(false)
     } finally {
       setDetailLoading(false)
@@ -216,7 +218,7 @@ export default function TokensPage() {
       setItems((prev) => prev.map((it) => (it.id === next.id ? next : it)))
       toast({ title: '默认通知渠道已更新', variant: 'success' })
     } catch (err) {
-      toast({ title: '保存失败', description: String(err), variant: 'destructive' })
+      toast({ title: '保存失败', description: extractApiError(err), variant: 'destructive' })
     } finally {
       setDetailSaving(false)
     }
@@ -230,7 +232,7 @@ export default function TokensPage() {
       const plaintext = await getTokenPlaintext(key.id)
       setCurlPlaintext(plaintext)
     } catch (err) {
-      toast({ title: '加载密钥失败', description: String(err), variant: 'destructive' })
+      toast({ title: '加载密钥失败', description: extractApiError(err), variant: 'destructive' })
       setCurlKeyId(null)
     } finally {
       setCurlLoading(false)
@@ -249,7 +251,7 @@ export default function TokensPage() {
       await navigator.clipboard.writeText(plaintext)
       toast({ title: '密钥已复制' })
     } catch (err) {
-      toast({ title: '复制失败', description: String(err), variant: 'destructive' })
+      toast({ title: '复制失败', description: extractApiError(err), variant: 'destructive' })
     } finally {
       setCopyingId(null)
     }
@@ -554,7 +556,7 @@ export default function TokensPage() {
                 </div>
                 <div className="space-y-1">
                   <p className="text-xs text-muted-foreground">创建时间</p>
-                  <p>{new Date(selectedKey.created_at).toLocaleString()}</p>
+                  <p>{formatInZone(selectedKey.created_at, tz)}</p>
                 </div>
               </div>
 

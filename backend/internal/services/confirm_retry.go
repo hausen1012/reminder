@@ -45,7 +45,10 @@ func NewConfirmRetryManager(db *gorm.DB, dispatch *DispatchService, confirmSvc *
 
 // Schedule 注册一轮重发。
 //
-// round 是已完成的轮次数（0 = 首次触发已发出，下次是第 1 次重发）。
+// round 是已完成的轮次数（0 = 首次触发已发出，下次是第 1 次重发），
+// 因此这里判断的是「已经发满 maxRetries 轮就不再排下一轮」，条件是 round >= max。
+// 对应的 retry 入口用的是 round > max：它校验的是「当前这一轮是否超界」，
+// 两者相差 1 是语义不同（排下一轮 vs 执行本轮），不是笔误。
 func (m *ConfirmRetryManager) Schedule(r *models.Reminder, chainID string, round int) {
 	if round >= r.ConfirmMaxRetries {
 		slog.Info("跳过调度", "chain", chainID, "round", round, "max_retries", r.ConfirmMaxRetries)

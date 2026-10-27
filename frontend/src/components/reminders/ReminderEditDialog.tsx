@@ -15,7 +15,8 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/switch'
 import { useToast } from '@/components/ui/use-toast'
-import { useConfig } from '@/contexts/ConfigContext'
+import { useSiteTimezone } from '@/contexts/ConfigContext'
+import { nowInZone, toWallClockString } from '@/lib/datetime'
 import { ChannelMultiSelect } from '@/components/channels/ChannelMultiSelect'
 import { ScheduleForm, type ScheduleValue } from './ScheduleForm'
 import { createReminder, extractApiError, listChannels, testReminderDryRun, updateReminder } from '@/lib/api'
@@ -29,12 +30,9 @@ interface Props {
   onSaved: () => void
 }
 
-function defaultInput(): ReminderInput {
-  // 默认时间 = 当前时间 + 5 分钟
-  const d = new Date()
-  d.setMinutes(d.getMinutes() + 5)
-  const pad = (n: number) => String(n).padStart(2, '0')
-  const at = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+function defaultInput(siteTimezone: string): ReminderInput {
+  // 默认时间 = 站点时区下的当前时间 + 5 分钟
+  const at = toWallClockString(nowInZone(siteTimezone, 5))
   return {
     title: '',
     content: '',
@@ -52,15 +50,16 @@ function defaultInput(): ReminderInput {
 
 export function ReminderEditDialog({ reminder, open, onClose, onSaved }: Props) {
   const isEdit = Boolean(reminder)
-  const [input, setInput] = useState<ReminderInput>(defaultInput())
+  // 站点时区是全局设置：既用于提示用户时间按哪个时区解释，
+  // 也用于生成"当前时间 + 5 分钟"这类默认值（不能按浏览器时区算）。
+  const tz = useSiteTimezone()
+  const [input, setInput] = useState<ReminderInput>(() => defaultInput(tz))
   const [saving, setSaving] = useState(false)
   const [testing, setTesting] = useState(false)
   const [channelOpen, setChannelOpen] = useState(false)
   const [channels, setChannels] = useState<Channel[]>([])
   const { toast } = useToast()
-  // 站点时区是全局设置，只用于提示用户时间按哪个时区解释
-  const { config } = useConfig()
-  const siteTimezone = config.timezone || 'Asia/Shanghai'
+  const siteTimezone = tz
 
   useEffect(() => {
     listChannels()
@@ -83,9 +82,9 @@ export function ReminderEditDialog({ reminder, open, onClose, onSaved }: Props) 
         confirm_max_retries: reminder.confirm_max_retries || 3,
       })
     } else {
-      setInput(defaultInput())
+      setInput(defaultInput(tz))
     }
-  }, [reminder])
+  }, [reminder, tz])
 
   function patch<K extends keyof ReminderInput>(key: K, val: ReminderInput[K]) {
     setInput((prev) => ({ ...prev, [key]: val }))

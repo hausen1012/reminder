@@ -5,7 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Pagination } from '@/components/ui/pagination'
 import { PageHeader } from '@/components/ui/PageHeader'
-import { getSchedulerStatus } from '@/lib/api'
+import { extractApiError, getSchedulerStatus } from '@/lib/api'
+import { formatInZone } from '@/lib/datetime'
+import { useSiteTimezone } from '@/contexts/ConfigContext'
 import type { SchedulerStatus } from '@/types'
 
 const PAGE_LIMIT = 10
@@ -18,6 +20,7 @@ const TYPE_LABEL: Record<string, string> = {
 
 export default function SchedulerPage() {
   const navigate = useNavigate()
+  const tz = useSiteTimezone()
   const [status, setStatus] = useState<SchedulerStatus | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -28,7 +31,7 @@ export default function SchedulerPage() {
     setLoading(true)
     getSchedulerStatus({ limit: currentLimit, offset: currentOffset })
       .then(setStatus)
-      .catch((e) => setError(e?.response?.data?.message || e.message || '加载失败'))
+      .catch((e) => setError(extractApiError(e, '加载失败')))
       .finally(() => setLoading(false))
   }
 
@@ -134,14 +137,10 @@ export default function SchedulerPage() {
                           {TYPE_LABEL[e.schedule_type] ?? e.schedule_type}
                         </td>
                         <td className="px-4 py-2.5 text-muted-foreground">
-                          {e.next_fire_at
-                            ? new Date(e.next_fire_at).toLocaleString('zh-CN')
-                            : '—'}
+                          {formatInZone(e.next_fire_at, tz)}
                         </td>
                         <td className="px-4 py-2.5 text-muted-foreground">
-                          {e.last_fired_at
-                            ? new Date(e.last_fired_at).toLocaleString('zh-CN')
-                            : '—'}
+                          {formatInZone(e.last_fired_at, tz)}
                         </td>
                       </tr>
                     ))}
@@ -167,13 +166,13 @@ export default function SchedulerPage() {
                     <div>
                       <span className="block">下次触发</span>
                       <span className="text-foreground">
-                        {e.next_fire_at ? new Date(e.next_fire_at).toLocaleString('zh-CN') : '—'}
+                        {formatInZone(e.next_fire_at, tz)}
                       </span>
                     </div>
                     <div>
                       <span className="block">上次触发</span>
                       <span className="text-foreground">
-                        {e.last_fired_at ? new Date(e.last_fired_at).toLocaleString('zh-CN') : '—'}
+                        {formatInZone(e.last_fired_at, tz)}
                       </span>
                     </div>
                   </div>

@@ -104,10 +104,13 @@ Engine 定时器到期
 
 ## 时区处理
 
-- 数据库里存的时间统一为 UTC（`next_fire_at` 等始终是 `+00:00`）
+- 数据库里存的时间统一为 UTC（`next_fire_at` 等始终是 `+00:00`）。
+  这条覆盖**所有**时间列：手写赋值的字段走 `timezone.UTC` / `UTCPtr`，
+  GORM 自动填充的 `created_at` / `updated_at` 由 `database.gormConfig()` 里的
+  `NowFunc` 强制成 UTC
 - 时区是**站点级全局设置**（面板「设置」页，按 `config` 表 `key=timezone` 保存），不按提醒保存
 - 调度计算时按站点时区解释 `schedule_spec` 里的本地时间（如 `09:00` 表示当地 9 点）
-- 展示时再转成站点时区，同时提供 `next_fire_at_local` 之类的便捷字段
+- 展示时前端按站点时区渲染（`lib/datetime.ts` 的 `formatInZone`），不依赖浏览器本地时区
 - 在设置页改时区会立刻重建 cron 实例并按新时区重算全部提醒，无需重启
 
 ::: warning SQLite 按文本比较时间

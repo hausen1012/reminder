@@ -6,7 +6,8 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Pagination } from '@/components/ui/pagination'
 import { useToast } from '@/components/ui/use-toast'
-import { formatTime } from '@/lib/utils'
+import { formatInZone } from '@/lib/datetime'
+import { useSiteTimezone } from '@/contexts/ConfigContext'
 import { extractApiError } from '@/lib/api'
 import { SortIcon } from '@/components/ui/SortIcon'
 import { PageHeader } from '@/components/ui/PageHeader'
@@ -30,6 +31,7 @@ const TYPE_LABEL: Record<ChannelType, string> = {
 }
 
 export default function ChannelsPage() {
+  const tz = useSiteTimezone()
   const [items, setItems] = useState<Channel[]>([])
   const [total, setTotal] = useState(0)
   const [limit, setLimit] = useState(10)
@@ -74,8 +76,8 @@ export default function ChannelsPage() {
       setTotal(data?.total ?? 0)
       setLoadError('')
     } catch (err) {
-      setLoadError(String(err))
-      toast({ title: '加载通知失败', description: String(err), variant: 'destructive' })
+      setLoadError(extractApiError(err, '加载失败'))
+      toast({ title: '加载通知失败', description: extractApiError(err), variant: 'destructive' })
     } finally {
       setLoading(false)
     }
@@ -118,7 +120,7 @@ export default function ChannelsPage() {
       toast({ title: '通知已复制', variant: 'success' })
       refresh()
     } catch (err) {
-      toast({ title: '复制失败', description: String(err), variant: 'destructive' })
+      toast({ title: '复制失败', description: extractApiError(err), variant: 'destructive' })
     }
   }
 
@@ -244,7 +246,7 @@ export default function ChannelsPage() {
                         </td>
                         <td className="px-4 py-2.5 text-xs text-muted-foreground">{TYPE_LABEL[ch.type]}</td>
                         <td className="px-4 py-2.5 text-xs whitespace-nowrap text-muted-foreground">
-                          {formatTime(ch.created_at)}
+                          {formatInZone(ch.created_at, tz)}
                         </td>
                         <td className="px-4 py-2.5">
                           <div className="flex justify-end gap-0.5">
@@ -294,7 +296,7 @@ export default function ChannelsPage() {
                   </div>
                 </div>
                 <div className="flex items-center justify-between text-xs text-muted-foreground">
-                  <span>创建于 {formatTime(ch.created_at)}</span>
+                  <span>创建于 {formatInZone(ch.created_at, tz)}</span>
                   <span className={ch.enabled ? 'text-green-600' : 'text-muted-foreground'}>
                     {ch.enabled ? '已启用' : '已禁用'}
                   </span>

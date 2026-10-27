@@ -43,7 +43,9 @@ import { useToast } from '@/components/ui/use-toast'
 import { Pagination } from '@/components/ui/pagination'
 import { Checkbox } from '@/components/ui/checkbox'
 import { ConfirmDialog } from '@/components/channels/ConfirmDialog'
-import { listLogs, getLogDetail, purgeLogs, countPurgeLogs, batchDeleteLogs } from '@/lib/api'
+import { listLogs, getLogDetail, purgeLogs, countPurgeLogs, batchDeleteLogs, extractApiError } from '@/lib/api'
+import { formatInZone } from '@/lib/datetime'
+import { useSiteTimezone } from '@/contexts/ConfigContext'
 import type { DeliveryLog, LogFilter } from '@/types'
 
 const STATUS_ICON: Record<string, typeof CheckCircle2> = {
@@ -85,6 +87,7 @@ function latencyColor(ms: number): string {
 }
 
 export default function LogsPage() {
+  const tz = useSiteTimezone()
   const [items, setItems] = useState<DeliveryLog[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -121,8 +124,8 @@ export default function LogsPage() {
       setTotal(data?.total ?? 0)
       setLoadError('')
     } catch (err) {
-      setLoadError(String(err))
-      toast({ title: '加载日志失败', description: String(err), variant: 'destructive' })
+      setLoadError(extractApiError(err, '加载失败'))
+      toast({ title: '加载日志失败', description: extractApiError(err), variant: 'destructive' })
     } finally {
       setLoading(false)
     }
@@ -140,7 +143,7 @@ export default function LogsPage() {
       const d = await getLogDetail(id)
       setDetail(d)
     } catch (err) {
-      toast({ title: '加载日志详情失败', description: String(err), variant: 'destructive' })
+      toast({ title: '加载日志详情失败', description: extractApiError(err), variant: 'destructive' })
     } finally {
       setDetailLoading(false)
     }
@@ -179,7 +182,7 @@ export default function LogsPage() {
       setPurgeOpen(false)
       refresh()
     } catch (err) {
-      toast({ title: '清理失败', description: String(err), variant: 'destructive' })
+      toast({ title: '清理失败', description: extractApiError(err), variant: 'destructive' })
     } finally {
       setPurging(false)
     }
@@ -226,7 +229,7 @@ export default function LogsPage() {
         await refresh()
       }
     } catch (err) {
-      toast({ title: '批量删除失败', description: String(err), variant: 'destructive' })
+      toast({ title: '批量删除失败', description: extractApiError(err), variant: 'destructive' })
     } finally {
       setBatchDeleting(false)
     }
@@ -369,7 +372,7 @@ export default function LogsPage() {
                           </div>
                         </td>
                         <td className="px-4 py-3 text-xs">
-                          {new Date(main.fired_at).toLocaleString()}
+                          {formatInZone(main.fired_at, tz)}
                         </td>
                         <td className="px-4 py-3">
                           <Badge variant="outline" className={`gap-1 ${mainColor}`}>
@@ -405,7 +408,7 @@ export default function LogsPage() {
                           <td className="px-4 py-2 pl-12 text-muted-foreground">
                             重发 #{sub.retry_round}
                           </td>
-                          <td className="px-4 py-2">{new Date(sub.fired_at).toLocaleString()}</td>
+                          <td className="px-4 py-2">{formatInZone(sub.fired_at, tz)}</td>
                           <td className="px-4 py-2">
                             <Badge variant="outline" className={`gap-1 ${subColor}`}>
                               <SubStatusIcon className="h-3 w-3" />
@@ -458,7 +461,7 @@ export default function LogsPage() {
                     <div className="grid grid-cols-2 gap-2 text-xs">
                       <div>
                         <span className="text-muted-foreground">触发时间</span>
-                        <p className="mt-0.5">{new Date(main.fired_at).toLocaleString()}</p>
+                        <p className="mt-0.5">{formatInZone(main.fired_at, tz)}</p>
                       </div>
                       <div>
                         <span className="text-muted-foreground">来源</span>
@@ -516,7 +519,7 @@ export default function LogsPage() {
                             {STATUS_LABEL[sub.status] ?? sub.status}
                           </Badge>
                         </div>
-                        <p className="text-xs text-muted-foreground">{new Date(sub.fired_at).toLocaleString()}</p>
+                        <p className="text-xs text-muted-foreground">{formatInZone(sub.fired_at, tz)}</p>
                         <div className="flex justify-end">
                           <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => handleDetail(sub.id)}>
                             详情
@@ -585,7 +588,7 @@ export default function LogsPage() {
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-muted-foreground min-w-[5rem]">触发时间</span>
-                      <span>{new Date(detail.fired_at).toLocaleString()}</span>
+                      <span>{formatInZone(detail.fired_at, tz)}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-muted-foreground min-w-[5rem]">重试轮次</span>
@@ -622,7 +625,7 @@ export default function LogsPage() {
                       {detail.confirmed_at && (
                         <div className="col-span-2 flex items-center gap-2">
                           <span className="text-muted-foreground min-w-[5rem]">确认时间</span>
-                          <span>{new Date(detail.confirmed_at).toLocaleString()}</span>
+                          <span>{formatInZone(detail.confirmed_at, tz)}</span>
                         </div>
                       )}
                       {detail.confirm_url && (
@@ -680,7 +683,7 @@ export default function LogsPage() {
                                 </span>
                               </td>
                               <td className="px-3 py-2">{a.attempt}</td>
-                              <td className="px-3 py-2 whitespace-nowrap">{new Date(a.created_at).toLocaleString()}</td>
+                              <td className="px-3 py-2 whitespace-nowrap">{formatInZone(a.created_at, tz)}</td>
                               <td className="px-3 py-2">
                                 {a.status === 'success' ? (
                                   <span className="inline-flex items-center gap-1 text-green-600">
@@ -734,7 +737,7 @@ export default function LogsPage() {
                                 <div>
                                   尝试 #<span>{a.attempt}</span>
                                 </div>
-                                <div>{new Date(a.created_at).toLocaleString()}</div>
+                                <div>{formatInZone(a.created_at, tz)}</div>
                                 <div className={`font-mono ${latencyColor(a.latency_ms)}`}>{a.latency_ms}ms</div>
                               </div>
                               {a.error && (

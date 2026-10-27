@@ -12,6 +12,9 @@ import (
 //
 // Type 必须返回 "log"：ChannelService 只允许 "log" 这种类型，
 // 前端「日志输出」选项提交的也是 "log"，三者需保持一致。
+//
+// 正文可能包含 {{confirm_url}} 等一次性凭据，但本通道的用途就是"把消息打到日志"，
+// 用户明确选择了它，因此这里保留完整正文——这是唯一允许输出正文的通道。
 type logNotifier struct{}
 
 func (n *logNotifier) Type() string { return "log" }

@@ -290,7 +290,7 @@ func (s *ChannelService) DryRun(ctx context.Context, chType string, config map[s
 	plainConfig, _ := json.Marshal(config)
 
 	subject := "通道试发 - " + chType
-	body := "这是来自 reminder2 的通道试发消息。\n类型：{{channel_type}}\n时间：{{now}}"
+	body := "这是来自 Reminder 的通道试发消息。\n类型：{{channel_type}}\n时间：{{now}}"
 	vars := map[string]string{
 		"channel_type": chType,
 		"now":          time.Now().In(s.TZ.Get()).Format("2006-01-02 15:04:05"),
@@ -304,7 +304,9 @@ func (s *ChannelService) DryRun(ctx context.Context, chType string, config map[s
 	}
 	if err := n.Send(ctx, plainConfig, rendered); err != nil {
 		slog.Info("试发失败", "type", chType, "error", err)
-		return err
+		// 试发失败通常是配置问题（密码错、地址不通），属于用户可处理的范围，
+		// 应返回 400 + 原文案，而不是 500「服务器内部错误」
+		return middleware.NewAppError(middleware.CodeValidationFailed, "试发失败: "+err.Error())
 	}
 	return nil
 }
@@ -557,6 +559,11 @@ func (s *ChannelService) encryptConfig(cfg map[string]any, oldEnc map[string]any
 }
 
 // decryptConfig 把 cfg 内 _enc 后缀字段的密文解密为明文。
+//
+// 解密失败最常见的原因是换过 ENCRYPTION_KEY，此时密文已经无法还原。
+// 这里返回 AppError（而不是裸 error）：试发接口会把该错误直接透给用户，
+// 裸 error 经 ErrorHandler 会变成 500，用户只看到「服务器内部错误」，
+// 完全无法判断该怎么办。返回 400 + 明确提示，用户就知道要重新填写。
 func (s *ChannelService) decryptConfig(raw datatypes.JSON) (map[string]any, error) {
 	cfg := map[string]any{}
 	if len(raw) > 0 {
@@ -574,7 +581,10 @@ func (s *ChannelService) decryptConfig(raw datatypes.JSON) (map[string]any, erro
 		}
 		plain, err := s.Box.DecryptString(str)
 		if err != nil {
-			return nil, fmt.Errorf("字段 %s 解密失败: %w", k, err)
+			slog.Warn("通道敏感字段解密失败，可能是 ENCRYPTION_KEY 已更换", "field", k, "error", err)
+			return nil, middleware.NewAppError(middleware.CodeValidationFailed,
+				"通道敏感字段无法解密（ENCRYPTION_KEY 可能已更换），请到「通知」页重新填写该通道的密码或密钥").
+				WithField(strings.TrimSuffix(k, encSuffix))
 		}
 		cfg[k] = plain
 	}

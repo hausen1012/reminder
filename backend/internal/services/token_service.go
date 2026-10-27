@@ -1,7 +1,12 @@
 // token_service 管理令牌的全生命周期。
 //
 // 外部程序通过 X-AUTH 鉴权调用 /api/external/v1/*，面板也可以创建/管理令牌。
-// 明文令牌仅创建时一次性返回，后续默认只展示前缀；如需重复查看则直接读取明文。
+// 明文令牌仅创建时一次性返回，后续默认只展示前缀；如需重复查看则由
+// GetPlaintext 解密后返回。
+//
+// 明文用 secretbox 加密后入库（与通道敏感字段同一把密钥）：数据库文件泄漏时
+// 不应连带泄漏可直接调用的令牌。早期版本以明文存储，解密失败时回退到
+// "原样当作明文"，保证升级后老令牌仍可查看。
 package services
 
 import (
@@ -15,6 +20,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/reminder/backend/internal/crypto/secretbox"
 	"github.com/reminder/backend/internal/middleware"
 	"github.com/reminder/backend/internal/models"
 	"gorm.io/gorm"
@@ -22,16 +28,20 @@ import (
 
 // TokenService 管理令牌。
 type TokenService struct {
-	DB *gorm.DB
+	DB  *gorm.DB
+	Box *secretbox.Box
 
 	mu         sync.Mutex
 	lastUsedAt map[uint]time.Time // 节流 TouchLastUsed
 }
 
 // NewTokenService 构造服务。
-func NewTokenService(db *gorm.DB) *TokenService {
+//
+// box 用于加密入库的明文；为 nil 时退化为不加密（仅测试用）。
+func NewTokenService(db *gorm.DB, box *secretbox.Box) *TokenService {
 	return &TokenService{
 		DB:         db,
+		Box:        box,
 		lastUsedAt: make(map[uint]time.Time),
 	}
 }
@@ -52,11 +62,15 @@ func (s *TokenService) Create(name string, defaultChannelIDs []uint) (string, *m
 	}
 
 	hash := sha256Hex(plain)
+	stored, err := s.sealPlaintext(plain)
+	if err != nil {
+		return "", nil, err
+	}
 	key := &models.Token{
 		Name:      name,
 		KeyHash:   hash,
 		Prefix:    plain[:len(keyPrefix)+8],
-		Plaintext: plain,
+		Plaintext: stored,
 		Enabled:   true,
 	}
 
@@ -181,7 +195,13 @@ func (s *TokenService) UpdateDefaultChannels(id uint, channelIDs []uint) error {
 	})
 }
 
-// GetPlaintext 返回令牌的明文。
+// GetPlaintext 返回令牌的明文（从库里解密）。
+//
+// 读取路径保证不返回 500：
+//   - 历史数据是明文入库（以 bdrk_ 开头），直接返回；
+//   - 解密成功，返回明文；
+//   - 解密失败（通常是换过 ENCRYPTION_KEY），返回 404 + 可操作提示，
+//     而不是把库里的密文当明文返回（用户会误以为那是令牌）。
 func (s *TokenService) GetPlaintext(id uint) (string, error) {
 	var key models.Token
 	if err := s.DB.First(&key, id).Error; err != nil {
@@ -193,7 +213,50 @@ func (s *TokenService) GetPlaintext(id uint) (string, error) {
 	if strings.TrimSpace(key.Plaintext) == "" {
 		return "", middleware.NewAppError(middleware.CodeNotFound, "该令牌暂无可查看的明文，请重新创建")
 	}
-	return key.Plaintext, nil
+	return s.openPlaintext(key.Plaintext)
+}
+
+// --- 明文加解密 ---
+
+// sealPlaintext 加密明文供落库；没有配置 Box 时原样返回（测试场景）。
+//
+// 加密失败时宁可让创建失败，也不静默降级为明文入库：
+// 那会在用户不知情的情况下掏空这层保护。这条路径实际不可达
+// （只有 crypto/rand 失败才会触发），因此允许它返回 500。
+func (s *TokenService) sealPlaintext(plain string) (string, error) {
+	if s.Box == nil {
+		return plain, nil
+	}
+	enc, err := s.Box.EncryptString(plain)
+	if err != nil {
+		slog.Error("令牌明文加密失败", "error", err)
+		return "", middleware.NewAppError(middleware.CodeInternalError, "令牌加密失败")
+	}
+	return enc, nil
+}
+
+// openPlaintext 解密库里的明文，保证不返回 500。
+//
+// 三种情况：
+//  1. 以 bdrk_ 开头 → 早期版本直接存的明文，原样返回（升级后老令牌仍可查看）；
+//  2. 解密成功 → 返回明文；
+//  3. 都失败 → 返回 404 + 提示重新创建。常见原因是换过 ENCRYPTION_KEY，
+//     此时库里的密文已无法还原，但令牌本身照旧可用（鉴权走独立的 sha256 哈希）。
+func (s *TokenService) openPlaintext(stored string) (string, error) {
+	// 未配置加密层（仅测试场景）：库里存的就是明文
+	if s.Box == nil {
+		return stored, nil
+	}
+	// 历史明文：不需要解密，也不该因为 Box 变化而失效
+	if strings.HasPrefix(stored, keyPrefix) {
+		return stored, nil
+	}
+	if plain, err := s.Box.DecryptString(stored); err == nil {
+		return plain, nil
+	}
+	slog.Warn("令牌明文解密失败，可能是 ENCRYPTION_KEY 已更换", "hint", "重新创建该令牌即可恢复查看")
+	return "", middleware.NewAppError(middleware.CodeNotFound,
+		"该令牌的明文无法解密（ENCRYPTION_KEY 可能已更换），请重新创建令牌")
 }
 
 // --- internal ---

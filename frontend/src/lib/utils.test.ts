@@ -3,8 +3,6 @@ import {
   formatChineseLunarDay,
   formatChineseLunarMonth,
   formatChineseLunarYear,
-  formatNextFire,
-  formatTime,
   getLunarYmd,
   getReminderSpecHour,
   getReminderSpecMinute,
@@ -67,25 +65,5 @@ describe('从 schedule_spec 提取时分', () => {
   it('无有效信息返回 undefined', () => {
     expect(getReminderSpecHour({})).toBeUndefined()
     expect(getReminderSpecMinute({ at: 'bad' })).toBeUndefined()
-  })
-})
-
-describe('时间格式化', () => {
-  it('空值显示占位符', () => {
-    expect(formatTime()).toBe('—')
-    expect(formatNextFire()).toBe('—')
-  })
-
-  it('非法时间显示占位符', () => {
-    expect(formatTime('not-a-date')).toBe('—')
-  })
-
-  it('formatNextFire 对过去时间返回占位符', () => {
-    expect(formatNextFire('2000-01-01T00:00:00Z')).toBe('—')
-  })
-
-  it('formatNextFire 对将来时间输出 YYYY/MM/DD HH:mm:ss', () => {
-    const future = new Date(Date.now() + 86_400_000).toISOString()
-    expect(formatNextFire(future)).toMatch(/^\d{4}\/\d{2}\/\d{2} \d{2}:\d{2}:\d{2}$/)
   })
 })

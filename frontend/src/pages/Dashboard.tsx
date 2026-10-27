@@ -6,6 +6,8 @@ import { Badge } from '@/components/ui/badge'
 import { useAuth } from '@/contexts/AuthContext'
 import { listTodayReminders, listLogs, listChannelStats, listTokenStats } from '@/lib/api'
 import { formatReminderDetail } from '@/lib/utils'
+import { formatInZone } from '@/lib/datetime'
+import { useSiteTimezone } from '@/contexts/ConfigContext'
 import { PageHeader } from '@/components/ui/PageHeader'
 import type { Reminder, DeliveryLog } from '@/types'
 import type { ChannelStats } from '@/lib/api'
@@ -16,6 +18,7 @@ function MiniLoader() {
 
 export default function Dashboard() {
   const { user } = useAuth()
+  const tz = useSiteTimezone()
 
   const [todayCount, setTodayCount] = useState(0)
   const [todayReminders, setTodayReminders] = useState<Reminder[]>([])
@@ -173,7 +176,7 @@ export default function Dashboard() {
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-medium truncate min-w-0">{r.title}</span>
                       <Badge variant="outline" className="text-xs shrink-0 ml-2">
-                        {r.next_fire_at ? new Date(r.next_fire_at).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) : '—'}
+                        {formatInZone(r.next_fire_at, tz, 'clock')}
                       </Badge>
                     </div>
                     <div className="text-xs text-muted-foreground mt-1 truncate">
@@ -210,7 +213,7 @@ export default function Dashboard() {
                       <span className={`text-xs px-1.5 py-0.5 rounded shrink-0 ml-2 whitespace-nowrap ${statusBadge(log.status)}`}>{log.status}</span>
                     </div>
                     <div className="text-xs text-muted-foreground mt-1 truncate">
-                      {new Date(log.fired_at).toLocaleString('zh-CN')}
+                      {formatInZone(log.fired_at, tz)}
                       {log.source && ` · ${log.source}`}
                     </div>
                   </Link>

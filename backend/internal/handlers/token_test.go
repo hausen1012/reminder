@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	"github.com/reminder/backend/internal/crypto/secretbox"
 	"github.com/reminder/backend/internal/middleware"
 	"github.com/reminder/backend/internal/services"
 	"gorm.io/gorm"
@@ -24,7 +25,13 @@ func newTokenTestEngineWithDB(t *testing.T) (*gin.Engine, *gorm.DB) {
 	gin.SetMode(gin.TestMode)
 	db := newTestDB(t)
 
-	h := &TokenHandler{Svc: services.NewTokenService(db)}
+	// 用真实 secretbox（与生产一致）：令牌明文加密入库，
+	// 这样 create → plaintext 的往返也顺带覆盖了解密路径。
+	box, err := secretbox.New("")
+	if err != nil {
+		t.Fatalf("构造 secretbox 失败: %v", err)
+	}
+	h := &TokenHandler{Svc: services.NewTokenService(db, box)}
 
 	r := gin.New()
 	r.Use(gin.Recovery())

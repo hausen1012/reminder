@@ -10,7 +10,6 @@ package scheduler
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"log/slog"
 	"sort"
@@ -477,14 +476,4 @@ func (e *Engine) AddPurgeCron(logSrv interface {
 			slog.Info("自动清理日志", "count", n)
 		}
 	})
-}
-
-// debugString 用于测试/排查内部状态。
-func (e *Engine) debugString() string {
-	e.mu.Lock()
-	defer e.mu.Unlock()
-	b, _ := json.Marshal(struct {
-		Count int `json:"count"`
-	}{Count: len(e.reg)})
-	return string(b)
 }

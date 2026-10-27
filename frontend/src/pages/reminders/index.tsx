@@ -20,12 +20,15 @@ import {
   batchDeleteReminders,
   createReminder,
   deleteReminder,
+  extractApiError,
   listChannels,
   listReminders,
   toggleReminder,
   type ListRemindersQuery,
 } from '@/lib/api'
-import { formatReminderDetail, formatTime, formatNextFire } from '@/lib/utils'
+import { formatReminderDetail } from '@/lib/utils'
+import { formatInZone, formatNextFireInZone } from '@/lib/datetime'
+import { useSiteTimezone } from '@/contexts/ConfigContext'
 import { SortIcon } from '@/components/ui/SortIcon'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { FilterToolbar } from '@/components/ui/FilterToolbar'
@@ -43,6 +46,7 @@ const TYPE_LABEL: Record<string, string> = {
 }
 
 export default function RemindersPage() {
+  const tz = useSiteTimezone()
   const [items, setItems] = useState<Reminder[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -93,8 +97,8 @@ export default function RemindersPage() {
       setTotal(data?.total ?? 0)
       setLoadError('')
     } catch (err) {
-      setLoadError(String(err))
-      toast({ title: '加载提醒失败', description: String(err), variant: 'destructive' })
+      setLoadError(extractApiError(err, '加载失败'))
+      toast({ title: '加载提醒失败', description: extractApiError(err), variant: 'destructive' })
     } finally {
       setLoading(false)
     }
@@ -117,7 +121,7 @@ export default function RemindersPage() {
       const next = await toggleReminder(r.id)
       setItems((prev) => prev.map((it) => (it.id === r.id ? next : it)))
     } catch (err) {
-      toast({ title: '切换状态失败', description: String(err), variant: 'destructive' })
+      toast({ title: '切换状态失败', description: extractApiError(err), variant: 'destructive' })
     }
   }
 
@@ -130,7 +134,7 @@ export default function RemindersPage() {
       setTotal((n) => n - 1)
       toast({ title: '提醒已删除', variant: 'success' })
     } catch (err) {
-      toast({ title: '删除失败', description: String(err), variant: 'destructive' })
+      toast({ title: '删除失败', description: extractApiError(err), variant: 'destructive' })
     } finally {
       setDeleting(false)
       setToDelete(null)
@@ -155,7 +159,7 @@ export default function RemindersPage() {
       toast({ title: '提醒已复制', variant: 'success' })
       refresh()
     } catch (err) {
-      toast({ title: '复制失败', description: String(err), variant: 'destructive' })
+      toast({ title: '复制失败', description: extractApiError(err), variant: 'destructive' })
     }
   }
 
@@ -190,7 +194,7 @@ export default function RemindersPage() {
         await refresh()
       }
     } catch (err) {
-      toast({ title: '批量删除失败', description: String(err), variant: 'destructive' })
+      toast({ title: '批量删除失败', description: extractApiError(err), variant: 'destructive' })
     } finally {
       setBatchDeleting(false)
     }
@@ -329,7 +333,7 @@ export default function RemindersPage() {
                           </span>
                         </td>
                         <td className="px-4 py-2.5 text-xs whitespace-nowrap">
-                          {r.enabled ? formatNextFire(r.next_fire_at) : '—'}
+                          {r.enabled ? formatNextFireInZone(r.next_fire_at, tz) : '—'}
                         </td>
                         <td className="px-4 py-2.5 max-w-[10rem]">
                           {chNames.length === 0 ? (
@@ -347,7 +351,7 @@ export default function RemindersPage() {
                           {SOURCE_LABEL[r.source] ?? r.source}
                         </td>
                         <td className="px-4 py-2.5 text-xs whitespace-nowrap text-muted-foreground">
-                          {formatTime(r.created_at)}
+                          {formatInZone(r.created_at, tz)}
                         </td>
                         <td className="px-4 py-2.5">
                           <div className="flex justify-end gap-0.5">
@@ -414,7 +418,7 @@ export default function RemindersPage() {
                     </div>
                     <div className="col-span-2">
                       <span className="text-muted-foreground">下次触发</span>
-                      <p className="mt-0.5">{r.enabled ? formatNextFire(r.next_fire_at) : '—'}</p>
+                      <p className="mt-0.5">{r.enabled ? formatNextFireInZone(r.next_fire_at, tz) : '—'}</p>
                     </div>
                     <div className="col-span-2">
                       <span className="text-muted-foreground">通知渠道</span>
@@ -424,7 +428,7 @@ export default function RemindersPage() {
                     </div>
                     <div className="col-span-2">
                       <span className="text-muted-foreground">创建时间</span>
-                      <p className="mt-0.5">{formatTime(r.created_at)}</p>
+                      <p className="mt-0.5">{formatInZone(r.created_at, tz)}</p>
                     </div>
                   </div>
 

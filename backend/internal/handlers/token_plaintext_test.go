@@ -60,25 +60,16 @@ func TestTokenGetPlaintext_EmptyPlaintext(t *testing.T) {
 	}
 }
 
-// 外部 API 文档页应返回 HTML 且包含鉴权说明。
-func TestExternalDocs(t *testing.T) {
+// 外部 API 文档页已废弃：路由不该再注册。
+//
+// 文档唯一来源是 docs-site/api/，改接口时同步改文档，代码里不再维护第二份内嵌 HTML。
+func TestExternalDocsRouteRemoved(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	r := gin.New()
-	r.GET("/api/external/v1/docs", (&ExternalHandler{}).Docs)
+	r := newTokenTestEngine(t)
 
 	w := doJSON(r, http.MethodGet, "/api/external/v1/docs", nil)
-	if w.Code != http.StatusOK {
-		t.Fatalf("状态码 = %d", w.Code)
-	}
-	if ct := w.Header().Get("Content-Type"); !containsSub(ct, "text/html") {
-		t.Fatalf("Content-Type = %q，期望 text/html", ct)
-	}
-	body := w.Body.String()
-	if !containsSub(body, "X-AUTH") {
-		t.Fatalf("文档应说明 X-AUTH 鉴权方式: %s", truncate(body, 200))
-	}
-	if !containsSub(body, "/api/external/v1/reminders") {
-		t.Fatal("文档应列出 reminders 端点")
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("状态码 = %d，期望 404（内嵌文档页已移除）", w.Code)
 	}
 }
 
@@ -95,12 +86,4 @@ func createdPlaintext(t *testing.T, w *httptest.ResponseRecorder) string {
 		t.Fatal("响应缺少 plaintext")
 	}
 	return resp.Data.Plaintext
-}
-
-// truncate 截断长字符串，便于错误信息可读。
-func truncate(s string, n int) string {
-	if len(s) <= n {
-		return s
-	}
-	return s[:n] + "..."
 }
