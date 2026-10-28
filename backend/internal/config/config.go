@@ -40,7 +40,7 @@ func Load() *Config {
 		Username:  getEnv("USERNAME", "admin"),
 		Password:  getEnv("PASSWORD", "admin123"),
 
-		EncryptionKey:        getEnv("ENCRYPTION_KEY", "changeme"),
+		EncryptionKey:        getEnv("ENCRYPTION_KEY", ""),
 		BaseURL:              getEnv("BASE_URL", "http://localhost:8765"),
 		Timezone:             getEnv("TIMEZONE", "Asia/Shanghai"),
 		SweepIntervalSec:     getEnvInt("SWEEP_INTERVAL_SEC", 60),
@@ -49,7 +49,7 @@ func Load() *Config {
 		LogFile:              getEnv("LOG_FILE", "/var/log/reminder"),
 	}
 
-	// JWTSecret 如果留空就自动生成，保持向下兼容
+	// JWTSecret 如果留空就自动生成
 	if cfg.JWTSecret == "" {
 		cfg.JWTSecret = randomSecret()
 		slog.Warn("JWT_SECRET 未配置，已自动生成")

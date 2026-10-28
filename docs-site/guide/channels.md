@@ -26,13 +26,13 @@
 | `from_addr` | 发件人地址 |
 | `from_name` | 发件人显示名，可留空 |
 | `to` | 收件人列表，多个用英文逗号分隔 |
+| `security_mode` | 连接安全模式：`starttls`（默认）、`implicit_tls`（465 端口直连 TLS）、`plain`（明文） |
 
-连接方式的判定顺序：
+连接方式由 `security_mode` 决定：
 
-1. 显式设置 `security_mode` 时以它为准（`plain` / `starttls` / `implicit_tls`）
-2. 否则勾选了 STARTTLS 就用 `starttls`
-3. 否则端口是 465 就推断为 `implicit_tls`
-4. 其余情况按 `plain`
+- `starttls`：STARTTLS 加密连接（默认，常用 587 端口）
+- `implicit_tls`：直连 TLS/SSL 加密（常用 465 端口）
+- `plain`：不加密明文连接（常用 25 端口）
 
 ::: tip 用邮箱服务商的「授权码」
 国内邮箱（QQ、163 等）通常不能直接用登录密码，需要在邮箱设置里开启 SMTP 服务并生成授权码，

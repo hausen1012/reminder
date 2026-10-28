@@ -11,8 +11,8 @@ import (
 type Channel struct {
 	ID   uint   `gorm:"primaryKey" json:"id"`
 	Name string `gorm:"size:64;not null;uniqueIndex" json:"name"`
-	Type string `gorm:"size:16;index" json:"type"` // smtp | dingtalk | wecom | webhook
-	// 同 Reminder.Enabled：去掉 default:true 即可不需要额外约束。
+	Type string `gorm:"size:16;index" json:"type"` // smtp | dingtalk | wecom | webhook | log
+	// 不加 default:true：GORM 会跳过带默认值的零值字段，导致 Enabled=false 被覆盖。
 	Enabled   bool           `json:"enabled"`
 	Config    datatypes.JSON `gorm:"type:text" json:"config"`
 	CreatedAt Time           `json:"created_at"`

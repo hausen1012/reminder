@@ -17,13 +17,12 @@ function ControlledWeCom({ initial = {} }: { initial?: Record<string, unknown> }
 }
 
 describe('WeComForm', () => {
-  it('渲染 Webhook URL 输入框与消息类型选择器', () => {
+  it('渲染 Webhook URL 输入框', () => {
     render(<ControlledWeCom />)
     expect(
       screen.getByPlaceholderText('https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=...'),
     ).toBeInTheDocument()
     expect(screen.getByText('Webhook URL')).toBeInTheDocument()
-    expect(screen.getByText('消息类型')).toBeInTheDocument()
   })
 
   it('输入 webhook_url 应写入 config', async () => {
@@ -37,12 +36,6 @@ describe('WeComForm', () => {
   it('已有配置应回显到输入框', () => {
     render(<ControlledWeCom initial={{ webhook_url: 'https://existing.test' }} />)
     expect(screen.getByRole('textbox')).toHaveValue('https://existing.test')
-  })
-
-  it('msg_type 缺省时选择器显示默认 text', () => {
-    render(<ControlledWeCom />)
-    // Radix Select 会把当前值渲染到 trigger 中
-    expect(screen.getByText('文本')).toBeInTheDocument()
   })
 })
 

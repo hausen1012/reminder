@@ -84,7 +84,7 @@ func (s *ConfigService) UpsertMap(cfg map[string]string) error {
 // 由调用方随后统一 Start + LoadAndRegisterAll。
 //
 // 启动时不重算 next_fire_at：库里有配置时，重启前后时区必然一致，重算纯属多余；
-// 库里没有配置而 TIMEZONE 被改动的情况属于一次性迁移场景，交给 sweeper 按容忍窗口处理
+// 库里没有配置而 TIMEZONE 被改动的情况交给 sweeper 按容忍窗口处理
 // （超出窗口标 expired，用户能在日志里看到，不会静默消失）。
 func (s *ConfigService) LoadTimezone() {
 	if s.TZ == nil {

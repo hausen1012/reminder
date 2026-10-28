@@ -11,8 +11,8 @@ import (
 // 回归测试：同一时刻用不同时区偏移传入，落库后必须是同一个整数毫秒，
 // 因此 sweeper 能一致地扫到它们。
 //
-// 改造前时间列存的是带偏移的文本，+08:00 与 +00:00 两行按字典序排在不同位置，
-// 边界查询会漏掉其中一半（这正是当年 TestSweeperTick_* 失败的根因）。
+// 若时间按文本落库，+08:00 与 +00:00 两行会按字典序排在不同位置，
+// 边界查询只命中一半。
 func TestSweeperTick_HandlesMixedOffsetInput(t *testing.T) {
 	db := openSchedulerTestDB(t)
 	loc := time.FixedZone("CST", 8*3600)
@@ -21,11 +21,11 @@ func TestSweeperTick_HandlesMixedOffsetInput(t *testing.T) {
 
 	missed := time.Now().Add(-10 * time.Minute)
 	// 同一时刻的两种写法：CST 与 UTC，落库后应完全相等
-	legacy := missed.In(loc)
-	modern := missed.UTC()
+	withOffset := missed.In(loc)
+	utcSame := missed.UTC()
 
 	var ids []uint
-	for _, tp := range []time.Time{legacy, modern} {
+	for _, tp := range []time.Time{withOffset, utcSame} {
 		r := &models.Reminder{
 			Title:        "偏移混用",
 			Calendar:     "solar",

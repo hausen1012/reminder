@@ -204,7 +204,7 @@ export function ReminderEditDialog({ reminder, open, onClose, onSaved }: Props) 
                       </div>
                       <div>
                         <p className="text-[10px] text-muted-foreground/80 mb-0.5">── 触发时间 ──</p>
-                        <p><code>{'{{fire_at}}'} / {'{{trigger_at}}'}</code> 计划触发日期时间</p>
+                        <p><code>{'{{fire_at}}'}</code> 计划触发日期时间</p>
                         <p><code>{'{{trigger_date}}'}</code> 触发日期</p>
                         <p><code>{'{{trigger_time}}'}</code> 触发时间</p>
                         <p><code>{'{{weekday}}'}</code> 触发日星期几</p>
@@ -214,7 +214,7 @@ export function ReminderEditDialog({ reminder, open, onClose, onSaved }: Props) 
                         <p><code>{'{{title}}'}</code> 提醒标题</p>
                         <p><code>{'{{content}}'}</code> 提醒内容</p>
                         <p><code>{'{{reminder_id}}'}</code> 提醒 ID</p>
-                        <p><code>{'{{reminder_source}}'} / {'{{source}}'}</code> 来源</p>
+                        <p><code>{'{{reminder_source}}'}</code> 来源</p>
                       </div>
                       <p className="text-[10px] text-muted-foreground/80 pt-1 border-t border-border/50">启用确认提醒后额外支持 <code>{'{{confirm_url}}'}</code></p>
                     </div>

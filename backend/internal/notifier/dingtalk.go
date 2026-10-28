@@ -19,7 +19,6 @@ import (
 type DingTalkConfig struct {
 	WebhookURL string   `json:"webhook_url"`
 	Secret     string   `json:"secret_enc"` // 可选，启用了加签时必填；传入时已是明文
-	MsgType    string   `json:"msg_type"`   // text | markdown，默认 text
 	AtMobiles  []string `json:"at_mobiles,omitempty"`
 	AtAll      bool     `json:"at_all,omitempty"`
 }
@@ -37,7 +36,6 @@ func (n *dingtalkNotifier) Send(ctx context.Context, configJSON []byte, msg Mess
 	if cfg.WebhookURL == "" {
 		return Permanent(fmt.Errorf("钉钉 webhook_url 未配置"))
 	}
-	// 注意：不再使用 cfg.MsgType，改为使用 msg.Format
 
 	endpoint := cfg.WebhookURL
 	if cfg.Secret != "" {

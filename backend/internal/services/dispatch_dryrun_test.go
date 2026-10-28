@@ -123,8 +123,8 @@ func TestBuildVars(t *testing.T) {
 
 	required := []string{
 		"now", "now_date", "now_time", "fire_at",
-		"trigger_at", "trigger_date", "trigger_time", "weekday",
-		"title", "content", "lunar_date", "reminder_id", "reminder_source", "source",
+		"trigger_date", "trigger_time", "weekday",
+		"title", "content", "lunar_date", "reminder_id", "reminder_source",
 	}
 	for _, k := range required {
 		if _, ok := vars[k]; !ok {

@@ -1,13 +1,6 @@
 // 企业微信机器人通知表单
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { type SubFormProps, updateField, cfgStr } from './form-utils'
 
 export function WeComForm({ config, onChange }: SubFormProps) {
@@ -20,21 +13,6 @@ export function WeComForm({ config, onChange }: SubFormProps) {
           value={cfgStr(config, 'webhook_url')}
           onChange={(e) => updateField(onChange, 'webhook_url', e.target.value)}
         />
-      </div>
-      <div className="space-y-2">
-        <Label>消息类型</Label>
-        <Select
-          value={cfgStr(config, 'msg_type', 'text')}
-          onValueChange={(v) => updateField(onChange, 'msg_type', v)}
-        >
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="text">文本</SelectItem>
-            <SelectItem value="markdown">Markdown</SelectItem>
-          </SelectContent>
-        </Select>
       </div>
     </div>
   )

@@ -33,11 +33,11 @@ type Box struct {
 }
 
 // New 根据 base64 编码的 keyB64 构造 Box。
-// keyB64 为空或为 "changeme" 时使用内置 fallbackKey。
+// keyB64 为空时使用内置 fallbackKey。
 // 其他非空值解析失败 / 长度不是 32 字节时返回错误。
 func New(keyB64 string) (*Box, error) {
 	var key []byte
-	if keyB64 == "" || keyB64 == "changeme" {
+	if keyB64 == "" {
 		key = fallbackKey
 	} else {
 		raw, err := base64.StdEncoding.DecodeString(keyB64)

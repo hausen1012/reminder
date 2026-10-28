@@ -202,7 +202,7 @@ func (s *Sweeper) markExpired(r *models.Reminder, now time.Time) error {
 		oldNext := r.NextFireAt
 		q := tx.Model(&models.Reminder{}).Where("id = ?", r.ID)
 		if oldNext != nil {
-			// 同 engine.fire：整数毫秒列的等值比较是精确的，无需 julianday
+			// 同 engine.fire：整数毫秒列的等值比较是精确的
 			q = q.Where("next_fire_at = ?", *oldNext)
 		} else {
 			q = q.Where("next_fire_at IS NULL")

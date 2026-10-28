@@ -104,8 +104,7 @@ handler 里只需 `abortErr(c, err)`，不要自己拼错误响应体。这样�
 
 `/api` 下未注册的路径由 `router.registerNotFound` 统一补成同样的结构，
 因此新增路由时不需要额外处理 404。前端取值统一用 `lib/api.ts` 的
-`extractApiError` / `extractApiErrorCode` / `extractApiErrorField`，不要自己读
-`err.response.data.message`（那是旧格式，永远取不到值）。
+`extractApiError` / `extractApiErrorCode` / `extractApiErrorField`。
 
 ## 日志与凭据
 

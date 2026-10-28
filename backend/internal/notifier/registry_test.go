@@ -4,9 +4,7 @@ import "testing"
 
 // 回归测试：Registry 的 key 必须覆盖所有对外暴露的通道类型。
 //
-// 曾经 "log" 类型在 ChannelService.validType 与前端 ChannelType 中都存在，
-// 但没注册到 Registry，导致用户创建「日志输出」通道后每次发送都失败
-// （错误：未知通道类型: log）。
+// 漏注册的后果是：用户创建该类型通道后每次发送都失败（错误：未知通道类型）。
 func TestRegistry_CoversAllAllowedChannelTypes(t *testing.T) {
 	// 与 services.ChannelService.validType 保持一致的类型清单
 	allowed := []string{"smtp", "dingtalk", "wecom", "webhook", "log"}

@@ -153,7 +153,7 @@ func TestDingTalk_Success(t *testing.T) {
 		_, _ = w.Write([]byte(`{"errcode":0,"errmsg":"ok"}`))
 	}))
 	defer srv.Close()
-	cfg, _ := json.Marshal(DingTalkConfig{WebhookURL: srv.URL, MsgType: "text"})
+	cfg, _ := json.Marshal(DingTalkConfig{WebhookURL: srv.URL})
 	err := (&dingtalkNotifier{}).Send(context.Background(), cfg, Message{Subject: "S", Body: "B"})
 	if err != nil {
 		t.Fatalf("send 失败: %v", err)
@@ -169,7 +169,7 @@ func TestWeCom_Success(t *testing.T) {
 		_, _ = w.Write([]byte(`{"errcode":0,"errmsg":"ok"}`))
 	}))
 	defer srv.Close()
-	cfg, _ := json.Marshal(WeComConfig{WebhookURL: srv.URL, MsgType: "text"})
+	cfg, _ := json.Marshal(WeComConfig{WebhookURL: srv.URL})
 	err := (&wecomNotifier{}).Send(context.Background(), cfg, Message{Body: "hi"})
 	if err != nil {
 		t.Fatalf("send 失败: %v", err)

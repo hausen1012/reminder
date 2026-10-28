@@ -37,7 +37,6 @@ func buildVars(r *models.Reminder, firedAt, planned time.Time, loc *time.Locatio
 		"now_date":        now.Format("2006-01-02"),
 		"now_time":        now.Format("15:04:05"),
 		"fire_at":         fireAt.Format("2006-01-02 15:04:05"),
-		"trigger_at":      fireAt.Format("2006-01-02 15:04:05"),
 		"trigger_date":    fireAt.Format("2006-01-02"),
 		"trigger_time":    fireAt.Format("15:04"),
 		"weekday":         weekdays[fireAt.Weekday()],
@@ -46,7 +45,6 @@ func buildVars(r *models.Reminder, firedAt, planned time.Time, loc *time.Locatio
 		"lunar_date":      lunarStr,
 		"reminder_id":     fmt.Sprintf("%d", r.ID),
 		"reminder_source": r.Source,
-		"source":          r.Source,
 	}
 	return vars
 }

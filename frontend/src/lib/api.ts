@@ -51,9 +51,7 @@ api.interceptors.response.use(
  *
  *   { "error": { "code": "not_found", "message": "提醒不存在", "field": "title" } }
  *
- * 因此正常路径只需读 `data.error.message`。
- * `data.message` 分支仅作灰度期兼容（旧版后端曾返回 {code,message,data}），
- * 待全量升级后可删除。
+ * 正常路径读取 `data.error.message`。
  */
 export function extractApiError(err: unknown, fallback = '操作失败'): string {
   const data: unknown = (err as { response?: { data?: unknown } })?.response?.data
@@ -65,9 +63,6 @@ export function extractApiError(err: unknown, fallback = '操作失败'): string
       const errObj = obj.error as Record<string, unknown>
       if (typeof errObj.message === 'string' && errObj.message) return errObj.message
     }
-
-    // 兼容旧格式（迁移期保留）
-    if (typeof obj.message === 'string' && obj.message) return obj.message
   }
   if (err instanceof Error) return err.message
   return fallback

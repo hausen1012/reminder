@@ -4,8 +4,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
-
-	"github.com/gin-gonic/gin"
 )
 
 // GetPlaintext：有明文时返回明文，缺明文时 404。
@@ -39,7 +37,7 @@ func TestTokenGetPlaintext(t *testing.T) {
 	}
 }
 
-// 明文为空（历史数据）时应返回 404 并提示重新创建。
+// 明文为空时应返回 404 并提示重新创建。
 func TestTokenGetPlaintext_EmptyPlaintext(t *testing.T) {
 	r, db := newTokenTestEngineWithDB(t)
 
@@ -49,7 +47,7 @@ func TestTokenGetPlaintext_EmptyPlaintext(t *testing.T) {
 	}
 	id := createdTokenID(t, w)
 
-	// 直接清空明文，模拟历史数据
+	// 直接清空明文，验证这条兜底路径
 	if err := db.Exec("UPDATE tokens SET plaintext = '' WHERE id = ?", id).Error; err != nil {
 		t.Fatalf("清空明文失败: %v", err)
 	}
@@ -57,19 +55,6 @@ func TestTokenGetPlaintext_EmptyPlaintext(t *testing.T) {
 	w = doJSON(r, http.MethodGet, "/tokens/"+itoa(id)+"/plaintext", nil)
 	if w.Code != http.StatusNotFound {
 		t.Fatalf("明文为空应 404，实际 %d, body=%s", w.Code, w.Body.String())
-	}
-}
-
-// 外部 API 文档页已废弃：路由不该再注册。
-//
-// 文档唯一来源是 docs-site/api/，改接口时同步改文档，代码里不再维护第二份内嵌 HTML。
-func TestExternalDocsRouteRemoved(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-	r := newTokenTestEngine(t)
-
-	w := doJSON(r, http.MethodGet, "/api/external/v1/docs", nil)
-	if w.Code != http.StatusNotFound {
-		t.Fatalf("状态码 = %d，期望 404（内嵌文档页已移除）", w.Code)
 	}
 }
 

@@ -239,9 +239,9 @@ func buildDingTalkPayload(cfg DingTalkConfig, msg Message) map[string]any {
 }
 ```
 
-同时移除 `Send()` 中对 `cfg.MsgType` 的引用（约第 38-41 行的 `if cfg.MsgType == "" { cfg.MsgType = "text" }` 不再需要，用 `msg.Format` 代替）。
+同时移除 `Send()` 中对 `cfg.MsgType` 的引用，格式一律用 `msg.Format` 决定。
 
-`DingTalkConfig` 中的 `MsgType` 字段保留不做修改（兼容已有配置，只是不再读取）。
+`DingTalkConfig` 不含 `MsgType` 字段。
 
 - [ ] **3d: 企微 — 改用 msg.Format 决定 msgtype**
 
@@ -279,7 +279,7 @@ func buildWeComPayload(cfg WeComConfig, msg Message) map[string]any {
 }
 ```
 
-同样去掉 `Send()` 中对 `cfg.MsgType` 的引用。`WeComConfig` 中的 `MsgType` 字段保留兼容。
+同样去掉 `Send()` 中对 `cfg.MsgType` 的引用，`WeComConfig` 不含 `MsgType` 字段。
 
 - [ ] **3e: Log — 按格式 strip 后输出**
 
@@ -572,7 +572,7 @@ const FORMAT_LABEL: Record<string, string> = {
 1. **后端构建通过** — `cd backend && go build ./...`
 2. **前端构建通过** — `cd frontend && npm run build`
 3. **新建提醒测试** — 分别用三种格式创建，观察 DB 中 `content_format` 写入正确
-4. **已有数据兼容** — 历史提醒的 `content_format` 自动为 "text"，行为不变（default 约束保证）
+4. **默认格式** — 未填写 content_format 时落库为 "text"（default 约束保证）
 5. **触发送达测试** — 用 test 触发，分别检查各通道收到内容格式：
    - text 格式 → 邮件看到纯文本
    - markdown 格式 → 邮件渲染为 HTML

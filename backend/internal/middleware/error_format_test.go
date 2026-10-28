@@ -15,8 +15,7 @@ import (
 //	{"error": {"code": "...", "message": "...", "field": "..."(可选)}}
 //
 // 这是整个后端唯一的错误响应形状。本文件把「所有错误出口」逐一断言一遍，
-// 防止任何一处回退成旧的 {"code":401,"message":"...","data":null} 包装
-//（历史上鉴权中间件就是这么写的，导致前端要兼容两套解析）。
+// 确保格式完全一致。
 
 // errorEnvelope 是错误响应的强类型表示。
 type errorEnvelope struct {
@@ -47,18 +46,16 @@ func assertUnifiedError(t *testing.T, w *httptest.ResponseRecorder, wantStatus i
 		t.Fatalf("error.message 不应为空: %s", w.Body.String())
 	}
 
-	// 关键断言：顶层不允许出现旧的 code/message/data 字段
+	// 顶层结构必须只有 error 一个键
 	var top map[string]json.RawMessage
 	if err := json.Unmarshal(w.Body.Bytes(), &top); err != nil {
 		t.Fatalf("无法解析顶层字段: %v", err)
 	}
-	for _, forbidden := range []string{"code", "message", "data"} {
-		if _, exists := top[forbidden]; exists {
-			t.Fatalf("顶层不应出现 %q（旧格式残留），body=%s", forbidden, w.Body.String())
-		}
-	}
 	if _, exists := top["error"]; !exists {
 		t.Fatalf("顶层应有 error 字段，body=%s", w.Body.String())
+	}
+	if len(top) != 1 {
+		t.Fatalf("顶层只应有 error 字段，实际 %d 个，body=%s", len(top), w.Body.String())
 	}
 	return env
 }

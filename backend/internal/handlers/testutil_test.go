@@ -9,9 +9,6 @@ import (
 )
 
 // newTestDB 构造一个仅供测试使用的内存 SQLite 数据库。
-//
-// 之前 handler 直接依赖 database.DB 全局单例，无法在无真实库的情况下测试；
-// 现改为构造服务时注入 *gorm.DB，这里就可以用内存库跑 handler 层测试。
 func newTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
 	// file:...?mode=memory&cache=shared 让同一连接串在测试期间共享同一份内存库

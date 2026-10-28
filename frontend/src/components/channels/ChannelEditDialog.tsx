@@ -55,13 +55,12 @@ function defaultConfig(type: ChannelType): Record<string, unknown> {
         from_addr: '',
         from_name: '',
         to: [],
-        use_starttls: true,
         security_mode: 'starttls',
       }
     case 'dingtalk':
-      return { webhook_url: '', secret_enc: '', msg_type: 'text' }
+      return { webhook_url: '', secret_enc: '' }
     case 'wecom':
-      return { webhook_url: '', msg_type: 'text' }
+      return { webhook_url: '' }
     case 'webhook':
       return {
         method: 'POST',

@@ -5,8 +5,7 @@
 // GetPlaintext 解密后返回。
 //
 // 明文用 secretbox 加密后入库（与通道敏感字段同一把密钥）：数据库文件泄漏时
-// 不应连带泄漏可直接调用的令牌。早期版本以明文存储，解密失败时回退到
-// "原样当作明文"，保证升级后老令牌仍可查看。
+// 不应连带泄漏可直接调用的令牌。解密失败时不回退、不猜测，直接提示重新创建。
 package services
 
 import (
@@ -198,7 +197,6 @@ func (s *TokenService) UpdateDefaultChannels(id uint, channelIDs []uint) error {
 // GetPlaintext 返回令牌的明文（从库里解密）。
 //
 // 读取路径保证不返回 500：
-//   - 历史数据是明文入库（以 bdrk_ 开头），直接返回；
 //   - 解密成功，返回明文；
 //   - 解密失败（通常是换过 ENCRYPTION_KEY），返回 404 + 可操作提示，
 //     而不是把库里的密文当明文返回（用户会误以为那是令牌）。
@@ -237,18 +235,11 @@ func (s *TokenService) sealPlaintext(plain string) (string, error) {
 
 // openPlaintext 解密库里的明文，保证不返回 500。
 //
-// 三种情况：
-//  1. 以 bdrk_ 开头 → 早期版本直接存的明文，原样返回（升级后老令牌仍可查看）；
-//  2. 解密成功 → 返回明文；
-//  3. 都失败 → 返回 404 + 提示重新创建。常见原因是换过 ENCRYPTION_KEY，
-//     此时库里的密文已无法还原，但令牌本身照旧可用（鉴权走独立的 sha256 哈希）。
+//  1. 解密成功 → 返回明文；
+//  2. 解密失败 → 返回 404 + 提示重新创建（如 ENCRYPTION_KEY 被更换，密文无法还原）。
 func (s *TokenService) openPlaintext(stored string) (string, error) {
 	// 未配置加密层（仅测试场景）：库里存的就是明文
 	if s.Box == nil {
-		return stored, nil
-	}
-	// 历史明文：不需要解密，也不该因为 Box 变化而失效
-	if strings.HasPrefix(stored, keyPrefix) {
 		return stored, nil
 	}
 	if plain, err := s.Box.DecryptString(stored); err == nil {

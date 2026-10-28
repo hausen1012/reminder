@@ -1,7 +1,6 @@
 // response 集中放置所有 handler 共用的响应与参数解析辅助函数。
 //
-// 这些函数原先散落在 channel.go 顶部，导致「通道相关的文件」承担了全局职责，
-// 现独立成文件，任何 handler 都可以直接复用。
+// 独立成文件，任何 handler 都可以直接复用，避免某个业务文件承担全局职责。
 package handlers
 
 import (

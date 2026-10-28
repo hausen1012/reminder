@@ -12,8 +12,7 @@ import (
 //   - lunar + once / interval
 //
 // 时区不在提醒上：站点时区是全局设置（设置页可改），由 config 表 key=timezone 保存。
-// 所有时间字段用 models.Time 以 Unix 毫秒落库——SQLite 对文本列按字典序比较，
-// 带偏移的时间文本会错序，也让 julianday() 包裹后的索引失效。
+// 所有时间字段用 models.Time 以 Unix 毫秒落库：整数比较与排序即时间序，索引直接生效。
 type Reminder struct {
 	ID            uint   `gorm:"primaryKey" json:"id"`
 	Title         string `gorm:"size:200;not null" json:"title"`
@@ -27,8 +26,6 @@ type Reminder struct {
 	// 注意：不能写 gorm:"default:true"。GORM 在 Create 时会跳过带默认值的零值字段，
 	// 导致 Enabled=false 被数据库默认值覆盖成 true（"创建即禁用"会静默失效）。
 	// 默认启用由业务代码（ReminderService.Create）显式赋值保证。
-	// 也不加 not null：历史库若存在 enabled 为 NULL 的行，AutoMigrate 重建表会因
-	// NOT NULL 约束失败而启动不了；本字段的修复只需要去掉 default，不需要加约束。
 	// Enabled 同时参与复合索引 idx_reminders_due（enabled, next_fire_at）：
 	// sweeper 与 Upcoming 的固定查询形态是 enabled=? AND next_fire_at <= ?
 	// ORDER BY next_fire_at，整数列配复合索引可以直接走范围扫描。

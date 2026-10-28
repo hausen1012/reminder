@@ -17,29 +17,11 @@ describe('extractApiError', () => {
     expect(extractApiError(unifiedError('not_found', '提醒不存在'))).toBe('提醒不存在')
   })
 
-  it('统一格式优先于旧格式', () => {
-    // 同时存在两种结构时，必须取 error.message
+  it('error.message 为空串时回退到 fallback', () => {
     const err = {
-      response: {
-        data: {
-          error: { code: 'validation_failed', message: '新格式消息' },
-          message: '旧格式消息',
-        },
-      },
+      response: { data: { error: { code: 'x', message: '' } } },
     }
-    expect(extractApiError(err)).toBe('新格式消息')
-  })
-
-  it('兼容旧格式 data.message', () => {
-    const err = { response: { data: { code: 400, message: '旧格式', data: null } } }
-    expect(extractApiError(err)).toBe('旧格式')
-  })
-
-  it('error.message 为空串时回退到旧格式', () => {
-    const err = {
-      response: { data: { error: { code: 'x', message: '' }, message: '兜底' } },
-    }
-    expect(extractApiError(err)).toBe('兜底')
+    expect(extractApiError(err, '兜底')).toBe('兜底')
   })
 
   it('无响应体时回退到 Error.message', () => {
@@ -75,11 +57,6 @@ describe('extractApiErrorCode', () => {
     ]) {
       expect(extractApiErrorCode(unifiedError(code, 'x'))).toBe(code)
     }
-  })
-
-  it('旧格式（顶层 code 为数字）不误判为错误码', () => {
-    const err = { response: { data: { code: 400, message: '旧格式' } } }
-    expect(extractApiErrorCode(err)).toBe('')
   })
 
   it('无响应体时返回空串', () => {

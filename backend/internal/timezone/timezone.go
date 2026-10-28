@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-// Fallback 是未配置或解析失败时的兜底时区，与历史默认值保持一致。
+// Fallback 是未配置或解析失败时的兜底时区。
 const Fallback = "Asia/Shanghai"
 
 // Provider 线程安全地持有站点时区名与解析结果。
@@ -83,21 +83,4 @@ func Valid(name string) bool {
 	}
 	_, err := time.LoadLocation(name)
 	return err == nil
-}
-
-// UTC 把时间归一化为 UTC。
-//
-// 落库时间现在由 models.Time 统一转成 Unix 毫秒整数，偏移已经不影响比较与排序；
-// 这里保留是为了给需要"明确按 UTC 展示/计算"的调用方一个语义清晰的入口。
-func UTC(t time.Time) time.Time {
-	return t.UTC()
-}
-
-// UTCPtr 归一化可空时间到 UTC，nil 原样返回。
-func UTCPtr(t *time.Time) *time.Time {
-	if t == nil {
-		return nil
-	}
-	u := t.UTC()
-	return &u
 }

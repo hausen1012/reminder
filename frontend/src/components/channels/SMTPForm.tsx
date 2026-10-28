@@ -15,7 +15,7 @@ type SMTPSecurityMode = 'plain' | 'starttls' | 'implicit_tls'
 
 function toSMTPSecurityMode(v: string): SMTPSecurityMode {
   if (v === 'plain' || v === 'starttls' || v === 'implicit_tls') return v
-  return 'plain'
+  return 'starttls'
 }
 
 const CONNECTION_LABEL: Record<SMTPSecurityMode, string> = {
@@ -25,11 +25,7 @@ const CONNECTION_LABEL: Record<SMTPSecurityMode, string> = {
 }
 
 function getSecurityMode(config: Record<string, unknown>): SMTPSecurityMode {
-  const mode = toSMTPSecurityMode(cfgStr(config, 'security_mode'))
-  if (mode !== 'plain') return mode
-  if (config.use_starttls) return 'starttls'
-  if (config.port === 465) return 'implicit_tls'
-  return 'plain'
+  return toSMTPSecurityMode(cfgStr(config, 'security_mode', 'starttls'))
 }
 
 export function SMTPForm({ config, onChange, isEdit }: SubFormProps) {
@@ -71,7 +67,6 @@ export function SMTPForm({ config, onChange, isEdit }: SubFormProps) {
           onValueChange={(value) => {
             const mode = toSMTPSecurityMode(value)
             updateField(onChange, 'security_mode', mode)
-            updateField(onChange, 'use_starttls', mode === 'starttls')
 
             const currentPort = Number(config.port ?? 0)
             if (mode === 'starttls' && [0, 25, 465].includes(currentPort)) {

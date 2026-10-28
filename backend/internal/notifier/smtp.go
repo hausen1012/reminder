@@ -24,7 +24,6 @@ type SMTPConfig struct {
 	FromAddr     string   `json:"from_addr"`
 	FromName     string   `json:"from_name"`
 	To           []string `json:"to"`
-	UseStartTLS  bool     `json:"use_starttls"`
 	SecurityMode string   `json:"security_mode"`
 }
 
@@ -132,26 +131,20 @@ func (n *smtpNotifier) doSend(cfg SMTPConfig, msg Message) error {
 	return client.Quit()
 }
 
-// buildMIME 构造一个最小可用的 MIME 邮件文本：
-// UTF-8 + Subject base64 编码，避免中文乱码。
+// resolveSMTPSecurityMode 返回连接安全模式，未配置时按 starttls 处理。
 func resolveSMTPSecurityMode(cfg SMTPConfig) (string, error) {
 	switch cfg.SecurityMode {
-	case "", "plain", "starttls", "implicit_tls":
+	case "plain", "starttls", "implicit_tls":
+		return cfg.SecurityMode, nil
+	case "":
+		return "starttls", nil
 	default:
 		return "", fmt.Errorf("未知 SMTP 安全模式: %s", cfg.SecurityMode)
 	}
-	if cfg.SecurityMode != "" {
-		return cfg.SecurityMode, nil
-	}
-	if cfg.UseStartTLS {
-		return "starttls", nil
-	}
-	if cfg.Port == 465 {
-		return "implicit_tls", nil
-	}
-	return "plain", nil
 }
 
+// buildMIME 构造一个最小可用的 MIME 邮件文本：
+// UTF-8 + Subject base64 编码，避免中文乱码。
 func buildMIME(cfg SMTPConfig, msg Message) string {
 	from := cfg.FromAddr
 	if cfg.FromName != "" {

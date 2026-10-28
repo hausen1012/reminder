@@ -10,7 +10,7 @@ type Token struct {
 	KeyHash   string `gorm:"size:64;uniqueIndex" json:"-"`
 	Prefix    string `gorm:"size:16" json:"prefix"`
 	Plaintext string `gorm:"type:text" json:"-"`
-	// 同 Reminder.Enabled：去掉 default:true 即可，不需要额外约束。
+	// 不加 default:true：GORM 会跳过带默认值的零值字段，导致 Enabled=false 被覆盖。
 	Enabled    bool  `json:"enabled"`
 	LastUsedAt *Time `json:"last_used_at,omitempty"`
 	CreatedAt  Time  `json:"created_at"`

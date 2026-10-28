@@ -1,8 +1,6 @@
 // user_service 提供用户认证、查询与密码修改。
 //
-// 之前这些逻辑直接写在 handler 里并依赖 database 包的全局 DB，
-// 导致 handler 无法在没有真实数据库的情况下测试；收敛到这里后
-// handler 只依赖接口，便于注入内存库。
+// 收敛在服务层后 handler 只依赖接口，可注入内存库做测试。
 package services
 
 import (

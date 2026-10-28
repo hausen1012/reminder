@@ -296,8 +296,8 @@ func (e *Engine) Remove(id uint) {
 
 // addCron 把 solar/cron 注册到 cron.Cron 实例。
 //
-// robfig/cron 在 WithSeconds() 下需要 6 字段；外部 spec 给的是标准 5 字段，
-// 这里手动补 "0 " 让两者兼容（用户配置含义不变）。
+// robfig/cron 在 WithSeconds() 下需要 6 字段；配置里给的是标准 5 字段，
+// 这里统一补上秒位 "0 "（用户配置含义不变）。
 func (e *Engine) addCron(r *models.Reminder, spec *ScheduleSpec) error {
 	if spec.Expr == "" {
 		return errors.New("cron 表达式为空")
@@ -480,7 +480,7 @@ func (e *Engine) fire(id uint) {
 	var logID uint
 	err = e.db.Transaction(func(tx *gorm.DB) error {
 		// 乐观锁：用旧 next_fire_at 防止重复触发。
-		// next_fire_at 是整数毫秒列，等值比较精确——不需要再套 julianday()。
+		// next_fire_at 是整数毫秒列，等值比较精确。
 		oldNext := r.NextFireAt
 		q := tx.Model(&models.Reminder{}).Where("id = ? AND enabled = ?", id, true)
 		if oldNext != nil {
@@ -582,7 +582,7 @@ func (e *Engine) AddPurgeCron(logSrv interface {
 		}
 	}
 	// 持锁登记与注册：ReloadTimezone 会整体替换 e.cron，
-	// 若这里不加锁，可能出现"登记到已废弃的实例上"导致清理任务丢失。
+	// 若这里不加锁，可能把任务登记到已被替换的旧实例上，导致清理任务丢失。
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	id, err := e.cron.AddFunc(expr, job)

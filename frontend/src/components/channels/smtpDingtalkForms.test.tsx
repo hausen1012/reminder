@@ -95,27 +95,27 @@ describe('SMTPForm', () => {
     expect(state.password_enc).toBe('***')
   })
 
-  it('端口 465 时连接方式推断为 implicit_tls', () => {
-    render(<ControlledSMTP initial={{ port: 465 }} />)
-    expect(screen.getByText('465 专用加密连接')).toBeInTheDocument()
-  })
-
-  it('use_starttls 为 true 时推断为 starttls', () => {
-    render(<ControlledSMTP initial={{ use_starttls: true }} />)
+  it('未指定 security_mode 时默认为 starttls', () => {
+    render(<ControlledSMTP />)
     expect(screen.getByText('推荐：加密连接（常见邮箱）')).toBeInTheDocument()
   })
 
-  it('默认推断为 plain', () => {
-    render(<ControlledSMTP initial={{ port: 587 }} />)
+  it('显式 implicit_tls 时显示对应连接方式', () => {
+    render(<ControlledSMTP initial={{ security_mode: 'implicit_tls' }} />)
+    expect(screen.getByText('465 专用加密连接')).toBeInTheDocument()
+  })
+
+  it('显式 plain 时显示对应连接方式', () => {
+    render(<ControlledSMTP initial={{ security_mode: 'plain' }} />)
     expect(screen.getByText('不加密连接（仅特殊服务器）')).toBeInTheDocument()
   })
 })
 
 describe('DingTalkForm', () => {
-  it('渲染 Webhook URL 与消息类型', () => {
+  it('渲染 Webhook URL 与加签密钥', () => {
     render(<ControlledDingTalk />)
     expect(screen.getByText('Webhook URL')).toBeInTheDocument()
-    expect(screen.getByText('消息类型')).toBeInTheDocument()
+    expect(screen.getByText('加签密钥（可选）')).toBeInTheDocument()
   })
 
   it('输入 webhook_url 应写入 config', async () => {

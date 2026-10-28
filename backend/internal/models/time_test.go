@@ -273,22 +273,36 @@ func TestTime_JSONRoundTrip(t *testing.T) {
 	if backNil != nil {
 		t.Fatalf("null 应读回 nil，实际 %v", backNil)
 	}
+
+	// 带毫秒与小数的写法也应解析成功，并截断到毫秒
+	var withMs Time
+	if err := json.Unmarshal([]byte(`"2026-06-26T12:00:00.123456789+08:00"`), &withMs); err != nil {
+		t.Fatalf("反序列化带小数的时间失败: %v", err)
+	}
+	if want := time.Date(2026, 6, 26, 4, 0, 0, 123000000, time.UTC); !withMs.Equal(want) {
+		t.Fatalf("反序列化得到 %v，期望 %v", withMs.Time, want)
+	}
+
+	// 空串等同"无此时间"
+	var backEmpty Time
+	if err := json.Unmarshal([]byte(`""`), &backEmpty); err != nil {
+		t.Fatalf("反序列化空串失败: %v", err)
+	}
+	if !backEmpty.IsZero() {
+		t.Fatalf("空串应读成零值，实际 %v", backEmpty.Time)
+	}
 }
 
-// Scan 要能容忍迁移前残留的文本时间，避免一条脏数据让整条查询报错。
-func TestTime_ScanLegacyText(t *testing.T) {
+// Scan 支持整数毫秒、time.Time 与 NULL。
+func TestTime_Scan(t *testing.T) {
 	cases := []struct {
 		name string
 		src  any
 		want time.Time
 	}{
 		{"整数毫秒", int64(1782475200123), time.UnixMilli(1782475200123).UTC()},
-		{"数字文本", "1782475200123", time.UnixMilli(1782475200123).UTC()},
-		{"带偏移文本", "2026-06-26 12:00:00.123456789+08:00", time.Date(2026, 6, 26, 4, 0, 0, 123456789, time.UTC)},
-		{"RFC3339", "2026-06-26T12:00:00Z", time.Date(2026, 6, 26, 12, 0, 0, 0, time.UTC)},
+		{"time.Time", time.Date(2026, 6, 26, 12, 0, 0, 123000000, time.UTC), time.Date(2026, 6, 26, 12, 0, 0, 123000000, time.UTC)},
 		{"NULL", nil, time.Time{}},
-		{"空串", "", time.Time{}},
-		{"无法识别", "not a time", time.Time{}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

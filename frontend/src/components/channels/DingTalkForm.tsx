@@ -2,13 +2,6 @@
 import { useRef, useState } from 'react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { type SubFormProps, updateField, cfgStr } from './form-utils'
 
 export function DingTalkForm({ config, onChange, isEdit }: SubFormProps) {
@@ -43,21 +36,6 @@ export function DingTalkForm({ config, onChange, isEdit }: SubFormProps) {
             }
           }}
         />
-      </div>
-      <div className="space-y-2">
-        <Label>消息类型</Label>
-        <Select
-          value={cfgStr(config, 'msg_type', 'text')}
-          onValueChange={(v) => updateField(onChange, 'msg_type', v)}
-        >
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="text">文本（text）</SelectItem>
-            <SelectItem value="markdown">Markdown</SelectItem>
-          </SelectContent>
-        </Select>
       </div>
     </div>
   )

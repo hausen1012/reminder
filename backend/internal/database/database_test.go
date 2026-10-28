@@ -71,8 +71,7 @@ func TestAutoTimestampStoredAsUTC(t *testing.T) {
 		t.Fatalf("创建失败: %v", err)
 	}
 
-	// 断言原始列必须是整数毫秒（旧实现里这里读的是驱动转出的 RFC3339 文本，
-	// 断言以 Z 结尾其实测不到真实存储格式；改成 CAST 成 INTEGER 才能验证）
+	// 断言原始列必须是整数毫秒存储
 	var raw struct {
 		CreatedAt *int64 `gorm:"column:created_at"`
 	}

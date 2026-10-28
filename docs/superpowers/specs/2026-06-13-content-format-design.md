@@ -33,7 +33,7 @@ POST/PUT `/api/reminders` 和 GET 响应中增加 `content_format` 字段，Exte
 | Webhook | 用户模板自控 | 用户模板自控 | 用户模板自控 |
 | Log | 直接输出 | strip 标记输出 | strip 标签输出 |
 
-钉钉/企微通道配置中的 `msg_type` 字段不再使用（保留兼容），格式完全由提醒的 content_format 决定。
+钉钉/企微通道配置不含 `msg_type` 字段，消息格式完全由提醒的 content_format 决定。
 
 ## 影响文件清单
 

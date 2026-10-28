@@ -280,7 +280,7 @@ func (s *ReminderService) List(f ListFilter) ([]*ReminderView, int64, error) {
 
 	orderClause := buildOrderClause(f.SortBy, f.SortOrder, "created_at DESC",
 		[]string{"id", "created_at", "next_fire_at", "title"})
-	// next_fire_at 是整数毫秒列，直接排序即为时间序（不再需要 julianday）
+	// next_fire_at 是整数毫秒列，直接排序即为时间序
 	var rows []models.Reminder
 	if err := q.Order(orderClause).Limit(f.Limit).Offset(f.Offset).Find(&rows).Error; err != nil {
 		return nil, 0, err
@@ -301,7 +301,7 @@ func (s *ReminderService) Upcoming(within time.Duration, limit int) ([]*Reminder
 	if limit > 50 {
 		limit = 50
 	}
-	// next_fire_at 是整数毫秒列：范围比较与排序都走索引，无需 julianday
+	// next_fire_at 是整数毫秒列：范围比较与排序都走索引
 	cutoff := time.Now().Add(within)
 	var rows []models.Reminder
 	if err := s.DB.Where("enabled = ? AND next_fire_at IS NOT NULL AND next_fire_at <= ?", true, models.TimeOf(cutoff)).

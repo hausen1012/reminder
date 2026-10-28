@@ -16,9 +16,7 @@ func TestResolveSMTPSecurityMode(t *testing.T) {
 		{name: "显式直连 TLS", cfg: SMTPConfig{SecurityMode: "implicit_tls"}, want: "implicit_tls"},
 		{name: "显式 STARTTLS", cfg: SMTPConfig{SecurityMode: "starttls"}, want: "starttls"},
 		{name: "显式明文", cfg: SMTPConfig{SecurityMode: "plain"}, want: "plain"},
-		{name: "兼容旧 STARTTLS", cfg: SMTPConfig{UseStartTLS: true, Port: 587}, want: "starttls"},
-		{name: "兼容旧 465", cfg: SMTPConfig{Port: 465}, want: "implicit_tls"},
-		{name: "默认明文", cfg: SMTPConfig{Port: 25}, want: "plain"},
+		{name: "默认 STARTTLS", cfg: SMTPConfig{}, want: "starttls"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

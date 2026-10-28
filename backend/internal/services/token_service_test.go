@@ -236,7 +236,7 @@ func TestTokenGetPlaintext(t *testing.T) {
 		t.Fatalf("明文不一致: %q vs %q", got, plain)
 	}
 
-	// 模拟历史数据：明文被清空
+	// 明文被清空后应报错
 	if err := db.Exec("UPDATE tokens SET plaintext = '' WHERE id = ?", key.ID).Error; err != nil {
 		t.Fatalf("清空明文失败: %v", err)
 	}

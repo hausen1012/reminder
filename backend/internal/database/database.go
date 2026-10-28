@@ -2,7 +2,6 @@ package database
 
 import (
 	"fmt"
-	"log/slog"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -17,6 +16,20 @@ import (
 )
 
 var DB *gorm.DB
+
+// allModels 是建表所需的全部模型清单。
+var allModels = []any{
+	&models.User{},
+	&models.Reminder{},
+	&models.ReminderChannel{},
+	&models.Channel{},
+	&models.DeliveryLog{},
+	&models.DeliveryAttempt{},
+	&models.Token{},
+	&models.TokenDefaultChannel{},
+	&models.ConfirmToken{},
+	&models.Config{},
+}
 
 func Init(cfg *config.Config) error {
 	dir := filepath.Dir(cfg.DBPath)
@@ -40,14 +53,6 @@ func Init(cfg *config.Config) error {
 
 	if err := db.AutoMigrate(allModels...); err != nil {
 		return fmt.Errorf("migrate: %w", err)
-	}
-
-	// AutoMigrate 只改列类型，不会转换既有值：旧库里时间列的文本形态
-	// 必须显式转成整数毫秒，否则同一列里两种形态并存，范围查询会只命中一半。
-	if n, err := normalizeTimeColumns(db); err != nil {
-		return fmt.Errorf("normalize time columns: %w", err)
-	} else if n > 0 {
-		slog.Info("时间列归一化完成", "rows", n)
 	}
 
 	DB = db

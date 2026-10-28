@@ -49,36 +49,7 @@ func TestTokenPlaintextStoredEncrypted(t *testing.T) {
 	}
 }
 
-// 早期版本的令牌是明文入库，升级后应仍能查看（不能因为解不开就报错）。
-func TestTokenPlaintextLegacyCompat(t *testing.T) {
-	svc, db := newTokenSvc(t)
-
-	const legacy = "bdrk_legacyplaintextkey000000000000"
-	if err := db.Create(&models.Token{
-		Name:      "历史令牌",
-		KeyHash:   sha256Hex(legacy),
-		Prefix:    legacy[:len(keyPrefix)+8],
-		Plaintext: legacy, // 老数据：直接存明文
-		Enabled:   true,
-	}).Error; err != nil {
-		t.Fatalf("写入历史数据失败: %v", err)
-	}
-
-	var key models.Token
-	if err := db.First(&key, "key_hash = ?", sha256Hex(legacy)).Error; err != nil {
-		t.Fatalf("查询失败: %v", err)
-	}
-
-	got, err := svc.GetPlaintext(key.ID)
-	if err != nil {
-		t.Fatalf("历史明文应可读取，得到错误: %v", err)
-	}
-	if got != legacy {
-		t.Fatalf("历史明文 = %q，期望 %q", got, legacy)
-	}
-}
-
-// 没有配置 Box（测试或早期路径）时应原样存取，不应崩。
+// 没有配置 Box（仅测试场景）时应原样存取，不应崩。
 func TestTokenPlaintextWithoutBox(t *testing.T) {
 	db := openTestDB(t)
 	svc := NewTokenService(db, nil)

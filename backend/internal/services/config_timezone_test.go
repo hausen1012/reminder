@@ -125,7 +125,7 @@ func TestConfigService_LoadTimezone(t *testing.T) {
 		t.Fatalf("无配置时应保留默认值，实际 %q", tz.Name())
 	}
 
-	// 直接写库（模拟老数据），再启动加载
+	// 直接写库，再启动加载
 	if err := db.Exec("INSERT INTO configs (key, value) VALUES (?, ?)", KeyTimezone, "Europe/Berlin").Error; err != nil {
 		t.Fatalf("写库失败: %v", err)
 	}

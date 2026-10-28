@@ -94,9 +94,7 @@ func TestResolveSMTPSecurityMode_AllBranches(t *testing.T) {
 		{"显式 plain", SMTPConfig{SecurityMode: "plain"}, "plain"},
 		{"显式 starttls", SMTPConfig{SecurityMode: "starttls"}, "starttls"},
 		{"显式 implicit_tls", SMTPConfig{SecurityMode: "implicit_tls"}, "implicit_tls"},
-		{"UseStartTLS", SMTPConfig{UseStartTLS: true}, "starttls"},
-		{"端口 465", SMTPConfig{Port: 465}, "implicit_tls"},
-		{"默认 plain", SMTPConfig{Port: 587}, "plain"},
+		{"默认 starttls", SMTPConfig{}, "starttls"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
