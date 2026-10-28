@@ -25,7 +25,7 @@ func TestSweeperTick_FiresWithinTolerance(t *testing.T) {
 		ScheduleSpec: datatypes.JSON(`{"start_at":"2026-06-05T09:00:00","every":1,"unit":"day"}`),
 		Enabled:      true,
 		Source:       "web",
-		NextFireAt:   &missed,
+		NextFireAt:   models.TimePtrOf(missed),
 	}
 	if err := db.Create(r).Error; err != nil {
 		t.Fatalf("创建提醒失败: %v", err)
@@ -62,7 +62,7 @@ func TestSweeperTick_MarksExpiredBeyondTolerance(t *testing.T) {
 		ScheduleSpec: datatypes.JSON(`{"start_at":"2026-06-05T09:00:00","every":1,"unit":"day"}`),
 		Enabled:      true,
 		Source:       "web",
-		NextFireAt:   &missed,
+		NextFireAt:   models.TimePtrOf(missed),
 	}
 	if err := db.Create(r).Error; err != nil {
 		t.Fatalf("创建提醒失败: %v", err)
@@ -107,7 +107,7 @@ func TestSweeperTick_OnceExpiredDisables(t *testing.T) {
 		ScheduleSpec: datatypes.JSON(`{"at":"2020-01-01T09:00:00"}`),
 		Enabled:      true,
 		Source:       "web",
-		NextFireAt:   &missed,
+		NextFireAt:   models.TimePtrOf(missed),
 	}
 	if err := db.Create(r).Error; err != nil {
 		t.Fatalf("创建提醒失败: %v", err)
@@ -143,7 +143,7 @@ func TestSweeperTick_IgnoresFutureReminders(t *testing.T) {
 		ScheduleSpec: datatypes.JSON(`{"start_at":"2026-06-05T09:00:00","every":1,"unit":"day"}`),
 		Enabled:      true,
 		Source:       "web",
-		NextFireAt:   &future,
+		NextFireAt:   models.TimePtrOf(future),
 	}
 	if err := db.Create(r).Error; err != nil {
 		t.Fatalf("创建提醒失败: %v", err)

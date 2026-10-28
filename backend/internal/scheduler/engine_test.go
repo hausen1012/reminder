@@ -26,7 +26,7 @@ func TestEngineFire_WritesLogAndAdvances(t *testing.T) {
 		ScheduleSpec: datatypes.JSON(`{"start_at":"2026-06-05T09:00:00","every":1,"unit":"day"}`),
 		Enabled:      true,
 		Source:       "web",
-		NextFireAt:   &next,
+		NextFireAt:   models.TimePtrOf(next),
 	}
 	if err := db.Create(r).Error; err != nil {
 		t.Fatalf("创建提醒失败: %v", err)
@@ -84,7 +84,7 @@ func TestEngineFire_OptimisticLockSkipsDuplicate(t *testing.T) {
 		ScheduleSpec: datatypes.JSON(`{"start_at":"2026-06-05T09:00:00","every":1,"unit":"day"}`),
 		Enabled:      true,
 		Source:       "web",
-		NextFireAt:   &stale,
+		NextFireAt:   models.TimePtrOf(stale),
 	}
 	if err := db.Create(r).Error; err != nil {
 		t.Fatalf("创建提醒失败: %v", err)
@@ -126,7 +126,7 @@ func TestEngineFire_ConcurrentOnlyOneWins(t *testing.T) {
 		ScheduleSpec: datatypes.JSON(`{"expr":"0 9 * * *"}`),
 		Enabled:      true,
 		Source:       "web",
-		NextFireAt:   &next,
+		NextFireAt:   models.TimePtrOf(next),
 	}
 	if err := db.Create(r).Error; err != nil {
 		t.Fatalf("创建提醒失败: %v", err)
@@ -169,7 +169,7 @@ func TestEngineFire_DisabledReminderIgnored(t *testing.T) {
 		ScheduleSpec: datatypes.JSON(`{"expr":"0 9 * * *"}`),
 		Enabled:      false,
 		Source:       "web",
-		NextFireAt:   &next,
+		NextFireAt:   models.TimePtrOf(next),
 	}
 	if err := db.Create(r).Error; err != nil {
 		t.Fatalf("创建提醒失败: %v", err)
@@ -197,7 +197,7 @@ func TestEngineAddRemove(t *testing.T) {
 		ScheduleSpec: datatypes.JSON(`{"start_at":"2026-06-05T09:00:00","every":1,"unit":"day"}`),
 		Enabled:      true,
 		Source:       "web",
-		NextFireAt:   &future,
+		NextFireAt:   models.TimePtrOf(future),
 	}
 	if err := db.Create(r).Error; err != nil {
 		t.Fatalf("创建提醒失败: %v", err)

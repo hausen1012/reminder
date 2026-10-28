@@ -26,7 +26,7 @@ func seedDeliveryLog(t *testing.T, db *gorm.DB, title, status string, retryRound
 	t.Helper()
 	dl := &models.DeliveryLog{
 		ReminderID:     1,
-		FiredAt:        time.Now().Add(-time.Duration(retryRound) * time.Minute),
+		FiredAt:        models.TimeOf(time.Now().Add(-time.Duration(retryRound) * time.Minute)),
 		Title:          title,
 		Content:        "正文",
 		Status:         status,
@@ -51,7 +51,7 @@ func TestLogGetDetail(t *testing.T) {
 	}
 	chain := "chain-1"
 	dl := &models.DeliveryLog{
-		ReminderID: r.ID, FiredAt: time.Now(), Title: "日志快照", Status: "success",
+		ReminderID: r.ID, FiredAt: models.TimeNow(), Title: "日志快照", Status: "success",
 		Source: "web", ConfirmChainID: &chain,
 	}
 	if err := db.Create(dl).Error; err != nil {
@@ -188,7 +188,7 @@ func TestLogPurge(t *testing.T) {
 	// 一条旧日志、一条新日志
 	old := seedDeliveryLog(t, db, "旧", "success", 0, nil)
 	if err := db.Model(&models.DeliveryLog{}).Where("id = ?", old.ID).
-		Update("fired_at", time.Now().Add(-48*time.Hour)).Error; err != nil {
+		Update("fired_at", models.TimeOf(time.Now().Add(-48*time.Hour))).Error; err != nil {
 		t.Fatalf("更新 fired_at 失败: %v", err)
 	}
 	seedDeliveryLog(t, db, "新", "success", 0, nil)

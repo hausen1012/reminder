@@ -62,8 +62,8 @@ func (s *LogService) List(f LogFilter) ([]*LogView, int64, error) {
 			q = q.Where("delivery_logs.reminder_id = ?", f.ReminderID)
 		}
 		if f.Since != nil {
-			// julianday 兼容历史行里的本地偏移写法
-			q = q.Where("julianday(delivery_logs.fired_at) >= julianday(?)", f.Since.UTC())
+			// fired_at 是整数毫秒列，直接比较即为时间序且能走索引
+			q = q.Where("delivery_logs.fired_at >= ?", models.TimeOf(*f.Since))
 		}
 		if f.Status != "" {
 			q = q.Where("delivery_logs.status = ?", f.Status)
@@ -223,7 +223,7 @@ func (s *LogService) BatchDelete(ids []uint) error {
 func (s *LogService) Purge(olderThan time.Duration, all bool) (int64, error) {
 	q := s.DB.Model(&models.DeliveryLog{})
 	if !all && olderThan > 0 {
-		q = q.Where("julianday(fired_at) < julianday(?)", time.Now().Add(-olderThan).UTC())
+		q = q.Where("fired_at < ?", models.TimeOf(time.Now().Add(-olderThan)))
 	} else if !all {
 		return 0, nil
 	}
@@ -271,7 +271,7 @@ func (s *LogService) Purge(olderThan time.Duration, all bool) (int64, error) {
 func (s *LogService) PurgeCount(olderThan time.Duration, all bool) (int64, error) {
 	q := s.DB.Model(&models.DeliveryLog{})
 	if !all && olderThan > 0 {
-		q = q.Where("julianday(fired_at) < julianday(?)", time.Now().Add(-olderThan).UTC())
+		q = q.Where("fired_at < ?", models.TimeOf(time.Now().Add(-olderThan)))
 	} else if !all {
 		return 0, nil
 	}

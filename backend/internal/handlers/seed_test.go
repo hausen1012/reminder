@@ -15,7 +15,7 @@ func seedLog(t *testing.T, db *gorm.DB, title string, retryRound int, chainID *s
 	t.Helper()
 	dl := &models.DeliveryLog{
 		ReminderID:     1,
-		FiredAt:        time.Now().Add(-time.Duration(retryRound) * time.Minute),
+		FiredAt:        models.TimeOf(time.Now().Add(-time.Duration(retryRound) * time.Minute)),
 		Title:          title,
 		Content:        "正文",
 		Status:         "success",

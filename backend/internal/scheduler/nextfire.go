@@ -5,8 +5,7 @@
 //   - confirm_retry：未确认重发链
 //
 // 时区统一由 timezone.Provider 提供，可用 loc 参数传入固定时区做单元测试。
-// 所有对外返回的时间都是 UTC：SQLite 以带偏移的文本存储时间并按字典序比较，
-// 只有统一成 +00:00 才能保证文本序等于时间序。
+// 时间落库统一走 models.Time（Unix 毫秒整数），偏移不再影响比较与排序。
 package scheduler
 
 import (
@@ -63,9 +62,8 @@ func ParseSpec(raw []byte) (*ScheduleSpec, error) {
 
 // Compute 根据 (calendar, scheduleType, spec, after, loc) 算出下一次触发时间。
 //
-// 返回值的时区与 loc 一致（便于按"当地几点"阅读与断言）；需要落库的调用方
-// 必须自己转成 UTC——SQLite 以带偏移文本存时间并按字典序比较，混合偏移会让
-// 区间查询错序（见 internal/timezone 里 UTC/UTCPtr 的说明）。
+// 返回值的时区与 loc 一致（便于按"当地几点"阅读与断言）；落库时由
+// models.Time 统一归一化为 Unix 毫秒，调用方无需再做时区转换。
 // 返回 nil（不报错）表示该 spec 已不会再触发（如单次已过期）。
 func Compute(calendar, scheduleType string, spec *ScheduleSpec, after time.Time, loc *time.Location) (*time.Time, error) {
 	if spec == nil {

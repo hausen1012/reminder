@@ -256,7 +256,7 @@ func TestChannelStats(t *testing.T) {
 	if err := db.Create(r).Error; err != nil {
 		t.Fatalf("创建提醒失败: %v", err)
 	}
-	dl := &models.DeliveryLog{ReminderID: r.ID, FiredAt: time.Now(), Title: "t", Status: "success", Source: "web"}
+	dl := &models.DeliveryLog{ReminderID: r.ID, FiredAt: models.TimeNow(), Title: "t", Status: "success", Source: "web"}
 	if err := db.Create(dl).Error; err != nil {
 		t.Fatalf("创建日志失败: %v", err)
 	}

@@ -165,7 +165,7 @@ func (s *TokenService) TouchLastUsed(keyID uint) {
 				slog.Error("TouchLastUsed goroutine panic", "recover", r)
 			}
 		}()
-		now := time.Now()
+		now := models.TimeNow()
 		_ = s.DB.Model(&models.Token{}).Where("id = ?", keyID).Update("last_used_at", now).Error
 	}()
 }
@@ -183,7 +183,7 @@ func (s *TokenService) DefaultChannelIDs(keyID uint) []uint {
 func (s *TokenService) Stats24h(keyID uint) int64 {
 	var count int64
 	s.DB.Model(&models.Reminder{}).
-		Where("token_id = ? AND julianday(created_at) > julianday(?)", keyID, time.Now().Add(-24*time.Hour).UTC()).
+		Where("token_id = ? AND created_at > ?", keyID, models.TimeOf(time.Now().Add(-24*time.Hour))).
 		Count(&count)
 	return count
 }

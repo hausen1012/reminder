@@ -24,7 +24,7 @@ func triggerDispatch(ctx context.Context, d *DispatchService, r *models.Reminder
 	now := time.Now()
 	dlog := &models.DeliveryLog{
 		ReminderID: r.ID,
-		FiredAt:    now,
+		FiredAt:    models.TimeOf(now),
 		Title:      r.Title,
 		Content:    r.Content,
 		Status:     "pending",
@@ -102,7 +102,7 @@ func TestLogServiceListPaginatesByConfirmChain(t *testing.T) {
 
 	other := &models.DeliveryLog{
 		ReminderID: reminder.ID,
-		FiredAt:    time.Now().Add(time.Minute),
+		FiredAt:    models.TimeOf(time.Now().Add(time.Minute)),
 		Title:      "另一条独立日志",
 		Content:    "独立内容",
 		Status:     "success",
@@ -349,7 +349,7 @@ func createConfirmReminder(t *testing.T, db *gorm.DB, intervalSec, maxRetries in
 		ConfirmRetryIntervalSec: intervalSec,
 		ConfirmMaxRetries:       maxRetries,
 		Source:                  "web",
-		NextFireAt:              &next,
+		NextFireAt:              models.TimePtrOf(next),
 	}
 	if err := db.Create(reminder).Error; err != nil {
 		t.Fatalf("创建测试提醒失败: %v", err)

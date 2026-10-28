@@ -85,11 +85,10 @@ func Valid(name string) bool {
 	return err == nil
 }
 
-// UTC 把时间归一化为 UTC，用于数据库写入与比较边界。
+// UTC 把时间归一化为 UTC。
 //
-// SQLite 把时间存成带偏移的文本，按字典序比较；站点时区偏移不同的两行
-// 会被排错位置（+08:00 的行永远大于 +00:00 的行）。统一写成 UTC 后，
-// 文本序即时间序，比较与排序才正确。
+// 落库时间现在由 models.Time 统一转成 Unix 毫秒整数，偏移已经不影响比较与排序；
+// 这里保留是为了给需要"明确按 UTC 展示/计算"的调用方一个语义清晰的入口。
 func UTC(t time.Time) time.Time {
 	return t.UTC()
 }

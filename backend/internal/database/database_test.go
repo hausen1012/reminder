@@ -13,8 +13,9 @@ import (
 
 // gormConfig 的 NowFunc 必须返回 UTC。
 //
-// SQLite 把时间存成带偏移的文本并按字典序比较，站点时区又能在设置页热更新；
-// 只要新旧行偏移不一致，created_at 排序与范围查询就会错序。
+// models.Time 的 Value 会自己归一化，但 GORM 自动填充 created_at / updated_at
+// 时直接拿 NowFunc 的返回值；保持 UTC 让自动字段与手写字段走同一条路径，
+// 也避免任何直接读 NowFunc 的代码拿到本地偏移。
 func TestGormConfig_NowFuncUTC(t *testing.T) {
 	// 把进程时区设成非 UTC，模拟生产环境里 TZ=Asia/Shanghai 的部署
 	old := time.Local
@@ -31,7 +32,7 @@ func TestGormConfig_NowFuncUTC(t *testing.T) {
 	}
 }
 
-// 自动时间戳落库后必须是 UTC 文本，与手写字段的 UTC 约定一致。
+// 自动时间戳必须以整数毫秒落库，与手写字段的存储形态保持一致。
 func TestAutoTimestampStoredAsUTC(t *testing.T) {
 	old := time.Local
 	loc, err := time.LoadLocation("Asia/Shanghai")
@@ -56,13 +57,13 @@ func TestAutoTimestampStoredAsUTC(t *testing.T) {
 		t.Fatalf("迁移失败: %v", err)
 	}
 
-	next := time.Now().UTC()
+	next := time.Now()
 	r := &models.Reminder{
 		Title:         "时间戳测试",
 		Calendar:      "solar",
 		ScheduleType:  "once",
 		Enabled:       true,
-		NextFireAt:    &next,
+		NextFireAt:    models.TimePtrOf(next),
 		ScheduleSpec:  []byte(`{"at":"2099-01-01T09:00:00"}`),
 		ContentFormat: "text",
 	}
@@ -70,14 +71,24 @@ func TestAutoTimestampStoredAsUTC(t *testing.T) {
 		t.Fatalf("创建失败: %v", err)
 	}
 
+	// 断言原始列必须是整数毫秒（旧实现里这里读的是驱动转出的 RFC3339 文本，
+	// 断言以 Z 结尾其实测不到真实存储格式；改成 CAST 成 INTEGER 才能验证）
 	var raw struct {
-		CreatedAt string `gorm:"column:created_at"`
+		CreatedAt *int64 `gorm:"column:created_at"`
 	}
-	if err := db.Raw("SELECT created_at FROM reminders WHERE id = ?", r.ID).Scan(&raw).Error; err != nil {
+	if err := db.Raw("SELECT CAST(created_at AS INTEGER) AS created_at FROM reminders WHERE id = ?", r.ID).
+		Scan(&raw).Error; err != nil {
 		t.Fatalf("读取原始值失败: %v", err)
 	}
-	if !strings.HasSuffix(raw.CreatedAt, "Z") {
-		t.Fatalf("created_at 落库值 = %q，期望以 Z 结尾的 UTC 文本", raw.CreatedAt)
+	if raw.CreatedAt == nil {
+		t.Fatal("created_at 应为整数，实际为 NULL")
+	}
+	if *raw.CreatedAt <= 0 {
+		t.Fatalf("created_at 落库值 = %d，期望正的 Unix 毫秒", *raw.CreatedAt)
+	}
+	// 毫秒量级：和当前时间的偏差应在一天内
+	if diff := time.Since(time.UnixMilli(*raw.CreatedAt)); diff > 24*time.Hour || diff < -24*time.Hour {
+		t.Fatalf("created_at 落库值 %d 与当前时间相差 %v，不像 Unix 毫秒", *raw.CreatedAt, diff)
 	}
 }
 

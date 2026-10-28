@@ -41,7 +41,7 @@ func createPendingLog(t *testing.T, db *gorm.DB, r *models.Reminder) uint {
 	t.Helper()
 	dl := &models.DeliveryLog{
 		ReminderID: r.ID,
-		FiredAt:    time.Now(),
+		FiredAt:    models.TimeNow(),
 		Title:      r.Title,
 		Content:    r.Content,
 		Status:     "pending",

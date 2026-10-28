@@ -1,7 +1,5 @@
 package models
 
-import "time"
-
 // Token 用于外部程序调用 /api/external/v1/* 时鉴权。
 //
 // KeyHash 是明文 sha256，Prefix 是明文前 8 位用于列表展示。
@@ -13,9 +11,9 @@ type Token struct {
 	Prefix    string `gorm:"size:16" json:"prefix"`
 	Plaintext string `gorm:"type:text" json:"-"`
 	// 同 Reminder.Enabled：去掉 default:true 即可，不需要额外约束。
-	Enabled    bool       `json:"enabled"`
-	LastUsedAt *time.Time `json:"last_used_at,omitempty"`
-	CreatedAt  time.Time  `json:"created_at"`
+	Enabled    bool  `json:"enabled"`
+	LastUsedAt *Time `json:"last_used_at,omitempty"`
+	CreatedAt  Time  `json:"created_at"`
 }
 
 // TokenDefaultChannel 是 Token 与默认通道的多对多关联。

@@ -20,7 +20,7 @@ func TestConfirm_SuccessPageEscapesTitle(t *testing.T) {
 	// 造一条日志 + 确认令牌
 	dl := &models.DeliveryLog{
 		ReminderID: 1,
-		FiredAt:    time.Now(),
+		FiredAt:    models.TimeNow(),
 		Title:      `<script>alert("xss")</script>`,
 		Content:    "正文",
 		Status:     "success",
@@ -58,7 +58,7 @@ func TestConfirm_MarksConfirmed(t *testing.T) {
 	svc := services.NewConfirmService(db, testConfig())
 
 	dl := &models.DeliveryLog{
-		ReminderID: 1, FiredAt: time.Now(), Title: "确认我", Status: "success", Source: "web",
+		ReminderID: 1, FiredAt: models.TimeNow(), Title: "确认我", Status: "success", Source: "web",
 	}
 	if err := db.Create(dl).Error; err != nil {
 		t.Fatalf("创建日志失败: %v", err)
@@ -114,7 +114,7 @@ func TestConfirm_ExpiredToken(t *testing.T) {
 	db := newTestDB(t)
 	svc := services.NewConfirmService(db, testConfig())
 
-	dl := &models.DeliveryLog{ReminderID: 1, FiredAt: time.Now(), Title: "过期", Status: "success"}
+	dl := &models.DeliveryLog{ReminderID: 1, FiredAt: models.TimeNow(), Title: "过期", Status: "success"}
 	if err := db.Create(dl).Error; err != nil {
 		t.Fatalf("创建日志失败: %v", err)
 	}

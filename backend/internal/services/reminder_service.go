@@ -122,7 +122,7 @@ func (s *ReminderService) Create(in ReminderInput) (*ReminderView, error) {
 		Source:                  source,
 		TokenID:                 in.TokenID,
 		Enabled:                 true,
-		NextFireAt:              timezone.UTCPtr(next),
+		NextFireAt:              models.TimePtr(next),
 		RequireConfirm:          in.RequireConfirm,
 		ConfirmRetryIntervalSec: in.ConfirmRetryIntervalSec,
 		ConfirmMaxRetries:       in.ConfirmMaxRetries,
@@ -194,10 +194,10 @@ func (s *ReminderService) Update(id uint, in ReminderInput) (*ReminderView, erro
 		if !*in.Enabled {
 			updates["next_fire_at"] = nil
 		} else {
-			updates["next_fire_at"] = timezone.UTCPtr(next)
+			updates["next_fire_at"] = models.TimePtr(next)
 		}
 	} else {
-		updates["next_fire_at"] = timezone.UTCPtr(next)
+		updates["next_fire_at"] = models.TimePtr(next)
 	}
 
 	err = s.DB.Transaction(func(tx *gorm.DB) error {
@@ -280,10 +280,7 @@ func (s *ReminderService) List(f ListFilter) ([]*ReminderView, int64, error) {
 
 	orderClause := buildOrderClause(f.SortBy, f.SortOrder, "created_at DESC",
 		[]string{"id", "created_at", "next_fire_at", "title"})
-	// next_fire_at 排序用 julianday：历史行带本地偏移，按文本排会错位置
-	if field, dir, ok := splitOrderClause(orderClause); ok && field == "next_fire_at" {
-		orderClause = "julianday(next_fire_at) " + dir
-	}
+	// next_fire_at 是整数毫秒列，直接排序即为时间序（不再需要 julianday）
 	var rows []models.Reminder
 	if err := q.Order(orderClause).Limit(f.Limit).Offset(f.Offset).Find(&rows).Error; err != nil {
 		return nil, 0, err
@@ -304,11 +301,11 @@ func (s *ReminderService) Upcoming(within time.Duration, limit int) ([]*Reminder
 	if limit > 50 {
 		limit = 50
 	}
-	// 用 julianday 比较而非文本：兼容升级前以本地时区偏移写入的历史行
-	cutoff := time.Now().Add(within).UTC()
+	// next_fire_at 是整数毫秒列：范围比较与排序都走索引，无需 julianday
+	cutoff := time.Now().Add(within)
 	var rows []models.Reminder
-	if err := s.DB.Where("enabled = ? AND next_fire_at IS NOT NULL AND julianday(next_fire_at) <= julianday(?)", true, cutoff).
-		Order("julianday(next_fire_at) ASC").
+	if err := s.DB.Where("enabled = ? AND next_fire_at IS NOT NULL AND next_fire_at <= ?", true, models.TimeOf(cutoff)).
+		Order("next_fire_at ASC").
 		Limit(limit).
 		Find(&rows).Error; err != nil {
 		return nil, err
@@ -324,9 +321,9 @@ func (s *ReminderService) Upcoming(within time.Duration, limit int) ([]*Reminder
 // UpcomingBetween 返回指定时间范围内待触发的 enabled 提醒（无 limit 限制）。
 func (s *ReminderService) UpcomingBetween(from, to time.Time, limit int) ([]*ReminderView, error) {
 	var rows []models.Reminder
-	q := s.DB.Where("enabled = ? AND next_fire_at IS NOT NULL AND julianday(next_fire_at) BETWEEN julianday(?) AND julianday(?)",
-		true, from.UTC(), to.UTC()).
-		Order("julianday(next_fire_at) ASC")
+	q := s.DB.Where("enabled = ? AND next_fire_at IS NOT NULL AND next_fire_at BETWEEN ? AND ?",
+		true, models.TimeOf(from), models.TimeOf(to)).
+		Order("next_fire_at ASC")
 	if limit > 0 {
 		q = q.Limit(limit)
 	}
@@ -403,8 +400,8 @@ func (s *ReminderService) Toggle(id uint) (*ReminderView, error) {
 		spec, perr := scheduler.ParseSpec(r.ScheduleSpec)
 		if perr == nil {
 			if next, cerr := scheduler.Compute(r.Calendar, r.ScheduleType, spec, time.Now(), s.TZ.Get()); cerr == nil {
-				updates["next_fire_at"] = timezone.UTCPtr(next)
-				r.NextFireAt = timezone.UTCPtr(next)
+				updates["next_fire_at"] = models.TimePtr(next)
+				r.NextFireAt = models.TimePtr(next)
 			} else {
 				// 计算失败时回退到旧值，保持禁用
 				r.Enabled = false
@@ -486,7 +483,7 @@ func (s *ReminderService) TestDryRun(ctx context.Context, title, content, conten
 	vars := buildVars(&models.Reminder{
 		Title:      title,
 		Content:    content,
-		NextFireAt: &now,
+		NextFireAt: models.TimePtrOf(now),
 	}, now, now, s.TZ.Get())
 
 	rendered := buildRenderedMessage(title, content, contentFormat, vars)

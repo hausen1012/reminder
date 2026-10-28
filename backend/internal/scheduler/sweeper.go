@@ -4,8 +4,8 @@
 //
 // 与 Engine.fire 共享同一套乐观锁，所以二者并发不会重复触发。
 //
-// 注意：next_fire_at 一律以 UTC 落库。SQLite 把时间存成带偏移的文本并按字典序
-// 比较，如果写入是 +08:00 而查询边界是 +00:00，扫描将一条也命中不了。
+// 注意：next_fire_at 是 models.Time（Unix 毫秒整数），比较与排序都是整数语义，
+// 写入时的时区偏移不会影响结果。
 package scheduler
 
 import (
@@ -136,13 +136,13 @@ func (s *Sweeper) loop(ctx context.Context, done chan struct{}) {
 //     - 否则：在事务里写一条 expired 日志并把 next_fire_at 推进
 func (s *Sweeper) tick() {
 	now := time.Now()
-	// 边界值转 UTC：库里存的是 +00:00 文本，用本地时区格式化会因偏移而错序
-	cutoffDue := now.Add(-s.skewSeconds).UTC()
-	cutoffExpire := now.Add(-s.missTol).UTC()
+	// 边界值统一取 UTC，与库里的整数毫秒按同一时刻比较
+	cutoffDue := now.Add(-s.skewSeconds)
+	cutoffExpire := now.Add(-s.missTol)
 
 	var items []models.Reminder
 	err := s.db.
-		Where("enabled = ? AND next_fire_at IS NOT NULL AND julianday(next_fire_at) <= julianday(?)", true, cutoffDue).
+		Where("enabled = ? AND next_fire_at IS NOT NULL AND next_fire_at <= ?", true, models.TimeOf(cutoffDue)).
 		Find(&items).Error
 	if err != nil {
 		slog.Info("扫描失败", "error", err)
@@ -164,7 +164,7 @@ func (s *Sweeper) tick() {
 				if r.NextFireAt == nil {
 					continue
 				}
-				if r.NextFireAt.UTC().Before(cutoffExpire) {
+				if r.NextFireAt.Before(cutoffExpire) {
 					if err := s.markExpired(r, now); err != nil {
 						slog.Info("标记 reminder expired 失败", "reminder", r.ID, "error", err)
 					}
@@ -196,19 +196,19 @@ func (s *Sweeper) markExpired(r *models.Reminder, now time.Time) error {
 	if err != nil {
 		return err
 	}
-	newNext = timezone.UTCPtr(newNext)
+	nextStored := models.TimePtr(newNext)
 
 	return s.db.Transaction(func(tx *gorm.DB) error {
 		oldNext := r.NextFireAt
 		q := tx.Model(&models.Reminder{}).Where("id = ?", r.ID)
 		if oldNext != nil {
-			// 同 engine.fire：用 julianday 比较，兼容历史 +08:00 数据
-			q = q.Where("julianday(next_fire_at) = julianday(?)", *oldNext)
+			// 同 engine.fire：整数毫秒列的等值比较是精确的，无需 julianday
+			q = q.Where("next_fire_at = ?", *oldNext)
 		} else {
 			q = q.Where("next_fire_at IS NULL")
 		}
 		updates := map[string]any{
-			"next_fire_at": newNext,
+			"next_fire_at": nextStored,
 		}
 		if r.ScheduleType == "once" && newNext == nil {
 			// 单次已过期：禁用，避免下次启动再扫到
@@ -224,7 +224,7 @@ func (s *Sweeper) markExpired(r *models.Reminder, now time.Time) error {
 		}
 		dlog := &models.DeliveryLog{
 			ReminderID: r.ID,
-			FiredAt:    timezone.UTC(*r.NextFireAt),
+			FiredAt:    *r.NextFireAt,
 			Title:      r.Title,
 			Content:    r.Content,
 			Status:     "expired",

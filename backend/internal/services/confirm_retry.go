@@ -147,7 +147,7 @@ func (m *ConfirmRetryManager) retry(reminderID uint, chainID string, round int) 
 		m.stopChain(chainID)
 		return
 	}
-	if time.Now().After(tok.ExpiresAt) {
+	if time.Now().After(tok.ExpiresAt.Time) {
 		slog.Info("停止确认链", "chain", chainID, "reason", "确认链接已过期")
 		m.stopChain(chainID)
 		return
@@ -155,7 +155,7 @@ func (m *ConfirmRetryManager) retry(reminderID uint, chainID string, round int) 
 
 	planned := time.Now()
 	if r.NextFireAt != nil {
-		planned = *r.NextFireAt
+		planned = r.NextFireAt.Std()
 	}
 	vars := buildVars(&r, time.Now(), planned, m.TZ.Get())
 	vars["confirm_url"] = m.ConfirmSvc.BuildURL(tok.Token)
@@ -164,7 +164,7 @@ func (m *ConfirmRetryManager) retry(reminderID uint, chainID string, round int) 
 
 	newLog := &models.DeliveryLog{
 		ReminderID:     r.ID,
-		FiredAt:        time.Now().UTC(),
+		FiredAt:        models.TimeNow(),
 		Title:          rendered.Subject,
 		Content:        rendered.Body,
 		Status:         "pending",

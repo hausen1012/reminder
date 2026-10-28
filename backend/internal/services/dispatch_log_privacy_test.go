@@ -132,7 +132,7 @@ func createConfirmReminderWithWebhook(t *testing.T, db *gorm.DB, intervalSec, ma
 		ConfirmRetryIntervalSec: intervalSec,
 		ConfirmMaxRetries:       maxRetries,
 		Source:                  "web",
-		NextFireAt:              &next,
+		NextFireAt:              models.TimePtrOf(next),
 	}
 	if err := db.Create(reminder).Error; err != nil {
 		t.Fatalf("创建测试提醒失败: %v", err)

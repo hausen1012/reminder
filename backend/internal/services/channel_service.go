@@ -55,8 +55,8 @@ type ChannelView struct {
 	Type      string         `json:"type"`
 	Enabled   bool           `json:"enabled"`
 	Config    map[string]any `json:"config"`
-	CreatedAt time.Time      `json:"created_at"`
-	UpdatedAt time.Time      `json:"updated_at"`
+	CreatedAt models.Time    `json:"created_at"`
+	UpdatedAt models.Time    `json:"updated_at"`
 }
 
 // ChannelListFilter 是通道列表分页参数。
@@ -339,7 +339,7 @@ type ChannelStats struct {
 //
 // 没有发送记录的通道也包含在结果中（total=0）。
 func (s *ChannelService) Stats(window time.Duration) ([]*ChannelStats, error) {
-	cutoff := time.Now().Add(-window).UTC()
+	cutoff := time.Now().Add(-window)
 
 	type aggRow struct {
 		ChannelID   uint
@@ -351,7 +351,7 @@ func (s *ChannelService) Stats(window time.Duration) ([]*ChannelStats, error) {
 	var rows []aggRow
 	s.DB.Model(&models.DeliveryAttempt{}).
 		Select("channel_id, channel_name, channel_type, COUNT(*) AS total, SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END) AS success").
-		Where("julianday(created_at) >= julianday(?)", cutoff).
+		Where("created_at >= ?", models.TimeOf(cutoff)).
 		Group("channel_id").
 		Scan(&rows)
 

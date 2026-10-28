@@ -17,7 +17,7 @@ func seedReminderForUpcoming(t *testing.T, db *gorm.DB, title string, next time.
 		ScheduleType: "once",
 		Enabled:      true,
 		Source:       "web",
-		NextFireAt:   &next,
+		NextFireAt:   models.TimePtrOf(next),
 	}
 	if err := db.Create(r).Error; err != nil {
 		t.Fatalf("创建提醒失败: %v", err)

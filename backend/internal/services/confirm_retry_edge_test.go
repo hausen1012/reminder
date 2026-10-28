@@ -43,7 +43,7 @@ func TestConfirmRetryRetry_StopsWhenConfirmDisabled(t *testing.T) {
 	chainID := "chain-noconfirm"
 
 	dl := &models.DeliveryLog{
-		ReminderID: r.ID, FiredAt: time.Now(), Title: "t", Status: "success",
+		ReminderID: r.ID, FiredAt: models.TimeNow(), Title: "t", Status: "success",
 		Source: "web", ConfirmChainID: &chainID,
 	}
 	if err := db.Create(dl).Error; err != nil {
@@ -100,7 +100,7 @@ func TestConfirmRetryRetry_StopsWhenTokenExpired(t *testing.T) {
 	chainID := "chain-expired"
 
 	dl := &models.DeliveryLog{
-		ReminderID: r.ID, FiredAt: time.Now(), Title: "t", Status: "success",
+		ReminderID: r.ID, FiredAt: models.TimeNow(), Title: "t", Status: "success",
 		Source: "web", ConfirmChainID: &chainID,
 	}
 	if err := db.Create(dl).Error; err != nil {
@@ -129,7 +129,7 @@ func TestConfirmRetryRetry_StopsWhenAlreadyConfirmed(t *testing.T) {
 	chainID := "chain-confirmed"
 
 	dl := &models.DeliveryLog{
-		ReminderID: r.ID, FiredAt: time.Now(), Title: "t", Status: "success",
+		ReminderID: r.ID, FiredAt: models.TimeNow(), Title: "t", Status: "success",
 		Source: "web", ConfirmChainID: &chainID, Confirmed: true,
 	}
 	if err := db.Create(dl).Error; err != nil {
@@ -157,7 +157,7 @@ func TestConfirmRetryRetry_StopsExceedingMaxRetries(t *testing.T) {
 	chainID := "chain-max"
 
 	dl := &models.DeliveryLog{
-		ReminderID: r.ID, FiredAt: time.Now(), Title: "t", Status: "success",
+		ReminderID: r.ID, FiredAt: models.TimeNow(), Title: "t", Status: "success",
 		Source: "web", ConfirmChainID: &chainID,
 	}
 	if err := db.Create(dl).Error; err != nil {

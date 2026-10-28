@@ -156,7 +156,7 @@ func TestEngineListRegistered(t *testing.T) {
 		ScheduleSpec: datatypes.JSON(`{"start_at":"2099-01-01T09:00:00","every":1,"unit":"day"}`),
 		Enabled:      true,
 		Source:       "web",
-		NextFireAt:   &future,
+		NextFireAt:   models.TimePtrOf(future),
 	}
 	if err := db.Create(r).Error; err != nil {
 		t.Fatalf("创建失败: %v", err)
@@ -192,7 +192,7 @@ func TestEngineListRegisteredSorted(t *testing.T) {
 	t1 := now.Add(3 * time.Hour)
 	t2 := now.Add(1 * time.Hour)
 	t3 := now.Add(2 * time.Hour)
-	times := []*time.Time{&t1, &t2, nil, &t3}
+	times := []*models.Time{models.TimePtrOf(t1), models.TimePtrOf(t2), nil, models.TimePtrOf(t3)}
 	for i, tp := range times {
 		r := &models.Reminder{
 			Title:        "r" + string(rune('0'+i)),
@@ -220,7 +220,7 @@ func TestEngineListRegisteredSorted(t *testing.T) {
 		if entries[i].NextFireAt == nil {
 			t.Fatalf("第 %d 条不应为 nil", i)
 		}
-		if i > 0 && entries[i].NextFireAt.Before(*entries[i-1].NextFireAt) {
+		if i > 0 && entries[i].NextFireAt.Before(entries[i-1].NextFireAt.Std()) {
 			t.Fatalf("未按升序排列: %v", entries)
 		}
 	}
@@ -259,7 +259,7 @@ func TestEngineLastFireTime(t *testing.T) {
 		ScheduleSpec: datatypes.JSON(`{"expr":"0 9 * * *"}`),
 		Enabled:      true,
 		Source:       "web",
-		NextFireAt:   &next,
+		NextFireAt:   models.TimePtrOf(next),
 	}
 	if err := db.Create(r).Error; err != nil {
 		t.Fatalf("创建失败: %v", err)

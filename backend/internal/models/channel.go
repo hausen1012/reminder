@@ -1,8 +1,6 @@
 package models
 
 import (
-	"time"
-
 	"gorm.io/datatypes"
 )
 
@@ -17,6 +15,6 @@ type Channel struct {
 	// 同 Reminder.Enabled：去掉 default:true 即可不需要额外约束。
 	Enabled   bool           `json:"enabled"`
 	Config    datatypes.JSON `gorm:"type:text" json:"config"`
-	CreatedAt time.Time      `json:"created_at"`
-	UpdatedAt time.Time      `json:"updated_at"`
+	CreatedAt Time           `json:"created_at"`
+	UpdatedAt Time           `json:"updated_at"`
 }

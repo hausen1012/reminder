@@ -21,7 +21,7 @@ func seedLogWithChain(t *testing.T, db *gorm.DB, chainID *string) *models.Delive
 	t.Helper()
 	dl := &models.DeliveryLog{
 		ReminderID:     1,
-		FiredAt:        time.Now(),
+		FiredAt:        models.TimeNow(),
 		Title:          "待确认",
 		Content:        "正文",
 		Status:         "success",
@@ -67,7 +67,7 @@ func TestConfirmConsumeToken_WithChain(t *testing.T) {
 	first := seedLogWithChain(t, db, &chain)
 	// 同一链上的重发记录
 	retry := &models.DeliveryLog{
-		ReminderID: 1, FiredAt: time.Now(), Title: "重发", Status: "success",
+		ReminderID: 1, FiredAt: models.TimeNow(), Title: "重发", Status: "success",
 		Source: "web", RetryRound: 1, ConfirmChainID: &chain,
 	}
 	if err := db.Create(retry).Error; err != nil {

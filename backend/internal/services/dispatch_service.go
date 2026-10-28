@@ -78,9 +78,10 @@ func (d *DispatchService) Run(ctx context.Context, r *models.Reminder, deliveryL
 
 	planned := r.NextFireAt
 	if planned == nil {
-		planned = ptrTime(time.Now())
+		fresh := models.TimeNow()
+		planned = &fresh
 	}
-	vars := buildVars(r, time.Now(), *planned, d.TZ.Get())
+	vars := buildVars(r, time.Now(), planned.Std(), d.TZ.Get())
 	// 不打印 vars 内容：其中的 confirm_url 带确认令牌，拿到即可替用户确认提醒。
 	// 排查时关心的是"渲染了多少变量、正文多长"，长度信息已经足够。
 	slog.Info("变量构建完成", "reminder", r.ID, "vars_count", len(vars))
@@ -377,8 +378,6 @@ func (d *DispatchService) sendDryRun(ctx context.Context, ch *models.Channel, ms
 }
 
 // --- helpers ---
-
-func ptrTime(t time.Time) *time.Time { return &t }
 
 // friendlyErr 取错误里适合直接展示给用户的那部分文案。
 //

@@ -2,6 +2,7 @@ package database
 
 import (
 	"fmt"
+	"log/slog"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -37,19 +38,16 @@ func Init(cfg *config.Config) error {
 	sqlDB.SetMaxOpenConns(4)
 	sqlDB.SetMaxIdleConns(2)
 
-	if err := db.AutoMigrate(
-		&models.User{},
-		&models.Reminder{},
-		&models.ReminderChannel{},
-		&models.Channel{},
-		&models.DeliveryLog{},
-		&models.DeliveryAttempt{},
-		&models.Token{},
-		&models.TokenDefaultChannel{},
-		&models.ConfirmToken{},
-		&models.Config{},
-	); err != nil {
+	if err := db.AutoMigrate(allModels...); err != nil {
 		return fmt.Errorf("migrate: %w", err)
+	}
+
+	// AutoMigrate 只改列类型，不会转换既有值：旧库里时间列的文本形态
+	// 必须显式转成整数毫秒，否则同一列里两种形态并存，范围查询会只命中一半。
+	if n, err := normalizeTimeColumns(db); err != nil {
+		return fmt.Errorf("normalize time columns: %w", err)
+	} else if n > 0 {
+		slog.Info("时间列归一化完成", "rows", n)
 	}
 
 	DB = db
@@ -58,11 +56,9 @@ func Init(cfg *config.Config) error {
 
 // gormConfig 返回生产环境统一使用的 GORM 配置。
 //
-// 关键点是 NowFunc 强制 UTC：GORM 自动填充的 created_at / updated_at
-// 默认取 time.Now()（带本地偏移），而 SQLite 的时间列是带偏移的文本、
-// 按字典序比较。站点时区可在设置页热更新，改过之后新旧行的偏移不一致，
-// 同一时刻会被排到错误位置（+08:00 的行恒大于 +00:00 的行）。
-// 手写的时间字段已由 timezone.UTC / UTCPtr 归一化，这里让自动字段保持一致。
+// NowFunc 仍然强制 UTC：models.Time 的 Value 会自己归一化，这里保持 UTC
+// 是为了让 GORM 自动填充的 created_at / updated_at 与手写字段走同一条路径，
+// 也避免任何直接读 NowFunc 的代码拿到本地偏移。
 func gormConfig() *gorm.Config {
 	return &gorm.Config{
 		NowFunc: func() time.Time { return time.Now().UTC() },

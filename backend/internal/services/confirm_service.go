@@ -40,7 +40,7 @@ func (s *ConfirmService) CreateToken(deliveryLogID uint, ttl time.Duration) (str
 	ct := &models.ConfirmToken{
 		Token:         token,
 		DeliveryLogID: deliveryLogID,
-		ExpiresAt:     time.Now().Add(ttl).UTC(),
+		ExpiresAt:     models.TimeOf(time.Now().Add(ttl)),
 	}
 	if err := s.DB.Create(ct).Error; err != nil {
 		return "", err
@@ -64,7 +64,7 @@ func (s *ConfirmService) ConsumeToken(token string) (*models.DeliveryLog, error)
 	if ct.UsedAt != nil {
 		return nil, errors.New("该确认链接已被使用")
 	}
-	if time.Now().After(ct.ExpiresAt) {
+	if time.Now().After(ct.ExpiresAt.Time) {
 		return nil, errors.New("确认链接已过期")
 	}
 
@@ -76,7 +76,7 @@ func (s *ConfirmService) ConsumeToken(token string) (*models.DeliveryLog, error)
 		return nil, err
 	}
 
-	now := time.Now().UTC()
+	now := models.TimeNow()
 	err := s.DB.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Model(&ct).Update("used_at", now).Error; err != nil {
 			return err

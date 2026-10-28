@@ -77,7 +77,7 @@ func TestSweeperLoop_RunsPeriodically(t *testing.T) {
 		ScheduleSpec: datatypes.JSON(`{"at":"2020-01-01T09:00:00"}`),
 		Enabled:      true,
 		Source:       "web",
-		NextFireAt:   &missed,
+		NextFireAt:   models.TimePtrOf(missed),
 	}
 	if err := db.Create(r).Error; err != nil {
 		t.Fatalf("创建失败: %v", err)

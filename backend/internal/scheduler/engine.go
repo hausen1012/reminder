@@ -176,11 +176,11 @@ func (e *Engine) RecomputeNextFire() (int, error) {
 			slog.Warn("重算下次触发失败", "reminder", r.ID, "error", err)
 			continue
 		}
-		// 显式用 any(nil)：直接传 *time.Time(nil) 到 GORM 的 Update 里
+		// 显式用 any(nil)：直接传 *models.Time(nil) 到 GORM 的 Update 里
 		// 类型断言路径不稳，容易把 NULL 写成零值时间。
 		var val any
 		if next != nil {
-			val = timezone.UTC(*next)
+			val = models.TimeOf(*next)
 		}
 		if err := e.db.Model(&models.Reminder{}).Where("id = ?", r.ID).
 			Update("next_fire_at", val).Error; err != nil {
@@ -360,12 +360,12 @@ func (e *Engine) RegisteredCount() int {
 
 // RegisteredEntry 对外暴露注册条目视图。
 type RegisteredEntry struct {
-	ID           uint       `json:"id"`
-	Kind         string     `json:"kind"`
-	NextFireAt   *time.Time `json:"next_fire_at"`
-	Title        string     `json:"title"`
-	LastFiredAt  *time.Time `json:"last_fired_at"`
-	ScheduleType string     `json:"schedule_type"`
+	ID           uint         `json:"id"`
+	Kind         string       `json:"kind"`
+	NextFireAt   *models.Time `json:"next_fire_at"`
+	Title        string       `json:"title"`
+	LastFiredAt  *models.Time `json:"last_fired_at"`
+	ScheduleType string       `json:"schedule_type"`
 }
 
 // ListRegistered 返回当前 Engine 中所有已注册条目的快照。
@@ -407,10 +407,10 @@ func (e *Engine) ListRegisteredSorted(offset, limit int) (entries []RegisteredEn
 		if all[j].NextFireAt == nil {
 			return true
 		}
-		if all[i].NextFireAt.Equal(*all[j].NextFireAt) {
+		if all[i].NextFireAt.Equal(all[j].NextFireAt.Std()) {
 			return all[i].ID < all[j].ID
 		}
-		return all[i].NextFireAt.Before(*all[j].NextFireAt)
+		return all[i].NextFireAt.Before(all[j].NextFireAt.Std())
 	})
 
 	if offset >= total {
@@ -473,25 +473,24 @@ func (e *Engine) fire(id uint) {
 	if err != nil {
 		slog.Info("计算下次触发失败", "reminder", id, "error", err)
 	}
-	// 统一以 UTC 落库：SQLite 按文本比较时间，偏移不同的行会被排错位置
-	nowUTC := timezone.UTC(now)
-	newNext = timezone.UTCPtr(newNext)
+	// 统一以 UTC 落库：models.Time 的 Value 内部已归一化，这里显式转换更直观
+	nowUTC := models.TimeOf(now)
+	nextStored := models.TimePtr(newNext)
 
 	var logID uint
 	err = e.db.Transaction(func(tx *gorm.DB) error {
 		// 乐观锁：用旧 next_fire_at 防止重复触发。
-		// 用 julianday() 比较而不是文本等值：升级前写入的行是 +08:00 偏移，
-		// 文本与 UTC 边界永远不相等，会让老提醒既不触发也不报错。
+		// next_fire_at 是整数毫秒列，等值比较精确——不需要再套 julianday()。
 		oldNext := r.NextFireAt
 		q := tx.Model(&models.Reminder{}).Where("id = ? AND enabled = ?", id, true)
 		if oldNext != nil {
-			q = q.Where("julianday(next_fire_at) = julianday(?)", *oldNext)
+			q = q.Where("next_fire_at = ?", *oldNext)
 		} else {
 			q = q.Where("next_fire_at IS NULL")
 		}
 		updates := map[string]any{
 			"last_fired_at": nowUTC,
-			"next_fire_at":  newNext,
+			"next_fire_at":  nextStored,
 			"fire_count":    gorm.Expr("fire_count + 1"),
 		}
 		res := q.Updates(updates)

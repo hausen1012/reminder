@@ -5,34 +5,35 @@ import (
 	"time"
 
 	"github.com/reminder/backend/internal/models"
-	"github.com/reminder/backend/internal/timezone"
 	"gorm.io/datatypes"
 )
 
-// 回归测试：升级前写入的行是带本地偏移的文本（如 +08:00），
-// 而查询边界是 UTC。若按文本比较，两条时间相同的记录会被排成不同位置，
-// sweeper 会一条也扫不到（这正是 CI 上 TestSweeperTick_* 失败的根因）。
-func TestSweeperTick_HandlesLegacyLocalOffsetRows(t *testing.T) {
+// 回归测试：同一时刻用不同时区偏移传入，落库后必须是同一个整数毫秒，
+// 因此 sweeper 能一致地扫到它们。
+//
+// 改造前时间列存的是带偏移的文本，+08:00 与 +00:00 两行按字典序排在不同位置，
+// 边界查询会漏掉其中一半（这正是当年 TestSweeperTick_* 失败的根因）。
+func TestSweeperTick_HandlesMixedOffsetInput(t *testing.T) {
 	db := openSchedulerTestDB(t)
 	loc := time.FixedZone("CST", 8*3600)
 	engine := NewEngine(db, &fakeDispatcher{}, testTZ(loc))
 	t.Cleanup(engine.Stop)
 
 	missed := time.Now().Add(-10 * time.Minute)
-	// 同一时刻的两种存法：历史数据是 +08:00，新数据是 +00:00
+	// 同一时刻的两种写法：CST 与 UTC，落库后应完全相等
 	legacy := missed.In(loc)
 	modern := missed.UTC()
 
 	var ids []uint
-	for _, tp := range []*time.Time{&legacy, &modern} {
+	for _, tp := range []time.Time{legacy, modern} {
 		r := &models.Reminder{
-			Title:        "偏移兼容",
+			Title:        "偏移混用",
 			Calendar:     "solar",
 			ScheduleType: "interval",
 			ScheduleSpec: datatypes.JSON(`{"start_at":"2026-06-05T09:00:00","every":1,"unit":"day"}`),
 			Enabled:      true,
 			Source:       "web",
-			NextFireAt:   tp,
+			NextFireAt:   models.TimePtrOf(tp),
 		}
 		if err := db.Create(r).Error; err != nil {
 			t.Fatalf("创建提醒失败: %v", err)
@@ -40,15 +41,17 @@ func TestSweeperTick_HandlesLegacyLocalOffsetRows(t *testing.T) {
 		ids = append(ids, r.ID)
 	}
 
-	// 两种写法分别落库：legacy 会存成 "...+08:00"，modern 存成 "...+00:00"。
-	// 这正是升级前后的真实数据形态。
-	var raw string
-	if err := db.Raw("SELECT CAST(next_fire_at AS TEXT) FROM reminders WHERE id = ?", ids[0]).
-		Scan(&raw).Error; err != nil {
+	// 两行落库值必须相同（都是整数毫秒），这是排序与范围查询正确的前提
+	var raws []string
+	if err := db.Raw("SELECT CAST(next_fire_at AS TEXT) FROM reminders ORDER BY id").
+		Scan(&raws).Error; err != nil {
 		t.Fatalf("读取原始列失败: %v", err)
 	}
-	if got := raw[len(raw)-6:]; got != "+08:00" {
-		t.Fatalf("历史数据应为 +08:00 偏移，实际 %q", raw)
+	if len(raws) != 2 {
+		t.Fatalf("应读到 2 行，实际 %d", len(raws))
+	}
+	if raws[0] != raws[1] {
+		t.Fatalf("同一时刻的不同偏移应存成同值，实际 %q / %q", raws[0], raws[1])
 	}
 
 	s := NewSweeper(db, engine, testTZ(loc), time.Minute, 60*time.Minute, 0)
@@ -56,13 +59,13 @@ func TestSweeperTick_HandlesLegacyLocalOffsetRows(t *testing.T) {
 
 	for _, id := range ids {
 		if n := countReminderLogs(t, db, id); n != 1 {
-			t.Fatalf("提醒 %d 应补发 1 条日志，实际 %d（落库原值 %q）", id, n, raw)
+			t.Fatalf("提醒 %d 应补发 1 条日志，实际 %d（落库原值 %q）", id, n, raws[0])
 		}
 	}
 }
 
-// 新写入的时间一律为 UTC，保证文本序等于时间序（索引与排序才有意义）。
-func TestEngineFire_WritesUTCNextFireAt(t *testing.T) {
+// 新写入的时间一律是整数毫秒，与传入的时区无关（Value 内部归一化为 UTC）。
+func TestEngineFire_WritesIntegerMillisecond(t *testing.T) {
 	db := openSchedulerTestDB(t)
 	loc := time.FixedZone("CST", 8*3600)
 	engine := NewEngine(db, &fakeDispatcher{}, testTZ(loc))
@@ -70,13 +73,13 @@ func TestEngineFire_WritesUTCNextFireAt(t *testing.T) {
 
 	next := time.Now().Add(-time.Second).In(loc)
 	r := &models.Reminder{
-		Title:        "写 UTC",
+		Title:        "写整数",
 		Calendar:     "solar",
 		ScheduleType: "interval",
 		ScheduleSpec: datatypes.JSON(`{"start_at":"2026-06-05T09:00:00","every":1,"unit":"day"}`),
 		Enabled:      true,
 		Source:       "web",
-		NextFireAt:   &next,
+		NextFireAt:   models.TimePtrOf(next),
 	}
 	if err := db.Create(r).Error; err != nil {
 		t.Fatalf("创建失败: %v", err)
@@ -84,23 +87,26 @@ func TestEngineFire_WritesUTCNextFireAt(t *testing.T) {
 
 	engine.fire(r.ID)
 
-	var text string
-	if err := db.Raw("SELECT CAST(next_fire_at AS TEXT) FROM reminders WHERE id = ?", r.ID).
-		Scan(&text).Error; err != nil {
+	// next_fire_at 与 fired_at 都必须是整数毫秒（13 位数字），而不是任何时间文本
+	var row struct {
+		Next *int64 `gorm:"column:next_fire_at"`
+	}
+	if err := db.Raw("SELECT CAST(next_fire_at AS INTEGER) AS next_fire_at FROM reminders WHERE id = ?", r.ID).
+		Scan(&row).Error; err != nil {
 		t.Fatalf("读取原始列失败: %v", err)
 	}
-	if got := text[len(text)-6:]; got != "+00:00" {
-		t.Fatalf("next_fire_at 应以 UTC 落库，实际文本 %q", text)
+	if row.Next == nil || *row.Next < 1e12 {
+		t.Fatalf("next_fire_at 应为毫秒整数，实际 %v", row.Next)
 	}
-
-	// 日志的 fired_at 同样应为 UTC
-	var logText string
-	if err := db.Raw("SELECT CAST(fired_at AS TEXT) FROM delivery_logs WHERE reminder_id = ?", r.ID).
-		Scan(&logText).Error; err != nil {
+	var firedAt struct {
+		V *int64 `gorm:"column:fired_at"`
+	}
+	if err := db.Raw("SELECT CAST(fired_at AS INTEGER) AS fired_at FROM delivery_logs WHERE reminder_id = ?", r.ID).
+		Scan(&firedAt).Error; err != nil {
 		t.Fatalf("读取日志时间失败: %v", err)
 	}
-	if got := logText[len(logText)-6:]; got != "+00:00" {
-		t.Fatalf("delivery_logs.fired_at 应以 UTC 落库，实际文本 %q", logText)
+	if firedAt.V == nil || *firedAt.V < 1e12 {
+		t.Fatalf("delivery_logs.fired_at 应为毫秒整数，实际 %v", firedAt.V)
 	}
 }
 
@@ -182,7 +188,7 @@ func TestEngineReloadTimezoneRecomputesNextFire(t *testing.T) {
 		t.Fatalf("计算初始 next_fire_at 失败: %v", err)
 	}
 	if err := db.Model(&models.Reminder{}).Where("id = ?", r.ID).
-		Update("next_fire_at", timezone.UTC(*oldNext)).Error; err != nil {
+		Update("next_fire_at", models.TimeOf(*oldNext)).Error; err != nil {
 		t.Fatalf("写入初始值失败: %v", err)
 	}
 
@@ -246,7 +252,7 @@ func TestEngineReloadTimezoneDoesNotFireMissedOnce(t *testing.T) {
 		ScheduleSpec: datatypes.JSON(`{"at":"2020-01-01T09:00:00"}`),
 		Enabled:      true,
 		Source:       "web",
-		NextFireAt:   &past,
+		NextFireAt:   models.TimePtrOf(past),
 	}
 	if err := db.Create(r).Error; err != nil {
 		t.Fatalf("创建失败: %v", err)

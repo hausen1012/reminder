@@ -1,8 +1,6 @@
 package models
 
 import (
-	"time"
-
 	"gorm.io/datatypes"
 )
 
@@ -14,7 +12,8 @@ import (
 //   - lunar + once / interval
 //
 // 时区不在提醒上：站点时区是全局设置（设置页可改），由 config 表 key=timezone 保存。
-// 所有时间字段以 UTC 落库——SQLite 按带偏移的文本比较时间，混合偏移会错序。
+// 所有时间字段用 models.Time 以 Unix 毫秒落库——SQLite 对文本列按字典序比较，
+// 带偏移的时间文本会错序，也让 julianday() 包裹后的索引失效。
 type Reminder struct {
 	ID            uint   `gorm:"primaryKey" json:"id"`
 	Title         string `gorm:"size:200;not null" json:"title"`
@@ -30,7 +29,10 @@ type Reminder struct {
 	// 默认启用由业务代码（ReminderService.Create）显式赋值保证。
 	// 也不加 not null：历史库若存在 enabled 为 NULL 的行，AutoMigrate 重建表会因
 	// NOT NULL 约束失败而启动不了；本字段的修复只需要去掉 default，不需要加约束。
-	Enabled bool   `gorm:"index" json:"enabled"`
+	// Enabled 同时参与复合索引 idx_reminders_due（enabled, next_fire_at）：
+	// sweeper 与 Upcoming 的固定查询形态是 enabled=? AND next_fire_at <= ?
+	// ORDER BY next_fire_at，整数列配复合索引可以直接走范围扫描。
+	Enabled bool   `gorm:"index;index:idx_reminders_due,priority:1" json:"enabled"`
 	Source  string `gorm:"size:16;index" json:"source"` // web | api
 	TokenID *uint  `gorm:"index" json:"token_id,omitempty"`
 
@@ -38,12 +40,12 @@ type Reminder struct {
 	ConfirmRetryIntervalSec int  `gorm:"default:0" json:"confirm_retry_interval_sec"`
 	ConfirmMaxRetries       int  `gorm:"default:0" json:"confirm_max_retries"`
 
-	NextFireAt  *time.Time `gorm:"index" json:"next_fire_at,omitempty"` // 始终为公历 UTC
-	LastFiredAt *time.Time `json:"last_fired_at,omitempty"`             // 始终为公历 UTC
-	FireCount   int        `json:"fire_count"`
+	NextFireAt  *Time `gorm:"index;index:idx_reminders_due,priority:2" json:"next_fire_at,omitempty"` // 始终为公历 UTC
+	LastFiredAt *Time `json:"last_fired_at,omitempty"`                                                // 始终为公历 UTC
+	FireCount   int   `json:"fire_count"`
 
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	CreatedAt Time `json:"created_at"`
+	UpdatedAt Time `json:"updated_at"`
 }
 
 // ReminderChannel 提醒与通道的多对多关联。

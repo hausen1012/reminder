@@ -89,6 +89,8 @@ Engine 定时器到期
 | `configs` | 站点配置（键值对） |
 
 数据库迁移在启动时自动执行（`AutoMigrate`），新增字段自动补齐。
+时间列会额外做一次值转换（`normalizeTimeColumns`），把旧版本遗留的时间文本
+就地转成整数毫秒，详见下文「时区处理」。
 
 ## 前端结构
 
@@ -104,23 +106,32 @@ Engine 定时器到期
 
 ## 时区处理
 
-- 数据库里存的时间统一为 UTC（`next_fire_at` 等始终是 `+00:00`）。
-  这条覆盖**所有**时间列：手写赋值的字段走 `timezone.UTC` / `UTCPtr`，
-  GORM 自动填充的 `created_at` / `updated_at` 由 `database.gormConfig()` 里的
-  `NowFunc` 强制成 UTC
+- 所有时间列在数据库里存 **Unix 毫秒整数**，不再是时间文本。
+  模型层用 `models.Time`（内嵌 `time.Time`，实现 `driver.Valuer` / `sql.Scanner`）
+  统一转换，写入时自动归一化为 UTC
 - 时区是**站点级全局设置**（面板「设置」页，按 `config` 表 `key=timezone` 保存），不按提醒保存
 - 调度计算时按站点时区解释 `schedule_spec` 里的本地时间（如 `09:00` 表示当地 9 点）
-- 展示时前端按站点时区渲染（`lib/datetime.ts` 的 `formatInZone`），不依赖浏览器本地时区
+- 展示时前端按站点时区渲染（`lib/datetime.ts` 的 `formatInZone`），不依赖浏览器本地时区。
+  接口返回的时间仍是 RFC3339 字符串，形态与早期版本一致
 - 在设置页改时区会立刻重建 cron 实例、按新时区重算并回写所有启用提醒的 `next_fire_at`，无需重启
   （`Engine.ReloadTimezone` → `Engine.RecomputeNextFire`）。只重建不重算是不够的：
   sweeper 依据库里的 `next_fire_at` 判断补漏，旧值在新时区下会变成过去时间，
   导致错误补发或被误标 `expired`
 - 重建 cron 实例时，每日日志清理等维护型任务会一并恢复（`Engine.purgeJobs`）
 
-::: warning SQLite 按文本比较时间
-`next_fire_at` 是带偏移的文本（如 `2026-10-26 18:23:02+08:00`）。
-文本比较对混合偏移会错序，所以时间范围查询统一用 `julianday(col)` 比较，
-并保证新写入的时间一律是 UTC。
+::: tip 为什么时间存整数而不是文本
+早期版本直接用 `time.Time`，go-sqlite3 会写成
+`2026-10-26 18:23:02.123456789+08:00` 这类变宽小数位、带时区偏移的文本。
+SQLite 对这种列按字典序比较，两行偏移不同时同一时刻会被排到不同位置，
+范围查询与排序都会失真。当时的补救是在 SQL 里套 `julianday()`，
+但函数包裹列会让**索引完全失效**（退化为全表扫描），而且 `julianday` 是浮点天数，
+等值比较只到约 50µs 精度，乐观锁的精确匹配形同虚设。
+
+改存整数毫秒后：比较与排序都是整数语义，`(enabled, next_fire_at)` 复合索引
+可直接走范围扫描，等值精确，也不必再靠"记得把时间转成 UTC"这条纪律维持正确性。
+
+升级时 `AutoMigrate` 只改列类型、不转换既有值，因此启动阶段还会跑一次
+`database.normalizeTimeColumns`，把残留的文本按值转成整数毫秒（解析不了的脏值置 NULL）。
 :::
 
 ## 并发与一致性
