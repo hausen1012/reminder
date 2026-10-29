@@ -31,64 +31,6 @@ func newTestScheduler(t *testing.T) (*scheduler.Engine, *scheduler.Sweeper) {
 	return engine, sweeper
 }
 
-// 提醒试发（test-dry）：各类失败路径与成功路径。
-func TestReminderTestDryRun(t *testing.T) {
-	r, db := newReminderTestEngine(t)
-
-	// 无通道 → 400
-	if w := doJSON(r, http.MethodPost, "/reminders/test-dry", map[string]any{
-		"title":       "标题",
-		"content":     "正文",
-		"channel_ids": []uint{},
-	}); w.Code != http.StatusBadRequest {
-		t.Fatalf("无通道应 400，实际 %d, body=%s", w.Code, w.Body.String())
-	}
-
-	// 标题为空白 → 400
-	if w := doJSON(r, http.MethodPost, "/reminders/test-dry", map[string]any{
-		"title":       "   ",
-		"content":     "正文",
-		"channel_ids": []uint{1},
-	}); w.Code != http.StatusBadRequest {
-		t.Fatalf("空标题应 400，实际 %d", w.Code)
-	}
-
-	// 通道不存在 → 400（没有可用通道）
-	if w := doJSON(r, http.MethodPost, "/reminders/test-dry", map[string]any{
-		"title":       "标题",
-		"content":     "正文",
-		"channel_ids": []uint{9999},
-	}); w.Code != http.StatusBadRequest {
-		t.Fatalf("通道不存在应 400，实际 %d", w.Code)
-	}
-
-	// 正常：真实 log 通道应发送成功
-	ch := &models.Channel{Name: "dry-log", Type: "log", Enabled: true, Config: []byte("{}")}
-	if err := db.Create(ch).Error; err != nil {
-		t.Fatalf("创建通道失败: %v", err)
-	}
-	w := doJSON(r, http.MethodPost, "/reminders/test-dry", map[string]any{
-		"title":       "试发标题",
-		"content":     "试发正文 {{now_date}}",
-		"channel_ids": []uint{ch.ID},
-	})
-	if w.Code != http.StatusOK {
-		t.Fatalf("试发应成功，实际 %d, body=%s", w.Code, w.Body.String())
-	}
-}
-
-// 通道试发：未知类型应 400。
-func TestChannelTestDryRun(t *testing.T) {
-	r := newChannelTestEngine(t)
-
-	if w := doJSON(r, http.MethodPost, "/channels/test-dry", map[string]any{
-		"type":   "telegram",
-		"config": map[string]any{},
-	}); w.Code != http.StatusBadRequest {
-		t.Fatalf("未知类型应 400，实际 %d, body=%s", w.Code, w.Body.String())
-	}
-}
-
 // 调度器状态接口应返回 engine 与 sweeper 状态。
 func TestSchedulerStatus(t *testing.T) {
 	gin.SetMode(gin.TestMode)

@@ -1,7 +1,6 @@
 package services
 
 import (
-	"errors"
 	"testing"
 	"time"
 
@@ -217,33 +216,6 @@ func TestConfirmConsumeToken_DBError(t *testing.T) {
 
 	if _, err := svc.ConsumeToken("any"); err == nil {
 		t.Fatal("DB 关闭后应报错")
-	}
-}
-
-// isUniqueErr 应识别 SQLite 的唯一约束错误。
-func TestIsUniqueErr(t *testing.T) {
-	if isUniqueErr(nil) {
-		t.Fatal("nil 不应判为唯一约束错误")
-	}
-	if isUniqueErr(errors.New("some other error")) {
-		t.Fatal("普通错误不应判为唯一约束错误")
-	}
-
-	db := openTestDB(t)
-	svc := NewChannelService(db, nil, testTZ(cstZone()))
-	if _, err := svc.Create(ChannelInput{Name: "dup", Type: "log", Config: map[string]any{}}); err != nil {
-		t.Fatalf("创建失败: %v", err)
-	}
-	// 重复名称触发唯一约束
-	_, err := svc.Create(ChannelInput{Name: "dup", Type: "log", Config: map[string]any{}})
-	if err == nil {
-		t.Fatal("重复名称应报错")
-	}
-	if !isUniqueErr(errors.Unwrap(err)) && !isUniqueErr(err) {
-		// 包装层可能不是原始错误，这里只要求走了"名称已存在"分支
-		if !containsSub(err.Error(), "已存在") {
-			t.Fatalf("应提示名称已存在，实际 %v", err)
-		}
 	}
 }
 

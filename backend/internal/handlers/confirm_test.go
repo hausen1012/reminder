@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"net/http"
-	"strings"
 	"testing"
 	"time"
 
@@ -152,11 +151,6 @@ func TestEscapeHTML_Combined(t *testing.T) {
 	if got != want {
 		t.Fatalf("escapeHTML(%q) = %q, 期望 %q", in, got, want)
 	}
-}
-
-// containsSub 判断字符串是否包含子串。
-func containsSub(s, sub string) bool {
-	return strings.Contains(s, sub)
 }
 
 // testConfig 返回测试用配置。

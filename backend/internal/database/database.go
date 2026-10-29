@@ -31,6 +31,13 @@ var allModels = []any{
 	&models.Config{},
 }
 
+// AllModels 返回建表所需的全部模型清单。
+//
+// 除 Init 外，测试用的内存库也用它建表，避免测试各自维护一份模型列表后与生产脱节。
+func AllModels() []any {
+	return append([]any(nil), allModels...)
+}
+
 func Init(cfg *config.Config) error {
 	dir := filepath.Dir(cfg.DBPath)
 	if err := os.MkdirAll(dir, 0755); err != nil {

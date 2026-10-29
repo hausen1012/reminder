@@ -33,16 +33,20 @@ backend/
   internal/
     config/            环境变量解析
     database/          连接与迁移
+    logger/            全局 slog 配置
     models/            GORM 模型
     handlers/          HTTP 处理器
     services/          业务逻辑
     scheduler/         调度引擎与兜底扫描
     notifier/          各通道发送实现
     middleware/        鉴权、错误、CORS、限流
+    timezone/          站点时区（运行期可改）
+    router/            路由装配
     crypto/secretbox/  对称加密
+    testutil/          仅测试用的脚手架（内存库、固定时区）
 frontend/
   src/
-    pages/  components/  contexts/  lib/  ui/
+    pages/  components/  contexts/  lib/  types/  test/
 docs-site/             文档站点（VitePress）
 docs/                  设计与实施记录
 ```
@@ -66,9 +70,12 @@ cd backend && go test ./... -race -count=1
 测试覆盖的重点路径包括：调度乐观锁、兜底补发与过期、通道投递状态机、确认重发链、
 外部 API 令牌隔离、确认链接转义。
 
-写测试时的两个惯例：
+写测试时的三个惯例：
 
-- 用内存 SQLite 建库，通过 `testutil_test.go` 里的辅助函数构造数据
+- 内存 SQLite 建库与固定时区统一走 `internal/testutil`（`testutil.NewDB(t)`、
+  `testutil.CST()`、`testutil.TZ(loc)`），各包不再各自抄一份建库代码
+- 每个包共享的脚手架（fake 替身、造数辅助、等待函数）集中放在该包的
+  `testutil_test.go`，不散落在具体用例文件里
 - handler 的测试通过 `httptest` 打真实路由，而不是直接调用方法
 
 ## 前端测试

@@ -53,9 +53,11 @@ func newReminderTestEngine(t *testing.T) (*gin.Engine, *gorm.DB) {
 // noopScheduler 是 services.SchedulerHook 的空实现，避免测试启动真实调度。
 type noopScheduler struct{}
 
-func (noopScheduler) Add(_ *models.Reminder) error    { return nil }
+func (noopScheduler) Add(_ *models.Reminder) error { return nil }
+
 func (noopScheduler) Update(_ *models.Reminder) error { return nil }
-func (noopScheduler) Remove(_ uint)                   {}
+
+func (noopScheduler) Remove(_ uint) {}
 
 // 最小合法入参。
 func onceBody(at string) map[string]any {
@@ -223,5 +225,72 @@ func TestReminderBatchDelete(t *testing.T) {
 
 	if w := doJSON(r, http.MethodDelete, "/reminders/batch", map[string]any{"ids": ids}); w.Code != http.StatusOK {
 		t.Fatalf("批量删除状态码 = %d", w.Code)
+	}
+}
+
+// 提醒列表：非法 limit/offset 应被容错（不报错）。
+func TestReminderList_BadParamsTolerated(t *testing.T) {
+	r, _ := newReminderTestEngine(t)
+
+	if w := doJSON(r, http.MethodGet, "/reminders?limit=abc&offset=xyz", nil); w.Code != http.StatusOK {
+		t.Fatalf("非法分页参数应容错，实际 %d", w.Code)
+	}
+	if w := doJSON(r, http.MethodGet, "/reminders?sort_by=id;DROP&sort_order=asc", nil); w.Code != http.StatusOK {
+		t.Fatalf("非法排序应容错，实际 %d", w.Code)
+	}
+}
+
+// 提醒 upcoming 的 within 非法值应回退为默认，不报错。
+func TestReminderUpcoming_BadWithin(t *testing.T) {
+	r, _ := newReminderTestEngine(t)
+
+	if w := doJSON(r, http.MethodGet, "/reminders/upcoming?within=bad-value", nil); w.Code != http.StatusOK {
+		t.Fatalf("非法 within 应容错，实际 %d", w.Code)
+	}
+}
+
+// 提醒试发（test-dry）：各类失败路径与成功路径。
+func TestReminderTestDryRun(t *testing.T) {
+	r, db := newReminderTestEngine(t)
+
+	// 无通道 → 400
+	if w := doJSON(r, http.MethodPost, "/reminders/test-dry", map[string]any{
+		"title":       "标题",
+		"content":     "正文",
+		"channel_ids": []uint{},
+	}); w.Code != http.StatusBadRequest {
+		t.Fatalf("无通道应 400，实际 %d, body=%s", w.Code, w.Body.String())
+	}
+
+	// 标题为空白 → 400
+	if w := doJSON(r, http.MethodPost, "/reminders/test-dry", map[string]any{
+		"title":       "   ",
+		"content":     "正文",
+		"channel_ids": []uint{1},
+	}); w.Code != http.StatusBadRequest {
+		t.Fatalf("空标题应 400，实际 %d", w.Code)
+	}
+
+	// 通道不存在 → 400（没有可用通道）
+	if w := doJSON(r, http.MethodPost, "/reminders/test-dry", map[string]any{
+		"title":       "标题",
+		"content":     "正文",
+		"channel_ids": []uint{9999},
+	}); w.Code != http.StatusBadRequest {
+		t.Fatalf("通道不存在应 400，实际 %d", w.Code)
+	}
+
+	// 正常：真实 log 通道应发送成功
+	ch := &models.Channel{Name: "dry-log", Type: "log", Enabled: true, Config: []byte("{}")}
+	if err := db.Create(ch).Error; err != nil {
+		t.Fatalf("创建通道失败: %v", err)
+	}
+	w := doJSON(r, http.MethodPost, "/reminders/test-dry", map[string]any{
+		"title":       "试发标题",
+		"content":     "试发正文 {{now_date}}",
+		"channel_ids": []uint{ch.ID},
+	})
+	if w.Code != http.StatusOK {
+		t.Fatalf("试发应成功，实际 %d, body=%s", w.Code, w.Body.String())
 	}
 }

@@ -4,15 +4,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/reminder/backend/internal/config"
 	"github.com/reminder/backend/internal/models"
 	"gorm.io/gorm"
 )
-
-// testCfg 返回测试用配置。
-func testCfg() *config.Config {
-	return &config.Config{BaseURL: "http://base.test"}
-}
 
 // newLogSvc 构造日志服务。
 func newLogSvc(t *testing.T, baseURL string) (*LogService, *gorm.DB) {

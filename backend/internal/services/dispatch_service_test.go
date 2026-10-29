@@ -1,13 +1,20 @@
 package services
 
 import (
+	"bytes"
 	"context"
-	"fmt"
+	"encoding/json"
+	"log/slog"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/reminder/backend/internal/crypto/secretbox"
 	"github.com/reminder/backend/internal/models"
+	"github.com/reminder/backend/internal/notifier"
+	"github.com/reminder/backend/internal/testutil"
 	"gorm.io/gorm"
 )
 
@@ -15,7 +22,7 @@ import (
 func createChannel(t *testing.T, db *gorm.DB, chType string, enabled bool) *models.Channel {
 	t.Helper()
 	ch := &models.Channel{
-		Name:    fmt.Sprintf("%s-%d", chType, time.Now().UnixNano()),
+		Name:    testutil.UniqueName(chType),
 		Type:    chType,
 		Enabled: enabled,
 		Config:  []byte("{}"),
@@ -256,4 +263,283 @@ func TestDispatchRun_NilOrZeroArgs(t *testing.T) {
 
 	dispatch.Run(context.Background(), nil, 1)
 	dispatch.Run(context.Background(), &models.Reminder{}, 0)
+}
+
+// newDispatchForDryRun 构造仅用于试发的 dispatch 服务。
+func newDispatchForDryRun(t *testing.T, db *gorm.DB) *DispatchService {
+	t.Helper()
+	loc := time.FixedZone("CST", 8*3600)
+	d := NewDispatchService(db, &ChannelService{DB: db, TZ: testTZ(loc)}, testTZ(loc))
+	d.RetryDelays = []time.Duration{0}
+	return d
+}
+
+// DryRun 全成功时不返回错误，且不落任何日志/attempt。
+func TestDispatchDryRun_AllSucceedNoRecords(t *testing.T) {
+	db := openTestDB(t)
+	d := newDispatchForDryRun(t, db)
+
+	ch1 := createChannel(t, db, "log", true)
+	ch2 := createChannel(t, db, "log", true)
+
+	msg := buildRenderedMessage("标题", "正文", "text", map[string]string{"title": "标题", "content": "正文"})
+	if err := d.DryRun(t.Context(), []*models.Channel{ch1, ch2}, msg); err != nil {
+		t.Fatalf("DryRun 应成功: %v", err)
+	}
+
+	// 试发不应写任何记录
+	var logs, attempts int64
+	db.Model(&models.DeliveryLog{}).Count(&logs)
+	db.Model(&models.DeliveryAttempt{}).Count(&attempts)
+	if logs != 0 || attempts != 0 {
+		t.Fatalf("试发不应落库，实际 logs=%d attempts=%d", logs, attempts)
+	}
+}
+
+// DryRun 遇到未知通道类型时应返回错误，且错误信息包含通道信息。
+func TestDispatchDryRun_UnknownTypeFails(t *testing.T) {
+	db := openTestDB(t)
+	d := newDispatchForDryRun(t, db)
+
+	bad := &models.Channel{Name: "bad", Type: "unknown", Enabled: true, Config: []byte("{}")}
+	err := d.DryRun(t.Context(), []*models.Channel{bad}, buildRenderedMessage("t", "c", "text", map[string]string{}))
+	if err == nil {
+		t.Fatal("未知类型应报错")
+	}
+	if !containsSub(err.Error(), "bad") {
+		t.Fatalf("错误信息应包含通道名: %v", err)
+	}
+}
+
+// DryRun 空通道列表应直接成功。
+func TestDispatchDryRun_Empty(t *testing.T) {
+	db := openTestDB(t)
+	d := newDispatchForDryRun(t, db)
+
+	if err := d.DryRun(t.Context(), nil, buildRenderedMessage("t", "c", "text", map[string]string{})); err != nil {
+		t.Fatalf("空通道应成功: %v", err)
+	}
+}
+
+// DryRun 的 ctx 取消时应尽快返回。
+func TestDispatchDryRun_ContextCancelled(t *testing.T) {
+	db := openTestDB(t)
+	d := newDispatchForDryRun(t, db)
+	d.RetryDelays = []time.Duration{0, time.Hour} // 第二次重试要等很久
+
+	// 用一个必定失败的通道类型触发重试分支
+	bad := &models.Channel{Name: "x", Type: "unknown", Enabled: true, Config: []byte("{}")}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	done := make(chan error, 1)
+	go func() {
+		done <- d.DryRun(ctx, []*models.Channel{bad}, buildRenderedMessage("t", "c", "text", map[string]string{}))
+	}()
+
+	select {
+	case <-done:
+		// 已返回
+	case <-time.After(5 * time.Second):
+		t.Fatal("ctx 取消后 DryRun 未及时返回")
+	}
+}
+
+// 渲染后的消息里 {{now_date}} 应被替换，且 content 变量被回写。
+func TestBuildRenderedMessage(t *testing.T) {
+	vars := map[string]string{"title": "标题", "content": "正文", "now_date": "2026-01-01"}
+	msg := buildRenderedMessage("{{title}}", "今天是 {{now_date}}", "text", vars)
+
+	if msg.Subject != "标题" {
+		t.Fatalf("subject = %q", msg.Subject)
+	}
+	if msg.Body != "今天是 2026-01-01" {
+		t.Fatalf("body = %q", msg.Body)
+	}
+	// vars["content"] 应被回写为渲染后的 body
+	if vars["content"] != msg.Body {
+		t.Fatalf("vars[content] = %q，应回写为渲染结果", vars["content"])
+	}
+	if msg.Format != "text" {
+		t.Fatalf("format = %q", msg.Format)
+	}
+}
+
+// buildVars 应包含设计文档列出的全部内置变量。
+func TestBuildVars(t *testing.T) {
+	loc := time.FixedZone("CST", 8*3600)
+	planned := time.Date(2026, 6, 5, 9, 0, 0, 0, loc)
+	fired := planned.Add(2 * time.Second)
+
+	r := &models.Reminder{
+		Title: "标题", Content: "正文", Source: "web", ID: 42,
+	}
+	vars := buildVars(r, fired, planned, loc)
+
+	required := []string{
+		"now", "now_date", "now_time", "fire_at",
+		"trigger_date", "trigger_time", "weekday",
+		"title", "content", "lunar_date", "reminder_id", "reminder_source",
+	}
+	for _, k := range required {
+		if _, ok := vars[k]; !ok {
+			t.Fatalf("缺少内置变量 %q", k)
+		}
+	}
+
+	if vars["title"] != "标题" || vars["content"] != "正文" {
+		t.Fatalf("title/content 不正确: %v", vars)
+	}
+	if vars["reminder_id"] != "42" {
+		t.Fatalf("reminder_id = %q", vars["reminder_id"])
+	}
+	if vars["fire_at"] != "2026-06-05 09:00:00" {
+		t.Fatalf("fire_at = %q", vars["fire_at"])
+	}
+	// weekday 应为中文
+	if vars["weekday"] != "周五" {
+		t.Fatalf("weekday = %q，期望 周五", vars["weekday"])
+	}
+	// lunar_date 应含"农历"
+	if !containsSub(vars["lunar_date"], "农历") {
+		t.Fatalf("lunar_date = %q", vars["lunar_date"])
+	}
+}
+
+// buildVars 传 nil 时区应回退到 Local，不 panic。
+func TestBuildVars_NilLocation(t *testing.T) {
+	now := time.Now()
+	r := &models.Reminder{Title: "t"}
+	vars := buildVars(r, now, now, nil)
+	if vars["now"] == "" {
+		t.Fatal("nil 时区时应回退到 Local")
+	}
+}
+
+// captureLogs 把全局 slog 临时重定向到内存 buffer，t.Cleanup 时还原。
+//
+// slog.SetDefault 是进程级全局状态，因此本文件里的用例都不要标记 t.Parallel。
+func captureLogs(t *testing.T) *bytes.Buffer {
+	t.Helper()
+	buf := &bytes.Buffer{}
+	old := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(buf, &slog.HandlerOptions{Level: slog.LevelDebug})))
+	t.Cleanup(func() { slog.SetDefault(old) })
+	return buf
+}
+
+// 投递日志不能泄露确认链接。
+//
+// vars 里带 confirm_url，拼出来就是完整可用的确认令牌；
+// 谁读到日志谁就能替用户把提醒确认掉，因此绝不能出现在日志里。
+// 这里刻意不用 log 通道——它的职责就是把正文打进日志，会掩盖要验证的点。
+func TestDispatchLogDoesNotLeakConfirmURL(t *testing.T) {
+	logs := captureLogs(t)
+
+	sink := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer sink.Close()
+
+	db := openTestDB(t)
+	stack := newConfirmTestStack(t, db)
+	reminder := createConfirmReminderWithWebhook(t, db, 60, 1, sink.URL)
+
+	if _, err := triggerDispatch(context.Background(), stack.dispatch, reminder); err != nil {
+		t.Fatalf("触发投递失败: %v", err)
+	}
+
+	var tok models.ConfirmToken
+	if err := db.First(&tok).Error; err != nil {
+		t.Fatalf("确认令牌未创建: %v", err)
+	}
+	if len(tok.Token) < 32 {
+		t.Fatalf("令牌长度异常: %q", tok.Token)
+	}
+
+	out := logs.String()
+	if strings.Contains(out, tok.Token) {
+		t.Fatalf("日志里出现了确认令牌明文:\n%s", out)
+	}
+	// 变量数量这类"形状信息"仍应保留，便于排查
+	if !strings.Contains(out, "vars_count") {
+		t.Fatalf("日志缺少 vars_count 字段，排查信息丢失:\n%s", out)
+	}
+}
+
+// webhook 通道的日志不能带 Authorization 等 header 取值。
+func TestWebhookLogRedactsCredentials(t *testing.T) {
+	logs := captureLogs(t)
+
+	const secretValue = "super-secret-token-value"
+	var gotAuth string
+	sink := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotAuth = r.Header.Get("Authorization")
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer sink.Close()
+
+	// WebhookConfig.AuthorizationEnc 在传入 Notifier 时已是明文
+	// （ChannelService 负责落库加密与读出解密），这里直接给明文。
+	cfg, _ := json.Marshal(map[string]any{
+		"method":            "POST",
+		"url":               sink.URL + "/hook?access_token=query-secret",
+		"authorization_enc": "Bearer " + secretValue,
+	})
+
+	n, err := notifier.Get("webhook")
+	if err != nil {
+		t.Fatalf("获取 webhook 发送器失败: %v", err)
+	}
+	if err := n.Send(context.Background(), cfg, notifier.Message{Subject: "s", Body: "b"}); err != nil {
+		t.Fatalf("webhook 发送失败: %v", err)
+	}
+
+	// 凭据必须真的发出去（功能没被削弱）
+	if gotAuth != "Bearer "+secretValue {
+		t.Fatalf("Authorization 未正确发送: %q", gotAuth)
+	}
+
+	out := logs.String()
+	for _, leak := range []string{secretValue, "query-secret"} {
+		if strings.Contains(out, leak) {
+			t.Fatalf("日志里出现了凭据 %q:\n%s", leak, out)
+		}
+	}
+}
+
+// createConfirmReminderWithWebhook 用 webhook 通道创建"需要确认"的提醒。
+func createConfirmReminderWithWebhook(t *testing.T, db *gorm.DB, intervalSec, maxRetries int, url string) *models.Reminder {
+	t.Helper()
+	cfg, _ := json.Marshal(map[string]any{"method": "POST", "url": url})
+	channel := &models.Channel{
+		Name:    testutil.UniqueName("webhook"),
+		Type:    "webhook",
+		Enabled: true,
+		Config:  cfg,
+	}
+	if err := db.Create(channel).Error; err != nil {
+		t.Fatalf("创建测试通道失败: %v", err)
+	}
+	next := time.Now().Add(time.Hour).UTC()
+	reminder := &models.Reminder{
+		Title:                   "确认机制测试",
+		Content:                 "请点击 {{confirm_url}} 完成确认",
+		Calendar:                "solar",
+		ScheduleType:            "once",
+		Enabled:                 true,
+		RequireConfirm:          true,
+		ConfirmRetryIntervalSec: intervalSec,
+		ConfirmMaxRetries:       maxRetries,
+		Source:                  "web",
+		NextFireAt:              models.TimePtrOf(next),
+	}
+	if err := db.Create(reminder).Error; err != nil {
+		t.Fatalf("创建测试提醒失败: %v", err)
+	}
+	if err := db.Create(&models.ReminderChannel{ReminderID: reminder.ID, ChannelID: channel.ID}).Error; err != nil {
+		t.Fatalf("绑定测试通道失败: %v", err)
+	}
+	return reminder
 }
