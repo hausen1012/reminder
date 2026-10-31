@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { ConfirmDialog } from '@/components/channels/ConfirmDialog'
+import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 
 describe('ConfirmDialog', () => {
   it('open=false 时不渲染内容', () => {

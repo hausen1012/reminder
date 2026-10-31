@@ -2,7 +2,7 @@ import React from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { FilterToolbar } from '@/components/ui/FilterToolbar'
+import { FilterToolbar } from '@/components/common/FilterToolbar'
 
 function setup(overrides: Partial<React.ComponentProps<typeof FilterToolbar>> = {}) {
   const props = {

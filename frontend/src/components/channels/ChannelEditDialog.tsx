@@ -19,11 +19,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useToast } from '@/components/ui/use-toast'
-import { SMTPForm } from './SMTPForm'
-import { DingTalkForm } from './DingTalkForm'
-import { WeComForm } from './WeComForm'
-import { WebhookForm } from './WebhookForm'
-import { LogForm } from './LogForm'
+import { SMTPForm, DingTalkForm, WeComForm, WebhookForm, LogForm } from './ChannelForms'
 import type { Channel, ChannelType } from '@/types'
 import { toChannelType } from '@/types'
 import { createChannel, extractApiError, testChannelDryRun, updateChannel } from '@/lib/api'

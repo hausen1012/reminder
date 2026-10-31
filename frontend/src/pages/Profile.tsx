@@ -2,8 +2,7 @@ import { useState, useEffect, type FormEvent } from 'react'
 import { Loader2, Github, BookOpen, ExternalLink } from 'lucide-react'
 import { extractApiError, updatePassword } from '@/lib/api'
 import { useConfig } from '@/contexts/ConfigContext'
-import { COMMON_TIMEZONES } from '@/lib/timezones'
-import { DOCS_URL, GITHUB_URL } from '@/lib/links'
+import { COMMON_TIMEZONES, DOCS_URL, GITHUB_URL } from '@/lib/constants'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -16,8 +15,8 @@ import {
 } from '@/components/ui/select'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useToast } from '@/components/ui/use-toast'
-import { AppLogo } from '@/components/ui/AppLogo'
-import { PageHeader } from '@/components/ui/PageHeader'
+import { AppLogo } from '@/components/common/AppLogo'
+import { PageHeader } from '@/components/common/PageHeader'
 
 export default function Profile() {
   // --- 修改密码 ---

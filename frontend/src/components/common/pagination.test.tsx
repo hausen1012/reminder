@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { Pagination } from '@/components/ui/pagination'
+import { Pagination } from '@/components/common/pagination'
 
 describe('Pagination', () => {
   it('无数据时显示 0-0 与 1/1', () => {

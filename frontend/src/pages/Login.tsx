@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { AppLogo } from '@/components/ui/AppLogo'
+import { AppLogo } from '@/components/common/AppLogo'
 import { extractApiError } from '@/lib/api'
 
 export default function Login() {

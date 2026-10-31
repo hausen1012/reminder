@@ -8,7 +8,7 @@ import { listTodayReminders, listLogs, listChannelStats, listTokenStats } from '
 import { formatReminderDetail } from '@/lib/utils'
 import { formatInZone } from '@/lib/datetime'
 import { useSiteTimezone } from '@/contexts/ConfigContext'
-import { PageHeader } from '@/components/ui/PageHeader'
+import { PageHeader } from '@/components/common/PageHeader'
 import type { Reminder, DeliveryLog } from '@/types'
 import type { ChannelStats } from '@/lib/api'
 

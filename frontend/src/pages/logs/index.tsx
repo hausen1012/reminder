@@ -19,8 +19,8 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { PageHeader } from '@/components/ui/PageHeader'
-import { FilterToolbar } from '@/components/ui/FilterToolbar'
+import { PageHeader } from '@/components/common/PageHeader'
+import { FilterToolbar } from '@/components/common/FilterToolbar'
 import { Badge } from '@/components/ui/badge'
 import {
   Select,
@@ -40,9 +40,9 @@ import {
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Separator } from '@/components/ui/separator'
 import { useToast } from '@/components/ui/use-toast'
-import { Pagination } from '@/components/ui/pagination'
+import { Pagination } from '@/components/common/pagination'
 import { Checkbox } from '@/components/ui/checkbox'
-import { ConfirmDialog } from '@/components/channels/ConfirmDialog'
+import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { listLogs, getLogDetail, purgeLogs, countPurgeLogs, batchDeleteLogs, extractApiError } from '@/lib/api'
 import { formatInZone } from '@/lib/datetime'
 import { useSiteTimezone } from '@/contexts/ConfigContext'

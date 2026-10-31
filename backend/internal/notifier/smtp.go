@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -141,6 +142,11 @@ func resolveSMTPSecurityMode(cfg SMTPConfig) (string, error) {
 	default:
 		return "", fmt.Errorf("未知 SMTP 安全模式: %s", cfg.SecurityMode)
 	}
+}
+
+// base64Encode 供 MIME header 的 RFC 2047 编码使用（=?UTF-8?B?...?=）。
+func base64Encode(s string) string {
+	return base64.StdEncoding.EncodeToString([]byte(s))
 }
 
 // buildMIME 构造一个最小可用的 MIME 邮件文本：

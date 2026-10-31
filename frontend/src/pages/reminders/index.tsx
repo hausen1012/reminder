@@ -13,9 +13,9 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useToast } from '@/components/ui/use-toast'
-import { Pagination } from '@/components/ui/pagination'
+import { Pagination } from '@/components/common/pagination'
 import { ReminderEditDialog } from '@/components/reminders/ReminderEditDialog'
-import { ConfirmDialog } from '@/components/channels/ConfirmDialog'
+import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import {
   batchDeleteReminders,
   createReminder,
@@ -29,9 +29,9 @@ import {
 import { formatReminderDetail } from '@/lib/utils'
 import { formatInZone, formatNextFireInZone } from '@/lib/datetime'
 import { useSiteTimezone } from '@/contexts/ConfigContext'
-import { SortIcon } from '@/components/ui/SortIcon'
-import { PageHeader } from '@/components/ui/PageHeader'
-import { FilterToolbar } from '@/components/ui/FilterToolbar'
+import { SortIcon } from '@/components/common/SortIcon'
+import { PageHeader } from '@/components/common/PageHeader'
+import { FilterToolbar } from '@/components/common/FilterToolbar'
 import type { Channel, Reminder } from '@/types'
 
 const SOURCE_LABEL: Record<string, string> = {

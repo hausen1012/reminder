@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { render, screen } from '@testing-library/react'
-import { PageHeader } from '@/components/ui/PageHeader'
-import { SortIcon } from '@/components/ui/SortIcon'
-import { AppLogo } from '@/components/ui/AppLogo'
+import { PageHeader } from '@/components/common/PageHeader'
+import { SortIcon } from '@/components/common/SortIcon'
+import { AppLogo } from '@/components/common/AppLogo'
 
 describe('PageHeader', () => {
   it('渲染标题', () => {

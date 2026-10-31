@@ -1,3 +1,6 @@
+// Package config 解析环境变量并给出运行时配置的默认值。
+//
+// 所有可调项集中在这里，配置项的含义与文档见 docs-site/guide/configuration.md。
 package config
 
 import (
@@ -67,6 +70,7 @@ func Load() *Config {
 	return cfg
 }
 
+// getEnv 读环境变量，未设置或为空时返回 fallback。
 func getEnv(key, fallback string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
@@ -74,6 +78,7 @@ func getEnv(key, fallback string) string {
 	return fallback
 }
 
+// getEnvInt 读整数环境变量，缺失或解析失败时返回 fallback。
 func getEnvInt(key string, fallback int) int {
 	v := os.Getenv(key)
 	if v == "" {
@@ -87,6 +92,7 @@ func getEnvInt(key string, fallback int) int {
 	return n
 }
 
+// randomSecret 生成 32 字节随机串作为 JWT 密钥。
 func randomSecret() string {
 	b := make([]byte, 32)
 	if _, err := rand.Read(b); err != nil {

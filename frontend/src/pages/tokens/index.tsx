@@ -3,8 +3,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { Plus, Trash2, Copy, CheckCircle2, Pencil, Terminal, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { PageHeader } from '@/components/ui/PageHeader'
-import { FilterToolbar } from '@/components/ui/FilterToolbar'
+import { PageHeader } from '@/components/common/PageHeader'
+import { FilterToolbar } from '@/components/common/FilterToolbar'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
@@ -16,7 +16,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Pagination } from '@/components/ui/pagination'
+import { Pagination } from '@/components/common/pagination'
 import { ChannelMultiSelect } from '@/components/channels/ChannelMultiSelect'
 import {
   Select,

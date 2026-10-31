@@ -1,8 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
-import { ProtectedRoute } from '@/components/guards/ProtectedRoute'
-import { PublicRoute } from '@/components/guards/PublicRoute'
+import { ProtectedRoute, PublicRoute } from '@/components/common/Routing'
 
 // mock useAuth，让守卫组件按需返回不同状态
 const mockAuth = vi.fn()

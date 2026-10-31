@@ -2,8 +2,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
-import { Sidebar } from '@/components/layout/Sidebar'
-import { AppLayout } from '@/components/layout/AppLayout'
+import { AppLayout, Sidebar } from '@/components/layout/Layout'
 
 // mock 三个 context，避免依赖 Provider 树
 const mockTheme = vi.fn()
