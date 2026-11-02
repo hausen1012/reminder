@@ -267,3 +267,52 @@ describe('api 监控与配置', () => {
     })
   })
 })
+
+describe('api AI 助手', () => {
+  beforeEach(() => mockRequest.mockReset())
+
+  it('getAISettings / updateAISettings', async () => {
+    mockRequest.mockReturnValue(respond({ data: { enabled: true } }))
+    expect(await api.getAISettings()).toEqual({ enabled: true })
+    expect(mockRequest).toHaveBeenCalledWith('get', '/ai/settings')
+
+    const input = { enabled: true, provider: 'openai' as const, base_url: '', model: 'm', api_key: '***' }
+    await api.updateAISettings(input)
+    expect(mockRequest).toHaveBeenCalledWith('put', '/ai/settings', input)
+  })
+
+  it('testAIConnection 提交配置', async () => {
+    mockRequest.mockReturnValue(respond({ data: { reply: 'OK' } }))
+    const input = { enabled: true, provider: 'anthropic' as const, base_url: '', model: 'm', api_key: '' }
+    expect(await api.testAIConnection(input)).toEqual({ reply: 'OK' })
+    expect(mockRequest).toHaveBeenCalledWith('post', '/ai/test', input)
+  })
+
+  it('sendAIChat 上传历史并放宽超时', async () => {
+    mockRequest.mockReturnValue(respond({ data: { reply: 'x', actions: [] } }))
+    const history = [{ role: 'user' as const, content: '上一句' }]
+    const res = await api.sendAIChat('这一句', history)
+    expect(mockRequest).toHaveBeenCalledWith(
+      'post',
+      '/ai/chat',
+      { message: '这一句', history },
+      { timeout: 120000 },
+    )
+    expect(res.reply).toBe('x')
+  })
+
+  it('listAIActions 返回空数组而不是 undefined', async () => {
+    mockRequest.mockReturnValue(respond({ data: null }))
+    expect(await api.listAIActions()).toEqual([])
+    expect(mockRequest).toHaveBeenCalledWith('get', '/ai/actions', { params: { status: 'pending' } })
+  })
+
+  it('applyAIAction / rejectAIAction', async () => {
+    mockRequest.mockReturnValue(respond({ data: { id: 'a1', status: 'applied' } }))
+    await api.applyAIAction('a1')
+    expect(mockRequest).toHaveBeenCalledWith('post', '/ai/actions/a1/apply')
+
+    await api.rejectAIAction('a1')
+    expect(mockRequest).toHaveBeenCalledWith('post', '/ai/actions/a1/reject')
+  })
+})

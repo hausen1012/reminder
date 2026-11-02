@@ -41,6 +41,7 @@ backend/
     notifier/          各通道发送实现
     middleware/        鉴权、错误、CORS、限流
     timezone/          站点时区（运行期可改）
+    llm/               厂商无关的对话接口（Anthropic / OpenAI 兼容实现）
     router/            路由装配
     crypto/secretbox/  对称加密
     testutil/          仅测试用的脚手架（内存库、固定时区）
@@ -73,7 +74,12 @@ cd backend && go test ./... -race -count=1
 ```
 
 测试覆盖的重点路径包括：调度乐观锁、兜底补发与过期、通道投递状态机、确认重发链、
-外部 API 令牌隔离、确认链接转义。
+外部 API 令牌隔离、确认链接转义、AI 工具编排与待确认操作。
+
+AI 相关测试用 fake `llm.Provider` 注入脚本化响应（`services/ai_service_test.go`），
+不访问真实网络；OpenAI 兼容协议本身用 `httptest` 起本地服务验证请求形状
+（`llm/provider_test.go`）。浮窗的本地存储恢复、草稿角标等行为在
+`components/ai/AIChatWidget.test.tsx` 里用 `sessionStorage` 覆盖。
 
 写测试时的三个惯例：
 

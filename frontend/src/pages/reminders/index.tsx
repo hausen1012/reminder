@@ -29,15 +29,11 @@ import {
 import { formatReminderDetail } from '@/lib/utils'
 import { formatInZone, formatNextFireInZone } from '@/lib/datetime'
 import { useSiteTimezone } from '@/contexts/ConfigContext'
+import { SOURCE_BADGE_CLASS, sourceLabel } from '@/lib/constants'
 import { SortIcon } from '@/components/common/SortIcon'
 import { PageHeader } from '@/components/common/PageHeader'
 import { FilterToolbar } from '@/components/common/FilterToolbar'
 import type { Channel, Reminder } from '@/types'
-
-const SOURCE_LABEL: Record<string, string> = {
-  web: 'Web',
-  api: 'API',
-}
 
 const TYPE_LABEL: Record<string, string> = {
   once: '单次',
@@ -59,7 +55,7 @@ export default function RemindersPage() {
   const [batchDeleting, setBatchDeleting] = useState(false)
   const [batchConfirmOpen, setBatchConfirmOpen] = useState(false)
 
-  const [source, setSource] = useState<string>('web')
+  const [source, setSource] = useState<string>('all')
   const [enabled, setEnabled] = useState<string>('all')
   const [search, setSearch] = useState('')
   const [limit, setLimit] = useState(10)
@@ -85,7 +81,7 @@ export default function RemindersPage() {
     setLoading(true)
     try {
       const q: ListRemindersQuery = {}
-      if (source !== 'all') q.source = source as 'web' | 'api'
+      if (source !== 'all') q.source = source as 'web' | 'api' | 'ai'
       if (enabled !== 'all') q.enabled = enabled === 'true'
       if (search.trim()) q.search = search.trim()
       q.limit = limit
@@ -239,6 +235,7 @@ export default function RemindersPage() {
               <SelectItem value="all">全部来源</SelectItem>
               <SelectItem value="web">Web</SelectItem>
               <SelectItem value="api">API</SelectItem>
+              <SelectItem value="ai">AI</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -347,8 +344,15 @@ export default function RemindersPage() {
                         <td className="px-4 py-2.5 text-center">
                           <Switch checked={r.enabled} onCheckedChange={() => handleToggle(r)} />
                         </td>
-                        <td className="px-4 py-2.5 text-xs text-muted-foreground pl-16">
-                          {SOURCE_LABEL[r.source] ?? r.source}
+                        <td className="px-4 py-2.5 pl-14">
+                          <span
+                            className={
+                              'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ' +
+                              (SOURCE_BADGE_CLASS[r.source] ?? 'bg-muted text-muted-foreground')
+                            }
+                          >
+                            {sourceLabel(r.source)}
+                          </span>
                         </td>
                         <td className="px-4 py-2.5 text-xs whitespace-nowrap text-muted-foreground">
                           {formatInZone(r.created_at, tz)}
@@ -410,7 +414,16 @@ export default function RemindersPage() {
                     </div>
                     <div>
                       <span className="text-muted-foreground">来源</span>
-                      <p className="mt-0.5">{SOURCE_LABEL[r.source] ?? r.source}</p>
+                      <p className="mt-0.5">
+                        <span
+                          className={
+                            'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ' +
+                            (SOURCE_BADGE_CLASS[r.source] ?? 'bg-muted text-muted-foreground')
+                          }
+                        >
+                          {sourceLabel(r.source)}
+                        </span>
+                      </p>
                     </div>
                     <div className="col-span-2">
                       <span className="text-muted-foreground">详情</span>

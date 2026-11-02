@@ -1,0 +1,377 @@
+// AI 助手浮窗：右下角悬浮按钮 + 点开的对话面板。
+//
+// 设计取舍：
+//  - 不做成独立页面。AI 的多数请求发生在"正看着某条提醒"的时候，
+//    浮窗能让用户不离开当前页就直接说"把这条改到每月 1 号"。
+//  - 对话不入库。聊天记录只存在浏览器（sessionStorage），刷新能续上，
+//    关掉标签页就散；落库的只有待确认草稿——那是"确认后才生效"的安全机制本身。
+import { useCallback, useEffect, useRef, useState } from 'react'
+import {
+  Bot,
+  Check,
+  Loader2,
+  MessageSquare,
+  Send,
+  Sparkles,
+  Trash2,
+  X,
+} from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Textarea } from '@/components/ui/textarea'
+import { useToast } from '@/components/ui/use-toast'
+import {
+  applyAIAction,
+  extractApiError,
+  getAISettings,
+  listAIActions,
+  rejectAIAction,
+  sendAIChat,
+} from '@/lib/api'
+import { AI_ACTION_LABEL } from '@/types'
+import type { AIAction, AIChatMessage } from '@/types'
+import { cn } from '@/lib/utils'
+
+const STORAGE_KEY = 'ai-chat-history'
+/** 只保留最近这么多条，避免 sessionStorage 无限增长。 */
+const MAX_STORED = 40
+
+const STATUS_LABEL: Record<string, string> = {
+  pending: '待确认',
+  applied: '已执行',
+  rejected: '已拒绝',
+  failed: '执行失败',
+}
+
+const KIND_DESC: Record<string, string> = {
+  create_channel: '确认后会在「通知」页新增该通道',
+  create_reminder: '确认后会在「提醒」页新增该提醒',
+  update_reminder: '确认后会覆盖该提醒的对应字段',
+  delete_reminder: '确认后该提醒会被永久删除',
+}
+
+function loadHistory(): AIChatMessage[] {
+  try {
+    const raw = sessionStorage.getItem(STORAGE_KEY)
+    if (!raw) return []
+    const parsed = JSON.parse(raw) as unknown
+    if (!Array.isArray(parsed)) return []
+    return parsed.filter(
+      (m): m is AIChatMessage =>
+        Boolean(m) &&
+        typeof (m as AIChatMessage).content === 'string' &&
+        ((m as AIChatMessage).role === 'user' || (m as AIChatMessage).role === 'assistant'),
+    )
+  } catch {
+    // 隐私模式 / 存储被禁用时静默降级为无历史
+    return []
+  }
+}
+
+function saveHistory(history: AIChatMessage[]) {
+  try {
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(history.slice(-MAX_STORED)))
+  } catch {
+    // 存不进去不影响本轮对话
+  }
+}
+
+export function AIChatWidget() {
+  const { toast } = useToast()
+  const [enabled, setEnabled] = useState(false)
+  const [loaded, setLoaded] = useState(false)
+  const [open, setOpen] = useState(false)
+  const [history, setHistory] = useState<AIChatMessage[]>(() => loadHistory())
+  const [actions, setActions] = useState<AIAction[]>([])
+  const [input, setInput] = useState('')
+  const [sending, setSending] = useState(false)
+  const bottomRef = useRef<HTMLDivElement>(null)
+
+  // 设置只读一次：未启用时不渲染按钮，避免在页面上留一个点开就报错的入口
+  useEffect(() => {
+    getAISettings()
+      .then((s) => setEnabled(Boolean(s?.enabled)))
+      .catch(() => setEnabled(false))
+      .finally(() => setLoaded(true))
+  }, [])
+
+  const refreshActions = useCallback(async () => {
+    try {
+      setActions(await listAIActions('pending'))
+    } catch {
+      setActions([])
+    }
+  }, [])
+
+  // 挂载后先拉一次待确认数量，用于气泡角标（不必等用户点开）
+  useEffect(() => {
+    if (!enabled) return
+    refreshActions()
+  }, [enabled, refreshActions])
+
+  useEffect(() => {
+    if (!open) return
+    refreshActions()
+  }, [open, refreshActions])
+
+  useEffect(() => {
+    if (!open) return
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [history, sending, open])
+
+  async function handleSend() {
+    const text = input.trim()
+    if (!text || sending) return
+    setSending(true)
+    const nextHistory = [...history, { role: 'user' as const, content: text }]
+    setHistory(nextHistory)
+    setInput('')
+    try {
+      // 只上传对话文本；本次消息单列，历史不含它
+      const res = await sendAIChat(text, history)
+      const withReply: AIChatMessage[] = [
+        ...nextHistory,
+        { role: 'assistant', content: res?.reply ?? '' },
+      ]
+      setHistory(withReply)
+      saveHistory(withReply)
+      if (res?.actions?.length) {
+        setActions((prev) => mergeActions(prev, res.actions))
+      }
+    } catch (err) {
+      // 失败时回滚这条用户消息，让输入框内容还在，用户可以直接重发
+      setHistory(history)
+      setInput(text)
+      toast({ title: '请求失败', description: extractApiError(err), variant: 'destructive' })
+    } finally {
+      setSending(false)
+    }
+  }
+
+  async function handleApply(action: AIAction) {
+    try {
+      await applyAIAction(action.id)
+      setActions((prev) => prev.filter((a) => a.id !== action.id))
+      toast({ title: '已执行', description: action.summary, variant: 'success' })
+    } catch (err) {
+      toast({ title: '执行失败', description: extractApiError(err), variant: 'destructive' })
+    }
+  }
+
+  async function handleReject(action: AIAction) {
+    try {
+      await rejectAIAction(action.id)
+      setActions((prev) => prev.filter((a) => a.id !== action.id))
+    } catch (err) {
+      toast({ title: '操作失败', description: extractApiError(err), variant: 'destructive' })
+    }
+  }
+
+  function clearHistory() {
+    setHistory([])
+    saveHistory([])
+  }
+
+  if (!loaded || !enabled) return null
+
+  const pendingCount = actions.length
+
+  return (
+    <>
+      {/* 悬浮按钮：面板打开时直接不渲染，避免它挡住面板或被抓取到 */}
+      {!open && (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        aria-label="打开 AI 助手"
+        className={cn(
+          'fixed bottom-5 right-5 z-40 flex h-12 w-12 items-center justify-center rounded-full',
+          'bg-primary text-primary-foreground shadow-lg transition-transform hover:scale-105',
+        )}
+      >
+        <Sparkles className="h-5 w-5" />
+        {pendingCount > 0 && (
+          <span className="absolute -right-0.5 -top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1 text-[11px] font-medium text-destructive-foreground">
+            {pendingCount}
+          </span>
+        )}
+      </button>
+      )}
+
+      {/* 对话面板：桌面右下角浮层，移动端近全屏 */}
+      {open && (
+        <div
+          className={cn(
+            'fixed z-50 flex flex-col overflow-hidden border bg-background shadow-2xl',
+            'bottom-0 right-0 h-[100dvh] w-full rounded-none',
+            'sm:bottom-5 sm:right-5 sm:h-[620px] sm:max-h-[calc(100dvh-2.5rem)] sm:w-[400px] sm:rounded-xl',
+          )}
+        >
+          <div className="flex items-center justify-between border-b px-4 py-3">
+            <div className="flex items-center gap-2">
+              <Bot className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-medium">AI 助手</span>
+              {pendingCount > 0 && (
+                <Badge variant="warning" className="text-[11px]">
+                  {pendingCount} 条待确认
+                </Badge>
+              )}
+            </div>
+            <div className="flex items-center gap-0.5">
+              {history.length > 0 && (
+                <Button variant="ghost" size="icon" className="h-7 w-7" title="清空对话" onClick={clearHistory}>
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              )}
+              <Button variant="ghost" size="icon" className="h-7 w-7" title="关闭" onClick={() => setOpen(false)}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+
+          <div className="flex-1 space-y-3 overflow-y-auto p-4">
+            {history.length === 0 && actions.length === 0 && (
+              <div className="py-8 text-center text-sm text-muted-foreground">
+                <MessageSquare className="mx-auto mb-3 h-8 w-8 opacity-40" />
+                用自然语言告诉我要做什么
+                <div className="mt-3 space-y-1 text-xs">
+                  <p>「每天早上 9 点提醒我喝水，发到钉钉」</p>
+                  <p>「帮我建一个邮件通知渠道」</p>
+                  <p>「把标题是『交房租』的提醒改成每月 1 号」</p>
+                </div>
+              </div>
+            )}
+
+            {history.map((m, i) => (
+              <div
+                key={`${m.role}-${i}`}
+                className={cn('flex', m.role === 'user' ? 'justify-end' : 'justify-start')}
+              >
+                <div
+                  className={cn(
+                    'max-w-[85%] whitespace-pre-wrap rounded-lg px-3 py-2 text-sm',
+                    m.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-secondary',
+                  )}
+                >
+                  {m.content}
+                </div>
+              </div>
+            ))}
+
+            {sending && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                助手正在思考…
+              </div>
+            )}
+
+            {actions.length > 0 && (
+              <div className="space-y-2 border-t pt-3">
+                <p className="text-xs font-medium text-muted-foreground">待确认操作（点确认后才生效）</p>
+                {actions.map((a) => (
+                  <ActionCard
+                    key={a.id}
+                    action={a}
+                    onApply={() => handleApply(a)}
+                    onReject={() => handleReject(a)}
+                  />
+                ))}
+              </div>
+            )}
+            <div ref={bottomRef} />
+          </div>
+
+          <div className="space-y-2 border-t p-3">
+            <Textarea
+              rows={2}
+              value={input}
+              placeholder="描述你要的提醒或通道…"
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => {
+                // Ctrl/Cmd + Enter 发送，避免与中文输入法的回车冲突
+                if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                  e.preventDefault()
+                  handleSend()
+                }
+              }}
+              disabled={sending}
+            />
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] text-muted-foreground">Ctrl / ⌘ + Enter 发送</span>
+              <Button size="sm" onClick={handleSend} disabled={sending || !input.trim()}>
+                {sending ? (
+                  <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                ) : (
+                  <Send className="mr-1 h-4 w-4" />
+                )}
+                发送
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
+
+function ActionCard({
+  action,
+  onApply,
+  onReject,
+}: {
+  action: AIAction
+  onApply: () => void
+  onReject: () => void
+}) {
+  const pending = action.status === 'pending'
+  return (
+    <div className="rounded-md border bg-card/40 p-2.5">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <Badge variant="outline" className="text-[11px]">
+              {AI_ACTION_LABEL[action.kind] ?? action.kind}
+            </Badge>
+            <Badge
+              variant={
+                action.status === 'applied'
+                  ? 'success'
+                  : action.status === 'failed'
+                    ? 'destructive'
+                    : 'warning'
+              }
+              className="text-[11px]"
+            >
+              {STATUS_LABEL[action.status] ?? action.status}
+            </Badge>
+          </div>
+          <p className="mt-1 truncate text-sm" title={action.summary}>
+            {action.summary}
+          </p>
+          <p className="mt-0.5 text-[11px] text-muted-foreground">
+            {action.status === 'failed' && action.error ? action.error : KIND_DESC[action.kind] ?? ''}
+          </p>
+        </div>
+        {pending && (
+          <div className="flex shrink-0 gap-1">
+            <Button size="sm" className="h-7 px-2 text-xs" onClick={onApply}>
+              <Check className="mr-0.5 h-3 w-3" />
+              确认
+            </Button>
+            <Button size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={onReject}>
+              忽略
+            </Button>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/** 合并草稿列表：按 id 去重，保留后端返回的最新状态。 */
+function mergeActions(prev: AIAction[], next: AIAction[]): AIAction[] {
+  const map = new Map<string, AIAction>()
+  prev.forEach((a) => map.set(a.id, a))
+  next.forEach((a) => map.set(a.id, a))
+  return Array.from(map.values())
+}

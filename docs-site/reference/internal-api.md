@@ -114,6 +114,20 @@ JWT 有效期为 72 小时。改密码后旧 JWT 仍然有效直到过期——�
 | `GET` | `/api/config` | 站点配置键值对 |
 | `PUT` | `/api/config` | 批量更新配置，值为空串表示删除该键 |
 
+## AI 助手
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| `GET` | `/api/ai/settings` | 读取 AI 设置，密钥回显为 `***` |
+| `PUT` | `/api/ai/settings` | 保存 AI 设置 |
+| `POST` | `/api/ai/test` | 测试厂商连通性 |
+| `POST` | `/api/ai/chat` | 发送消息，返回回复与本轮待确认操作（无状态，对话不入库） |
+| `GET` | `/api/ai/actions` | 列出待确认草稿（`?status=pending`） |
+| `POST` | `/api/ai/actions/:id/apply` | 执行待确认操作 |
+| `POST` | `/api/ai/actions/:id/reject` | 拒绝待确认操作 |
+
+详细的请求/响应示例见[AI 助手接口](/reference/ai-api)。这些接口不对外部令牌开放。
+
 ## 确认链接
 
 | 方法 | 路径 | 说明 |

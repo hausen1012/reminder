@@ -42,6 +42,7 @@ export default defineConfig({
           items: [
             { text: '提醒与调度', link: '/guide/reminders' },
             { text: '通知渠道', link: '/guide/channels' },
+            { text: 'AI 助手', link: '/guide/ai-assistant' },
             { text: '内容格式与占位符', link: '/guide/content-format' },
             { text: '确认机制', link: '/guide/confirmation' },
             { text: '日志与监控', link: '/guide/logs-and-monitoring' },
@@ -63,6 +64,7 @@ export default defineConfig({
             { text: '模板变量', link: '/reference/variables' },
             { text: '响应格式与错误码', link: '/reference/response-and-errors' },
             { text: '内置 API', link: '/reference/internal-api' },
+            { text: 'AI 助手接口', link: '/reference/ai-api' },
             { text: '发送状态与重试', link: '/reference/delivery-status' },
           ],
         },

@@ -550,3 +550,55 @@ func TestNewEngine_NilLocation(t *testing.T) {
 		t.Fatal("tz 应回退到默认时区")
 	}
 }
+
+// AddDailyJob 注册的维护任务应在 ReloadTimezone 后仍然存在（与日志清理同等对待）。
+func TestEngineAddDailyJobSurvivesReload(t *testing.T) {
+	db := openSchedulerTestDB(t)
+	loc := time.FixedZone("CST", 8*3600)
+	tz := testTZ(loc)
+	e := NewEngine(db, &fakeDispatcher{}, tz)
+	e.Start()
+	t.Cleanup(e.Stop)
+
+	ran := make(chan struct{}, 1)
+	if _, err := e.AddDailyJob("测试任务", DailyPurgeExpr, func() { ran <- struct{}{} }); err != nil {
+		t.Fatalf("AddDailyJob 失败: %v", err)
+	}
+	if got := e.ExtraEntryCount(); got != 1 {
+		t.Fatalf("维护任务数 = %d，期望 1", got)
+	}
+
+	if err := tz.Set("America/New_York"); err != nil {
+		t.Fatalf("切换时区失败: %v", err)
+	}
+	e.ReloadTimezone()
+	if got := e.ExtraEntryCount(); got != 1 {
+		t.Fatalf("重建后维护任务数 = %d，期望 1", got)
+	}
+}
+
+// 维护任务 panic 不应带崩进程，且不影响后续调度。
+func TestEngineAddDailyJobRecoversPanic(t *testing.T) {
+	db := openSchedulerTestDB(t)
+	e := NewEngine(db, &fakeDispatcher{}, testTZ(time.FixedZone("CST", 8*3600)))
+	e.Start()
+	t.Cleanup(e.Stop)
+
+	// 直接取出注册的包装函数执行一次，验证 recover 生效
+	err := func() (err error) {
+		id, addErr := e.AddDailyJob("会 panic 的任务", DailyPurgeExpr, func() {
+			panic("boom")
+		})
+		if addErr != nil {
+			return addErr
+		}
+		e.mu.Lock()
+		entry := e.cron.Entry(id)
+		e.mu.Unlock()
+		entry.Job.Run()
+		return nil
+	}()
+	if err != nil {
+		t.Fatalf("注册失败: %v", err)
+	}
+}

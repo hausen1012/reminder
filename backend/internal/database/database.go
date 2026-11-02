@@ -29,6 +29,7 @@ var allModels = []any{
 	&models.TokenDefaultChannel{},
 	&models.ConfirmToken{},
 	&models.Config{},
+	&models.AIAction{},
 }
 
 // AllModels 返回建表所需的全部模型清单。

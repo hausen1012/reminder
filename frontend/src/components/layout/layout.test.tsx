@@ -11,6 +11,9 @@ const mockConfig = vi.fn()
 vi.mock('@/contexts/ThemeContext', () => ({ useTheme: () => mockTheme() }))
 vi.mock('@/contexts/AuthContext', () => ({ useAuth: () => mockAuth() }))
 vi.mock('@/contexts/ConfigContext', () => ({ useConfig: () => mockConfig() }))
+// 外壳测试只关心布局，浮窗有自己的测试文件，这里替换成空组件避免引入
+// toast 上下文依赖
+vi.mock('@/components/ai/AIChatWidget', () => ({ AIChatWidget: () => null }))
 
 function renderSidebar(onNavClick?: () => void) {
   return render(

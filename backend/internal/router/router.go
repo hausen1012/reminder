@@ -96,6 +96,23 @@ func Setup(staticFS embed.FS, cfg *config.Config) (*SetupResult, error) {
 		_, _ = engine.AddPurgeCron(logSvc, purgeAfter)
 	}
 
+	// 自动清理 AI 草稿：固定保留 90 天，不提供开关——
+	// 草稿没有长期价值（结果在 reminders / channels 里），
+	// 留着的唯一效果是让浮窗角标永远挂着数字。
+	aiSvc := services.NewAIService(database.DB, box, tz, reminderSvc, channelSvc)
+	if _, err := engine.AddDailyJob("AI草稿清理", scheduler.DailyPurgeExpr, func() {
+		n, err := aiSvc.PurgeActions(services.ActionRetention)
+		if err != nil {
+			slog.Info("自动清理 AI 草稿失败", "error", err)
+		} else if n > 0 {
+			slog.Info("自动清理 AI 草稿", "count", n)
+		}
+	}); err != nil {
+		slog.Warn("注册 AI 草稿清理任务失败", "error", err)
+	} else {
+		slog.Info("已注册 AI 草稿自动清理", "retention_days", int(services.ActionRetention.Hours()/24))
+	}
+
 	tokenSvc := services.NewTokenService(database.DB, box)
 	userSvc := services.NewUserService(database.DB)
 
@@ -109,6 +126,7 @@ func Setup(staticFS embed.FS, cfg *config.Config) (*SetupResult, error) {
 	externalHandler := &handlers.ExternalHandler{ReminderSvc: reminderSvc, TokenSvc: tokenSvc, ChannelSvc: channelSvc}
 	schedulerHandler := &handlers.SchedulerHandler{Engine: engine, Sweeper: sweeper}
 	configHandler := &handlers.ConfigHandler{Svc: configSvc}
+	aiHandler := &handlers.AIHandler{Svc: aiSvc}
 
 	// 确认链接（无需认证）
 	r.GET("/c/:token", confirmHandler.Confirm)
@@ -200,6 +218,17 @@ func Setup(staticFS embed.FS, cfg *config.Config) (*SetupResult, error) {
 
 		scheduler := protected.Group("/scheduler")
 		scheduler.GET("/status", schedulerHandler.Status)
+
+		ai := protected.Group("/ai")
+		{
+			ai.GET("/settings", aiHandler.GetSettings)
+			ai.PUT("/settings", aiHandler.UpdateSettings)
+			ai.POST("/test", aiHandler.Test)
+			ai.GET("/actions", aiHandler.ListActions)
+			ai.POST("/chat", aiHandler.Chat)
+			ai.POST("/actions/:id/apply", aiHandler.ApplyAction)
+			ai.POST("/actions/:id/reject", aiHandler.RejectAction)
+		}
 
 		cfgRoute := protected.Group("/config")
 		cfgRoute.GET("", configHandler.GetAll)

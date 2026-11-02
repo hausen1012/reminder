@@ -217,3 +217,13 @@ func waitFor(t *testing.T, timeout time.Duration, cond func() bool, desc string)
 	}
 	t.Fatalf("超时：%s", desc)
 }
+
+// newChannelSvcForTestWithDB 复用已有测试库构造通道服务（AI 测试需要共享同一个 db）。
+func newChannelSvcForTestWithDB(t *testing.T, db *gorm.DB) (*ChannelService, *gorm.DB) {
+	t.Helper()
+	box, err := secretbox.New("")
+	if err != nil {
+		t.Fatalf("构造 secretbox 失败: %v", err)
+	}
+	return NewChannelService(db, box, testTZ(cstZone())), db
+}

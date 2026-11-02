@@ -12,6 +12,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"runtime/debug"
 	"sort"
 	"sync"
 	"time"
@@ -565,14 +566,13 @@ func (e *Engine) LoadAndRegisterAll() error {
 	return nil
 }
 
-// AddPurgeCron 注册一个每天凌晨 3 点的定时清理任务。
+// AddPurgeCron 注册一个每天凌晨 3 点的日志清理任务。
 //
 // 任务会记进 purgeJobs，这样 ReloadTimezone 重建 cron 实例后能自动恢复；
 // 调用方无需（也不应该）在时区变更后手动重注册。
 func (e *Engine) AddPurgeCron(logSrv interface {
 	Purge(olderThan time.Duration, all bool) (int64, error)
 }, purgeAfter time.Duration) (cron.EntryID, error) {
-	const expr = "0 0 3 * * *"
 	job := func() {
 		n, err := logSrv.Purge(purgeAfter, false)
 		if err != nil {
@@ -581,14 +581,35 @@ func (e *Engine) AddPurgeCron(logSrv interface {
 			slog.Info("自动清理日志", "count", n)
 		}
 	}
+	return e.AddDailyJob("日志清理", DailyPurgeExpr, job)
+}
+
+// DailyPurgeExpr 是维护型任务的运行时刻：每天凌晨 3 点（含秒字段）。
+const DailyPurgeExpr = "0 0 3 * * *"
+
+// AddDailyJob 注册一个每天凌晨 3 点运行的维护型任务。
+//
+// 任务会记进 purgeJobs，ReloadTimezone 重建 cron 实例后自动恢复；
+// name 只用于日志，便于区分是哪一个维护任务出了错。
+func (e *Engine) AddDailyJob(name string, expr string, job func()) (cron.EntryID, error) {
+	wrapped := func() {
+		defer func() {
+			// 维护任务跑在 cron goroutine 里，panic 会带崩整个进程，
+			// 这里兜住并记录，下一个周期照常执行。
+			if r := recover(); r != nil {
+				slog.Error("维护任务 panic", "job", name, "recover", r, "stack", debug.Stack())
+			}
+		}()
+		job()
+	}
 	// 持锁登记与注册：ReloadTimezone 会整体替换 e.cron，
 	// 若这里不加锁，可能把任务登记到已被替换的旧实例上，导致清理任务丢失。
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	id, err := e.cron.AddFunc(expr, job)
+	id, err := e.cron.AddFunc(expr, wrapped)
 	if err != nil {
 		return id, err
 	}
-	e.purgeJobs = append(e.purgeJobs, purgeJob{expr: expr, job: job})
+	e.purgeJobs = append(e.purgeJobs, purgeJob{expr: expr, job: wrapped})
 	return id, nil
 }

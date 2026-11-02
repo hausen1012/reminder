@@ -9,6 +9,7 @@ import { formatReminderDetail } from '@/lib/utils'
 import { formatInZone } from '@/lib/datetime'
 import { useSiteTimezone } from '@/contexts/ConfigContext'
 import { PageHeader } from '@/components/common/PageHeader'
+import { sourceLabel } from '@/lib/constants'
 import type { Reminder, DeliveryLog } from '@/types'
 import type { ChannelStats } from '@/lib/api'
 
@@ -214,7 +215,7 @@ export default function Dashboard() {
                     </div>
                     <div className="text-xs text-muted-foreground mt-1 truncate">
                       {formatInZone(log.fired_at, tz)}
-                      {log.source && ` · ${log.source}`}
+                      {log.source && ` · ${sourceLabel(log.source)}`}
                     </div>
                   </Link>
                 ))}

@@ -48,7 +48,7 @@ export interface ChannelListResp {
 
 export type ReminderCalendar = 'solar' | 'lunar'
 export type ReminderScheduleType = 'once' | 'interval' | 'cron'
-export type ReminderSource = 'web' | 'api'
+export type ReminderSource = 'web' | 'api' | 'ai'
 export type ContentFormat = 'text' | 'markdown' | 'html'
 
 export function toContentFormat(v: string): ContentFormat {
@@ -91,7 +91,7 @@ export interface ReminderInput {
   schedule_type: ReminderScheduleType
   schedule_spec: Record<string, unknown>
   enabled?: boolean
-  source?: 'web' | 'api'
+  source?: 'web' | 'api' | 'ai'
   channel_ids: number[]
   require_confirm: boolean
   confirm_retry_interval_sec: number
@@ -208,4 +208,61 @@ export interface CalendarResult {
   lunar?: { year: number; month: number; day: number }
   hour: number
   minute: number
+}
+// --- AI 助手 ---
+
+export type AIProvider = 'anthropic' | 'openai'
+
+export interface AISettings {
+  enabled: boolean
+  provider: AIProvider
+  base_url: string
+  model: string
+  /** 已配置时后端回 "***"，否则为空串 */
+  api_key: string
+}
+
+export interface AISettingsInput {
+  enabled: boolean
+  provider: AIProvider
+  base_url: string
+  model: string
+  api_key: string
+}
+
+export type AIActionKind =
+  | 'create_channel'
+  | 'create_reminder'
+  | 'update_reminder'
+  | 'delete_reminder'
+
+export type AIActionStatus = 'pending' | 'applied' | 'rejected' | 'failed'
+
+export interface AIAction {
+  id: string
+  kind: AIActionKind
+  summary: string
+  status: AIActionStatus
+  error?: string
+  result_ref?: string
+  created_at: string
+  updated_at: string
+}
+
+/** 日志行里保存的一条对话消息（只存在浏览器里，不入库）。 */
+export interface AIChatMessage {
+  role: 'user' | 'assistant'
+  content: string
+}
+
+export interface AIChatResult {
+  reply: string
+  actions: AIAction[]
+}
+
+export const AI_ACTION_LABEL: Record<AIActionKind, string> = {
+  create_channel: '新建通道',
+  create_reminder: '新建提醒',
+  update_reminder: '修改提醒',
+  delete_reminder: '删除提醒',
 }

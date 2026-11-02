@@ -98,6 +98,27 @@ $b = New-Object byte[] 32
 
 值为空字符串时表示删除该配置项，回退到内置默认（`timezone` 回退到 `Asia/Shanghai`）。
 
+AI 助手相关配置也以 `ai_` 前缀存在同一张表里，但**不通过 `/api/config` 读写**，
+而是走专门的 `GET/PUT /api/ai/settings`：
+
+| 键 | 说明 |
+|---|---|
+| `ai_enabled` | 是否启用 AI 助手 |
+| `ai_provider` | `anthropic` / `openai`（OpenAI 兼容协议） |
+| `ai_base_url` | 厂商地址；Anthropic 留空走官方 |
+| `ai_model` | 模型名 |
+| `ai_api_key_enc` | 加密后的 API Key，读出时恒显示 `***` |
+
+密钥单独走 AI 设置接口，是为了避免通用配置接口把明文或密文带出面板以外的地方。
+详见[AI 助手](/guide/ai-assistant)。
+
+::: tip 没有新增环境变量
+AI 助手的全部配置都在面板里改，改完立即生效（每次对话都按最新设置构造客户端），
+不需要重启进程，也不需要额外的环境变量。
+
+对话内容不写入数据库；`config` 表里的 `ai_*` 只保存厂商、模型与加密后的密钥。
+:::
+
 ## Docker 部署示例
 
 ```yaml

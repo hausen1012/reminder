@@ -46,6 +46,7 @@ import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { listLogs, getLogDetail, purgeLogs, countPurgeLogs, batchDeleteLogs, extractApiError } from '@/lib/api'
 import { formatInZone } from '@/lib/datetime'
 import { useSiteTimezone } from '@/contexts/ConfigContext'
+import { SOURCE_BADGE_CLASS, sourceLabel } from '@/lib/constants'
 import type { DeliveryLog, LogFilter } from '@/types'
 
 const STATUS_ICON: Record<string, typeof CheckCircle2> = {
@@ -294,6 +295,7 @@ export default function LogsPage() {
             <SelectContent>
               <SelectItem value="all">全部来源</SelectItem>
               <SelectItem value="web">Web</SelectItem>
+              <SelectItem value="ai">AI</SelectItem>
               <SelectItem value="api">API</SelectItem>
             </SelectContent>
           </Select>
@@ -381,7 +383,9 @@ export default function LogsPage() {
                           </Badge>
                         </td>
                         <td className="px-4 py-3">
-                          <Badge variant="secondary">{main.source === 'api' ? 'API' : 'Web'}</Badge>
+                          <Badge variant="secondary" className={SOURCE_BADGE_CLASS[main.source]}>
+                            {sourceLabel(main.source)}
+                          </Badge>
                         </td>
                         <td className="px-4 py-3 text-xs">
                           {main.confirmed ? (
@@ -466,7 +470,9 @@ export default function LogsPage() {
                       <div>
                         <span className="text-muted-foreground">来源</span>
                         <p className="mt-0.5">
-                          <Badge variant="secondary" className="text-xs">{main.source === 'api' ? 'API' : 'Web'}</Badge>
+                          <Badge variant="secondary" className={`text-xs ${SOURCE_BADGE_CLASS[main.source]}`}>
+                            {sourceLabel(main.source)}
+                          </Badge>
                         </p>
                       </div>
                       <div>
@@ -584,7 +590,7 @@ export default function LogsPage() {
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-muted-foreground min-w-[5rem]">来源</span>
-                      <span>{detail.source === 'api' ? 'API' : 'Web'}</span>
+                      <span>{sourceLabel(detail.source)}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-muted-foreground min-w-[5rem]">触发时间</span>

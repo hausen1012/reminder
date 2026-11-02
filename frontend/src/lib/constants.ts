@@ -34,3 +34,26 @@ export const COMMON_TIMEZONES = [
   'Pacific/Auckland',
   'UTC',
 ]
+
+// 提醒来源的展示文案与徽章配色。
+//
+// 来源取值由后端写入：web（面板表单）、ai（AI 助手确认后创建）、api（外部令牌）。
+// 各处列表、详情、筛选统一引用这里，避免出现「api 显示成 Web」这类漏判。
+export const SOURCE_LABEL: Record<string, string> = {
+  web: 'Web',
+  ai: 'AI',
+  api: 'API',
+}
+
+// 徽章配色：Web 中性、AI 强调、API 次强调，便于快速扫读。
+export const SOURCE_BADGE_CLASS: Record<string, string> = {
+  web: 'bg-muted text-muted-foreground',
+  ai: 'bg-violet-500/15 text-violet-700 dark:text-violet-300',
+  api: 'bg-sky-500/15 text-sky-700 dark:text-sky-300',
+}
+
+/** 取来源展示文案，未知来源原样返回。 */
+export function sourceLabel(source: string | undefined): string {
+  if (!source) return '—'
+  return SOURCE_LABEL[source] ?? source
+}

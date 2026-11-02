@@ -16,6 +16,7 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useToast } from '@/components/ui/use-toast'
 import { AppLogo } from '@/components/common/AppLogo'
+import { AISettingsCard } from '@/components/ai/AISettingsCard'
 import { PageHeader } from '@/components/common/PageHeader'
 
 export default function Profile() {
@@ -221,6 +222,9 @@ export default function Profile() {
             </form>
           </CardContent>
         </Card>
+
+        {/* AI 助手 */}
+        <AISettingsCard />
 
         {/* 关于项目 */}
         <Card>

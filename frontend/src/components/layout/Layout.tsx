@@ -28,6 +28,7 @@ import { useTheme } from '@/contexts/ThemeContext'
 import { useAuth } from '@/contexts/AuthContext'
 import { useConfig } from '@/contexts/ConfigContext'
 import { AppLogo } from '@/components/common/AppLogo'
+import { AIChatWidget } from '@/components/ai/AIChatWidget'
 import { DOCS_URL, GITHUB_URL } from '@/lib/constants'
 import { cn } from '@/lib/utils'
 
@@ -84,6 +85,9 @@ export function AppLayout() {
         </div>
         <Outlet />
       </main>
+
+      {/* AI 助手：右下角悬浮窗，不占导航、不进数据库 */}
+      <AIChatWidget />
     </div>
   )
 }

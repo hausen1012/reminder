@@ -44,13 +44,45 @@
 | `notifier` | 各通道的发送实现，统一 `Notifier` 接口 |
 | `models` | GORM 模型 |
 | `middleware` | 鉴权、日志、错误渲染、CORS、限流 |
-| `crypto/secretbox` | 通道敏感字段的对称加解密 |
+| `crypto/secretbox` | 通道敏感字段与 AI 草稿的对称加解密 |
+| `llm` | 厂商无关的对话接口，Anthropic 与 OpenAI 兼容协议两个实现 |
 
 设计上有两条约束值得注意：
 
 - **服务层不依赖 scheduler 的具体实现**，而是依赖一个 `SchedulerHook` 接口，避免循环依赖
 - **调度器不直接发送消息**，而是写一条 `pending` 日志后异步交给 `DispatchService`，
   把「什么时候触发」和「怎么发出去」解耦
+
+## AI 助手的执行链路
+
+```
+POST /api/ai/chat（无状态：history 由前端上传）
+  │
+  ├─ 读取 ai_* 设置，按 provider 构造 llm.Provider
+  ├─ 拼接客户端上传的历史（最多 30 条）
+  └─ 工具循环（最多 8 轮）
+        │
+        ├─ llm.Provider.Chat(system + 历史 + 工具定义)
+        ├─ 只读工具（list_channels / list_reminders）立即执行，结果回填
+        └─ 写工具（create_* / update_* / delete_reminder）
+              └─ 只生成 ai_actions 草稿（payload_enc 加密），不落业务表
+  │
+  └─ 返回 reply + 本轮新生成的草稿（对话不落库）
+
+POST /api/ai/actions/:id/apply
+  └─ 解密 payload → 反序列化 → 调用既有 ReminderService / ChannelService
+```
+
+对话本身不落库：助手是面板右下角的浮动工具，聊天记录只存在浏览器 `sessionStorage`，
+刷新页面能续上、关掉标签页就散。唯一的持久化是待确认草稿——那是「确认后才生效」的机制本身。
+
+关键约束：**写操作不经过任何绕过校验的捷径**。草稿执行时走的是和面板表单
+完全相同的服务层方法，所以校验规则、调度器同步、通道绑定的处理方式都一致。
+
+厂商差异被收敛在 `internal/llm`：上层只看到 `Turn` / `ToolCall` / `Reply`，
+Anthropic 的 `tool_result` 与 OpenAI 的 `role=tool` 消息由各自的 Provider 翻译。
+Anthropic 一侧开启思考，因此 assistant 轮要把上一轮的原始响应（含 thinking 块签名）
+原样回放，这一步通过 `Turn.Raw` 透传，编排层不需要理解其中的结构。
 
 ## 一次触发的完整链路
 
@@ -86,7 +118,8 @@ Engine 定时器到期
 | `confirm_tokens` | 确认令牌 |
 | `tokens` | 外部 API 令牌 |
 | `token_default_channels` | 令牌的默认通道路由 |
-| `configs` | 站点配置（键值对） |
+| `configs` | 站点配置（键值对），AI 设置也以 `ai_` 前缀存在这里 |
+| `ai_actions` | AI 生成的待确认写操作（入参加密存储），保留 90 天后自动清理。对话本身不入库 |
 
 数据库结构在启动时自动建齐（`AutoMigrate`）。
 

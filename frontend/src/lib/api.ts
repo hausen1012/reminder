@@ -2,6 +2,11 @@ import axios from 'axios'
 import type {
   Token,
   ApiResponse,
+  AIAction,
+  AIChatMessage,
+  AIChatResult,
+  AISettings,
+  AISettingsInput,
   Channel,
   ChannelInput,
   ChannelListResp,
@@ -171,7 +176,7 @@ export async function testChannelDryRun(input: {
 // --- 提醒 ---
 
 export interface ListRemindersQuery {
-  source?: 'web' | 'api' | 'all'
+  source?: 'web' | 'api' | 'ai' | 'all'
   enabled?: boolean
   search?: string
   limit?: number
@@ -340,4 +345,51 @@ export async function batchDeleteChannels(ids: number[]) {
 
 export async function batchDeleteLogs(ids: number[]) {
   await api.delete<ApiResponse<null>>('/logs/batch', { data: { ids } })
+}
+// --- AI 助手 ---
+
+export async function getAISettings() {
+  const res = await api.get<ApiResponse<AISettings>>('/ai/settings')
+  return res.data.data
+}
+
+export async function updateAISettings(input: AISettingsInput) {
+  const res = await api.put<ApiResponse<AISettings>>('/ai/settings', input)
+  return res.data.data
+}
+
+export async function testAIConnection(input: AISettingsInput) {
+  const res = await api.post<ApiResponse<{ reply: string }>>('/ai/test', input)
+  return res.data.data
+}
+
+/**
+ * 发一轮对话。
+ *
+ * 接口是无状态的：历史由前端持有并随请求上传，服务端不保存聊天记录。
+ * 超时放宽到 120 秒——工具循环可能持续数十秒。
+ */
+export async function sendAIChat(message: string, history: AIChatMessage[]) {
+  const res = await api.post<ApiResponse<AIChatResult>>(
+    '/ai/chat',
+    { message, history },
+    { timeout: 120000 },
+  )
+  return res.data.data
+}
+
+/** 拉取待确认草稿（刷新页面后恢复用）。 */
+export async function listAIActions(status: 'pending' | 'all' = 'pending') {
+  const res = await api.get<ApiResponse<{ items: AIAction[] }>>('/ai/actions', { params: { status } })
+  return res.data.data?.items ?? []
+}
+
+export async function applyAIAction(id: string) {
+  const res = await api.post<ApiResponse<AIAction>>(`/ai/actions/${id}/apply`)
+  return res.data.data
+}
+
+export async function rejectAIAction(id: string) {
+  const res = await api.post<ApiResponse<AIAction>>(`/ai/actions/${id}/reject`)
+  return res.data.data
 }
