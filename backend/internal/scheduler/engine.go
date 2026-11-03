@@ -169,12 +169,12 @@ func (e *Engine) RecomputeNextFire() (int, error) {
 		r := &items[i]
 		spec, err := ParseSpec(r.ScheduleSpec)
 		if err != nil {
-			slog.Warn("重算时解析 schedule_spec 失败", "reminder", r.ID, "error", err)
+			slog.Warn("重算时解析 schedule_spec 失败，跳过该提醒", "reminder", r.ID, "title", r.Title, "error", err)
 			continue
 		}
 		next, err := Compute(r.Calendar, r.ScheduleType, spec, now, loc)
 		if err != nil {
-			slog.Warn("重算下次触发失败", "reminder", r.ID, "error", err)
+			slog.Warn("重算下次触发失败，跳过该提醒", "reminder", r.ID, "title", r.Title, "error", err)
 			continue
 		}
 		// 显式用 any(nil)：直接传 *models.Time(nil) 到 GORM 的 Update 里
@@ -453,9 +453,10 @@ func (e *Engine) fire(id uint) {
 	var r models.Reminder
 	if err := e.db.First(&r, id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
+			// 提醒已被删除（或并发删除），调度器里的定时器属于残留，无需记录
 			return
 		}
-		slog.Info("读取 reminder 失败", "reminder", id, "error", err)
+		slog.Error("触发时读取提醒失败", "reminder", id, "error", err)
 		return
 	}
 	if !r.Enabled {
@@ -464,7 +465,7 @@ func (e *Engine) fire(id uint) {
 
 	spec, err := ParseSpec(r.ScheduleSpec)
 	if err != nil {
-		slog.Info("解析 reminder spec 失败", "reminder", id, "error", err)
+		slog.Error("触发时解析 schedule_spec 失败，本次触发被跳过", "reminder", id, "title", r.Title, "spec", string(r.ScheduleSpec), "error", err)
 		return
 	}
 
@@ -472,7 +473,9 @@ func (e *Engine) fire(id uint) {
 	// 算出新的 next_fire_at（cron 也要算，用于持久化展示）
 	newNext, err := Compute(r.Calendar, r.ScheduleType, spec, now, e.tz.Get())
 	if err != nil {
-		slog.Info("计算下次触发失败", "reminder", id, "error", err)
+		// 继续触发本次提醒（用户等的是这一条），但下次时间会写空，必须留痕
+		slog.Error("触发时计算下次触发时间失败，本次仍投递，next_fire_at 将写空",
+			"reminder", id, "title", r.Title, "schedule_type", r.ScheduleType, "calendar", r.Calendar, "error", err)
 	}
 	// 统一以 UTC 落库：models.Time 的 Value 内部已归一化，这里显式转换更直观
 	nowUTC := models.TimeOf(now)
@@ -524,7 +527,7 @@ func (e *Engine) fire(id uint) {
 		if errors.Is(err, errSkipped) {
 			return
 		}
-		slog.Info("fire 事务失败", "reminder", id, "error", err)
+		slog.Error("触发事务失败，本次投递未发生", "reminder", id, "title", r.Title, "error", err)
 		return
 	}
 
@@ -543,7 +546,8 @@ func (e *Engine) fire(id uint) {
 		var rr models.Reminder
 		if err := e.db.First(&rr, id).Error; err == nil {
 			if err := e.addAfterFunc(&rr, spec); err != nil {
-				slog.Info("reschedule reminder 失败", "reminder", id, "error", err)
+				slog.Error("触发后重新注册下一次失败，该提醒将不再自动触发（依赖兜底扫描）",
+					"reminder", id, "title", r.Title, "error", err)
 			}
 		}
 	}
@@ -560,7 +564,10 @@ func (e *Engine) LoadAndRegisterAll() error {
 	}
 	for i := range items {
 		if err := e.Add(&items[i]); err != nil {
-			slog.Info("注册 reminder 失败", "reminder", items[i].ID, "error", err)
+			slog.Error("注册提醒到调度器失败，该提醒不会被自动触发（依赖兜底扫描）",
+				"reminder", items[i].ID, "title", items[i].Title,
+				"schedule_type", items[i].ScheduleType, "calendar", items[i].Calendar,
+				"spec", string(items[i].ScheduleSpec), "error", err)
 		}
 	}
 	return nil
@@ -576,7 +583,7 @@ func (e *Engine) AddPurgeCron(logSrv interface {
 	job := func() {
 		n, err := logSrv.Purge(purgeAfter, false)
 		if err != nil {
-			slog.Info("自动清理日志失败", "error", err)
+			slog.Error("自动清理日志失败", "error", err)
 		} else if n > 0 {
 			slog.Info("自动清理日志", "count", n)
 		}

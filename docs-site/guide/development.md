@@ -137,6 +137,20 @@ handler 里只需 `abortErr(c, err)`，不要自己拼错误响应体。这样�
 正文里可能带 `{{confirm_url}}`（一次性确认令牌），变量里还可能带用户内容，
 记全文等于把令牌与隐私一起写进日志。`log` 通道是唯一例外——它的用途就是把正文打出来。
 
+### 写日志的约定
+
+- **级别要选对**：失败路径用 `Warn` / `Error`，不要用 `Info`——否则设置
+  `LOG_LEVEL=warn` 时真正的故障会被一起藏掉。`Info` 只留给生命周期与业务节点。
+- **错误必须带 `error` 字段**：`slog.Warn("...", "error", err)`，不要只写一句
+  「失败了」。
+- **HTTP 错误只记一次**：handler 用 `abortErr`，由 `ErrorHandler` 统一记录并分级；
+  请求体解析失败用 `abortBindErr(c, err, "请求体格式错误")`，它会记下底层原因。
+  不要在 handler 里再补一条日志。
+- **带上下文**：请求内加 `request_id`（`middleware.RequestIDOf(c)`）；
+  投递链路带 `reminder` / `log` / `channel` / `attempt`，便于 `grep` 串起来。
+- **调试细节用 `Debug`**：高频成功路径（每条 SQL、单通道发送成功）不要用 `Info`，
+  否则日志会被淹没。
+
 ## 文档站点
 
 ```bash

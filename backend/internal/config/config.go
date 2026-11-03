@@ -12,6 +12,11 @@ import (
 	"time"
 )
 
+// 日志目录的默认值。
+//
+// 导出成常量，让其它包（测试、文档生成）引用同一份默认值，不必各自硬编码。
+const DefaultLogFile = "/var/log/reminder"
+
 // Config 汇总所有运行时配置。
 //
 // 时区不在这里：站点时区存在数据库的 config 表（key=timezone），
@@ -49,7 +54,7 @@ func Load() *Config {
 		SweepIntervalSec:     getEnvInt("SWEEP_INTERVAL_SEC", 60),
 		MissToleranceMinutes: getEnvInt("MISS_TOLERANCE_MINUTES", 60),
 		LogAutoPurgeDays:     getEnvInt("LOG_AUTO_PURGE_DAYS", 0),
-		LogFile:              getEnv("LOG_FILE", "/var/log/reminder"),
+		LogFile:              getEnv("LOG_FILE", DefaultLogFile),
 	}
 
 	// JWTSecret 如果留空就自动生成

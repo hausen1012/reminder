@@ -5,7 +5,6 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"github.com/reminder/backend/internal/middleware"
 	"github.com/reminder/backend/internal/services"
 )
 
@@ -74,7 +73,7 @@ func (h *TokenHandler) Create(c *gin.Context) {
 		DefaultChannelIDs []uint `json:"default_channel_ids"`
 	}
 	if err := c.ShouldBindJSON(&in); err != nil {
-		abortErr(c, middleware.NewAppError(middleware.CodeValidationFailed, "请求体格式错误"))
+		abortBindErr(c, err, "请求体格式错误")
 		return
 	}
 	plain, key, err := h.Svc.Create(in.Name, in.DefaultChannelIDs)
@@ -128,7 +127,7 @@ func (h *TokenHandler) UpdateDefaultChannels(c *gin.Context) {
 		ChannelIDs []uint `json:"channel_ids"`
 	}
 	if err := c.ShouldBindJSON(&in); err != nil {
-		abortErr(c, middleware.NewAppError(middleware.CodeValidationFailed, "请求体格式错误"))
+		abortBindErr(c, err, "请求体格式错误")
 		return
 	}
 	if err := h.Svc.UpdateDefaultChannels(id, in.ChannelIDs); err != nil {

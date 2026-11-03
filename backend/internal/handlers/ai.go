@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/reminder/backend/internal/middleware"
 	"github.com/reminder/backend/internal/services"
 )
 
@@ -25,7 +24,7 @@ func (h *AIHandler) GetSettings(c *gin.Context) {
 func (h *AIHandler) UpdateSettings(c *gin.Context) {
 	var in services.AISettingsInput
 	if err := c.ShouldBindJSON(&in); err != nil {
-		abortErr(c, middleware.NewAppError(middleware.CodeValidationFailed, "请求体格式错误"))
+		abortBindErr(c, err, "请求体格式错误")
 		return
 	}
 	out, err := h.Svc.SaveSettings(in)
@@ -40,7 +39,7 @@ func (h *AIHandler) UpdateSettings(c *gin.Context) {
 func (h *AIHandler) Test(c *gin.Context) {
 	var in services.AISettingsInput
 	if err := c.ShouldBindJSON(&in); err != nil {
-		abortErr(c, middleware.NewAppError(middleware.CodeValidationFailed, "请求体格式错误"))
+		abortBindErr(c, err, "请求体格式错误")
 		return
 	}
 	reply, err := h.Svc.TestConnection(c.Request.Context(), in)
@@ -57,7 +56,7 @@ func (h *AIHandler) Test(c *gin.Context) {
 func (h *AIHandler) Chat(c *gin.Context) {
 	var in services.ChatInput
 	if err := c.ShouldBindJSON(&in); err != nil {
-		abortErr(c, middleware.NewAppError(middleware.CodeValidationFailed, "请求体格式错误"))
+		abortBindErr(c, err, "请求体格式错误")
 		return
 	}
 	res, err := h.Svc.Chat(c.Request.Context(), in)

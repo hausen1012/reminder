@@ -77,7 +77,7 @@ func (h *ChannelHandler) Get(c *gin.Context) {
 func (h *ChannelHandler) Create(c *gin.Context) {
 	var in services.ChannelInput
 	if err := c.ShouldBindJSON(&in); err != nil {
-		abortErr(c, middleware.NewAppError(middleware.CodeValidationFailed, "请求体格式错误"))
+		abortBindErr(c, err, "请求体格式错误")
 		return
 	}
 	v, err := h.Svc.Create(in)
@@ -97,7 +97,7 @@ func (h *ChannelHandler) Update(c *gin.Context) {
 	}
 	var in services.ChannelInput
 	if err := c.ShouldBindJSON(&in); err != nil {
-		abortErr(c, middleware.NewAppError(middleware.CodeValidationFailed, "请求体格式错误"))
+		abortBindErr(c, err, "请求体格式错误")
 		return
 	}
 	v, err := h.Svc.Update(id, in)
@@ -158,7 +158,7 @@ func (h *ChannelHandler) BatchDelete(c *gin.Context) {
 		IDs []uint `json:"ids"`
 	}
 	if err := c.ShouldBindJSON(&in); err != nil {
-		abortErr(c, middleware.NewAppError(middleware.CodeValidationFailed, "请求体格式错误"))
+		abortBindErr(c, err, "请求体格式错误")
 		return
 	}
 	if len(in.IDs) == 0 {
@@ -180,7 +180,7 @@ func (h *ChannelHandler) TestDryRun(c *gin.Context) {
 		Config map[string]any `json:"config"`
 	}
 	if err := c.ShouldBindJSON(&in); err != nil {
-		abortErr(c, middleware.NewAppError(middleware.CodeValidationFailed, "请求体格式错误"))
+		abortBindErr(c, err, "请求体格式错误")
 		return
 	}
 	if err := h.Svc.DryRun(c.Request.Context(), in.Type, in.Config); err != nil {

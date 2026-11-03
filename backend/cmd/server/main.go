@@ -20,12 +20,28 @@ import (
 var staticFS embed.FS
 
 func main() {
+	// 先解析配置再装配日志：config.Load 会按 TIMEZONE 同步 time.Local，
+	// 日志文件按自然日滚动时用的是站点时区，而不是宿主机时区。
+	// （config.Load 自身的告警发生在日志装配前，只会以标准库默认格式打到 stderr。）
 	cfg := config.Load()
 
 	logger.Init(cfg.LogFile)
 
+	slog.Info("启动配置",
+		"port", cfg.Port,
+		"db_path", cfg.DBPath,
+		"base_url", cfg.BaseURL,
+		"timezone", cfg.Timezone,
+		"log_file", cfg.LogFile,
+		"log_format", getEnv("LOG_FORMAT", "text"),
+		"log_level", getEnv("LOG_LEVEL", "info"),
+		"sweep_interval_sec", cfg.SweepIntervalSec,
+		"miss_tolerance_minutes", cfg.MissToleranceMinutes,
+		"log_auto_purge_days", cfg.LogAutoPurgeDays,
+	)
+
 	if err := database.Init(cfg); err != nil {
-		slog.Error("数据库初始化失败", "error", err)
+		slog.Error("数据库初始化失败", "db_path", cfg.DBPath, "error", err)
 		os.Exit(1)
 	}
 
@@ -70,4 +86,14 @@ func main() {
 	}
 	res.Handles.Engine.Stop()
 	slog.Info("已退出。")
+}
+
+// getEnv 读环境变量，未设置或为空时返回 fallback。
+//
+// main 里只需要这一个，没必要为此导出 config 包的内部小工具。
+func getEnv(key, fallback string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return fallback
 }

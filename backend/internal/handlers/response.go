@@ -4,6 +4,7 @@
 package handlers
 
 import (
+	"log/slog"
 	"net/http"
 	"strconv"
 
@@ -21,7 +22,27 @@ func parseID(c *gin.Context, key string) (uint, error) {
 	return uint(id), nil
 }
 
+// abortBindErr 统一处理请求体解析失败。
+//
+// 对外只回一句用户能看懂的话（不暴露 JSON 字段名等内部细节），
+// 但把底层原因（缺字段、类型不对、JSON 语法错）写进日志：
+// 只有「请求体格式错误」这句话的日志，排查时等于没有信息。
+func abortBindErr(c *gin.Context, err error, message string) {
+	if err != nil {
+		slog.Warn("请求体解析失败",
+			"path", c.Request.URL.Path,
+			"request_id", middleware.RequestIDOf(c),
+			"content_type", c.ContentType(),
+			"error", err,
+		)
+	}
+	abortErr(c, middleware.NewAppError(middleware.CodeValidationFailed, message))
+}
+
 // abortErr 是处理 service 错误的统一入口：AppError 走中间件渲染，其余视为 unknown。
+//
+// 这里不写日志：ErrorHandler 在渲染响应时统一记录（带 request_id 与分级级别），
+// 若此处也记一遍，同一次失败会在日志里出现两条，反而干扰排查。
 func abortErr(c *gin.Context, err error) {
 	_ = c.Error(err)
 	c.Abort()

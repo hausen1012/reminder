@@ -5,6 +5,7 @@ package services
 
 import (
 	"errors"
+	"log/slog"
 	"sort"
 	"time"
 
@@ -175,9 +176,11 @@ func (s *LogService) GetDetail(id uint) (*LogView, error) {
 		reminderTitle = r.Title
 	}
 
-	// 取 attempts
+	// 取 attempts；查不到投递明细是展示降级，不该让详情接口失败，但要留痕
 	var attempts []models.DeliveryAttempt
-	s.DB.Where("delivery_log_id = ?", id).Order("attempt ASC").Find(&attempts)
+	if err := s.DB.Where("delivery_log_id = ?", id).Order("attempt ASC").Find(&attempts).Error; err != nil {
+		slog.Warn("读取投递明细失败，详情页将缺少通道级记录", "log", id, "error", err)
+	}
 
 	// 取 confirm_url
 	var confirmURL string
@@ -260,9 +263,11 @@ func (s *LogService) Purge(olderThan time.Duration, all bool) (int64, error) {
 		return 0, err
 	}
 
-	// all=true 时回收 SQLite 空间
+	// all=true 时回收 SQLite 空间；失败不算清理失败（数据已删掉），但要留痕
 	if all {
-		s.DB.Exec("VACUUM")
+		if err := s.DB.Exec("VACUUM").Error; err != nil {
+			slog.Warn("清理日志后回收 SQLite 空间失败", "error", err)
+		}
 	}
 	return count, nil
 }

@@ -42,6 +42,9 @@ type SetupResult struct {
 func Setup(staticFS embed.FS, cfg *config.Config) (*SetupResult, error) {
 	r := gin.New()
 	r.Use(gin.Recovery())
+	// RequestID 必须排在 SlogLogger / ErrorHandler 之前：
+	// 后两者都要读它来把「请求日志」和「错误日志」串起来。
+	r.Use(middleware.RequestID())
 	r.Use(middleware.SlogLogger())
 	r.Use(middleware.ErrorHandler())
 	r.Use(middleware.CORS())
@@ -93,7 +96,9 @@ func Setup(staticFS embed.FS, cfg *config.Config) (*SetupResult, error) {
 	logSvc := services.NewLogService(database.DB, cfg.BaseURL)
 	if cfg.LogAutoPurgeDays > 0 {
 		purgeAfter := time.Duration(cfg.LogAutoPurgeDays) * 24 * time.Hour
-		_, _ = engine.AddPurgeCron(logSvc, purgeAfter)
+		if _, err := engine.AddPurgeCron(logSvc, purgeAfter); err != nil {
+			slog.Error("注册日志自动清理任务失败", "purge_days", cfg.LogAutoPurgeDays, "error", err)
+		}
 	}
 
 	// 自动清理 AI 草稿：固定保留 90 天，不提供开关——
@@ -103,7 +108,7 @@ func Setup(staticFS embed.FS, cfg *config.Config) (*SetupResult, error) {
 	if _, err := engine.AddDailyJob("AI草稿清理", scheduler.DailyPurgeExpr, func() {
 		n, err := aiSvc.PurgeActions(services.ActionRetention)
 		if err != nil {
-			slog.Info("自动清理 AI 草稿失败", "error", err)
+			slog.Error("自动清理 AI 草稿失败", "error", err)
 		} else if n > 0 {
 			slog.Info("自动清理 AI 草稿", "count", n)
 		}

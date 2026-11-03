@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"log/slog"
+
 	"github.com/gin-gonic/gin"
 	"github.com/reminder/backend/internal/middleware"
 	"github.com/reminder/backend/internal/services"
@@ -21,7 +23,7 @@ type PasswordRequest struct {
 func (h *UserHandler) UpdatePassword(c *gin.Context) {
 	var req PasswordRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		abortErr(c, middleware.NewAppError(middleware.CodeValidationFailed, "密码至少 6 个字符"))
+		abortBindErr(c, err, "密码至少 6 个字符")
 		return
 	}
 
@@ -32,6 +34,7 @@ func (h *UserHandler) UpdatePassword(c *gin.Context) {
 	}
 
 	if err := h.Svc.ChangePassword(userID, req.OldPassword, req.NewPassword); err != nil {
+		slog.Warn("修改密码失败", "user_id", userID, "request_id", middleware.RequestIDOf(c), "error", err)
 		abortErr(c, err)
 		return
 	}

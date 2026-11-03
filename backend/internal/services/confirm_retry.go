@@ -103,7 +103,8 @@ func (m *ConfirmRetryManager) StopAll() {
 func (m *ConfirmRetryManager) retry(reminderID uint, chainID string, round int) {
 	var r models.Reminder
 	if err := m.DB.First(&r, reminderID).Error; err != nil {
-		slog.Info("停止确认链", "chain", chainID, "reason", "提醒不存在")
+		// 记录不存在是正常终止路径；其他 DB 错误同样会落到这里，一并带上原因
+		slog.Info("停止确认链", "chain", chainID, "reason", "提醒不存在", "reminder", reminderID, "error", err)
 		m.stopChain(chainID)
 		return
 	}
@@ -124,9 +125,14 @@ func (m *ConfirmRetryManager) retry(reminderID uint, chainID string, round int) 
 	}
 
 	var confirmed int64
-	m.DB.Model(&models.DeliveryLog{}).
+	if err := m.DB.Model(&models.DeliveryLog{}).
 		Where("confirm_chain_id = ? AND confirmed = ?", chainID, true).
-		Count(&confirmed)
+		Count(&confirmed).Error; err != nil {
+		// 查不到确认状态就不能冒险继续重发：宁可这一轮跳过，也不要给已确认的用户再发一遍
+		slog.Error("查询确认状态失败，本轮重发跳过", "chain", chainID, "round", round, "error", err)
+		m.stopChain(chainID)
+		return
+	}
 	if confirmed > 0 {
 		slog.Info("停止确认链", "chain", chainID, "reason", "用户已确认")
 		m.stopChain(chainID)
@@ -138,7 +144,7 @@ func (m *ConfirmRetryManager) retry(reminderID uint, chainID string, round int) 
 		Where("delivery_logs.confirm_chain_id = ?", chainID).
 		First(&tok).Error
 	if err != nil {
-		slog.Info("停止确认链", "chain", chainID, "reason", "查找 token 失败", "error", err)
+		slog.Warn("停止确认链", "chain", chainID, "reason", "查找 token 失败", "round", round, "error", err)
 		m.stopChain(chainID)
 		return
 	}
@@ -173,7 +179,7 @@ func (m *ConfirmRetryManager) retry(reminderID uint, chainID string, round int) 
 		ConfirmChainID: &chainID,
 	}
 	if err := m.DB.Create(newLog).Error; err != nil {
-		slog.Warn("创建重发日志失败", "chain", chainID, "error", err)
+		slog.Error("创建重发日志失败，确认链终止", "chain", chainID, "round", round, "reminder", r.ID, "error", err)
 		m.stopChain(chainID)
 		return
 	}

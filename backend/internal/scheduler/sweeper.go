@@ -145,7 +145,7 @@ func (s *Sweeper) tick() {
 		Where("enabled = ? AND next_fire_at IS NOT NULL AND next_fire_at <= ?", true, models.TimeOf(cutoffDue)).
 		Find(&items).Error
 	if err != nil {
-		slog.Info("扫描失败", "error", err)
+		slog.Error("兜底扫描查询失败，本轮补漏跳过", "error", err)
 		return
 	}
 
@@ -166,7 +166,7 @@ func (s *Sweeper) tick() {
 				}
 				if r.NextFireAt.Before(cutoffExpire) {
 					if err := s.markExpired(r, now); err != nil {
-						slog.Info("标记 reminder expired 失败", "reminder", r.ID, "error", err)
+						slog.Error("标记提醒为 expired 失败", "reminder", r.ID, "title", r.Title, "error", err)
 					}
 					continue
 				}

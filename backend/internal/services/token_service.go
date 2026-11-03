@@ -165,7 +165,10 @@ func (s *TokenService) TouchLastUsed(keyID uint) {
 			}
 		}()
 		now := models.TimeNow()
-		_ = s.DB.Model(&models.Token{}).Where("id = ?", keyID).Update("last_used_at", now).Error
+		// 失败只记日志、不重试：last_used_at 是统计字段，写不进去不影响鉴权本身
+		if err := s.DB.Model(&models.Token{}).Where("id = ?", keyID).Update("last_used_at", now).Error; err != nil {
+			slog.Warn("更新令牌 last_used_at 失败", "token_id", keyID, "error", err)
+		}
 	}()
 }
 

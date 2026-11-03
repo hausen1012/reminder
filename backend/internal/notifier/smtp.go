@@ -37,7 +37,7 @@ func (n *smtpNotifier) Send(ctx context.Context, configJSON []byte, msg Message)
 	if err := json.Unmarshal(configJSON, &cfg); err != nil {
 		return Permanent(fmt.Errorf("解析 SMTP 配置失败: %w", err))
 	}
-	slog.Info("开始发送", "subject", msg.Subject, "to", cfg.To, "body_len", len(msg.Body), "format", msg.Format)
+	slog.Debug("SMTP 开始发送", "subject", msg.Subject, "to", cfg.To, "body_len", len(msg.Body), "format", msg.Format, "host", cfg.Host, "port", cfg.Port, "security_mode", cfg.SecurityMode)
 	if cfg.Host == "" || cfg.Port == 0 || cfg.FromAddr == "" || len(cfg.To) == 0 {
 		return Permanent(fmt.Errorf("SMTP 配置缺少必填字段"))
 	}

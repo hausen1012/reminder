@@ -89,7 +89,10 @@ func (s *ReminderService) Create(in ReminderInput) (*ReminderView, error) {
 	if err := s.validate(&in); err != nil {
 		return nil, err
 	}
-	specRaw, _ := json.Marshal(in.ScheduleSpec)
+	specRaw, err := json.Marshal(in.ScheduleSpec)
+	if err != nil {
+		return nil, middleware.NewAppError(middleware.CodeValidationFailed, "schedule_spec 不是合法 JSON").WithField("schedule_spec")
+	}
 	spec, err := scheduler.ParseSpec(specRaw)
 	if err != nil {
 		return nil, middleware.NewAppError(middleware.CodeValidationFailed, err.Error()).WithField("schedule_spec")
@@ -141,8 +144,9 @@ func (s *ReminderService) Create(in ReminderInput) (*ReminderView, error) {
 	}
 	if s.Engine != nil {
 		if err := s.Engine.Add(r); err != nil {
-			// 调度器失败不应导致 CRUD 失败：用户保存的数据已落库
-			slog.Info("注册到调度器失败", "id", r.ID, "error", err)
+			// 调度器失败不应导致 CRUD 失败：用户保存的数据已落库。
+			// 但这意味着该提醒不会自动触发（只能靠兜底扫描），必须靠日志暴露出来。
+			slog.Error("注册提醒到调度器失败，数据已保存但不会自动触发", "id", r.ID, "title", r.Title, "error", err)
 		}
 	}
 	return s.toView(r, in.ChannelIDs), nil
@@ -157,7 +161,10 @@ func (s *ReminderService) Update(id uint, in ReminderInput) (*ReminderView, erro
 	if err := s.validate(&in); err != nil {
 		return nil, err
 	}
-	specRaw, _ := json.Marshal(in.ScheduleSpec)
+	specRaw, err := json.Marshal(in.ScheduleSpec)
+	if err != nil {
+		return nil, middleware.NewAppError(middleware.CodeValidationFailed, "schedule_spec 不是合法 JSON").WithField("schedule_spec")
+	}
 	spec, err := scheduler.ParseSpec(specRaw)
 	if err != nil {
 		return nil, middleware.NewAppError(middleware.CodeValidationFailed, err.Error()).WithField("schedule_spec")
@@ -216,7 +223,7 @@ func (s *ReminderService) Update(id uint, in ReminderInput) (*ReminderView, erro
 	}
 	if s.Engine != nil {
 		if err := s.Engine.Update(r); err != nil {
-			slog.Info("更新调度器失败", "id", id, "error", err)
+			slog.Error("更新调度器失败，改动已保存但调度时间可能未生效", "id", id, "title", r.Title, "error", err)
 		}
 	}
 	if s.ConfirmMgr != nil {
@@ -423,7 +430,9 @@ func (s *ReminderService) Toggle(id uint) (*ReminderView, error) {
 	}
 	if s.Engine != nil {
 		if r.Enabled {
-			_ = s.Engine.Add(r)
+			if err := s.Engine.Add(r); err != nil {
+				slog.Error("启用提醒时注册调度器失败，提醒已启用但不会自动触发", "id", id, "title", r.Title, "error", err)
+			}
 		} else {
 			s.Engine.Remove(id)
 		}

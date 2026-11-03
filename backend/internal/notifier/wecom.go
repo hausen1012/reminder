@@ -27,7 +27,7 @@ func (n *wecomNotifier) Send(ctx context.Context, configJSON []byte, msg Message
 	if err := json.Unmarshal(configJSON, &cfg); err != nil {
 		return Permanent(fmt.Errorf("解析企微配置失败: %w", err))
 	}
-	slog.Info("开始发送", "subject", msg.Subject, "body_len", len(msg.Body), "format", msg.Format)
+	slog.Debug("企微开始发送", "subject", msg.Subject, "body_len", len(msg.Body), "format", msg.Format, "url", redactURLString(cfg.WebhookURL))
 	if cfg.WebhookURL == "" {
 		return Permanent(fmt.Errorf("企微 webhook_url 未配置"))
 	}

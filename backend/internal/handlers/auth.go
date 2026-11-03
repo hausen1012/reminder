@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"log/slog"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -25,12 +26,15 @@ type LoginRequest struct {
 func (h *AuthHandler) Login(c *gin.Context) {
 	var req LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		abortErr(c, middleware.NewAppError(middleware.CodeValidationFailed, "请输入用户名和密码"))
+		abortBindErr(c, err, "请输入用户名和密码")
 		return
 	}
 
 	user, err := h.UserSvc.Authenticate(req.Username, req.Password)
 	if err != nil {
+		// 失败原因（用户不存在 / 密码错）对外统一为同一句，但日志要分开记：
+		// 只有「登录失败」三个字，事后无法判断是撞库还是用户记错密码。
+		slog.Warn("登录失败", "path", c.Request.URL.Path, "request_id", middleware.RequestIDOf(c), "username", req.Username, "error", err)
 		abortErr(c, err)
 		return
 	}
@@ -42,9 +46,11 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	})
 	tokenStr, err := token.SignedString([]byte(h.JWTSecret))
 	if err != nil {
+		slog.Error("签发 JWT 失败", "path", c.Request.URL.Path, "request_id", middleware.RequestIDOf(c), "user_id", user.ID, "error", err)
 		abortErr(c, err)
 		return
 	}
+	slog.Info("登录成功", "user_id", user.ID, "username", user.Username, "request_id", middleware.RequestIDOf(c))
 
 	successJSON(c, gin.H{
 		"token": tokenStr,

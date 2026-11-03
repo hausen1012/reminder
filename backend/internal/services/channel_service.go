@@ -303,7 +303,7 @@ func (s *ChannelService) DryRun(ctx context.Context, chType string, config map[s
 		Vars:    vars,
 	}
 	if err := n.Send(ctx, plainConfig, rendered); err != nil {
-		slog.Info("试发失败", "type", chType, "error", err)
+		slog.Warn("通道试发失败", "type", chType, "error", err)
 		// 试发失败通常是配置问题（密码错、地址不通），属于用户可处理的范围，
 		// 应返回 400 + 原文案，而不是 500「服务器内部错误」
 		return middleware.NewAppError(middleware.CodeValidationFailed, "试发失败: "+err.Error())

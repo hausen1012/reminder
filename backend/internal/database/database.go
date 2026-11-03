@@ -2,6 +2,7 @@ package database
 
 import (
 	"fmt"
+	"log/slog"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -9,10 +10,12 @@ import (
 	"time"
 
 	"github.com/reminder/backend/internal/config"
+	"github.com/reminder/backend/internal/logger"
 	"github.com/reminder/backend/internal/models"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
+	gormlogger "gorm.io/gorm/logger"
 )
 
 var DB *gorm.DB
@@ -72,9 +75,39 @@ func Init(cfg *config.Config) error {
 // NowFunc 仍然强制 UTC：models.Time 的 Value 会自己归一化，这里保持 UTC
 // 是为了让 GORM 自动填充的 created_at / updated_at 与手写字段走同一条路径，
 // 也避免任何直接读 NowFunc 的代码拿到本地偏移。
+//
+// Logger 接到 slog 上：之前 GORM 默认把 SQL 打到标准输出，
+// 既绕过了 LOG_FORMAT / LOG_LEVEL，也没有结构化字段。现在的规则是：
+//   - 失败 SQL → Error 级别，带 sql / rows / error；
+//   - 慢查询（> 500ms）→ Warn 级别；
+//   - 其余 SQL 只在 LOG_LEVEL=debug 时记录。
+//
+// RecordNotFound 不计入错误：业务上「查不到」是正常分支（例如 404），
+// 记成 Error 会把真正该看的失败淹掉。
+//
+// 传入的 slog.Default() 是此刻的默认 logger，因此 logger.Init 必须先于
+// database.Init 调用（main 里的顺序就是这样）。
 func gormConfig() *gorm.Config {
 	return &gorm.Config{
 		NowFunc: func() time.Time { return time.Now().UTC() },
+		Logger: gormlogger.NewSlogLogger(slog.Default(), gormlogger.Config{
+			SlowThreshold:             500 * time.Millisecond,
+			LogLevel:                  gormLogLevel(logger.Level()),
+			IgnoreRecordNotFoundError: true,
+			Colorful:                  false,
+		}),
+	}
+}
+
+// gormLogLevel 把 slog 级别映射成 GORM 的日志级别。
+func gormLogLevel(level slog.Level) gormlogger.LogLevel {
+	switch {
+	case level <= slog.LevelDebug:
+		return gormlogger.Info // Debug：打印全部 SQL
+	case level <= slog.LevelInfo:
+		return gormlogger.Warn // Info：只打印慢查询与错误
+	default:
+		return gormlogger.Error // Warn/Error：只打印失败 SQL
 	}
 }
 

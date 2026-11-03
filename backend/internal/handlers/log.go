@@ -108,7 +108,7 @@ func (h *LogHandler) BatchDelete(c *gin.Context) {
 		IDs []uint `json:"ids"`
 	}
 	if err := c.ShouldBindJSON(&in); err != nil {
-		abortErr(c, middleware.NewAppError(middleware.CodeValidationFailed, "请求体格式错误"))
+		abortBindErr(c, err, "请求体格式错误")
 		return
 	}
 	if len(in.IDs) == 0 {

@@ -64,7 +64,7 @@ func (h *ReminderHandler) Get(c *gin.Context) {
 func (h *ReminderHandler) Create(c *gin.Context) {
 	var in services.ReminderInput
 	if err := c.ShouldBindJSON(&in); err != nil {
-		abortErr(c, middleware.NewAppError(middleware.CodeValidationFailed, "请求体格式错误"))
+		abortBindErr(c, err, "请求体格式错误")
 		return
 	}
 	v, err := h.Svc.Create(in)
@@ -84,7 +84,7 @@ func (h *ReminderHandler) Update(c *gin.Context) {
 	}
 	var in services.ReminderInput
 	if err := c.ShouldBindJSON(&in); err != nil {
-		abortErr(c, middleware.NewAppError(middleware.CodeValidationFailed, "请求体格式错误"))
+		abortBindErr(c, err, "请求体格式错误")
 		return
 	}
 	v, err := h.Svc.Update(id, in)
@@ -136,7 +136,7 @@ func (h *ReminderHandler) Preview(c *gin.Context) {
 		Count        int            `json:"count"`
 	}
 	if err := c.ShouldBindJSON(&in); err != nil {
-		abortErr(c, middleware.NewAppError(middleware.CodeValidationFailed, "请求体格式错误"))
+		abortBindErr(c, err, "请求体格式错误")
 		return
 	}
 	in.Calendar = strings.TrimSpace(in.Calendar)
@@ -159,7 +159,7 @@ func (h *ReminderHandler) TestDryRun(c *gin.Context) {
 		ChannelIDs    []uint `json:"channel_ids"`
 	}
 	if err := c.ShouldBindJSON(&in); err != nil {
-		abortErr(c, middleware.NewAppError(middleware.CodeValidationFailed, "请求体格式错误"))
+		abortBindErr(c, err, "请求体格式错误")
 		return
 	}
 	if err := h.Svc.TestDryRun(c.Request.Context(), in.Title, in.Content, in.ContentFormat, in.ChannelIDs); err != nil {
@@ -212,7 +212,7 @@ func (h *ReminderHandler) BatchDelete(c *gin.Context) {
 		IDs []uint `json:"ids"`
 	}
 	if err := c.ShouldBindJSON(&in); err != nil {
-		abortErr(c, middleware.NewAppError(middleware.CodeValidationFailed, "请求体格式错误"))
+		abortBindErr(c, err, "请求体格式错误")
 		return
 	}
 	if len(in.IDs) == 0 {

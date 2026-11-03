@@ -5,6 +5,7 @@
 package middleware
 
 import (
+	"log/slog"
 	"net/http"
 	"sync"
 	"time"
@@ -66,6 +67,16 @@ func (rl *RateLimiter) Allow(keyID uint, limitPerMinute int) bool {
 	return true
 }
 
+// tokenPrefix 返回令牌的前 8 个字符，用于在日志里区分是哪个令牌。
+//
+// 只留前缀不足以还原明文（令牌是 24 字节随机串），但足以判断"是不是同一个调用方"。
+func tokenPrefix(key string) string {
+	if len(key) <= 8 {
+		return "***"
+	}
+	return key[:8] + "…"
+}
+
 // TokenAuth 返回中间件。
 //
 // verify 接收明文返回 tokenID；toucher 可选更新 last_used_at；
@@ -77,6 +88,7 @@ func TokenAuth(verify TokenVerifier, toucher TokenToucher, limiter *RateLimiter)
 	return func(c *gin.Context) {
 		key := c.GetHeader("X-AUTH")
 		if key == "" {
+			slog.Warn("外部令牌鉴权失败", "path", c.Request.URL.Path, "request_id", RequestIDOf(c), "reason", "缺少 X-AUTH 请求头")
 			c.AbortWithStatusJSON(http.StatusUnauthorized,
 				ErrorBody(CodeUnauthorized, "缺少 X-AUTH 请求头", ""))
 			return
@@ -84,12 +96,16 @@ func TokenAuth(verify TokenVerifier, toucher TokenToucher, limiter *RateLimiter)
 
 		tokenID, ok := verify(key)
 		if !ok {
+			// 只记令牌前缀，不记明文或哈希：日志本身不该成为凭据来源。
+			slog.Warn("外部令牌鉴权失败", "path", c.Request.URL.Path, "request_id", RequestIDOf(c),
+				"reason", "令牌无效", "token_prefix", tokenPrefix(key))
 			c.AbortWithStatusJSON(http.StatusUnauthorized,
 				ErrorBody(CodeUnauthorized, "令牌无效", ""))
 			return
 		}
 
 		if !limiter.Allow(tokenID, 60) {
+			slog.Warn("外部令牌触发限流", "path", c.Request.URL.Path, "request_id", RequestIDOf(c), "token_id", tokenID)
 			c.AbortWithStatusJSON(http.StatusTooManyRequests,
 				ErrorBody(CodeRateLimited, "请求过于频繁", ""))
 			return

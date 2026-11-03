@@ -99,11 +99,15 @@ func ErrorBody(code ErrorCode, message, field string) gin.H {
 // ErrorHandler 是顶层中间件：
 //  1. recover panic 并以 internal_error 响应；
 //  2. 把 handler 通过 c.Error 注册的 AppError 统一渲染为 JSON 错误体。
+//
+// 同时负责把错误写进服务端日志：AppError 按状态码分级（4xx → Warn，5xx → Error），
+// 未知错误一律 Error。日志里带 method / path / request_id / code / message / field，
+// 让「请求日志」与「错误日志」能通过 request_id 对上同一次请求。
 func ErrorHandler() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		defer func() {
 			if r := recover(); r != nil {
-				slog.Error("panic", "recover", r, "stack", debug.Stack())
+				logWithRequest(c, slog.LevelError, "panic 恢复", "recover", r, "stack", string(debug.Stack()))
 				if !c.Writer.Written() {
 					c.AbortWithStatusJSON(http.StatusInternalServerError,
 						ErrorBody(CodeInternalError, "服务器内部错误", ""))
@@ -120,14 +124,40 @@ func ErrorHandler() gin.HandlerFunc {
 		err := c.Errors[0].Err
 		var ae *AppError
 		if errors.As(err, &ae) {
-			c.AbortWithStatusJSON(ae.httpStatus(), ErrorBody(ae.Code, ae.Message, ae.Field))
+			status := ae.httpStatus()
+			level := slog.LevelWarn
+			if status >= http.StatusInternalServerError {
+				level = slog.LevelError
+			}
+			logWithRequest(c, level, "请求返回业务错误",
+				"status", status,
+				"error_code", string(ae.Code),
+				"error_message", ae.Message,
+				"field", ae.Field,
+			)
+			c.AbortWithStatusJSON(status, ErrorBody(ae.Code, ae.Message, ae.Field))
 			return
 		}
 		// 未知错误，统一 500，且不泄露内部细节
-		slog.Error("未处理的错误", "error", err)
+		logWithRequest(c, slog.LevelError, "未处理的错误", "error", err)
 		if !c.Writer.Written() {
 			c.AbortWithStatusJSON(http.StatusInternalServerError,
 				ErrorBody(CodeInternalError, "服务器内部错误", ""))
 		}
 	}
+}
+
+// logWithRequest 输出带请求上下文的日志。
+//
+// method / path / request_id 让一条错误日志可以脱离请求日志单独定位；
+// request_id 为空（未装配 RequestID 中间件的测试路由）时自动省略。
+func logWithRequest(c *gin.Context, level slog.Level, msg string, args ...any) {
+	attrs := []any{
+		"method", c.Request.Method,
+		"path", c.Request.URL.Path,
+	}
+	if id := RequestIDOf(c); id != "" {
+		attrs = append(attrs, "request_id", id)
+	}
+	slog.Log(c.Request.Context(), level, msg, append(attrs, args...)...)
 }

@@ -32,7 +32,7 @@ func (n *dingtalkNotifier) Send(ctx context.Context, configJSON []byte, msg Mess
 	if err := json.Unmarshal(configJSON, &cfg); err != nil {
 		return Permanent(fmt.Errorf("解析钉钉配置失败: %w", err))
 	}
-	slog.Info("开始发送", "subject", msg.Subject, "body_len", len(msg.Body), "format", msg.Format)
+	slog.Debug("钉钉开始发送", "subject", msg.Subject, "body_len", len(msg.Body), "format", msg.Format, "url", redactURLString(cfg.WebhookURL))
 	if cfg.WebhookURL == "" {
 		return Permanent(fmt.Errorf("钉钉 webhook_url 未配置"))
 	}
