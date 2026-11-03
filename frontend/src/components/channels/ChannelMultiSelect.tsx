@@ -40,7 +40,7 @@ export function ChannelMultiSelect({
       <button
         type="button"
         onClick={() => onOpenChange(!open)}
-        className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm outline-none"
       >
         <span className={`truncate ${value.length > 0 ? '' : 'text-muted-foreground'}`}>
           {formatChannelNames(channels, value, placeholder)}
