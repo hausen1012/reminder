@@ -177,6 +177,11 @@ export interface TokenListResp {
 }
 
 // --- 监控 ---
+export interface SchedulerChannel {
+  id: number
+  name: string
+  type: string
+}
 
 export interface SchedulerEntry {
   id: number
@@ -185,6 +190,7 @@ export interface SchedulerEntry {
   title: string
   last_fired_at?: string
   schedule_type: string
+  channels?: SchedulerChannel[]
 }
 
 export interface SchedulerStatus {

@@ -359,14 +359,22 @@ func (e *Engine) RegisteredCount() int {
 	return len(e.reg)
 }
 
+// ChannelInfo 表示注册条目关联的通道简要信息。
+type ChannelInfo struct {
+	ID   uint   `json:"id"`
+	Name string `json:"name"`
+	Type string `json:"type"`
+}
+
 // RegisteredEntry 对外暴露注册条目视图。
 type RegisteredEntry struct {
-	ID           uint         `json:"id"`
-	Kind         string       `json:"kind"`
-	NextFireAt   *models.Time `json:"next_fire_at"`
-	Title        string       `json:"title"`
-	LastFiredAt  *models.Time `json:"last_fired_at"`
-	ScheduleType string       `json:"schedule_type"`
+	ID           uint          `json:"id"`
+	Kind         string        `json:"kind"`
+	NextFireAt   *models.Time  `json:"next_fire_at"`
+	Title        string        `json:"title"`
+	LastFiredAt  *models.Time  `json:"last_fired_at"`
+	ScheduleType string        `json:"schedule_type"`
+	Channels     []ChannelInfo `json:"channels"`
 }
 
 // ListRegistered 返回当前 Engine 中所有已注册条目的快照。
@@ -374,17 +382,66 @@ func (e *Engine) ListRegistered() []RegisteredEntry {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	out := make([]RegisteredEntry, 0, len(e.reg))
+	if len(e.reg) == 0 {
+		return out
+	}
+
+	ids := make([]uint, 0, len(e.reg))
+	for id := range e.reg {
+		ids = append(ids, id)
+	}
+
+	var reminders []models.Reminder
+	if err := e.db.Select("id, next_fire_at, title, last_fired_at, schedule_type").
+		Where("id IN ?", ids).
+		Find(&reminders).Error; err != nil {
+		slog.Error("ListRegistered 查询提醒失败", "err", err)
+	}
+
+	reminderMap := make(map[uint]models.Reminder, len(reminders))
+	for _, r := range reminders {
+		reminderMap[r.ID] = r
+	}
+
+	type chRow struct {
+		ReminderID uint   `gorm:"column:reminder_id"`
+		ChannelID  uint   `gorm:"column:channel_id"`
+		Name       string `gorm:"column:name"`
+		Type       string `gorm:"column:type"`
+	}
+	var chRows []chRow
+	if err := e.db.Table("reminder_channels").
+		Select("reminder_channels.reminder_id, channels.id AS channel_id, channels.name, channels.type").
+		Joins("JOIN channels ON channels.id = reminder_channels.channel_id").
+		Where("reminder_channels.reminder_id IN ?", ids).
+		Order("channels.name ASC").
+		Scan(&chRows).Error; err != nil {
+		slog.Error("ListRegistered 查询通道失败", "err", err)
+	}
+
+	chMap := make(map[uint][]ChannelInfo)
+	for _, row := range chRows {
+		chMap[row.ReminderID] = append(chMap[row.ReminderID], ChannelInfo{
+			ID:   row.ChannelID,
+			Name: row.Name,
+			Type: row.Type,
+		})
+	}
+
 	for id, r := range e.reg {
 		ent := RegisteredEntry{
-			ID:   id,
-			Kind: string(r.kind),
+			ID:       id,
+			Kind:     string(r.kind),
+			Channels: chMap[id],
 		}
-		var reminder models.Reminder
-		if err := e.db.Select("next_fire_at, title, last_fired_at, schedule_type").First(&reminder, id).Error; err == nil {
-			ent.NextFireAt = reminder.NextFireAt
-			ent.Title = reminder.Title
-			ent.LastFiredAt = reminder.LastFiredAt
-			ent.ScheduleType = reminder.ScheduleType
+		if ent.Channels == nil {
+			ent.Channels = []ChannelInfo{}
+		}
+		if rem, ok := reminderMap[id]; ok {
+			ent.NextFireAt = rem.NextFireAt
+			ent.Title = rem.Title
+			ent.LastFiredAt = rem.LastFiredAt
+			ent.ScheduleType = rem.ScheduleType
 		}
 		out = append(out, ent)
 	}

@@ -390,6 +390,18 @@ func TestEngineListRegistered(t *testing.T) {
 		t.Fatalf("Add 失败: %v", err)
 	}
 
+	ch := &models.Channel{
+		Name:    "测试通道",
+		Type:    "webhook",
+		Enabled: true,
+	}
+	if err := db.Create(ch).Error; err != nil {
+		t.Fatalf("创建通道失败: %v", err)
+	}
+	if err := db.Create(&models.ReminderChannel{ReminderID: r.ID, ChannelID: ch.ID}).Error; err != nil {
+		t.Fatalf("关联通道失败: %v", err)
+	}
+
 	entries := e.ListRegistered()
 	if len(entries) != 1 {
 		t.Fatalf("应返回 1 条，实际 %d", len(entries))
@@ -402,6 +414,9 @@ func TestEngineListRegistered(t *testing.T) {
 	}
 	if entries[0].Kind == "" {
 		t.Fatal("Kind 不应为空")
+	}
+	if len(entries[0].Channels) != 1 || entries[0].Channels[0].Name != "测试通道" {
+		t.Fatalf("Channels 期望 [测试通道]，实际 %+v", entries[0].Channels)
 	}
 }
 
