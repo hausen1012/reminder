@@ -29,13 +29,13 @@ function renderProfile() {
   )
 }
 
-// 导航按钮与分区内的提交按钮可能同名（如「修改密码」），因此导航统一在 nav 内查找
+// 导航统一在 nav 属性为设置分区的容器内查找
 function navButton(name: string) {
   const nav = screen.getByRole('navigation', { name: '设置分区' })
   return within(nav).getByRole('button', { name })
 }
 
-// 设置页的分区导航：点左侧导航项后只显示对应分区的表单
+// 设置页三大分区：账户信息、基础设置、AI 助手
 describe('Profile 分区导航', () => {
   beforeEach(() => {
     localStorage.setItem('token', 'test-token')
@@ -50,29 +50,34 @@ describe('Profile 分区导航', () => {
     })
   })
 
-  it('默认展示修改密码，其余分区默认隐藏', async () => {
+  it('默认展示账户信息，其余分区默认隐藏', async () => {
     renderProfile()
-    expect(navButton('修改密码')).toHaveAttribute('aria-current', 'page')
+    expect(navButton('账户信息')).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('heading', { name: '账户信息' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '基本信息' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: '修改密码' })).toBeInTheDocument()
-    expect(screen.queryByRole('heading', { name: '时区' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: '基础设置' })).not.toBeInTheDocument()
     await waitFor(() => expect(vi.mocked(getConfig)).toHaveBeenCalled())
   })
 
   it('点击导航项切换到对应分区', async () => {
     renderProfile()
 
-    await userEvent.click(navButton('时区'))
-    expect(screen.getByRole('heading', { name: '时区' })).toBeInTheDocument()
-    expect(screen.queryByRole('heading', { name: '修改密码' })).not.toBeInTheDocument()
-
-    await userEvent.click(navButton('关于项目'))
+    await userEvent.click(navButton('基础设置'))
+    expect(screen.getByRole('heading', { name: '基础设置' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '站点信息' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '时区设置' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: '关于项目' })).toBeInTheDocument()
-    expect(screen.queryByRole('heading', { name: '时区' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: '账户信息' })).not.toBeInTheDocument()
+
+    await userEvent.click(navButton('AI 助手'))
+    expect(screen.getByRole('heading', { name: 'AI 助手' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: '基础设置' })).not.toBeInTheDocument()
   })
 
   it('回显当前站点时区', async () => {
     renderProfile()
-    await userEvent.click(navButton('时区'))
+    await userEvent.click(navButton('基础设置'))
     // 下拉里同时存在隐藏的 option 与触发器文本，因此按触发器 id 断言
     await waitFor(() => {
       expect(document.getElementById('site-tz')).toHaveTextContent('Europe/Berlin')
@@ -81,12 +86,14 @@ describe('Profile 分区导航', () => {
 
   it('保存时区会提交 timezone 配置', async () => {
     renderProfile()
-    await userEvent.click(navButton('时区'))
+    await userEvent.click(navButton('基础设置'))
     await waitFor(() => {
       expect(document.getElementById('site-tz')).toHaveTextContent('Europe/Berlin')
     })
 
-    await userEvent.click(screen.getByRole('button', { name: '保存' }))
+    const buttons = screen.getAllByRole('button', { name: '保存' })
+    // 时区卡片中的保存按钮为第二个（第一个是站点信息的保存）
+    await userEvent.click(buttons[1])
 
     await waitFor(() => {
       expect(vi.mocked(updateConfig)).toHaveBeenCalledWith({ timezone: 'Europe/Berlin' })

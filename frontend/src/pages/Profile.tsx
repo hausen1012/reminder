@@ -1,11 +1,20 @@
-import { useState, useEffect, type FormEvent } from 'react'
-import { Loader2, Github, BookOpen, ExternalLink } from 'lucide-react'
+import { useState, useEffect, useContext, type FormEvent } from 'react'
+import { Loader2, Github, BookOpen, ExternalLink, User as UserIcon } from 'lucide-react'
 import { extractApiError, updatePassword } from '@/lib/api'
 import { useConfig } from '@/contexts/ConfigContext'
+import { AuthContext } from '@/contexts/AuthContext'
 import { COMMON_TIMEZONES, DOCS_URL, GITHUB_URL } from '@/lib/constants'
+import { formatInZone } from '@/lib/datetime'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+} from '@/components/ui/card'
 import {
   Select,
   SelectContent,
@@ -19,39 +28,31 @@ import { AISettingsSection } from '@/components/ai/AISettingsSection'
 import { PageHeader } from '@/components/common/PageHeader'
 import { cn } from '@/lib/utils'
 
-// 设置页的分区导航：左侧列出设置项，右侧只展示当前选中项的表单
+// 设置页三大分区：账户信息、基础设置、AI 助手
 const SECTIONS = [
   {
-    id: 'password',
-    label: '修改密码',
-    description: '请定期更换密码以确保安全',
+    id: 'account',
+    label: '账户信息',
+    description: '管理当前登录账户与密码安全',
   },
   {
-    id: 'brand',
-    label: '站点信息',
-    description: '配置站点名称和浏览器标签图标',
-  },
-  {
-    id: 'timezone',
-    label: '时区',
-    description: '决定所有提醒的时间如何解释与展示',
+    id: 'general',
+    label: '基础设置',
+    description: '配置站点外观、运行环境与系统信息',
   },
   {
     id: 'ai',
     label: 'AI 助手',
     description: '开启后可用自然语言对话来创建通知通道与提醒；助手生成的写操作需要你确认后才生效',
   },
-  {
-    id: 'about',
-    label: '关于项目',
-    description: '开源仓库与完整文档',
-  },
 ] as const
 
 type SectionId = (typeof SECTIONS)[number]['id']
 
 export default function Profile() {
-  const [active, setActive] = useState<SectionId>('password')
+  const [active, setActive] = useState<SectionId>('account')
+  const auth = useContext(AuthContext)
+  const user = auth?.user
 
   // --- 修改密码 ---
   const [oldPassword, setOldPassword] = useState('')
@@ -190,127 +191,210 @@ export default function Profile() {
                 <p className="text-sm text-muted-foreground">{section.description}</p>
               </div>
 
-              {/* 修改密码 */}
-              {section.id === 'password' && (
-                <form onSubmit={handlePassword} className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="old-password">原密码</Label>
-                    <Input id="old-password" type="password" value={oldPassword} onChange={(e) => setOldPassword(e.target.value)} required />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="new-password">新密码</Label>
-                    <Input id="new-password" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required minLength={6} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="confirm-password">确认新密码</Label>
-                    <Input id="confirm-password" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required minLength={6} />
-                  </div>
-                  {pwdMsg && <p className="text-sm text-green-600 dark:text-green-400 sm:col-span-2">{pwdMsg}</p>}
-                  {pwdError && <p className="text-sm text-destructive sm:col-span-2">{pwdError}</p>}
-                  <div className="sm:col-span-2">
-                    <Button type="submit" size="sm" disabled={pwdLoading}>
-                      {pwdLoading && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
-                      {pwdLoading ? '修改中…' : '修改密码'}
-                    </Button>
-                  </div>
-                </form>
-              )}
-
-              {/* 站点信息 */}
-              {section.id === 'brand' && (
-                <form onSubmit={handleBrandSave} className="space-y-5">
-                  <div className="space-y-2">
-                    <Label htmlFor="app-name">站点名称</Label>
-                    <Input id="app-name" value={appName} onChange={(e) => setAppName(e.target.value)} placeholder="Reminder" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>浏览器图标</Label>
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border bg-background">
-                        {logoSvg ? (
-                          <AppLogo svg={logoSvg} className="h-8 w-8 object-contain" alt="图标" />
-                        ) : (
-                          <span className="text-xs text-muted-foreground">无</span>
-                        )}
+              {/* 账户信息 */}
+              {section.id === 'account' && (
+                <div className="space-y-6">
+                  {/* 基本信息 */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base font-medium">基本信息</CardTitle>
+                      <CardDescription>当前登录系统的账户与角色信息</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex items-center gap-4">
+                        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary font-semibold text-lg">
+                          {user?.username ? user.username.slice(0, 2).toUpperCase() : <UserIcon className="h-6 w-6" />}
+                        </div>
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-foreground">{user?.username || 'admin'}</span>
+                            <span className="rounded-full bg-secondary px-2 py-0.5 text-xs text-muted-foreground font-normal">
+                              UID: {user?.id ?? 1}
+                            </span>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            注册时间：{user?.created_at ? formatInZone(user.created_at, timezone, 'datetime') : '—'}
+                          </p>
+                        </div>
                       </div>
-                      <div className="flex gap-2">
-                        <Button type="button" variant="outline" size="sm" onClick={() => document.getElementById('logo-upload')?.click()}>
-                          上传
-                        </Button>
-                        {logoSvg && (
-                          <Button type="button" variant="outline" size="sm" onClick={clearLogoSvg}>
-                            清除
+                    </CardContent>
+                  </Card>
+
+                  {/* 修改密码 */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base font-medium">修改密码</CardTitle>
+                      <CardDescription>定期更换密码以确保系统安全，长度不少于 6 位</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <form onSubmit={handlePassword} className="space-y-4 max-w-xl">
+                        <div className="space-y-2">
+                          <Label htmlFor="old-password">原密码</Label>
+                          <Input
+                            id="old-password"
+                            type="password"
+                            value={oldPassword}
+                            onChange={(e) => setOldPassword(e.target.value)}
+                            required
+                            autoComplete="current-password"
+                          />
+                        </div>
+                        <div className="grid gap-4 sm:grid-cols-2">
+                          <div className="space-y-2">
+                            <Label htmlFor="new-password">新密码</Label>
+                            <Input
+                              id="new-password"
+                              type="password"
+                              value={newPassword}
+                              onChange={(e) => setNewPassword(e.target.value)}
+                              required
+                              minLength={6}
+                              autoComplete="new-password"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="confirm-password">确认新密码</Label>
+                            <Input
+                              id="confirm-password"
+                              type="password"
+                              value={confirmPassword}
+                              onChange={(e) => setConfirmPassword(e.target.value)}
+                              required
+                              minLength={6}
+                              autoComplete="new-password"
+                            />
+                          </div>
+                        </div>
+                        {pwdMsg && <p className="text-sm text-green-600 dark:text-green-400">{pwdMsg}</p>}
+                        {pwdError && <p className="text-sm text-destructive">{pwdError}</p>}
+                        <div>
+                          <Button type="submit" size="sm" disabled={pwdLoading}>
+                            {pwdLoading && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
+                            {pwdLoading ? '修改中…' : '修改密码'}
                           </Button>
-                        )}
-                        <input id="logo-upload" type="file" accept="image/*,.svg" className="hidden" onChange={handleLogoUpload} />
-                      </div>
-                    </div>
-                    <p className="text-xs text-muted-foreground">支持 PNG、JPG、SVG，将显示在浏览器标签和侧边栏</p>
-                  </div>
-                  <Button type="submit" size="sm" disabled={saving}>
-                    {saving ? '保存中...' : '保存'}
-                  </Button>
-                </form>
+                        </div>
+                      </form>
+                    </CardContent>
+                  </Card>
+                </div>
               )}
 
-              {/* 时区 */}
-              {section.id === 'timezone' && (
-                <form onSubmit={handleTimezoneSave} className="space-y-5">
-                  <div className="space-y-2">
-                    <Label htmlFor="site-tz">站点时区</Label>
-                    <Select value={timezone} onValueChange={setTimezone}>
-                      <SelectTrigger id="site-tz">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {COMMON_TIMEZONES.map((tz) => (
-                          <SelectItem key={tz} value={tz}>
-                            {tz}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <p className="text-xs text-muted-foreground">
-                      提醒里填写的时间（如 09:00）按此时区解释。修改后所有提醒的下次触发时间会立即重算，无需重启。
-                    </p>
-                  </div>
-                  <Button type="submit" size="sm" disabled={savingTz}>
-                    {savingTz ? '保存中...' : '保存'}
-                  </Button>
-                </form>
+              {/* 基础设置 */}
+              {section.id === 'general' && (
+                <div className="space-y-6">
+                  {/* 站点信息 */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base font-medium">站点信息</CardTitle>
+                      <CardDescription>配置站点名称和浏览器标签图标</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <form onSubmit={handleBrandSave} className="space-y-5 max-w-xl">
+                        <div className="space-y-2">
+                          <Label htmlFor="app-name">站点名称</Label>
+                          <Input id="app-name" value={appName} onChange={(e) => setAppName(e.target.value)} placeholder="Reminder" />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>浏览器图标</Label>
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border bg-background">
+                              {logoSvg ? (
+                                <AppLogo svg={logoSvg} className="h-8 w-8 object-contain" alt="图标" />
+                              ) : (
+                                <span className="text-xs text-muted-foreground">无</span>
+                              )}
+                            </div>
+                            <div className="flex gap-2">
+                              <Button type="button" variant="outline" size="sm" onClick={() => document.getElementById('logo-upload')?.click()}>
+                                上传
+                              </Button>
+                              {logoSvg && (
+                                <Button type="button" variant="outline" size="sm" onClick={clearLogoSvg}>
+                                  清除
+                                </Button>
+                              )}
+                              <input id="logo-upload" type="file" accept="image/*,.svg" className="hidden" onChange={handleLogoUpload} />
+                            </div>
+                          </div>
+                          <p className="text-xs text-muted-foreground">支持 PNG、JPG、SVG，将显示在浏览器标签和侧边栏</p>
+                        </div>
+                        <Button type="submit" size="sm" disabled={saving}>
+                          {saving ? '保存中...' : '保存'}
+                        </Button>
+                      </form>
+                    </CardContent>
+                  </Card>
+
+                  {/* 时区设置 */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base font-medium">时区设置</CardTitle>
+                      <CardDescription>决定所有提醒的时间如何解释与展示</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <form onSubmit={handleTimezoneSave} className="space-y-5 max-w-xl">
+                        <div className="space-y-2">
+                          <Label htmlFor="site-tz">站点时区</Label>
+                          <Select value={timezone} onValueChange={setTimezone}>
+                            <SelectTrigger id="site-tz">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {COMMON_TIMEZONES.map((tz) => (
+                                <SelectItem key={tz} value={tz}>
+                                  {tz}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <p className="text-xs text-muted-foreground">
+                            提醒里填写的时间（如 09:00）按此时区解释。修改后所有提醒的下次触发时间会立即重算，无需重启。
+                          </p>
+                        </div>
+                        <Button type="submit" size="sm" disabled={savingTz}>
+                          {savingTz ? '保存中...' : '保存'}
+                        </Button>
+                      </form>
+                    </CardContent>
+                  </Card>
+
+                  {/* 关于项目 */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base font-medium">关于项目</CardTitle>
+                      <CardDescription>Reminder 开源仓库与完整文档</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <a
+                        href={GITHUB_URL}
+                        target="_blank"
+                        rel="noreferrer noopener"
+                        className="flex items-center gap-2 text-sm text-primary hover:underline"
+                      >
+                        <Github className="h-4 w-4" />
+                        github.com/hausen1012/reminder
+                        <ExternalLink className="h-3 w-3" />
+                      </a>
+                      <a
+                        href={DOCS_URL}
+                        target="_blank"
+                        rel="noreferrer noopener"
+                        className="flex items-center gap-2 text-sm text-primary hover:underline"
+                      >
+                        <BookOpen className="h-4 w-4" />
+                        hausen1012.github.io/reminder
+                        <ExternalLink className="h-3 w-3" />
+                      </a>
+                      <p className="text-xs text-muted-foreground">
+                        遇到问题或有建议，欢迎到 GitHub 提 Issue；具体用法见文档站点。
+                      </p>
+                    </CardContent>
+                  </Card>
+                </div>
               )}
 
               {/* AI 助手 */}
               {section.id === 'ai' && <AISettingsSection />}
-
-              {/* 关于项目 */}
-              {section.id === 'about' && (
-                <div className="space-y-3">
-                  <a
-                    href={GITHUB_URL}
-                    target="_blank"
-                    rel="noreferrer noopener"
-                    className="flex items-center gap-2 text-sm text-primary hover:underline"
-                  >
-                    <Github className="h-4 w-4" />
-                    github.com/hausen1012/reminder
-                    <ExternalLink className="h-3 w-3" />
-                  </a>
-                  <a
-                    href={DOCS_URL}
-                    target="_blank"
-                    rel="noreferrer noopener"
-                    className="flex items-center gap-2 text-sm text-primary hover:underline"
-                  >
-                    <BookOpen className="h-4 w-4" />
-                    hausen1012.github.io/reminder
-                    <ExternalLink className="h-3 w-3" />
-                  </a>
-                  <p className="text-xs text-muted-foreground">
-                    遇到问题或有建议，欢迎到 GitHub 提 Issue；具体用法见文档站点。
-                  </p>
-                </div>
-              )}
             </div>
           ))}
         </div>

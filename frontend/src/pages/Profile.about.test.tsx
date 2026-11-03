@@ -18,7 +18,7 @@ vi.mock('@/lib/api', async () => {
 
 import { getAISettings, getConfig } from '@/lib/api'
 
-// 设置页的「关于项目」分区：展示开源仓库与文档站点地址。
+// 设置页「基础设置」分区下的「关于项目」卡片：展示开源仓库与文档站点地址。
 describe('Profile 关于项目', () => {
   beforeEach(() => {
     localStorage.setItem('token', 'test-token')
@@ -32,7 +32,7 @@ describe('Profile 关于项目', () => {
     })
   })
 
-  it('切换到关于项目后展示 GitHub 与文档站地址，均在新窗口打开', async () => {
+  it('切换到基础设置后展示 GitHub 与文档站地址，均在新窗口打开', async () => {
     render(
       <ToastProviderRoot>
         <ConfigProvider>
@@ -41,7 +41,7 @@ describe('Profile 关于项目', () => {
       </ToastProviderRoot>,
     )
 
-    await userEvent.click(screen.getByRole('button', { name: '关于项目' }))
+    await userEvent.click(screen.getByRole('button', { name: '基础设置' }))
     await waitFor(() => expect(screen.getByRole('heading', { name: '关于项目' })).toBeInTheDocument())
 
     const github = screen.getByRole('link', { name: /github\.com\/hausen1012\/reminder/ })
