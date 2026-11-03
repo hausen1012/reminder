@@ -40,7 +40,7 @@ trap cleanup SIGINT SIGTERM
 
 echo "Starting backend (Go/Gin)..."
 cd "$ROOT_DIR/backend"
-LOG_FILE="$ROOT_DIR/logs" go run ./cmd/server/ &
+LOG_FILE="$ROOT_DIR/logs" DB_PATH="$ROOT_DIR/data/reminder.db" go run ./cmd/server/ &
 BACKEND_PID=$!
 
 echo "Waiting for backend..."

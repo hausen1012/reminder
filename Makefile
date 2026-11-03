@@ -7,7 +7,7 @@ dev:
 
 # Local development
 dev-backend:
-	cd backend && go run ./cmd/server/
+	cd backend && LOG_FILE=../logs DB_PATH=../data/reminder.db go run ./cmd/server/
 
 dev-frontend:
 	cd frontend && npm run dev

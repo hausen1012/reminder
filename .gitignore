@@ -33,6 +33,7 @@ logs/
 *.log
 
 # 本地数据库与临时文件
+data/
 *.db
 *.db-wal
 *.db-shm
