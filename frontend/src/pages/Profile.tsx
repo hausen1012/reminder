@@ -152,7 +152,7 @@ export default function Profile() {
         {/* 分区导航：移动端横向可滚动，桌面端纵向列表 */}
         <nav
           aria-label="设置分区"
-          className="flex gap-1 overflow-x-auto pb-1 md:w-52 md:shrink-0 md:flex-col md:overflow-visible md:pb-0"
+          className="flex gap-1 overflow-x-auto pb-1 md:-ml-3 md:w-52 md:shrink-0 md:flex-col md:overflow-visible md:pb-0"
         >
           {SECTIONS.map((section) => {
             const isActive = active === section.id
