@@ -1,6 +1,8 @@
 package services
 
 import (
+	"errors"
+	"sync"
 	"testing"
 	"time"
 
@@ -177,8 +179,98 @@ func TestConfirmConsumeToken_LogDeleted(t *testing.T) {
 		t.Fatalf("删除日志失败: %v", err)
 	}
 
-	if _, err := svc.ConsumeToken(token); err == nil {
-		t.Fatal("日志不存在时应报错")
+	if _, err := svc.ConsumeToken(token); !errors.Is(err, ErrConfirmLogMissing) {
+		t.Fatalf("日志不存在时应返回 ErrConfirmLogMissing，实际 %v", err)
+	}
+}
+
+// 重复消费：返回 ErrConfirmTokenUsed 与日志本身，且不改写 confirmed_at。
+func TestConfirmConsumeToken_DuplicateReturnsLog(t *testing.T) {
+	svc, db := newConfirmSvc(t, "http://x.test")
+
+	dl := seedLogWithChain(t, db, nil)
+	token, err := svc.CreateToken(dl.ID, time.Hour)
+	if err != nil {
+		t.Fatalf("创建令牌失败: %v", err)
+	}
+
+	first, err := svc.ConsumeToken(token)
+	if err != nil {
+		t.Fatalf("首次消费应成功: %v", err)
+	}
+	if first.ConfirmedAt == nil {
+		t.Fatal("首次消费应写入 confirmed_at")
+	}
+	firstAt := first.ConfirmedAt.Time
+
+	second, err := svc.ConsumeToken(token)
+	if !errors.Is(err, ErrConfirmTokenUsed) {
+		t.Fatalf("重复消费应返回 ErrConfirmTokenUsed，实际 %v", err)
+	}
+	if second == nil || second.ID != dl.ID {
+		t.Fatalf("重复消费应带回日志，实际 %+v", second)
+	}
+
+	// 首次确认时间不能被第二次点击覆盖
+	var got models.DeliveryLog
+	if err := db.First(&got, dl.ID).Error; err != nil {
+		t.Fatalf("读取日志失败: %v", err)
+	}
+	if got.ConfirmedAt == nil || !got.ConfirmedAt.Time.Equal(firstAt) {
+		t.Fatalf("confirmed_at 被改写: %v -> %v", firstAt, got.ConfirmedAt)
+	}
+}
+
+// 并发点击同一个链接：只有一个能真正消费，其余都应按「已使用」返回。
+func TestConfirmConsumeToken_ConcurrentOnlyOneWins(t *testing.T) {
+	svc, db := newConfirmSvc(t, "http://x.test")
+
+	dl := seedLogWithChain(t, db, nil)
+	token, err := svc.CreateToken(dl.ID, time.Hour)
+	if err != nil {
+		t.Fatalf("创建令牌失败: %v", err)
+	}
+
+	const workers = 8
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	success, used, other := 0, 0, 0
+	var firstErr error
+	for i := 0; i < workers; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_, err := svc.ConsumeToken(token)
+			mu.Lock()
+			defer mu.Unlock()
+			switch {
+			case err == nil:
+				success++
+			case errors.Is(err, ErrConfirmTokenUsed):
+				used++
+			default:
+				other++
+				if firstErr == nil {
+					firstErr = err
+				}
+			}
+		}()
+	}
+	wg.Wait()
+
+	if success != 1 {
+		t.Fatalf("并发点击应只有 1 次成功，实际 %d（other=%d, err=%v）", success, other, firstErr)
+	}
+	if used != workers-1 {
+		t.Fatalf("其余 %d 次应返回已使用，实际 %d", workers-1, used)
+	}
+
+	var ct models.ConfirmToken
+	if err := db.Where("token = ?", token).First(&ct).Error; err != nil {
+		t.Fatalf("读取令牌失败: %v", err)
+	}
+	if ct.UsedAt == nil {
+		t.Fatal("used_at 应已写入")
 	}
 }
 

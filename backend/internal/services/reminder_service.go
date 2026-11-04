@@ -292,10 +292,9 @@ func (s *ReminderService) List(f ListFilter) ([]*ReminderView, int64, error) {
 	if err := q.Order(orderClause).Limit(f.Limit).Offset(f.Offset).Find(&rows).Error; err != nil {
 		return nil, 0, err
 	}
-	views := make([]*ReminderView, 0, len(rows))
-	for i := range rows {
-		chIDs, _ := s.channelIDs(rows[i].ID)
-		views = append(views, s.toView(&rows[i], chIDs))
+	views, err := s.viewsOf(rows)
+	if err != nil {
+		return nil, 0, err
 	}
 	return views, total, nil
 }
@@ -317,12 +316,7 @@ func (s *ReminderService) Upcoming(within time.Duration, limit int) ([]*Reminder
 		Find(&rows).Error; err != nil {
 		return nil, err
 	}
-	views := make([]*ReminderView, 0, len(rows))
-	for i := range rows {
-		chIDs, _ := s.channelIDs(rows[i].ID)
-		views = append(views, s.toView(&rows[i], chIDs))
-	}
-	return views, nil
+	return s.viewsOf(rows)
 }
 
 // UpcomingBetween 返回指定时间范围内待触发的 enabled 提醒（无 limit 限制）。
@@ -337,12 +331,7 @@ func (s *ReminderService) UpcomingBetween(from, to time.Time, limit int) ([]*Rem
 	if err := q.Find(&rows).Error; err != nil {
 		return nil, err
 	}
-	views := make([]*ReminderView, 0, len(rows))
-	for i := range rows {
-		chIDs, _ := s.channelIDs(rows[i].ID)
-		views = append(views, s.toView(&rows[i], chIDs))
-	}
-	return views, nil
+	return s.viewsOf(rows)
 }
 
 // Delete 硬删除一条提醒并从调度器移除。
@@ -584,6 +573,49 @@ func (s *ReminderService) channelIDs(reminderID uint) ([]uint, error) {
 		return nil, err
 	}
 	return ids, nil
+}
+
+// channelIDsBatch 一次查出多条提醒绑定的通道，返回 reminder_id → channel_id 列表。
+//
+// 列表类接口不能用逐条 channelIDs：50 条提醒就是 50 次额外查询（N+1）。
+func (s *ReminderService) channelIDsBatch(reminderIDs []uint) (map[uint][]uint, error) {
+	out := make(map[uint][]uint, len(reminderIDs))
+	if len(reminderIDs) == 0 {
+		return out, nil
+	}
+	type pair struct {
+		ReminderID uint
+		ChannelID  uint
+	}
+	var rows []pair
+	if err := s.DB.Model(&models.ReminderChannel{}).
+		Select("reminder_id, channel_id").
+		Where("reminder_id IN ?", reminderIDs).
+		Order("reminder_id ASC, channel_id ASC").
+		Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+	for _, row := range rows {
+		out[row.ReminderID] = append(out[row.ReminderID], row.ChannelID)
+	}
+	return out, nil
+}
+
+// viewsOf 把一批提醒转成视图，通道绑定一次性批量查出（避免 N+1）。
+func (s *ReminderService) viewsOf(rows []models.Reminder) ([]*ReminderView, error) {
+	ids := make([]uint, 0, len(rows))
+	for i := range rows {
+		ids = append(ids, rows[i].ID)
+	}
+	chMap, err := s.channelIDsBatch(ids)
+	if err != nil {
+		return nil, err
+	}
+	views := make([]*ReminderView, 0, len(rows))
+	for i := range rows {
+		views = append(views, s.toView(&rows[i], chMap[rows[i].ID]))
+	}
+	return views, nil
 }
 
 func (s *ReminderService) getOrNotFound(id uint) (*models.Reminder, error) {

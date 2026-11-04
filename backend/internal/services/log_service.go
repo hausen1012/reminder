@@ -222,34 +222,49 @@ func (s *LogService) BatchDelete(ids []uint) error {
 	})
 }
 
-// Purge 清理日志。
-func (s *LogService) Purge(olderThan time.Duration, all bool) (int64, error) {
-	q := s.DB.Model(&models.DeliveryLog{})
-	if !all && olderThan > 0 {
-		q = q.Where("fired_at < ?", models.TimeOf(time.Now().Add(-olderThan)))
-	} else if !all {
-		return 0, nil
-	}
+// purgeBatchSize 是单次清理的日志条数。
+//
+// 清理不能用「先 Pluck 出全部 id 再分批删」：日志量大时那一份 id 切片
+// 本身就是几百 MB 的内存尖峰。这里改成每轮现取一批 id（至多 500 个）
+// 立刻删除，内存占用与日志总量无关。
+const purgeBatchSize = 500
 
-	var ids []uint
-	if err := q.Pluck("id", &ids).Error; err != nil {
-		return 0, err
-	}
-	if len(ids) == 0 {
+// Purge 清理日志。
+//
+// 循环取批：每轮只把一批 id 读进内存，先删它们的 attempts 再删日志本身，
+// 保证同一批的 id 在两条 DELETE 之间不会漂移；取不到一批的量即结束。
+// 整个清理在一个事务里完成，中途失败整体回滚，不会留下「日志删了、attempts 还在」。
+func (s *LogService) Purge(olderThan time.Duration, all bool) (int64, error) {
+	if !all && olderThan <= 0 {
 		return 0, nil
 	}
+	cutoff := models.TimeOf(time.Now().Add(-olderThan))
 
 	var count int64
 	err := s.DB.Transaction(func(tx *gorm.DB) error {
-		for _, batch := range chunkIDs(ids, 500) {
-			if err := tx.Where("delivery_log_id IN ?", batch).Delete(&models.DeliveryAttempt{}).Error; err != nil {
+		for {
+			var ids []uint
+			q := tx.Model(&models.DeliveryLog{}).Limit(purgeBatchSize)
+			if !all {
+				q = q.Where("fired_at < ?", cutoff)
+			}
+			if err := q.Order("id ASC").Pluck("id", &ids).Error; err != nil {
 				return err
 			}
-			res := tx.Where("id IN ?", batch).Delete(&models.DeliveryLog{})
+			if len(ids) == 0 {
+				break
+			}
+			if err := tx.Where("delivery_log_id IN ?", ids).Delete(&models.DeliveryAttempt{}).Error; err != nil {
+				return err
+			}
+			res := tx.Where("id IN ?", ids).Delete(&models.DeliveryLog{})
 			if res.Error != nil {
 				return res.Error
 			}
 			count += res.RowsAffected
+			if len(ids) < purgeBatchSize {
+				break
+			}
 		}
 
 		// 清理孤立的 confirm_tokens（关联的 delivery_log 已被删）

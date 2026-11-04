@@ -21,6 +21,21 @@ import (
 // 用的是同一个值，两边各写一个字面量迟早会漂移。
 const ConfirmTokenTTL = 72 * time.Hour
 
+// ConsumeToken 可能返回的哨兵错误。
+//
+// 导出成哨兵值而不是字符串：HTTP 层需要区分「已确认」与真正的失败，
+// 前者应当渲染成幂等的成功页，而不是吓人的错误页。
+var (
+	// ErrConfirmTokenInvalid 令牌不存在。
+	ErrConfirmTokenInvalid = errors.New("确认链接无效")
+	// ErrConfirmTokenUsed 令牌已被消费（含并发抢先的情况）。
+	ErrConfirmTokenUsed = errors.New("该确认链接已被使用")
+	// ErrConfirmTokenExpired 令牌已过有效期。
+	ErrConfirmTokenExpired = errors.New("确认链接已过期")
+	// ErrConfirmLogMissing 令牌对应的投递日志已被清理。
+	ErrConfirmLogMissing = errors.New("确认记录不存在")
+)
+
 // ConfirmService 提供令牌的创建、消费与 URL 拼接。
 type ConfirmService struct {
 	DB  *gorm.DB
@@ -56,57 +71,76 @@ func (s *ConfirmService) CreateToken(deliveryLogID uint, ttl time.Duration) (str
 
 // ConsumeToken 消费一个令牌。
 //
-// 成功时：标记 used_at、更新 delivery_log 的 confirmed 字段，
-// 返回该 delivery_log。
-// 错误情况：令牌不存在、已使用、已过期。
+// 成功时：标记 used_at、更新 delivery_log 的 confirmed 字段，返回该 delivery_log。
+// 错误情况：令牌不存在（ErrConfirmTokenInvalid）、已使用（ErrConfirmTokenUsed）、
+// 已过期（ErrConfirmTokenExpired）、日志已被清理（ErrConfirmLogMissing）。
+//
+// 并发语义：多次点击（浏览器预取、用户连点、多设备同时打开）只会有一次真正生效。
+// used_at 的写入是带 `used_at IS NULL` 条件的原子 UPDATE，RowsAffected=0 即说明
+// 被别的请求抢先消费，此时按「已使用」处理并尽量返回日志，让上层渲染幂等成功页。
+// 已使用时不修改任何数据，也不会重复更新 confirmed_at。
 func (s *ConfirmService) ConsumeToken(token string) (*models.DeliveryLog, error) {
 	var ct models.ConfirmToken
 	if err := s.DB.First(&ct, "token = ?", token).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errors.New("确认链接无效")
+			return nil, ErrConfirmTokenInvalid
 		}
 		return nil, err
 	}
+
 	if ct.UsedAt != nil {
-		return nil, errors.New("该确认链接已被使用")
+		// 重复点击：不报错页，尽量带回日志让上层渲染「已经确认过了」
+		var dl models.DeliveryLog
+		if err := s.DB.First(&dl, ct.DeliveryLogID).Error; err == nil {
+			return &dl, ErrConfirmTokenUsed
+		}
+		return nil, ErrConfirmTokenUsed
 	}
 	if time.Now().After(ct.ExpiresAt.Time) {
-		return nil, errors.New("确认链接已过期")
+		return nil, ErrConfirmTokenExpired
 	}
 
 	var target models.DeliveryLog
 	if err := s.DB.First(&target, ct.DeliveryLogID).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errors.New("确认记录不存在")
+			return nil, ErrConfirmLogMissing
 		}
 		return nil, err
 	}
 
 	now := models.TimeNow()
 	err := s.DB.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Model(&ct).Update("used_at", now).Error; err != nil {
-			return err
+		// 条件更新保证只有一个请求能把 used_at 从 NULL 写成 now
+		res := tx.Model(&models.ConfirmToken{}).
+			Where("token = ? AND used_at IS NULL", token).
+			Update("used_at", now)
+		if res.Error != nil {
+			return res.Error
+		}
+		if res.RowsAffected == 0 {
+			return ErrConfirmTokenUsed
 		}
 		updates := map[string]any{
 			"confirmed":    true,
 			"confirmed_at": now,
 		}
 		if target.ConfirmChainID != nil && *target.ConfirmChainID != "" {
-			if err := tx.Model(&models.DeliveryLog{}).
+			return tx.Model(&models.DeliveryLog{}).
 				Where("confirm_chain_id = ?", *target.ConfirmChainID).
-				Updates(updates).Error; err != nil {
-				return err
-			}
-			return nil
+				Updates(updates).Error
 		}
-		if err := tx.Model(&models.DeliveryLog{}).
+		return tx.Model(&models.DeliveryLog{}).
 			Where("id = ?", ct.DeliveryLogID).
-			Updates(updates).Error; err != nil {
-			return err
-		}
-		return nil
+			Updates(updates).Error
 	})
 	if err != nil {
+		if errors.Is(err, ErrConfirmTokenUsed) {
+			// 并发被抢先：数据已被对方写好，直接读回交给上层
+			var dl models.DeliveryLog
+			if e := s.DB.First(&dl, ct.DeliveryLogID).Error; e == nil {
+				return &dl, ErrConfirmTokenUsed
+			}
+		}
 		return nil, err
 	}
 

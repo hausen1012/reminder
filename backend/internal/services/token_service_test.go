@@ -250,22 +250,47 @@ func TestTokenGetPlaintext(t *testing.T) {
 
 // ListViews / GetView 应带出默认通道与 24h 用量。
 func TestTokenViews(t *testing.T) {
-	svc, _ := newTokenSvc(t)
+	svc, db := newTokenSvc(t)
 
 	_, key, err := svc.Create("视图", []uint{7, 8})
 	if err != nil {
 		t.Fatalf("创建失败: %v", err)
+	}
+	_, other, err := svc.Create("另一个", nil)
+	if err != nil {
+		t.Fatalf("创建第二个失败: %v", err)
+	}
+	// 只有第一个令牌有 24h 内的提醒
+	for i := 0; i < 3; i++ {
+		r := &models.Reminder{Title: "r", Calendar: "solar", ScheduleType: "once", Enabled: true, TokenID: &key.ID}
+		if err := db.Create(r).Error; err != nil {
+			t.Fatalf("创建提醒失败: %v", err)
+		}
 	}
 
 	views, total, err := svc.ListViews(10, 0, "")
 	if err != nil {
 		t.Fatalf("ListViews 失败: %v", err)
 	}
-	if total != 1 || len(views) != 1 {
-		t.Fatalf("应为 1 条，实际 total=%d", total)
+	if total != 2 || len(views) != 2 {
+		t.Fatalf("应为 2 条，实际 total=%d", total)
 	}
-	if len(views[0].DefaultChannelIDs) != 2 {
-		t.Fatalf("应带出 2 个默认通道，实际 %v", views[0].DefaultChannelIDs)
+	byID := map[uint]*TokenView{}
+	for _, v := range views {
+		byID[v.ID] = v
+	}
+	if got := byID[key.ID].DefaultChannelIDs; len(got) != 2 {
+		t.Fatalf("应带出 2 个默认通道，实际 %v", got)
+	}
+	if got := byID[key.ID].Usage24h; got != 3 {
+		t.Fatalf("24h 用量 = %d，期望 3", got)
+	}
+	if got := byID[other.ID].Usage24h; got != 0 {
+		t.Fatalf("无提醒的令牌用量应为 0，实际 %d", got)
+	}
+	// 无默认通道时应是空切片而不是 nil（前端直接 .length）
+	if byID[other.ID].DefaultChannelIDs == nil {
+		t.Fatal("无默认通道时应返回空切片")
 	}
 
 	view, err := svc.GetView(key.ID)
@@ -274,6 +299,9 @@ func TestTokenViews(t *testing.T) {
 	}
 	if view.Name != "视图" {
 		t.Fatalf("name = %q", view.Name)
+	}
+	if view.Usage24h != 3 {
+		t.Fatalf("GetView 24h 用量 = %d，期望 3", view.Usage24h)
 	}
 }
 
@@ -461,5 +489,40 @@ func TestTokenPlaintextWithWrongKeyReturnsNotFound(t *testing.T) {
 	// 令牌本身照旧可用：鉴权走独立保存的 sha256 哈希
 	if _, ok := NewTokenService(db, boxB).Verify(plain); !ok {
 		t.Fatal("换密钥不应影响令牌鉴权")
+	}
+}
+
+// ListViews 的查询数不应随令牌数量增长（防 N+1）。
+//
+// 5 个令牌时固定为 5 次查询：count + 分页 + 默认通道批量 + 用量批量，
+// 逐条查会变成 1+2N 次。
+func TestTokenListViews_QueryCountIndependentOfRowCount(t *testing.T) {
+	svc, db := newTokenSvc(t)
+
+	for i := 0; i < 5; i++ {
+		if _, _, err := svc.Create("n-plus-one-"+itoaTest(i), []uint{uint(i + 1)}); err != nil {
+			t.Fatalf("创建失败: %v", err)
+		}
+	}
+
+	var views []*TokenView
+	n := countQueries(t, db, func(scoped *gorm.DB) {
+		scopedSvc := NewTokenService(scoped, nil)
+		items, total, err := scopedSvc.ListViews(10, 0, "")
+		if err != nil {
+			t.Fatalf("ListViews 失败: %v", err)
+		}
+		if total != 5 || len(items) != 5 {
+			t.Fatalf("应返回 5 条，实际 total=%d len=%d", total, len(items))
+		}
+		views = items
+	})
+	if n > 5 {
+		t.Fatalf("ListViews 产生了 %d 次查询，期望 ≤5", n)
+	}
+	for _, v := range views {
+		if len(v.DefaultChannelIDs) != 1 {
+			t.Fatalf("令牌 %d 的默认通道数 = %d，期望 1", v.ID, len(v.DefaultChannelIDs))
+		}
 	}
 }

@@ -84,13 +84,29 @@ func TestConfirm_MarksConfirmed(t *testing.T) {
 		t.Fatal("确认后 token.used_at 应写入")
 	}
 
-	// 重复点击应提示已使用，且仍是 200 页面
+	// 重复点击应渲染幂等成功页（已确认过），而不是红色错误页
 	w2 := doJSON(newConfirmEngine(h), http.MethodGet, "/c/"+token, nil)
 	if w2.Code != http.StatusOK {
 		t.Fatalf("重复确认状态码 = %d", w2.Code)
 	}
-	if !containsSub(w2.Body.String(), "已被使用") {
-		t.Fatalf("重复确认应提示已使用: %s", w2.Body.String())
+	body2 := w2.Body.String()
+	if containsSub(body2, "确认失败") {
+		t.Fatalf("重复点击不应显示失败页: %s", body2)
+	}
+	if !containsSub(body2, "之前已确认") {
+		t.Fatalf("重复点击应提示此前已确认: %s", body2)
+	}
+	if !containsSub(body2, got.ConfirmedAt.Format("2006-01-02 15:04:05")) {
+		t.Fatalf("应展示首次确认时间: %s", body2)
+	}
+
+	// 重复点击不应改变首次确认时间
+	var after models.DeliveryLog
+	if err := db.First(&after, dl.ID).Error; err != nil {
+		t.Fatalf("读取日志失败: %v", err)
+	}
+	if after.ConfirmedAt == nil || !after.ConfirmedAt.Time.Equal(got.ConfirmedAt.Time) {
+		t.Fatalf("重复点击改写了 confirmed_at: %v -> %v", got.ConfirmedAt, after.ConfirmedAt)
 	}
 }
 

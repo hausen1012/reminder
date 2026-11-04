@@ -284,3 +284,82 @@ func TestNewLogService_DefaultURL(t *testing.T) {
 		t.Fatal("空字符串应回退到默认 PublicURL")
 	}
 }
+
+// 大量日志的清理应能跨多个批次完成，且 attempts 一并清掉。
+//
+// 用例刻意超过 purgeBatchSize，覆盖「按批取 id 循环删除」的路径；
+// 旧实现会先把全部 id Pluck 进内存，这里同时守住结果正确性。
+func TestLogPurge_MultipleBatches(t *testing.T) {
+	svc, db := newLogSvc(t, "")
+
+	totalRows := purgeBatchSize*2 + 37
+	logs := make([]models.DeliveryLog, 0, totalRows)
+	attempts := make([]models.DeliveryAttempt, 0, totalRows)
+	old := models.TimeOf(time.Now().Add(-48 * time.Hour))
+	for i := 0; i < totalRows; i++ {
+		logs = append(logs, models.DeliveryLog{
+			ReminderID: 1,
+			FiredAt:    old,
+			Title:      "批量-" + itoaTest(i),
+			Content:    "正文",
+			Status:     "success",
+			Source:     "web",
+		})
+	}
+	if err := db.CreateInBatches(&logs, 500).Error; err != nil {
+		t.Fatalf("批量插入日志失败: %v", err)
+	}
+	for i := range logs {
+		attempts = append(attempts, models.DeliveryAttempt{
+			DeliveryLogID: logs[i].ID, ChannelID: 1, ChannelType: "log",
+			ChannelName: "c", Attempt: 1, Status: "success",
+		})
+	}
+	if err := db.CreateInBatches(&attempts, 500).Error; err != nil {
+		t.Fatalf("批量插入 attempts 失败: %v", err)
+	}
+
+	// 一条新日志必须保留
+	keep := seedDeliveryLog(t, db, "保留", "success", 0, nil)
+
+	deleted, err := svc.Purge(24*time.Hour, false)
+	if err != nil {
+		t.Fatalf("Purge 失败: %v", err)
+	}
+	if deleted != int64(totalRows) {
+		t.Fatalf("deleted = %d，期望 %d", deleted, totalRows)
+	}
+
+	var logCount, attemptCount int64
+	db.Model(&models.DeliveryLog{}).Count(&logCount)
+	db.Model(&models.DeliveryAttempt{}).Count(&attemptCount)
+	if logCount != 1 {
+		t.Fatalf("应只剩 1 条日志，实际 %d", logCount)
+	}
+	if attemptCount != 0 {
+		t.Fatalf("attempts 应被清空，实际剩 %d", attemptCount)
+	}
+	var still models.DeliveryLog
+	if err := db.First(&still, keep.ID).Error; err != nil {
+		t.Fatalf("保留的日志被误删: %v", err)
+	}
+}
+
+// all=true 删除全部日志时同样走分批路径，并清掉孤立的 confirm_tokens。
+func TestLogPurge_AllClearsTokens(t *testing.T) {
+	svc, db := newLogSvc(t, "")
+
+	dl := seedDeliveryLog(t, db, "待清", "success", 0, nil)
+	if _, err := NewConfirmService(db, testCfg()).CreateToken(dl.ID, time.Hour); err != nil {
+		t.Fatalf("创建确认令牌失败: %v", err)
+	}
+
+	if n, err := svc.Purge(0, true); err != nil || n != 1 {
+		t.Fatalf("Purge(all) = %d, err=%v，期望 1", n, err)
+	}
+	var tokens int64
+	db.Model(&models.ConfirmToken{}).Count(&tokens)
+	if tokens != 0 {
+		t.Fatalf("孤立 confirm_tokens 未清理，剩 %d", tokens)
+	}
+}

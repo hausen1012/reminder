@@ -582,3 +582,71 @@ func TestLoadChannelsByIDs(t *testing.T) {
 		t.Fatalf("空输入应返回 nil, nil，实际 %v, %v", got, err)
 	}
 }
+
+// 列表类接口的查询数不应随返回条数增长（防 N+1）。
+//
+// 3 条提醒绑定通道后，List 应固定为 3 次查询：count + 分页 + 通道批量。
+// 逐条查 channel_ids 会变成 3+N 次。
+func TestReminderList_QueryCountIndependentOfRowCount(t *testing.T) {
+	db := openTestDB(t)
+	svc := newReminderStack(t, db)
+
+	ch := createChannel(t, db, "log", true)
+	for i := 0; i < 5; i++ {
+		in := validOnceInput()
+		in.Title = "n-plus-one-" + itoaTest(i)
+		in.ChannelIDs = []uint{ch.ID}
+		if _, err := svc.Create(in); err != nil {
+			t.Fatalf("创建失败: %v", err)
+		}
+	}
+
+	var got []*ReminderView
+	n := countQueries(t, db, func(scoped *gorm.DB) {
+		scopedSvc := &ReminderService{DB: scoped, TZ: svc.TZ}
+		items, total, err := scopedSvc.List(ListFilter{Limit: 50})
+		if err != nil {
+			t.Fatalf("List 失败: %v", err)
+		}
+		if total != 5 || len(items) != 5 {
+			t.Fatalf("应返回 5 条，实际 total=%d len=%d", total, len(items))
+		}
+		got = items
+	})
+	if n > 3 {
+		t.Fatalf("List 产生了 %d 次查询，期望 ≤3（count + 分页 + 通道批量）", n)
+	}
+	for _, v := range got {
+		if len(v.ChannelIDs) != 1 || v.ChannelIDs[0] != ch.ID {
+			t.Fatalf("批量加载的 channel_ids 不正确: %v", v.ChannelIDs)
+		}
+	}
+}
+
+// Upcoming 同理：条数增长不应带来逐条查询。
+func TestReminderUpcoming_QueryCountIndependentOfRowCount(t *testing.T) {
+	db := openTestDB(t)
+	svc := newReminderStack(t, db)
+
+	ch := createChannel(t, db, "log", true)
+	for i := 0; i < 5; i++ {
+		r := seedReminderForUpcoming(t, db, "up-"+itoaTest(i), time.Now().Add(time.Minute), true)
+		if err := db.Create(&models.ReminderChannel{ReminderID: r.ID, ChannelID: ch.ID}).Error; err != nil {
+			t.Fatalf("绑定通道失败: %v", err)
+		}
+	}
+
+	n := countQueries(t, db, func(scoped *gorm.DB) {
+		scopedSvc := &ReminderService{DB: scoped, TZ: svc.TZ}
+		items, err := scopedSvc.Upcoming(time.Hour, 10)
+		if err != nil {
+			t.Fatalf("Upcoming 失败: %v", err)
+		}
+		if len(items) != 5 {
+			t.Fatalf("应返回 5 条，实际 %d", len(items))
+		}
+	})
+	if n > 2 {
+		t.Fatalf("Upcoming 产生了 %d 次查询，期望 ≤2（分页 + 通道批量）", n)
+	}
+}

@@ -5,6 +5,7 @@
 package handlers
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -20,6 +21,10 @@ type ConfirmHandler struct {
 }
 
 // Confirm 处理 GET /c/:token
+//
+// 幂等语义：重复点击（连点、浏览器预取、多设备同时打开）本质上是「已经处理过了」，
+// 不该给用户看一页红色「确认失败」。因此已使用的令牌渲染成功页并注明确认时间，
+// 只有真正无效 / 过期 / 日志已清理的情况才显示错误页。
 func (h *ConfirmHandler) Confirm(c *gin.Context) {
 	token := c.Param("token")
 	if token == "" {
@@ -29,6 +34,10 @@ func (h *ConfirmHandler) Confirm(c *gin.Context) {
 
 	dl, err := h.Svc.ConsumeToken(token)
 	if err != nil {
+		if errors.Is(err, services.ErrConfirmTokenUsed) && dl != nil {
+			c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(confirmAlreadyPage(dl)))
+			return
+		}
 		c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(confirmErrorPage(err.Error())))
 		return
 	}
@@ -68,6 +77,45 @@ p{font-size:14px;color:#666;line-height:1.6}
 <div class="icon"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></div>
 <h1>确认成功</h1>
 <p>你已确认「%s」提醒，不再重复发送。</p>
+<div class="detail">确认时间：%s</div>
+</div>
+</body>
+</html>`, escapeHTML(title), confirmedAt)
+}
+
+// confirmAlreadyPage 重复点击页：把「已被使用」渲染成中性的成功态，
+// 显示首次确认时间，让用户清楚「这件事已经处理过了」。
+func confirmAlreadyPage(dl *models.DeliveryLog) string {
+	title := "该提醒"
+	if dl.Title != "" {
+		title = dl.Title
+	}
+	confirmedAt := "此前"
+	if dl.ConfirmedAt != nil {
+		confirmedAt = dl.ConfirmedAt.Format("2006-01-02 15:04:05")
+	}
+	return fmt.Sprintf(`<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>已确认</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;background:#f5f5f5;color:#333}
+.card{background:#fff;border-radius:12px;padding:40px;text-align:center;box-shadow:0 2px 12px rgba(0,0,0,.08);max-width:420px;margin:20px}
+.icon{width:56px;height:56px;background:#22c55e;border-radius:50%%;display:flex;align-items:center;justify-content:center;margin:0 auto 20px}
+.icon svg{width:28px;height:28px;fill:#fff}
+h1{font-size:20px;margin-bottom:8px;color:#16a34a}
+p{font-size:14px;color:#666;line-height:1.6}
+.detail{margin-top:20px;padding:12px;background:#f9fafb;border-radius:8px;font-size:13px;color:#888}
+</style>
+</head>
+<body>
+<div class="card">
+<div class="icon"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></div>
+<h1>之前已确认</h1>
+<p>「%s」提醒已确认过了，不会重复发送。</p>
 <div class="detail">确认时间：%s</div>
 </div>
 </body>

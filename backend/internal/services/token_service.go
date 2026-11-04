@@ -181,6 +181,32 @@ func (s *TokenService) DefaultChannelIDs(keyID uint) []uint {
 	return ids
 }
 
+// DefaultChannelIDsBatch 一次查出多个令牌的默认通道，返回 token_id → channel_id 列表。
+//
+// 列表接口不能用逐条 DefaultChannelIDs：每页 N 个令牌就是 N 次额外查询（N+1）。
+func (s *TokenService) DefaultChannelIDsBatch(keyIDs []uint) (map[uint][]uint, error) {
+	out := make(map[uint][]uint, len(keyIDs))
+	if len(keyIDs) == 0 {
+		return out, nil
+	}
+	type pair struct {
+		TokenID   uint
+		ChannelID uint
+	}
+	var rows []pair
+	if err := s.DB.Model(&models.TokenDefaultChannel{}).
+		Select("token_id, channel_id").
+		Where("token_id IN ?", keyIDs).
+		Order("token_id ASC, channel_id ASC").
+		Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+	for _, row := range rows {
+		out[row.TokenID] = append(out[row.TokenID], row.ChannelID)
+	}
+	return out, nil
+}
+
 // Stats24h 返回近 24 小时使用次数（按 reminders 表 TokenID 统计）。
 func (s *TokenService) Stats24h(keyID uint) int64 {
 	var count int64
@@ -188,6 +214,30 @@ func (s *TokenService) Stats24h(keyID uint) int64 {
 		Where("token_id = ? AND created_at > ?", keyID, models.TimeOf(time.Now().Add(-24*time.Hour))).
 		Count(&count)
 	return count
+}
+
+// Stats24hBatch 一次统计多个令牌近 24 小时的使用次数。
+func (s *TokenService) Stats24hBatch(keyIDs []uint) (map[uint]int64, error) {
+	out := make(map[uint]int64, len(keyIDs))
+	if len(keyIDs) == 0 {
+		return out, nil
+	}
+	type row struct {
+		TokenID uint
+		Count   int64
+	}
+	var rows []row
+	if err := s.DB.Model(&models.Reminder{}).
+		Select("token_id, COUNT(*) AS count").
+		Where("token_id IN ? AND created_at > ?", keyIDs, models.TimeOf(time.Now().Add(-24*time.Hour))).
+		Group("token_id").
+		Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+	for _, r := range rows {
+		out[r.TokenID] = r.Count
+	}
+	return out, nil
 }
 
 // UpdateDefaultChannels 更新令牌的默认通道绑定。
@@ -318,17 +368,35 @@ type TokenView struct {
 }
 
 // ListViews 返回令牌富列表，支持分页和搜索。
+//
+// 默认通道与 24h 用量都按整页一次性批量查询：逐条查会变成 2N+1 次往返。
 func (s *TokenService) ListViews(limit, offset int, search string) ([]*TokenView, int64, error) {
 	keys, total, err := s.List(limit, offset, search)
 	if err != nil {
 		return nil, 0, err
 	}
+	ids := make([]uint, 0, len(keys))
+	for _, k := range keys {
+		ids = append(ids, k.ID)
+	}
+	chMap, err := s.DefaultChannelIDsBatch(ids)
+	if err != nil {
+		return nil, 0, err
+	}
+	usageMap, err := s.Stats24hBatch(ids)
+	if err != nil {
+		return nil, 0, err
+	}
 	views := make([]*TokenView, 0, len(keys))
 	for _, k := range keys {
+		chIDs := chMap[k.ID]
+		if chIDs == nil {
+			chIDs = []uint{}
+		}
 		views = append(views, &TokenView{
 			Token:             *k,
-			DefaultChannelIDs: s.DefaultChannelIDs(k.ID),
-			Usage24h:          s.Stats24h(k.ID),
+			DefaultChannelIDs: chIDs,
+			Usage24h:          usageMap[k.ID],
 		})
 	}
 	return views, total, nil
