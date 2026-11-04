@@ -110,8 +110,7 @@ func (d *DispatchService) Run(ctx context.Context, r *models.Reminder, deliveryL
 				d.ConfirmMgr.CancelByReminderID(r.ID)
 			}
 			confirmChainID = uuid.New().String()
-			ttl := 72 * time.Hour // 充足有效期
-			token, err := d.ConfirmMgr.ConfirmSvc.CreateToken(deliveryLogID, ttl)
+			token, err := d.ConfirmMgr.ConfirmSvc.CreateToken(deliveryLogID, ConfirmTokenTTL)
 			if err == nil {
 				vars["confirm_url"] = d.ConfirmMgr.ConfirmSvc.BuildURL(token)
 				d.DB.Model(&models.DeliveryLog{}).Where("id = ?", deliveryLogID).

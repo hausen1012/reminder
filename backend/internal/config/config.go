@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -38,6 +39,12 @@ type Config struct {
 	MissToleranceMinutes int    // 漏触发容忍上限，超过则标记为 expired 不发送
 	LogAutoPurgeDays     int    // 自动清理日志的保留天数；0 表示不自动清理
 	LogFile              string // 日志目录；默认 /var/log/reminder，创建失败时仅输出到 stderr
+
+	// 安全相关
+	MaxBodyMB        int64    // 单个请求体上限（MB），超出返回 413
+	TrustedProxies   []string // 可信反向代理 CIDR 列表；为空表示不信任任何代理头
+	LoginMaxAttempts int      // 登录连续失败多少次后锁定，0 表示关闭登录限流
+	LoginLockoutMin  int      // 登录锁定时长（分钟）
 }
 
 func Load() *Config {
@@ -55,6 +62,22 @@ func Load() *Config {
 		MissToleranceMinutes: getEnvInt("MISS_TOLERANCE_MINUTES", 60),
 		LogAutoPurgeDays:     getEnvInt("LOG_AUTO_PURGE_DAYS", 0),
 		LogFile:              getEnv("LOG_FILE", DefaultLogFile),
+
+		MaxBodyMB:        int64(getEnvInt("MAX_BODY_MB", 1)),
+		TrustedProxies:   splitCSV(getEnv("TRUSTED_PROXIES", "")),
+		LoginMaxAttempts: getEnvInt("LOGIN_MAX_ATTEMPTS", 5),
+		LoginLockoutMin:  getEnvInt("LOGIN_LOCKOUT_MINUTES", 15),
+	}
+	if cfg.MaxBodyMB <= 0 {
+		// 0 或负数会让所有请求被拒；按「未配置」处理而不是照字面生效
+		slog.Warn("MAX_BODY_MB 非法，回退为 1 MB", "value", cfg.MaxBodyMB)
+		cfg.MaxBodyMB = 1
+	}
+	if cfg.LoginMaxAttempts < 0 {
+		cfg.LoginMaxAttempts = 0
+	}
+	if cfg.LoginLockoutMin <= 0 {
+		cfg.LoginLockoutMin = 15
 	}
 
 	// JWTSecret 如果留空就自动生成
@@ -95,6 +118,24 @@ func getEnvInt(key string, fallback int) int {
 		return fallback
 	}
 	return n
+}
+
+// splitCSV 把逗号分隔的列表拆成切片，忽略空白项。
+//
+// 用于 TRUSTED_PROXIES 这类可配置多项的环境变量：
+// 写 "nginx 的 IP、容器网段" 比要求用户手写 JSON 更符合 YAML/Compose 的习惯。
+func splitCSV(v string) []string {
+	if strings.TrimSpace(v) == "" {
+		return nil
+	}
+	parts := strings.Split(v, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if p = strings.TrimSpace(p); p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
 }
 
 // randomSecret 生成 32 字节随机串作为 JWT 密钥。

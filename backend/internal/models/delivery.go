@@ -15,5 +15,8 @@ type DeliveryLog struct {
 	ConfirmChainID *string `gorm:"size:36;index" json:"confirm_chain_id,omitempty"`
 	RetryRound     int     `json:"retry_round"` // 0 = 第一次触发，>0 = 第 N 次重发
 	Source         string  `gorm:"size:16;index" json:"source"`
-	CreatedAt      Time    `json:"created_at"`
+	// Error 记录「日志没走到终态」的原因（例如进程在投递中途退出后被兜底扫描收敛）。
+	// 正常投递的失败原因在 delivery_attempts 里，这里只用于解释状态本身。
+	Error     string `gorm:"size:255" json:"error,omitempty"`
+	CreatedAt Time   `json:"created_at"`
 }

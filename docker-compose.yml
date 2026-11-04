@@ -25,3 +25,7 @@ services:
       - LOG_FILE=${LOG_FILE:-/var/log/reminder}
       - LOG_FORMAT=${LOG_FORMAT:-text}
       - LOG_LEVEL=${LOG_LEVEL:-info}
+      - MAX_BODY_MB=${MAX_BODY_MB:-1}
+      - TRUSTED_PROXIES=${TRUSTED_PROXIES:-}
+      - LOGIN_MAX_ATTEMPTS=${LOGIN_MAX_ATTEMPTS:-5}
+      - LOGIN_LOCKOUT_MINUTES=${LOGIN_LOCKOUT_MINUTES:-15}

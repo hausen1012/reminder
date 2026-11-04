@@ -241,7 +241,7 @@ func (s *ChannelService) Delete(id uint) error {
 		return err
 	}
 	if reminderCount+tokenCount > 0 {
-		return middleware.NewAppError(middleware.CodeConflict, "该通知被提醒或令牌绑定，请先解除相定")
+		return middleware.NewAppError(middleware.CodeConflict, "该通知被提醒或令牌绑定，请先解除绑定")
 	}
 	return s.DB.Delete(&models.Channel{}, id).Error
 }

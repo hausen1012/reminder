@@ -35,19 +35,51 @@ type SetupResult struct {
 	Handles *SchedulerHandles
 }
 
+// applyMiddleware 装配全局中间件。
+//
+// 顺序是契约，不是随意排列：
+//
+//	Recovery      → 兜住任何下游 panic，必须是第一个
+//	RequestID     → SlogLogger / ErrorHandler 都要读它，必须在其前
+//	CORS          → 必须在所有可能提前 Abort 的中间件之前。
+//	                 gin 的 c.AbortWithStatusJSON 会停止后续中间件执行，
+//	                 排在 CORS 之前的 BodyLimit 一旦拒绝请求，响应里就没有
+//	                 Access-Control-* 头，浏览器会把 413 当成不可读的跨域失败，
+//	                 前端只能显示「网络错误」而不是「请求过大」
+//	SlogLogger    → 记录访问日志，包括被 CORS 预检、BodyLimit 拦下的请求
+//	BodyLimit     → 读 body 前就拦住超大请求
+//	ErrorHandler  → 渲染 c.Error 里注册的 AppError，放在业务路由之前即可
+//
+// 这里拆成独立函数，是为了让顺序能被单测直接断言（见 router/middleware_order_test.go）：
+// 之前 413 缺 CORS 头就是顺序写错导致的，光靠读代码不容易发现。
+func applyMiddleware(r *gin.Engine, cfg *config.Config) {
+	r.Use(gin.Recovery())
+	r.Use(middleware.RequestID())
+	r.Use(middleware.CORS())
+	r.Use(middleware.SlogLogger())
+	r.Use(middleware.BodyLimit(cfg.MaxBodyMB << 20))
+	r.Use(middleware.ErrorHandler())
+}
+
 // Setup 构建路由 + 启动调度器 + Sweeper。
 //
 // 返回值包含 gin.Engine 与 SchedulerHandles（供 main 在优雅停机时 Stop 各后台组件）。
 // 初始化失败时返回 error，由调用方决定如何退出，避免在库内 panic。
 func Setup(staticFS embed.FS, cfg *config.Config) (*SetupResult, error) {
 	r := gin.New()
-	r.Use(gin.Recovery())
-	// RequestID 必须排在 SlogLogger / ErrorHandler 之前：
-	// 后两者都要读它来把「请求日志」和「错误日志」串起来。
-	r.Use(middleware.RequestID())
-	r.Use(middleware.SlogLogger())
-	r.Use(middleware.ErrorHandler())
-	r.Use(middleware.CORS())
+	// 中间件顺序集中在这里维护，顺序本身就是契约，改动前先读 applyMiddleware 的注释。
+	applyMiddleware(r, cfg)
+
+	// 默认 gin 信任所有代理头（X-Forwarded-For 可被任意客户端伪造）。
+	// 本项目的访问日志会记录 IP，若不作限制，日志里的来源 IP 毫无参考价值。
+	// 只有显式配置了 TRUSTED_PROXIES 才信任代理头，否则一律用 TCP 对端地址。
+	if err := r.SetTrustedProxies(cfg.TrustedProxies); err != nil {
+		slog.Warn("TRUSTED_PROXIES 配置非法，已忽略全部代理头", "value", cfg.TrustedProxies, "error", err)
+		_ = r.SetTrustedProxies(nil)
+	}
+	if len(cfg.TrustedProxies) == 0 {
+		slog.Info("未配置 TRUSTED_PROXIES，客户端 IP 取 TCP 对端地址（反向代理后需配置）")
+	}
 
 	box, err := secretbox.New(cfg.EncryptionKey)
 	if err != nil {
@@ -81,6 +113,13 @@ func Setup(staticFS embed.FS, cfg *config.Config) (*SetupResult, error) {
 	engine.Start()
 	if err := engine.LoadAndRegisterAll(); err != nil {
 		slog.Error("调度器加载已有提醒失败", "error", err)
+	}
+
+	// 恢复重启前未完成的确认重发链。
+	// 内存里的定时器随进程消失，但链的轮次与时间都在库里；
+	// 不恢复的话，一个「需要确认」的提醒在重启后就只发一次，永远不再催。
+	if _, err := confirmMgr.RecoverChains(); err != nil {
+		slog.Error("恢复确认重发链失败，重启前的催办将不会继续", "error", err)
 	}
 
 	// 启动 sweeper
@@ -121,7 +160,11 @@ func Setup(staticFS embed.FS, cfg *config.Config) (*SetupResult, error) {
 	tokenSvc := services.NewTokenService(database.DB, box)
 	userSvc := services.NewUserService(database.DB)
 
-	authHandler := &handlers.AuthHandler{JWTSecret: cfg.JWTSecret, UserSvc: userSvc}
+	loginLimiter := middleware.NewLoginLimiter(
+		cfg.LoginMaxAttempts,
+		time.Duration(cfg.LoginLockoutMin)*time.Minute,
+	)
+	authHandler := &handlers.AuthHandler{JWTSecret: cfg.JWTSecret, UserSvc: userSvc, Limiter: loginLimiter}
 	userHandler := &handlers.UserHandler{Svc: userSvc}
 	channelHandler := &handlers.ChannelHandler{Svc: channelSvc}
 	reminderHandler := &handlers.ReminderHandler{Svc: reminderSvc}

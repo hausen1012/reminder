@@ -22,6 +22,11 @@
 
 JWT 有效期为 72 小时。改密码后旧 JWT 仍然有效直到过期——如需立即失效，重启服务并更换 `JWT_SECRET`。
 
+登录失败限流：同一「用户名 + 客户端 IP」连续失败 `LOGIN_MAX_ATTEMPTS` 次（默认 5）后，
+在 `LOGIN_LOCKOUT_MINUTES`（默认 15 分钟）内一律返回 `429 rate_limited`，
+响应头 `Retry-After` 给出**剩余锁定秒数**（与配置的锁定时长一致，不足 1 秒按 1 秒返回）。
+用户名大小写不敏感；成功登录会清零计数。详见[配置项](/guide/configuration)。
+
 ## 提醒
 
 | 方法 | 路径 | 说明 |

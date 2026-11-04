@@ -20,6 +20,7 @@ const (
 	CodeValidationFailed ErrorCode = "validation_failed"
 	CodeConflict         ErrorCode = "conflict"
 	CodeRateLimited      ErrorCode = "rate_limited"
+	CodePayloadTooLarge  ErrorCode = "payload_too_large"
 	CodeInternalError    ErrorCode = "internal_error"
 )
 
@@ -74,6 +75,8 @@ func (e *AppError) httpStatus() int {
 		return http.StatusConflict
 	case CodeRateLimited:
 		return http.StatusTooManyRequests
+	case CodePayloadTooLarge:
+		return http.StatusRequestEntityTooLarge
 	default:
 		return http.StatusInternalServerError
 	}

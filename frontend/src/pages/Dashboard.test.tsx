@@ -35,7 +35,7 @@ describe('Dashboard 首页', () => {
     vi.mocked(getMe).mockResolvedValue({
       code: 0,
       message: 'ok',
-      data: { id: 1, username: 'admin', is_admin: true, created_at: '' },
+      data: { id: 1, username: 'admin', created_at: '' },
     })
     vi.mocked(listTodayReminders).mockResolvedValue([
       {
@@ -53,6 +53,7 @@ describe('Dashboard 首页', () => {
         confirm_retry_interval_sec: 300,
         confirm_max_retries: 3,
         next_fire_at: '2026-11-03T09:00:00Z',
+        fire_count: 0,
         created_at: '2026-11-01T00:00:00Z',
         updated_at: '2026-11-01T00:00:00Z',
       },

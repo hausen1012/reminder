@@ -600,6 +600,12 @@ export default function LogsPage() {
                       <span className="text-muted-foreground min-w-[5rem]">重试轮次</span>
                       <span>{detail.retry_round > 0 ? `#${detail.retry_round}` : '首次'}</span>
                     </div>
+                    {detail.error && (
+                      <div className="col-span-1 sm:col-span-2 flex items-start gap-2">
+                        <span className="text-muted-foreground min-w-[5rem] shrink-0">异常说明</span>
+                        <span className="text-red-600 dark:text-red-400">{detail.error}</span>
+                      </div>
+                    )}
                   </div>
                 </TabsContent>
 

@@ -133,6 +133,9 @@ export interface DeliveryLog {
   confirm_url?: string
   retry_round: number
   source: string
+  // 日志本身未走到终态的原因（如进程在投递中途退出后被兜底扫描收敛）。
+  // 通道级失败原因在 attempts[].error 里，与这个字段不是一回事。
+  error?: string
   created_at: string
   reminder_title: string
   attempts?: DeliveryAttempt[]

@@ -101,7 +101,6 @@ export default function Dashboard() {
   const totalChannelSuccess = channelStats.reduce((s, c) => s + c.success, 0)
   const channelSuccessRate = totalChannelSend > 0 ? ((totalChannelSuccess / totalChannelSend) * 100).toFixed(1) : '—'
 
-  const logsSuccess = logs.filter((l) => l.status === 'success').length
   const logsFailed = logs.filter((l) => l.status === 'failed' || l.status === 'partial').length
 
   const engineRunning = schedulerStatus?.engine?.running ?? false

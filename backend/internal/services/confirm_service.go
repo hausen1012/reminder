@@ -15,6 +15,12 @@ import (
 	"gorm.io/gorm"
 )
 
+// ConfirmTokenTTL 是确认链接的有效期。
+//
+// 导出成常量：Dispatch 创建令牌、RecoverChains 判断「这条链还有没有意义」
+// 用的是同一个值，两边各写一个字面量迟早会漂移。
+const ConfirmTokenTTL = 72 * time.Hour
+
 // ConfirmService 提供令牌的创建、消费与 URL 拼接。
 type ConfirmService struct {
 	DB  *gorm.DB

@@ -47,7 +47,8 @@
 | 403 | `forbidden` | 已鉴权但无权访问 |
 | 404 | `not_found` | 资源不存在，或不属于当前调用方 |
 | 409 | `conflict` | 与现有数据冲突（如名称重复） |
-| 429 | `rate_limited` | 请求过于频繁，外部 API 默认每令牌 60 次/分钟 |
+| 413 | `payload_too_large` | 请求体超过 `MAX_BODY_MB` 上限（默认 1 MB） |
+| 429 | `rate_limited` | 请求过于频繁：外部 API 每令牌 60 次/分钟；登录连续失败达到 `LOGIN_MAX_ATTEMPTS` 后锁定期内也会返回此码 |
 | 500 | `internal_error` | 服务器内部错误。只在程序 bug 或环境异常时出现，配置类问题一律不用 500 |
 
 ::: tip 所有错误出口都统一

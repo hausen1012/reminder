@@ -6,7 +6,9 @@ package services
 
 import (
 	"context"
+	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -16,6 +18,7 @@ import (
 	"github.com/reminder/backend/internal/testutil"
 	"github.com/reminder/backend/internal/timezone"
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 // openTestDB 构造测试用的内存 SQLite 库（已迁移生产全量模型）。
@@ -226,4 +229,39 @@ func newChannelSvcForTestWithDB(t *testing.T, db *gorm.DB) (*ChannelService, *go
 		t.Fatalf("构造 secretbox 失败: %v", err)
 	}
 	return NewChannelService(db, box, testTZ(cstZone())), db
+}
+
+// itoaTest 是小整数转字符串的测试内小工具。
+func itoaTest(v int) string {
+	return strconv.Itoa(v)
+}
+
+// queryCounter 是只数数、不输出的 gorm logger，用于断言 SQL 条数。
+type queryCounter struct {
+	logger.Interface
+	mu sync.Mutex
+	n  int
+}
+
+func (q *queryCounter) Trace(
+	_ context.Context, _ time.Time,
+	fc func() (sql string, rowsAffected int64), _ error,
+) {
+	q.mu.Lock()
+	q.n++
+	q.mu.Unlock()
+	// 仍然执行原逻辑：不执行的话查询不会真正发生，计数也就失去意义
+	_, _ = fc()
+}
+
+// countQueries 在独立 session 上执行 fn 并返回期间产生的 SQL 条数。
+//
+// 用独立 session 而不是改 db.Logger：session 持有自己的 logger 副本，
+// 两者查同一个连接池，也不会有并发 goroutine 读写 db.Logger 的竞争。
+func countQueries(t *testing.T, db *gorm.DB, fn func(*gorm.DB)) int {
+	t.Helper()
+	counter := &queryCounter{}
+	scoped := db.Session(&gorm.Session{Logger: counter})
+	fn(scoped)
+	return counter.n
 }
