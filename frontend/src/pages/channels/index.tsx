@@ -223,7 +223,7 @@ export default function ChannelsPage() {
                         onCheckedChange={toggleSelectAll}
                       />
                     </th>
-                    <th className="px-4 py-2.5 w-[14rem]">名称</th>
+                    <th className="px-4 py-2.5">名称</th>
                     <th className="px-4 py-2.5 w-28">类型</th>
                     <th className="px-4 py-2.5 w-44 whitespace-nowrap cursor-pointer select-none" onClick={() => toggleSort('created_at')}>
                       创建时间<SortIcon active={sortBy === 'created_at'} direction={sortOrder} />
@@ -242,7 +242,7 @@ export default function ChannelsPage() {
                           />
                         </td>
                         <td className="px-4 py-2.5">
-                          <span className="font-medium truncate" title={ch.name}>{ch.name}</span>
+                          <span className="font-medium truncate block" title={ch.name}>{ch.name}</span>
                         </td>
                         <td className="px-4 py-2.5 text-xs text-muted-foreground">{TYPE_LABEL[ch.type]}</td>
                         <td className="px-4 py-2.5 text-xs whitespace-nowrap text-muted-foreground">
