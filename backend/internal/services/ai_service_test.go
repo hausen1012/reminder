@@ -730,4 +730,3 @@ func TestAIChat_CleansUpDraftsOnSubsequentRoundError(t *testing.T) {
 		t.Fatalf("后续轮次报错后草稿必须被回滚清理，实际残留 %d 条", count)
 	}
 }
-
