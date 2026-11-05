@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { AlertCircle } from 'lucide-react'
+import { AlertCircle, RefreshCw } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { Pagination } from '@/components/common/pagination'
 import { PageHeader } from '@/components/common/PageHeader'
 import { extractApiError, getSchedulerStatus } from '@/lib/api'
@@ -23,23 +24,50 @@ export default function SchedulerPage() {
   const tz = useSiteTimezone()
   const [status, setStatus] = useState<SchedulerStatus | null>(null)
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState('')
   const [limit, setLimit] = useState(PAGE_LIMIT)
   const [offset, setOffset] = useState(0)
 
-  const fetch = (currentOffset: number, currentLimit: number) => {
-    setLoading(true)
-    getSchedulerStatus({ limit: currentLimit, offset: currentOffset })
-      .then(setStatus)
-      .catch((e) => setError(extractApiError(e, '加载失败')))
-      .finally(() => setLoading(false))
-  }
+  const statusRef = useRef(status)
+  statusRef.current = status
+
+  const fetchData = useCallback(
+    async (currentOffset: number, currentLimit: number, mode: 'initial' | 'manual' | 'silent' = 'initial') => {
+      if (mode === 'initial') {
+        setLoading(true)
+      } else if (mode === 'manual') {
+        setRefreshing(true)
+      }
+
+      try {
+        const data = await getSchedulerStatus({ limit: currentLimit, offset: currentOffset })
+        setStatus(data)
+        setError('')
+      } catch (e) {
+        // 静默后台刷新且已有数据时，不冲掉当前页面数据
+        if (mode !== 'silent' || !statusRef.current) {
+          setError(extractApiError(e, '加载失败'))
+        }
+      } finally {
+        if (mode === 'initial') {
+          setLoading(false)
+        } else if (mode === 'manual') {
+          setRefreshing(false)
+        }
+      }
+    },
+    [],
+  )
 
   useEffect(() => {
-    fetch(offset, limit)
-    const id = setInterval(() => fetch(offset, limit), 10000)
+    // 首次或分页条件改变时，若已有数据则平滑更新
+    fetchData(offset, limit, statusRef.current ? 'silent' : 'initial')
+    const id = setInterval(() => {
+      fetchData(offset, limit, 'silent')
+    }, 10000)
     return () => clearInterval(id)
-  }, [offset, limit])
+  }, [offset, limit, fetchData])
 
   const engine = status?.engine
   const sweeper = status?.sweeper
@@ -47,7 +75,18 @@ export default function SchedulerPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="监控" />
+      <PageHeader title="监控">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => fetchData(offset, limit, 'manual')}
+          disabled={loading || refreshing}
+          className="gap-1.5"
+        >
+          <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+          刷新
+        </Button>
+      </PageHeader>
 
       {/* 概览卡片 */}
       <div className="grid gap-4 md:grid-cols-4">
@@ -94,14 +133,14 @@ export default function SchedulerPage() {
 
       {/* 注册任务表格 */}
       <Card>
-        {error ? (
+        {error && !status ? (
           <CardContent className="py-6">
             <div className="flex items-center gap-2 text-destructive">
               <AlertCircle className="h-5 w-5" />
               <span>{error}</span>
             </div>
           </CardContent>
-        ) : loading ? (
+        ) : loading && !status ? (
           <CardContent className="py-6">
             <p className="text-sm text-muted-foreground">加载中…</p>
           </CardContent>

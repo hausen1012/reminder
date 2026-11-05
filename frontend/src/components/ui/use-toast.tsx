@@ -47,7 +47,11 @@ export function ToastProviderRoot({ children }: { children: React.ReactNode }) {
     setItems((prev) => [...prev, { ...opts, id: Date.now() + Math.random() }])
   }, [])
 
-  const remove = React.useCallback((id: number) => {
+  const remove = React.useCallback((id?: number) => {
+    if (id === undefined) {
+      setItems([])
+      return
+    }
     setItems((prev) => prev.filter((it) => it.id !== id))
   }, [])
 
