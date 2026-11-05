@@ -520,13 +520,18 @@ func (e *Engine) fire(id uint) {
 		return
 	}
 
+	now := time.Now()
+	// 若下次触发时间还在未来（允许 2 秒时钟抖动容差），说明已被其它并发路径（如 cron/sweeper）触发并推进，跳过本次触发
+	if r.NextFireAt != nil && r.NextFireAt.After(now.Add(2*time.Second)) {
+		return
+	}
+
 	spec, err := ParseSpec(r.ScheduleSpec)
 	if err != nil {
 		slog.Error("触发时解析 schedule_spec 失败，本次触发被跳过", "reminder", id, "title", r.Title, "spec", string(r.ScheduleSpec), "error", err)
 		return
 	}
 
-	now := time.Now()
 	// 算出新的 next_fire_at（cron 也要算，用于持久化展示）
 	newNext, err := Compute(r.Calendar, r.ScheduleType, spec, now, e.tz.Get())
 	if err != nil {
