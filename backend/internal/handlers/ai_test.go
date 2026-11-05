@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -94,6 +95,46 @@ func TestAISettingsValidation(t *testing.T) {
 		if resp.Error.Code != string(middleware.CodeValidationFailed) {
 			t.Fatalf("用例 %d 错误码 = %q", i, resp.Error.Code)
 		}
+	}
+}
+
+// 自定义提示词随设置读写，且超长时 400。
+func TestAISettingsCustomPrompt(t *testing.T) {
+	r, _ := newAITestEngine(t)
+
+	w := doJSON(r, http.MethodPut, "/ai/settings", services.AISettingsInput{
+		Enabled:      true,
+		Provider:     "openai",
+		Model:        "deepseek-chat",
+		APIKey:       "sk-abc",
+		CustomPrompt: "回复请简洁，叫我老板",
+	})
+	if w.Code != http.StatusOK {
+		t.Fatalf("状态码 = %d, body=%s", w.Code, w.Body.String())
+	}
+	var put struct {
+		Data services.AISettings `json:"data"`
+	}
+	decodeJSON(t, w, &put)
+	if put.Data.CustomPrompt != "回复请简洁，叫我老板" {
+		t.Fatalf("custom_prompt = %q", put.Data.CustomPrompt)
+	}
+
+	var get struct {
+		Data services.AISettings `json:"data"`
+	}
+	decodeJSON(t, doJSON(r, http.MethodGet, "/ai/settings", nil), &get)
+	if get.Data.CustomPrompt != "回复请简洁，叫我老板" {
+		t.Fatalf("读回 custom_prompt = %q", get.Data.CustomPrompt)
+	}
+
+	w = doJSON(r, http.MethodPut, "/ai/settings", services.AISettingsInput{
+		Provider:     "openai",
+		APIKey:       "***",
+		CustomPrompt: strings.Repeat("啊", 4001),
+	})
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("超长提示词状态码 = %d，期望 400", w.Code)
 	}
 }
 

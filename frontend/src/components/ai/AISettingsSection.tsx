@@ -1,7 +1,8 @@
-// AI 设置分区：厂商、模型、Base URL 与 API Key。
+// AI 设置分区：厂商、模型、Base URL、API Key 与自定义提示词。
 //
 // 密钥由后端加密存储，读回时恒为 "***"；用户不动输入框就原样回传占位符，
 // 后端据此保留原密钥（与通知通道的敏感字段是同一套约定）。
+// 自定义提示词会追加在内置规则之后，只用于补充风格与业务约定。
 import { useEffect, useState, type FormEvent } from 'react'
 import { Loader2 } from 'lucide-react'
 import {
@@ -14,6 +15,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
+import { Textarea } from '@/components/ui/textarea'
 import {
   Select,
   SelectContent,
@@ -45,6 +47,7 @@ export function AISettingsSection() {
   const [baseURL, setBaseURL] = useState('')
   const [model, setModel] = useState('claude-opus-5-5')
   const [apiKey, setApiKey] = useState('')
+  const [customPrompt, setCustomPrompt] = useState('')
   const [hasKey, setHasKey] = useState(false)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -60,6 +63,7 @@ export function AISettingsSection() {
         setModel(s.model ?? '')
         setHasKey(s.api_key === '***')
         setApiKey('') // 输入框留空表示"不修改"；只有 hasKey 时才有原值
+        setCustomPrompt(s.custom_prompt ?? '')
       })
       .catch(() => {})
       .finally(() => setLoading(false))
@@ -68,7 +72,14 @@ export function AISettingsSection() {
   function toInput() {
     // 输入框留空时回传占位符，让后端保留原密钥
     const key = apiKey.trim() === '' && hasKey ? '***' : apiKey.trim()
-    return { enabled, provider, base_url: baseURL.trim(), model: model.trim(), api_key: key }
+    return {
+      enabled,
+      provider,
+      base_url: baseURL.trim(),
+      model: model.trim(),
+      api_key: key,
+      custom_prompt: customPrompt.trim(),
+    }
   }
 
   async function handleSave(e: FormEvent) {
@@ -192,6 +203,22 @@ export function AISettingsSection() {
         />
         <p className="text-xs text-muted-foreground">
           密钥加密后保存；本地 Ollama 等无需鉴权的服务可以留空
+        </p>
+      </div>
+
+      <div className="space-y-2 sm:col-span-2">
+        <Label htmlFor="ai-custom-prompt">自定义提示词（可选）</Label>
+        <Textarea
+          id="ai-custom-prompt"
+          rows={6}
+          maxLength={4000}
+          placeholder="例如：称呼我为「老板」；回复尽量简短，一句话说完；提醒标题统一加上「⏰」前缀。"
+          value={customPrompt}
+          onChange={(e) => setCustomPrompt(e.target.value)}
+        />
+        <p className="text-xs text-muted-foreground">
+          追加在内置规则之后，用于补充称呼、语气与业务约定（最多 4000 字）。
+          它不能改变工具使用与「待确认后才生效」等硬性规则；留空表示只用内置提示词。
         </p>
       </div>
 

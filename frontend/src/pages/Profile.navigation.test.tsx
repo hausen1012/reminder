@@ -47,6 +47,7 @@ describe('Profile 分区导航', () => {
       base_url: '',
       model: 'claude-opus-5-5',
       api_key: '',
+      custom_prompt: '',
     })
   })
 

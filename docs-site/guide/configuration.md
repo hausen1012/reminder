@@ -156,6 +156,7 @@ AI 助手相关配置也以 `ai_` 前缀存在同一张表里，但**不通过 `
 | `ai_base_url` | 厂商地址；Anthropic 留空走官方 |
 | `ai_model` | 模型名 |
 | `ai_api_key_enc` | 加密后的 API Key，读出时恒显示 `***` |
+| `ai_custom_prompt` | 用户自定义的追加提示词，拼接在内置系统提示词之后 |
 
 密钥单独走 AI 设置接口，是为了避免通用配置接口把明文或密文带出面板以外的地方。
 详见[AI 助手](/guide/ai-assistant)。

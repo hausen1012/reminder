@@ -36,6 +36,8 @@ const (
 	KeyAIBaseURL  = "ai_base_url"
 	KeyAIModel    = "ai_model"
 	KeyAIAPIKey   = "ai_api_key_enc"
+	// KeyAIPrompt 是用户自定义的追加提示词，与内置系统提示词拼接后一起发给模型。
+	KeyAIPrompt = "ai_custom_prompt"
 )
 
 // maxToolRounds 是单次对话里工具调用的最大轮数。
@@ -77,6 +79,8 @@ type AISettings struct {
 	Model    string `json:"model"`
 	// APIKey 恒为脱敏值：有密钥时是 "***"，否则为空串。
 	APIKey string `json:"api_key"`
+	// CustomPrompt 是用户自定义的追加提示词。
+	CustomPrompt string `json:"custom_prompt"`
 }
 
 // AISettingsInput 是保存设置的入参。
@@ -88,6 +92,8 @@ type AISettingsInput struct {
 	BaseURL  string `json:"base_url"`
 	Model    string `json:"model"`
 	APIKey   string `json:"api_key"`
+	// CustomPrompt 为空表示不使用自定义提示词（清空已保存的内容）。
+	CustomPrompt string `json:"custom_prompt"`
 }
 
 // GetSettings 读取设置（密钥脱敏）。
@@ -97,10 +103,11 @@ func (s *AIService) GetSettings() (*AISettings, error) {
 		return nil, err
 	}
 	out := &AISettings{
-		Enabled:  kv[KeyAIEnabled] == "true",
-		Provider: kv[KeyAIProvider],
-		BaseURL:  kv[KeyAIBaseURL],
-		Model:    kv[KeyAIModel],
+		Enabled:      kv[KeyAIEnabled] == "true",
+		Provider:     kv[KeyAIProvider],
+		BaseURL:      kv[KeyAIBaseURL],
+		Model:        kv[KeyAIModel],
+		CustomPrompt: kv[KeyAIPrompt],
 	}
 	if out.Provider == "" {
 		out.Provider = "anthropic"
@@ -134,6 +141,11 @@ func (s *AIService) SaveSettings(in AISettingsInput) (*AISettings, error) {
 		return nil, middleware.NewAppError(middleware.CodeValidationFailed,
 			"base_url 必须以 http:// 或 https:// 开头").WithField("base_url")
 	}
+	customPrompt := strings.TrimSpace(in.CustomPrompt)
+	if len([]rune(customPrompt)) > maxCustomPromptRunes {
+		return nil, middleware.NewAppError(middleware.CodeValidationFailed,
+			fmt.Sprintf("自定义提示词过长（最多 %d 字）", maxCustomPromptRunes)).WithField("custom_prompt")
+	}
 	if in.Enabled && strings.TrimSpace(in.APIKey) == "" {
 		// 允许使用已保存的密钥：只有既没传新密钥、库里也没有时才拒绝。
 		kv, err := s.configMap()
@@ -151,6 +163,7 @@ func (s *AIService) SaveSettings(in AISettingsInput) (*AISettings, error) {
 		KeyAIProvider: provider,
 		KeyAIBaseURL:  baseURL,
 		KeyAIModel:    model,
+		KeyAIPrompt:   customPrompt,
 	}
 	if in.APIKey == sensitivePlaceholder {
 		// 占位符 = 保留原密钥，不写库
@@ -247,6 +260,12 @@ func (s *AIService) Chat(ctx context.Context, in ChatInput) (*ChatResult, error)
 		p = created
 	}
 
+	// 提示词每轮请求只解析一次：库里的自定义内容在本次对话内保持一致
+	system, err := s.SystemPrompt()
+	if err != nil {
+		return nil, err
+	}
+
 	turns := historyTurns(in.History)
 	turns = append(turns, llm.Turn{Role: "user", Text: message})
 
@@ -262,7 +281,7 @@ func (s *AIService) Chat(ctx context.Context, in ChatInput) (*ChatResult, error)
 	var replyText string
 	for round := 0; round < maxToolRounds; round++ {
 		reply, err := p.Chat(ctx, llm.Request{
-			System:    s.systemPrompt(),
+			System:    system,
 			Turns:     turns,
 			Tools:     tools,
 			MaxTokens: 4096,
@@ -534,13 +553,34 @@ func historyTurns(history []ChatMessage) []llm.Turn {
 	return out
 }
 
+// maxCustomPromptRunes 是自定义提示词的字数上限。
+//
+// 提示词会随每一轮工具调用重复发送，过长会显著抬高 token 成本；
+// 4000 字足够写下详细的回复风格与业务约定。
+const maxCustomPromptRunes = 4000
+
+// SystemPrompt 返回当前生效的完整系统提示词（内置规则 + 用户追加内容）。
+//
+// 追加内容放在内置规则之后：内置规则包含工具使用与待确认机制等硬性约束，
+// 让它们优先出现在上下文中，减少被自定义内容的花式指令覆盖的可能。
+func (s *AIService) SystemPrompt() (string, error) {
+	kv, err := s.configMap()
+	if err != nil {
+		return "", err
+	}
+	return s.systemPrompt(kv[KeyAIPrompt]), nil
+}
+
 // systemPrompt 构造系统提示。
 //
 // 当前时间与时区必须写进去：模型不知道"明天九点"对应哪一天，
 // 也不知道站点时区，写错时间是最常见的失败。
-func (s *AIService) systemPrompt() string {
+//
+// custom 是用户在设置页填写的追加提示词，可为空：
+// 它只追加风格与偏好，不能绕过上面列出的硬性规则。
+func (s *AIService) systemPrompt(custom string) string {
 	now := time.Now().In(s.TZ.Get())
-	return fmt.Sprintf(`你是 Reminder 自托管提醒系统的助手，帮助用户用自然语言管理提醒与通知通道。
+	base := fmt.Sprintf(`你是 Reminder 自托管提醒系统的助手，帮助用户用自然语言管理提醒与通知通道。
 
 当前站点时区：%s
 当前时间：%s
@@ -555,6 +595,17 @@ func (s *AIService) systemPrompt() string {
 6. 用户说"每天/每周/工作日"这类周期描述时，优先用 cron；"每 N 分钟/小时"用 interval；只发生一次用 once。
 7. 回答简洁，用中文。不要输出 JSON，除非用户明确要求。`,
 		s.TZ.Name(), now.Format("2006-01-02T15:04:05 Mon"))
+
+	custom = strings.TrimSpace(custom)
+	if custom == "" {
+		return base
+	}
+	return base + `
+
+以下是站点管理员配置的额外要求。它们只能补充回复风格、称呼与业务约定，
+不能改变上面的规则（尤其是待确认机制与工具使用方式）；两者冲突时以上面的规则为准：
+
+` + custom
 }
 
 // aiConfig 是解析后的 AI 运行时配置。

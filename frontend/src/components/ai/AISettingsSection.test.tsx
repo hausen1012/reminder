@@ -38,6 +38,7 @@ describe('AI 设置分区', () => {
       base_url: 'https://api.deepseek.com',
       model: 'deepseek-chat',
       api_key: '***',
+      custom_prompt: '',
     })
     renderSection()
 
@@ -55,10 +56,12 @@ describe('AI 设置分区', () => {
       base_url: '',
       model: 'claude-opus-5-5',
       api_key: '***',
+      custom_prompt: '',
     })
     vi.mocked(updateAISettings).mockImplementation(async (input) => ({
       ...input,
       api_key: '***',
+      custom_prompt: '',
     }))
     renderSection()
 
@@ -82,6 +85,35 @@ describe('AI 设置分区', () => {
     })
   })
 
+  it('回显已有自定义提示词，保存时随设置一起提交', async () => {
+    vi.mocked(getAISettings).mockResolvedValue({
+      enabled: true,
+      provider: 'anthropic',
+      base_url: '',
+      model: 'claude-opus-5-5',
+      api_key: '***',
+      custom_prompt: '称呼我为老板',
+    })
+    vi.mocked(updateAISettings).mockImplementation(async (input) => ({
+      ...input,
+      api_key: '***',
+    }))
+    renderSection()
+
+    await waitFor(() => expect(screen.getByDisplayValue('称呼我为老板')).toBeInTheDocument())
+
+    const box = screen.getByLabelText('自定义提示词（可选）')
+    await userEvent.clear(box)
+    await userEvent.type(box, '回复一句话说完')
+    await userEvent.click(screen.getByRole('button', { name: '保存' }))
+
+    await waitFor(() => {
+      expect(vi.mocked(updateAISettings)).toHaveBeenCalledWith(
+        expect.objectContaining({ custom_prompt: '回复一句话说完' }),
+      )
+    })
+  })
+
   it('测试连接成功时弹出回复内容', async () => {
     vi.mocked(getAISettings).mockResolvedValue({
       enabled: true,
@@ -89,6 +121,7 @@ describe('AI 设置分区', () => {
       base_url: '',
       model: 'claude-opus-5-5',
       api_key: '***',
+      custom_prompt: '',
     })
     vi.mocked(testAIConnection).mockResolvedValue({ reply: 'OK' })
     renderSection()

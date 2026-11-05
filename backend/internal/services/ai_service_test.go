@@ -555,6 +555,74 @@ func TestAIToolDefinitions(t *testing.T) {
 	}
 }
 
+// 自定义提示词：保存后追加在内置规则之后，随对话请求发出；留空则只用内置提示词。
+func TestAICustomPrompt(t *testing.T) {
+	svc, fake, _ := newAITestService(t, &llm.Reply{Text: "ok"})
+
+	// 未配置时，系统提示里不应出现追加段落
+	if _, err := chat(svc, "hi"); err != nil {
+		t.Fatalf("Chat 失败: %v", err)
+	}
+	if strings.Contains(fake.calls[0].System, "额外要求") {
+		t.Fatalf("未配置自定义提示词时不应出现追加段落: %s", fake.calls[0].System)
+	}
+
+	saved, err := svc.SaveSettings(AISettingsInput{
+		Enabled:      true,
+		Provider:     "anthropic",
+		APIKey:       "sk-x",
+		CustomPrompt: "  称呼我为老板  ",
+	})
+	if err != nil {
+		t.Fatalf("保存设置失败: %v", err)
+	}
+	if saved.CustomPrompt != "称呼我为老板" {
+		t.Fatalf("custom_prompt 应去除首尾空白，实际 %q", saved.CustomPrompt)
+	}
+
+	if _, err := chat(svc, "hi"); err != nil {
+		t.Fatalf("Chat 失败: %v", err)
+	}
+	system := fake.calls[len(fake.calls)-1].System
+	idxBase := strings.Index(system, "你是 Reminder 自托管提醒系统的助手")
+	idxCustom := strings.Index(system, "称呼我为老板")
+	if idxBase < 0 || idxCustom < 0 {
+		t.Fatalf("系统提示应同时包含内置规则与自定义内容: %s", system)
+	}
+	if idxCustom < idxBase {
+		t.Fatalf("自定义内容应追加在内置规则之后: %s", system)
+	}
+	// 内置的待确认规则不能被自定义内容挤掉
+	if !strings.Contains(system, "待确认操作") {
+		t.Fatalf("内置规则不应丢失: %s", system)
+	}
+
+	// 清空后不再追加
+	if _, err := svc.SaveSettings(AISettingsInput{
+		Enabled: true, Provider: "anthropic", APIKey: "***", CustomPrompt: "",
+	}); err != nil {
+		t.Fatalf("清空提示词失败: %v", err)
+	}
+	if got, err := svc.SystemPrompt(); err != nil {
+		t.Fatalf("读取系统提示失败: %v", err)
+	} else if strings.Contains(got, "称呼我为老板") {
+		t.Fatalf("清空后不应再包含自定义内容: %s", got)
+	}
+}
+
+// 自定义提示词超长应被拒绝。
+func TestAISaveSettings_CustomPromptTooLong(t *testing.T) {
+	svc, _, _ := newAITestService(t, &llm.Reply{Text: "ok"})
+	_, err := svc.SaveSettings(AISettingsInput{
+		Provider:     "anthropic",
+		APIKey:       "sk-x",
+		CustomPrompt: strings.Repeat("啊", maxCustomPromptRunes+1),
+	})
+	if err == nil || !strings.Contains(err.Error(), "过长") {
+		t.Fatalf("应返回过长错误，实际 %v", err)
+	}
+}
+
 // PurgeActions 只删超过保留期的草稿，保留期内的（无论状态）都不动。
 func TestAIPurgeActions(t *testing.T) {
 	svc, _, db := newAITestService(t, &llm.Reply{Text: "ok"})

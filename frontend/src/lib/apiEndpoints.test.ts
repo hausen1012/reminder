@@ -276,14 +276,28 @@ describe('api AI 助手', () => {
     expect(await api.getAISettings()).toEqual({ enabled: true })
     expect(mockRequest).toHaveBeenCalledWith('get', '/ai/settings')
 
-    const input = { enabled: true, provider: 'openai' as const, base_url: '', model: 'm', api_key: '***' }
+    const input = {
+      enabled: true,
+      provider: 'openai' as const,
+      base_url: '',
+      model: 'm',
+      api_key: '***',
+      custom_prompt: '',
+    }
     await api.updateAISettings(input)
     expect(mockRequest).toHaveBeenCalledWith('put', '/ai/settings', input)
   })
 
   it('testAIConnection 提交配置', async () => {
     mockRequest.mockReturnValue(respond({ data: { reply: 'OK' } }))
-    const input = { enabled: true, provider: 'anthropic' as const, base_url: '', model: 'm', api_key: '' }
+    const input = {
+      enabled: true,
+      provider: 'anthropic' as const,
+      base_url: '',
+      model: 'm',
+      api_key: '',
+      custom_prompt: '',
+    }
     expect(await api.testAIConnection(input)).toEqual({ reply: 'OK' })
     expect(mockRequest).toHaveBeenCalledWith('post', '/ai/test', input)
   })

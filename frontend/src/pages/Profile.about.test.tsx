@@ -29,6 +29,7 @@ describe('Profile 关于项目', () => {
       base_url: '',
       model: 'claude-opus-5-5',
       api_key: '',
+      custom_prompt: '',
     })
   })
 

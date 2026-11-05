@@ -229,6 +229,8 @@ export interface AISettings {
   model: string
   /** 已配置时后端回 "***"，否则为空串 */
   api_key: string
+  /** 用户自定义的追加提示词，与内置规则拼接后发给模型 */
+  custom_prompt: string
 }
 
 export interface AISettingsInput {
@@ -237,6 +239,7 @@ export interface AISettingsInput {
   base_url: string
   model: string
   api_key: string
+  custom_prompt: string
 }
 
 export type AIActionKind =

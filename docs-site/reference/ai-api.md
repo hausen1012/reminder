@@ -20,7 +20,8 @@
   "provider": "openai",
   "base_url": "https://api.deepseek.com",
   "model": "deepseek-chat",
-  "api_key": "sk-xxx"
+  "api_key": "sk-xxx",
+  "custom_prompt": "称呼我为老板，回复尽量一句话说完"
 }
 ```
 
@@ -30,6 +31,10 @@
 | `base_url` | 留空时：`anthropic` 走官方地址，`openai` 走 `https://api.openai.com` |
 | `model` | 模型名；留空时按厂商给默认值 |
 | `api_key` | 传 `"***"` 表示保留已保存的密钥；传空串表示清除；传新值则覆盖 |
+| `custom_prompt` | 追加在内置系统提示词之后的用户自定义内容；空串表示不用。最多 4000 字，超出返回 `validation_failed` |
+
+`custom_prompt` 会跟在内置规则之后、并注明「冲突时以内置规则为准」，
+因此不能用来绕过待确认机制。`GET /api/ai/settings` 会原样返回该字段（它不是密钥，不做脱敏）。
 
 `enabled=true` 且库里没有已保存密钥、请求也没带新密钥时，返回 `validation_failed`。
 
@@ -146,4 +151,6 @@
 ## 涉及的配置键
 
 AI 设置存在 `config` 表，前缀 `ai_`：`ai_enabled`、`ai_provider`、`ai_base_url`、
-`ai_model`、`ai_api_key_enc`。它们不通过 `/api/config` 暴露。
+`ai_model`、`ai_api_key_enc`、`ai_custom_prompt`。它们不通过 `/api/config` 暴露。
+
+`ai_custom_prompt` 为明文（不是密钥），值为空时该行被删除，回退到只用内置提示词。
