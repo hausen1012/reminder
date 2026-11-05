@@ -5,11 +5,13 @@ import (
 	"encoding/json"
 	"errors"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/reminder/backend/internal/llm"
+	"github.com/reminder/backend/internal/middleware"
 	"github.com/reminder/backend/internal/models"
 	"gorm.io/gorm"
 )
@@ -728,5 +730,72 @@ func TestAIChat_CleansUpDraftsOnSubsequentRoundError(t *testing.T) {
 	db.Model(&models.AIAction{}).Count(&count)
 	if count != 0 {
 		t.Fatalf("后续轮次报错后草稿必须被回滚清理，实际残留 %d 条", count)
+	}
+}
+
+// 验证：并发执行 ApplyAction 时，原子 CAS 保证仅有一次成功，避免生成重复实体。
+func TestAIApplyAction_ConcurrentExecution(t *testing.T) {
+	svc, _, db := newAITestService(t, &llm.Reply{Text: "ok"})
+
+	payload, _ := json.Marshal(ReminderInput{
+		Title:        "并发测试提醒",
+		Content:      "并发正文",
+		Calendar:     "solar",
+		ScheduleType: "once",
+		ScheduleSpec: map[string]any{"at": "2030-01-01T09:00:00"},
+		ChannelIDs:   []uint{1},
+	})
+	enc, err := svc.Box.EncryptString(string(payload))
+	if err != nil {
+		t.Fatalf("加密草稿失败: %v", err)
+	}
+
+	act := &models.AIAction{
+		ID:         "act_concurrent_test",
+		Kind:       "create_reminder",
+		Summary:    "创建并发测试提醒",
+		PayloadEnc: enc,
+		Status:     "pending",
+	}
+	if err := db.Create(act).Error; err != nil {
+		t.Fatalf("创建草稿失败: %v", err)
+	}
+
+	const n = 5
+	errs := make([]error, n)
+	var wg sync.WaitGroup
+	wg.Add(n)
+	for i := 0; i < n; i++ {
+		go func(idx int) {
+			defer wg.Done()
+			_, errs[idx] = svc.ApplyAction(act.ID)
+		}(i)
+	}
+	wg.Wait()
+
+	successCount := 0
+	conflictCount := 0
+	for _, e := range errs {
+		if e == nil {
+			successCount++
+		} else {
+			var appErr *middleware.AppError
+			if errors.As(e, &appErr) && appErr.Code == middleware.CodeConflict {
+				conflictCount++
+			}
+		}
+	}
+
+	if successCount != 1 {
+		t.Fatalf("期望仅有 1 次执行成功，实际成功 %d 次: %v", successCount, errs)
+	}
+	if conflictCount != n-1 {
+		t.Fatalf("期望 %d 次报 CodeConflict 冲突，实际 %d 次", n-1, conflictCount)
+	}
+
+	var reminderCount int64
+	db.Model(&models.Reminder{}).Where("title = ?", "并发测试提醒").Count(&reminderCount)
+	if reminderCount != 1 {
+		t.Fatalf("期望数据库中仅创建 1 条提醒，实际创建了 %d 条", reminderCount)
 	}
 }

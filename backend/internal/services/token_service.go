@@ -122,7 +122,7 @@ func (s *TokenService) Toggle(id uint) (*models.Token, error) {
 	return &key, nil
 }
 
-// Delete 删除令牌。
+// Delete 删除令牌并级联清理关联的默认通道绑定。
 func (s *TokenService) Delete(id uint) error {
 	var key models.Token
 	if err := s.DB.First(&key, id).Error; err != nil {
@@ -131,7 +131,12 @@ func (s *TokenService) Delete(id uint) error {
 		}
 		return err
 	}
-	return s.DB.Delete(&key).Error
+	return s.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("token_id = ?", id).Delete(&models.TokenDefaultChannel{}).Error; err != nil {
+			return err
+		}
+		return tx.Delete(&key).Error
+	})
 }
 
 // Verify 验证明文令牌是否有效。

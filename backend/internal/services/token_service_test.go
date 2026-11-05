@@ -526,3 +526,28 @@ func TestTokenListViews_QueryCountIndependentOfRowCount(t *testing.T) {
 		}
 	}
 }
+
+// 验证：删除令牌时级联清理 token_default_channels 中的绑定关系，避免通道后续因孤儿关联无法被删除。
+func TestTokenDelete_CleansUpDefaultChannels(t *testing.T) {
+	svc, db := newTokenSvc(t)
+
+	_, token, err := svc.Create("带通道令牌", []uint{1, 2})
+	if err != nil {
+		t.Fatalf("创建令牌失败: %v", err)
+	}
+
+	var count int64
+	db.Model(&models.TokenDefaultChannel{}).Where("token_id = ?", token.ID).Count(&count)
+	if count != 2 {
+		t.Fatalf("创建后应有 2 条默认通道关联，实际 %d", count)
+	}
+
+	if err := svc.Delete(token.ID); err != nil {
+		t.Fatalf("删除令牌失败: %v", err)
+	}
+
+	db.Model(&models.TokenDefaultChannel{}).Where("token_id = ?", token.ID).Count(&count)
+	if count != 0 {
+		t.Fatalf("删除令牌后默认通道关联应被清空，实际残留 %d 条", count)
+	}
+}

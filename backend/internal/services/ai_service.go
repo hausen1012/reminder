@@ -398,6 +398,19 @@ func (s *AIService) ApplyAction(id string) (*models.AIAction, error) {
 		return nil, middleware.NewAppError(middleware.CodeConflict, "该操作已处理，无法重复执行")
 	}
 
+	// 原子 CAS 抢占：先在库里将 pending 推进为 applied，
+	// 防止快速连击或并发请求同时穿透并多次触发副作用（如创建重复提醒）。
+	res := s.DB.Model(&models.AIAction{}).
+		Where("id = ? AND status = ?", id, "pending").
+		Update("status", "applied")
+	if res.Error != nil {
+		return nil, res.Error
+	}
+	if res.RowsAffected == 0 {
+		return nil, middleware.NewAppError(middleware.CodeConflict, "该操作已处理，无法重复执行")
+	}
+	act.Status = "applied"
+
 	raw, err := s.Box.DecryptString(act.PayloadEnc)
 	if err != nil {
 		s.markAction(act, "failed", "草稿内容无法解密（ENCRYPTION_KEY 可能已更换）", "")
@@ -468,7 +481,16 @@ func (s *AIService) RejectAction(id string) (*models.AIAction, error) {
 	if act.Status != "pending" {
 		return nil, middleware.NewAppError(middleware.CodeConflict, "该操作已处理")
 	}
-	s.markAction(act, "rejected", "", "")
+	res := s.DB.Model(&models.AIAction{}).
+		Where("id = ? AND status = ?", id, "pending").
+		Update("status", "rejected")
+	if res.Error != nil {
+		return nil, res.Error
+	}
+	if res.RowsAffected == 0 {
+		return nil, middleware.NewAppError(middleware.CodeConflict, "该操作已处理")
+	}
+	act.Status = "rejected"
 	return act, nil
 }
 
