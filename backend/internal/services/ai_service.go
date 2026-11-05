@@ -278,6 +278,16 @@ func (s *AIService) Chat(ctx context.Context, in ChatInput) (*ChatResult, error)
 	}
 
 	var createdIDs []string
+	var success bool
+	defer func() {
+		if !success && len(createdIDs) > 0 {
+			// 对话因报错（如模型 429、网络超时等）未正常结束，回滚清理本轮生成的草稿，避免变成孤儿待确认记录
+			if delErr := s.DB.Where("id IN ?", createdIDs).Delete(&models.AIAction{}).Error; delErr != nil {
+				slog.Error("清理未完成对话的 AI 草稿失败", "error", delErr, "ids", createdIDs)
+			}
+		}
+	}()
+
 	var replyText string
 	for round := 0; round < maxToolRounds; round++ {
 		reply, err := p.Chat(ctx, llm.Request{
@@ -335,6 +345,7 @@ func (s *AIService) Chat(ctx context.Context, in ChatInput) (*ChatResult, error)
 	if err != nil {
 		return nil, err
 	}
+	success = true
 	return &ChatResult{Reply: replyText, Actions: actions}, nil
 }
 

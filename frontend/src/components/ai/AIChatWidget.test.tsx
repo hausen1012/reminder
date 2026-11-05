@@ -183,6 +183,21 @@ describe('AI 助手浮窗', () => {
     await waitFor(() => expect(screen.queryByRole('button', { name: /忽略/ })).toBeNull())
   })
 
+  it('支持全部忽略待确认草稿', async () => {
+    vi.mocked(getAISettings).mockResolvedValue(enabledSettings)
+    const action2 = { ...pendingAction, id: 'act-2', summary: '创建提醒：周报' }
+    vi.mocked(listAIActions).mockResolvedValue([pendingAction, action2])
+    vi.mocked(rejectAIAction).mockResolvedValue({ ...pendingAction, status: 'rejected' })
+    renderWidget()
+
+    await userEvent.click(await screen.findByLabelText('打开 AI 助手'))
+    await waitFor(() => expect(screen.getByText('全部忽略')).toBeInTheDocument())
+
+    await userEvent.click(screen.getByText('全部忽略'))
+    await waitFor(() => expect(vi.mocked(rejectAIAction)).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(screen.queryByText('创建提醒：喝水')).toBeNull())
+  })
+
   it('请求失败时回填输入框并提示', async () => {
     vi.mocked(getAISettings).mockResolvedValue(enabledSettings)
     vi.mocked(sendAIChat).mockRejectedValue({

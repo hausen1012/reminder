@@ -692,3 +692,42 @@ func TestAIPurgeActionsNonPositive(t *testing.T) {
 		t.Fatalf("草稿不应被删除，实际剩 %d", count)
 	}
 }
+
+type errorOnRoundProvider struct {
+	round int
+	errOn int
+}
+
+func (p *errorOnRoundProvider) Chat(_ context.Context, _ llm.Request) (*llm.Reply, error) {
+	p.round++
+	if p.round == p.errOn {
+		return nil, errors.New("HTTP 429: rps exhausted")
+	}
+	return toolCall("create_reminder", `{
+		"title":"喝水",
+		"schedule_type":"once",
+		"schedule_spec":{"at":"2030-01-01T09:00:00"},
+		"channel_ids":[1]
+	}`), nil
+}
+
+// 验证：工具调用入库草稿后，后续轮次模型调用出错时，已入库的草稿会被自动回滚清理，避免残留孤儿待确认操作。
+func TestAIChat_CleansUpDraftsOnSubsequentRoundError(t *testing.T) {
+	svc, _, db := newAITestService(t)
+	svc.providerOverride = &errorOnRoundProvider{errOn: 2}
+
+	_, err := chat(svc, "提醒我喝水")
+	if err == nil {
+		t.Fatal("期望返回错误，但成功了")
+	}
+	if !strings.Contains(err.Error(), "429") {
+		t.Fatalf("期望包含 429 错误，实际: %v", err)
+	}
+
+	var count int64
+	db.Model(&models.AIAction{}).Count(&count)
+	if count != 0 {
+		t.Fatalf("后续轮次报错后草稿必须被回滚清理，实际残留 %d 条", count)
+	}
+}
+

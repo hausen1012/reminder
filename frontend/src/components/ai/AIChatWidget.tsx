@@ -167,6 +167,18 @@ export function AIChatWidget() {
     }
   }
 
+  async function handleRejectAll() {
+    const pendingActions = actions.filter((a) => a.status === 'pending')
+    if (pendingActions.length === 0) return
+    try {
+      await Promise.all(pendingActions.map((a) => rejectAIAction(a.id)))
+      setActions([])
+    } catch (err) {
+      refreshActions()
+      toast({ title: '操作失败', description: extractApiError(err), variant: 'destructive' })
+    }
+  }
+
   function clearHistory() {
     setHistory([])
     saveHistory([])
@@ -267,7 +279,18 @@ export function AIChatWidget() {
 
             {actions.length > 0 && (
               <div className="space-y-2 border-t pt-3">
-                <p className="text-xs font-medium text-muted-foreground">待确认操作（点确认后才生效）</p>
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-medium text-muted-foreground">待确认操作（点确认后才生效）</p>
+                  {actions.filter((a) => a.status === 'pending').length > 1 && (
+                    <button
+                      type="button"
+                      className="text-[11px] text-muted-foreground hover:text-foreground hover:underline"
+                      onClick={handleRejectAll}
+                    >
+                      全部忽略
+                    </button>
+                  )}
+                </div>
                 {actions.map((a) => (
                   <ActionCard
                     key={a.id}
