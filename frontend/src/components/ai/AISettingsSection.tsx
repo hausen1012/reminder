@@ -419,22 +419,6 @@ export function AISettingsSection() {
         </div>
       </div>
 
-      <div className="space-y-2 sm:col-span-2">
-        <Label htmlFor="ai-custom-prompt">自定义提示词（可选）</Label>
-        <Textarea
-          id="ai-custom-prompt"
-          rows={5}
-          maxLength={4000}
-          placeholder="例如：称呼我为「老板」；回复尽量简短，一句话说完；提醒标题统一加上「⏰」前缀。"
-          value={customPrompt}
-          onChange={(e) => setCustomPrompt(e.target.value)}
-        />
-        <p className="text-xs text-muted-foreground">
-          追加在内置规则之后，用于补充称呼、语气与业务约定（最多 4000 字）。
-          它不能改变工具使用与「待确认后才生效」等硬性规则；留空表示只用内置提示词。
-        </p>
-      </div>
-
       <div className="space-y-2">
         <Label htmlFor="ai-max-tokens">最大上下文窗口（Token）</Label>
         <Input
@@ -466,6 +450,22 @@ export function AISettingsSection() {
         <p className="text-xs text-muted-foreground">
           接口失败（限流、超时、网络错误、服务端 5xx）后的自动重试次数，默认 10。
           填 0 表示不重试；密钥错误、参数错误这类不会重试。
+        </p>
+      </div>
+
+      <div className="space-y-2 sm:col-span-2">
+        <Label htmlFor="ai-custom-prompt">自定义提示词（可选）</Label>
+        <Textarea
+          id="ai-custom-prompt"
+          rows={5}
+          maxLength={4000}
+          placeholder="例如：称呼我为「老板」；回复尽量简短，一句话说完；提醒标题统一加上「⏰」前缀。"
+          value={customPrompt}
+          onChange={(e) => setCustomPrompt(e.target.value)}
+        />
+        <p className="text-xs text-muted-foreground">
+          追加在内置规则之后，用于补充称呼、语气与业务约定（最多 4000 字）。
+          它不能改变工具使用与「待确认后才生效」等硬性规则；留空表示只用内置提示词。
         </p>
       </div>
 
