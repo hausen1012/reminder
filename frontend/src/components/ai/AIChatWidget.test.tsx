@@ -9,6 +9,7 @@ vi.mock('@/lib/api', async () => {
   return {
     ...actual,
     getAISettings: vi.fn(),
+    updateAISettings: vi.fn(),
     listAIActions: vi.fn(),
     sendAIChatStream: vi.fn(),
     applyAIAction: vi.fn(),
@@ -22,6 +23,7 @@ import {
   listAIActions,
   rejectAIAction,
   sendAIChatStream,
+  updateAISettings,
 } from '@/lib/api'
 import type { AIAction, AIChatResult, AISettings } from '@/types'
 
@@ -57,6 +59,7 @@ describe('AI 助手浮窗', () => {
   beforeEach(() => {
     sessionStorage.clear()
     vi.mocked(getAISettings).mockReset()
+    vi.mocked(updateAISettings).mockReset()
     vi.mocked(listAIActions).mockReset().mockResolvedValue([])
     vi.mocked(sendAIChatStream).mockReset()
     vi.mocked(applyAIAction).mockReset()
@@ -144,7 +147,7 @@ describe('AI 助手浮窗', () => {
     ])
   })
 
-  it('支持在对话面板中展示当前模型', async () => {
+  it('模型选择器与发送按钮同排展示，且不会被长模型名撑开', async () => {
     vi.mocked(getAISettings).mockResolvedValue({
       ...enabledSettings,
       model: 'deepseek-chat',
@@ -153,8 +156,74 @@ describe('AI 助手浮窗', () => {
     renderWidget()
 
     await userEvent.click(await screen.findByLabelText('打开 AI 助手'))
-    expect(await screen.findByText('当前模型')).toBeInTheDocument()
+    const trigger = await screen.findByLabelText('切换模型')
     expect(screen.getByText('deepseek-chat')).toBeInTheDocument()
+
+    // 同一容器里既有模型选择器也有发送按钮：满足「放在发送按钮旁边」
+    const row = trigger.parentElement
+    expect(row).not.toBeNull()
+    expect(row).toContainElement(screen.getByRole('button', { name: '发送' }))
+    // 长模型名靠 max-w + 截断兜住，不换行撑破输入区
+    expect(trigger).toHaveClass('max-w-[150px]')
+    expect(trigger).toHaveClass('truncate')
+  })
+
+  it('切换模型只影响本次对话，不写回设置', async () => {
+    vi.mocked(getAISettings).mockResolvedValue({
+      ...enabledSettings,
+      model: 'deepseek-chat',
+      models: ['deepseek-chat', 'deepseek-reasoner'],
+    })
+    vi.mocked(sendAIChatStream).mockResolvedValue({ reply: '好的', actions: [] })
+    renderWidget()
+
+    await userEvent.click(await screen.findByLabelText('打开 AI 助手'))
+    await userEvent.click(await screen.findByLabelText('切换模型'))
+    await userEvent.click(await screen.findByRole('option', { name: 'deepseek-reasoner' }))
+
+    await waitFor(() =>
+      expect(screen.getByLabelText('切换模型')).toHaveTextContent('deepseek-reasoner'),
+    )
+    // 切换不落库：模型只随每次请求的 model 字段发给后端
+    expect(vi.mocked(updateAISettings)).not.toHaveBeenCalled()
+
+    await userEvent.type(screen.getByPlaceholderText(/描述你要的提醒或通知渠道/), '你好')
+    await userEvent.click(screen.getByRole('button', { name: '发送' }))
+    await waitFor(() => expect(screen.getByText('好的')).toBeInTheDocument())
+
+    expect(vi.mocked(sendAIChatStream).mock.calls[0][2]).toBe('deepseek-reasoner')
+    expect(vi.mocked(updateAISettings)).not.toHaveBeenCalled()
+  })
+
+  it('模型下拉框只包含设置里的模型，不提供手动输入', async () => {
+    vi.mocked(getAISettings).mockResolvedValue({
+      ...enabledSettings,
+      model: 'deepseek-chat',
+      models: ['deepseek-chat', 'deepseek-reasoner'],
+    })
+    renderWidget()
+
+    await userEvent.click(await screen.findByLabelText('打开 AI 助手'))
+    await userEvent.click(await screen.findByLabelText('切换模型'))
+
+    const options = await screen.findAllByRole('option')
+    expect(options.map((o) => o.textContent)).toEqual(['deepseek-chat', 'deepseek-reasoner'])
+    expect(screen.queryByText(/手动输入其他模型/)).toBeNull()
+    expect(screen.queryByLabelText('自定义模型名称')).toBeNull()
+  })
+
+  it('设置里没有模型列表时不渲染切换控件', async () => {
+    vi.mocked(getAISettings).mockResolvedValue({
+      ...enabledSettings,
+      model: '',
+      models: [],
+    })
+    renderWidget()
+
+    await userEvent.click(await screen.findByLabelText('打开 AI 助手'))
+    expect(screen.queryByLabelText('切换模型')).toBeNull()
+    // 输入与发送不受影响
+    expect(screen.getByPlaceholderText(/描述你要的提醒或通知渠道/)).toBeInTheDocument()
   })
 
   it('刷新后从 sessionStorage 恢复对话', async () => {

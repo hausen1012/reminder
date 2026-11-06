@@ -9,7 +9,6 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   Bot,
   Check,
-  Cpu,
   Loader2,
   MessageSquare,
   Send,
@@ -20,7 +19,6 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import {
   Select,
@@ -37,7 +35,6 @@ import {
   listAIActions,
   rejectAIAction,
   sendAIChatStream,
-  updateAISettings,
 } from '@/lib/api'
 import { AI_ACTION_LABEL } from '@/types'
 import type { AIAction, AIChatMessage, AIChatProgress } from '@/types'
@@ -98,10 +95,10 @@ export function AIChatWidget() {
   const [sending, setSending] = useState(false)
   // 服务端推送的过程状态（思考中 / 第 n 次重试）；null 表示没有可显示的内容
   const [progress, setProgress] = useState<AIChatProgress | null>(null)
+  // 当前会话选中的模型：只在本地生效，随每次请求的 model 字段发给后端，
+  // 不写回设置——面板里的切换是「这次用哪个模型」，不是「以后都改用它」。
   const [currentModel, setCurrentModel] = useState<string>('')
   const [availableModels, setAvailableModels] = useState<string[]>([])
-  const [isCustomModel, setIsCustomModel] = useState(false)
-  const [customModelInput, setCustomModelInput] = useState('')
   const bottomRef = useRef<HTMLDivElement>(null)
   // 当前进行中请求的取消句柄；null 表示没有可中止的请求
   const abortRef = useRef<AbortController | null>(null)
@@ -111,11 +108,14 @@ export function AIChatWidget() {
       const s = await getAISettings()
       if (!s) return
       setEnabled(Boolean(s.enabled))
+      // 当前模型始终出现在下拉里：设置的模型可能不在 models 列表中
       const modelList = s.models && s.models.length > 0
         ? s.models
         : (s.model ? [s.model] : [])
-      setAvailableModels(modelList)
-      setCurrentModel((prev) => prev || s.model || (modelList[0] ?? ''))
+      const selected = s.model || modelList[0] || ''
+      const merged = selected && !modelList.includes(selected) ? [selected, ...modelList] : modelList
+      setAvailableModels(merged)
+      setCurrentModel((prev) => (merged.includes(prev) ? prev : selected))
     } catch {
       setEnabled(false)
     } finally {
@@ -152,48 +152,10 @@ export function AIChatWidget() {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [history, sending, open])
 
-  async function handleModelChange(val: string) {
-    if (val === '__custom__') {
-      setIsCustomModel(true)
-      return
-    }
+  function handleModelChange(val: string) {
+    if (!val || val === currentModel) return
     setCurrentModel(val)
     toast({ title: '已切换模型', description: val })
-    // 同步到设置让偏好持久化
-    try {
-      const s = await getAISettings()
-      if (s) {
-        await updateAISettings({
-          ...s,
-          model: val,
-          api_key: s.api_key === '***' ? '***' : '',
-        })
-      }
-    } catch {
-      // 静默降级
-    }
-  }
-
-  function handleCustomModelConfirm() {
-    const val = customModelInput.trim()
-    if (!val) return
-    if (!availableModels.includes(val)) {
-      setAvailableModels((prev) => [val, ...prev])
-    }
-    setCurrentModel(val)
-    setIsCustomModel(false)
-    setCustomModelInput('')
-    toast({ title: '已切换模型', description: val })
-    getAISettings().then((s) => {
-      if (s) {
-        updateAISettings({
-          ...s,
-          model: val,
-          models: Array.from(new Set([val, ...(s.models || [])])),
-          api_key: s.api_key === '***' ? '***' : '',
-        }).catch(() => {})
-      }
-    }).catch(() => {})
   }
 
   async function handleSend() {
@@ -349,75 +311,6 @@ export function AIChatWidget() {
             </div>
           </div>
 
-          {/* 模型切换条 */}
-          <div className="flex items-center justify-between border-b bg-muted/40 px-3.5 py-1.5 text-xs">
-            <div className="flex items-center gap-1.5 text-muted-foreground shrink-0">
-              <Cpu className="h-3.5 w-3.5 text-primary" />
-              <span className="font-medium">当前模型</span>
-            </div>
-            {isCustomModel ? (
-              <div className="flex items-center gap-1 flex-1 max-w-[240px] ml-2">
-                <Input
-                  placeholder="输入模型名称"
-                  value={customModelInput}
-                  onChange={(e) => setCustomModelInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault()
-                      handleCustomModelConfirm()
-                    } else if (e.key === 'Escape') {
-                      setIsCustomModel(false)
-                    }
-                  }}
-                  autoFocus
-                  className="h-6 text-xs px-2"
-                />
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="default"
-                  className="h-6 px-2 text-xs"
-                  onClick={handleCustomModelConfirm}
-                >
-                  确定
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  className="h-6 px-1.5 text-xs"
-                  onClick={() => setIsCustomModel(false)}
-                >
-                  <X className="h-3 w-3" />
-                </Button>
-              </div>
-            ) : (
-              <div className="flex items-center gap-1">
-                <Select
-                  value={availableModels.includes(currentModel) ? currentModel : ''}
-                  onValueChange={handleModelChange}
-                >
-                  <SelectTrigger
-                    className="h-6 max-w-[200px] border-none bg-background/80 px-2 text-xs font-medium shadow-none hover:bg-background"
-                    aria-label="切换模型"
-                  >
-                    <SelectValue placeholder={currentModel || '选择模型'} />
-                  </SelectTrigger>
-                  <SelectContent align="end">
-                    {availableModels.map((m) => (
-                      <SelectItem key={m} value={m} className="text-xs">
-                        {m}
-                      </SelectItem>
-                    ))}
-                    <SelectItem value="__custom__" className="text-xs text-primary font-medium">
-                      + 手动输入其他模型…
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-          </div>
-
           <div className="flex-1 space-y-3 overflow-y-auto p-4">
             {history.length === 0 && actions.length === 0 && (
               <div className="py-8 text-center text-sm text-muted-foreground">
@@ -498,34 +391,58 @@ export function AIChatWidget() {
               }}
               disabled={sending}
             />
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] text-muted-foreground">
-                {sending ? '可随时中止，不会留下半截草稿' : 'Ctrl / ⌘ + Enter 发送'}
+            <div className="flex items-center justify-between gap-2">
+              <span className="shrink-0 text-[11px] text-muted-foreground">
+                {sending ? '可随时中止' : 'Ctrl / ⌘ + Enter 发送'}
               </span>
-              {sending ? (
-                // 发送中：换成红色中止按钮，点击断开流并回滚本条消息
-                <Button
-                  size="icon"
-                  variant="destructive"
-                  className="h-8 w-8 rounded-full"
-                  onClick={handleAbort}
-                  aria-label="中止"
-                  title="中止本次请求"
-                >
-                  <Square className="h-3.5 w-3.5 fill-current" />
-                </Button>
-              ) : (
-                <Button
-                  size="icon"
-                  className="h-8 w-8 rounded-full"
-                  onClick={handleSend}
-                  disabled={!input.trim()}
-                  aria-label="发送"
-                  title="发送"
-                >
-                  <Send className="h-4 w-4" />
-                </Button>
-              )}
+              <div className="flex min-w-0 items-center gap-1.5">
+                {/* 模型切换：与发送按钮同排，宽度设上限并截断，避免长模型名撑破输入区 */}
+                {availableModels.length > 0 && (
+                  <Select
+                    value={availableModels.includes(currentModel) ? currentModel : ''}
+                    onValueChange={handleModelChange}
+                  >
+                    <SelectTrigger
+                      className="h-8 w-auto max-w-[150px] min-w-0 truncate border-none bg-muted/60 px-2 text-xs font-medium shadow-none hover:bg-muted"
+                      aria-label="切换模型"
+                      title={currentModel || '选择模型'}
+                    >
+                      <SelectValue placeholder={currentModel || '选择模型'} />
+                    </SelectTrigger>
+                    <SelectContent align="end" className="max-w-[280px]">
+                      {availableModels.map((m) => (
+                        <SelectItem key={m} value={m} className="text-xs">
+                          {m}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+                {sending ? (
+                  // 发送中：换成红色中止按钮，点击断开流并回滚本条消息
+                  <Button
+                    size="icon"
+                    variant="destructive"
+                    className="h-8 w-8 shrink-0 rounded-full"
+                    onClick={handleAbort}
+                    aria-label="中止"
+                    title="中止本次请求"
+                  >
+                    <Square className="h-3.5 w-3.5 fill-current" />
+                  </Button>
+                ) : (
+                  <Button
+                    size="icon"
+                    className="h-8 w-8 shrink-0 rounded-full"
+                    onClick={handleSend}
+                    disabled={!input.trim()}
+                    aria-label="发送"
+                    title="发送"
+                  >
+                    <Send className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
         </div>
