@@ -132,7 +132,7 @@ export function ChannelEditDialog({ channel, open, onClose, onSaved }: Props) {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     if (!name.trim()) {
-      toast({ title: '通知名称必填', variant: 'destructive' })
+      toast({ title: '渠道名称必填', variant: 'destructive' })
       return
     }
     setSaving(true)
@@ -142,7 +142,7 @@ export function ChannelEditDialog({ channel, open, onClose, onSaved }: Props) {
       } else {
         await createChannel({ name, type, config })
       }
-      toast({ title: isEdit ? '通知已更新' : '通知已创建', variant: 'success' })
+      toast({ title: isEdit ? '通知渠道已更新' : '通知渠道已创建', variant: 'success' })
       onSaved()
     } catch (err: unknown) {
       toast({ title: '保存失败', description: extractApiError(err), variant: 'destructive' })
@@ -155,7 +155,7 @@ export function ChannelEditDialog({ channel, open, onClose, onSaved }: Props) {
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{isEdit ? '编辑通知' : '新建通知'}</DialogTitle>
+          <DialogTitle>{isEdit ? '编辑通知渠道' : '新建通知渠道'}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">

@@ -44,7 +44,7 @@ const STATUS_LABEL: Record<string, string> = {
 }
 
 const KIND_DESC: Record<string, string> = {
-  create_channel: '确认后会在「通知」页新增该通道',
+  create_channel: '确认后会在「通知渠道」页新增该渠道',
   create_reminder: '确认后会在「提醒」页新增该提醒',
   update_reminder: '确认后会覆盖该提醒的对应字段',
   delete_reminder: '确认后该提醒会被永久删除',
@@ -308,7 +308,7 @@ export function AIChatWidget() {
             <Textarea
               rows={2}
               value={input}
-              placeholder="描述你要的提醒或通道…"
+              placeholder="描述你要的提醒或通知渠道…"
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => {
                 // Ctrl/Cmd + Enter 发送，避免与中文输入法的回车冲突

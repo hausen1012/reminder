@@ -77,7 +77,7 @@ export default function ChannelsPage() {
       setLoadError('')
     } catch (err) {
       setLoadError(extractApiError(err, '加载失败'))
-      toast({ title: '加载通知失败', description: extractApiError(err), variant: 'destructive' })
+      toast({ title: '加载通知渠道失败', description: extractApiError(err), variant: 'destructive' })
     } finally {
       setLoading(false)
     }
@@ -100,7 +100,7 @@ export default function ChannelsPage() {
       } else {
         await refresh()
       }
-      toast({ title: '通知已删除', variant: 'success' })
+      toast({ title: '通知渠道已删除', variant: 'success' })
     } catch (err) {
       toast({ title: '删除失败', description: extractApiError(err, '删除失败'), variant: 'destructive' })
     } finally {
@@ -117,7 +117,7 @@ export default function ChannelsPage() {
         config: ch.config,
         enabled: ch.enabled,
       })
-      toast({ title: '通知已复制', variant: 'success' })
+      toast({ title: '通知渠道已复制', variant: 'success' })
       refresh()
     } catch (err) {
       toast({ title: '复制失败', description: extractApiError(err), variant: 'destructive' })
@@ -145,7 +145,7 @@ export default function ChannelsPage() {
     setBatchDeleting(true)
     try {
       await batchDeleteChannels(Array.from(selectedIds))
-      toast({ title: `已删除 ${selectedIds.size} 条通知`, variant: 'success' })
+      toast({ title: `已删除 ${selectedIds.size} 个通知渠道`, variant: 'success' })
       setSelectedIds(new Set())
       const remainAfterDelete = items.length - selectedIds.size
       if (remainAfterDelete === 0 && offset > 0) {
@@ -162,7 +162,7 @@ export default function ChannelsPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="通知">
+      <PageHeader title="通知渠道">
         <div className="flex items-center gap-2">
           {selectedIds.size > 0 && (
             <Button size="sm" variant="destructive" onClick={() => setBatchConfirmOpen(true)}>
@@ -172,7 +172,7 @@ export default function ChannelsPage() {
           )}
           <Button size="sm" onClick={() => setCreating(true)}>
             <Plus className="h-4 w-4 mr-1" />
-            新建通知
+            新建渠道
           </Button>
         </div>
       </PageHeader>
@@ -186,7 +186,7 @@ export default function ChannelsPage() {
           setSearchVersion((v) => v + 1)
         }}
         onRefresh={refresh}
-        placeholder="搜索通知名称…"
+        placeholder="搜索渠道名称…"
       />
 
       {loading ? (
@@ -206,7 +206,7 @@ export default function ChannelsPage() {
       ) : items.length === 0 ? (
         <Card>
           <CardContent className="py-10 text-center text-sm text-muted-foreground">
-            还没有通知，点击右上角新建一个吧。
+            还没有通知渠道，点击右上角新建一个吧。
           </CardContent>
         </Card>
       ) : (

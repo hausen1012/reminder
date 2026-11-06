@@ -273,7 +273,7 @@ export interface AIChatResult {
 }
 
 export const AI_ACTION_LABEL: Record<AIActionKind, string> = {
-  create_channel: '新建通道',
+  create_channel: '新建通知渠道',
   create_reminder: '新建提醒',
   update_reminder: '修改提醒',
   delete_reminder: '删除提醒',

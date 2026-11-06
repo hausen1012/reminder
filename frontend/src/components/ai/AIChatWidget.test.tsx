@@ -76,7 +76,7 @@ describe('AI 助手浮窗', () => {
     await userEvent.click(trigger)
 
     expect(screen.getByText('AI 助手')).toBeInTheDocument()
-    expect(screen.getByPlaceholderText(/描述你要的提醒或通道/)).toBeInTheDocument()
+    expect(screen.getByPlaceholderText(/描述你要的提醒或通知渠道/)).toBeInTheDocument()
     // 打开后按钮隐藏，避免挡住面板
     expect(screen.queryByLabelText('打开 AI 助手')).toBeNull()
   })
@@ -96,7 +96,7 @@ describe('AI 助手浮窗', () => {
     renderWidget()
 
     await userEvent.click(await screen.findByLabelText('打开 AI 助手'))
-    await userEvent.type(screen.getByPlaceholderText(/描述你要的提醒或通道/), '明天九点提醒我喝水')
+    await userEvent.type(screen.getByPlaceholderText(/描述你要的提醒或通知渠道/), '明天九点提醒我喝水')
     await userEvent.click(screen.getByRole('button', { name: /发送/ }))
 
     await waitFor(() => expect(screen.getByText('已生成待确认卡片')).toBeInTheDocument())
@@ -115,7 +115,7 @@ describe('AI 助手浮窗', () => {
     renderWidget()
 
     await userEvent.click(await screen.findByLabelText('打开 AI 助手'))
-    const box = screen.getByPlaceholderText(/描述你要的提醒或通道/)
+    const box = screen.getByPlaceholderText(/描述你要的提醒或通知渠道/)
     await userEvent.type(box, '第一条')
     await userEvent.click(screen.getByRole('button', { name: /发送/ }))
     await waitFor(() => expect(screen.getByText('好的')).toBeInTheDocument())
@@ -206,7 +206,7 @@ describe('AI 助手浮窗', () => {
     renderWidget()
 
     await userEvent.click(await screen.findByLabelText('打开 AI 助手'))
-    const box = screen.getByPlaceholderText(/描述你要的提醒或通道/) as HTMLTextAreaElement
+    const box = screen.getByPlaceholderText(/描述你要的提醒或通知渠道/) as HTMLTextAreaElement
     await userEvent.type(box, '明天提醒我')
     await userEvent.click(screen.getByRole('button', { name: /发送/ }))
 

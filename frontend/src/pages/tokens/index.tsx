@@ -232,7 +232,7 @@ export default function TokensPage() {
       const plaintext = await getTokenPlaintext(key.id)
       setCurlPlaintext(plaintext)
     } catch (err) {
-      toast({ title: '加载密钥失败', description: extractApiError(err), variant: 'destructive' })
+      toast({ title: '加载令牌失败', description: extractApiError(err), variant: 'destructive' })
       setCurlKeyId(null)
     } finally {
       setCurlLoading(false)
@@ -249,7 +249,7 @@ export default function TokensPage() {
     try {
       const plaintext = await getTokenPlaintext(keyId)
       await navigator.clipboard.writeText(plaintext)
-      toast({ title: '密钥已复制' })
+      toast({ title: '令牌已复制' })
     } catch (err) {
       toast({ title: '复制失败', description: extractApiError(err), variant: 'destructive' })
     } finally {
@@ -316,8 +316,8 @@ export default function TokensPage() {
                 <thead className="border-b bg-muted/40 text-left text-xs uppercase text-muted-foreground">
                   <tr>
                     <th className="px-4 py-2.5 w-[14rem]">名称</th>
-                    <th className="px-4 py-2.5 w-[10rem]">密钥</th>
-                    <th className="px-4 py-2.5 w-[10rem]">通知</th>
+                    <th className="px-4 py-2.5 w-[10rem]">令牌</th>
+                    <th className="px-4 py-2.5 w-[10rem]">通知渠道</th>
                     <th className="px-4 py-2.5 w-16 text-center">启用</th>
                     <th className="px-4 py-2.5 w-44">最近使用</th>
                     <th className="px-4 py-2.5 w-36 text-right">操作</th>
@@ -339,7 +339,7 @@ export default function TokensPage() {
                             onClick={() => handleCopyFromList(key.id)}
                             disabled={copyingId === key.id}
                             className="shrink-0 rounded p-0.5 text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
-                            title="复制完整密钥"
+                            title="复制完整令牌"
                           >
                             <Copy className="h-3.5 w-3.5" />
                           </button>
@@ -392,7 +392,7 @@ export default function TokensPage() {
 
                 <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
                   <div>
-                    <span className="text-muted-foreground">密钥</span>
+                    <span className="text-muted-foreground">令牌</span>
                     <div className="flex items-center gap-1 mt-0.5">
                       <code className="truncate text-muted-foreground">{key.prefix}...</code>
                       <button
@@ -400,7 +400,7 @@ export default function TokensPage() {
                         onClick={() => handleCopyFromList(key.id)}
                         disabled={copyingId === key.id}
                         className="shrink-0 rounded p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-50"
-                        title="复制完整密钥"
+                        title="复制完整令牌"
                       >
                         <Copy className="h-3 w-3" />
                       </button>
@@ -441,7 +441,7 @@ export default function TokensPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>新建令牌</DialogTitle>
-            <DialogDescription>创建后密钥会立即展示，之后可在详情里查看。</DialogDescription>
+            <DialogDescription>创建后令牌会立即展示，之后可在详情里查看。</DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div className="space-y-2">
@@ -479,7 +479,7 @@ export default function TokensPage() {
       <Dialog open={Boolean(createdResult)} onOpenChange={(open) => !open && resetCreateDialog()}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>密钥已创建</DialogTitle>
+            <DialogTitle>令牌已创建</DialogTitle>
             <DialogDescription>请立即复制并安全保存。</DialogDescription>
           </DialogHeader>
           {createdResult && (
@@ -492,10 +492,10 @@ export default function TokensPage() {
                     type="button"
                     onClick={() => {
                       navigator.clipboard.writeText(createdResult.plaintext)
-                      toast({ title: '密钥已复制' })
+                      toast({ title: '令牌已复制' })
                     }}
                     className="rounded p-1 text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
-                    title="复制密钥"
+                    title="复制令牌"
                   >
                     <Copy className="h-4 w-4" />
                   </button>
@@ -521,23 +521,20 @@ export default function TokensPage() {
             <p className="text-sm text-muted-foreground">加载中…</p>
           ) : (
             <div className="space-y-4">
-              <div className="space-y-2">
-                <Label>明文字令</Label>
-                <div className="rounded-md border bg-muted p-3">
-                  <div className="flex items-start gap-2">
-                    <code className="min-w-0 flex-1 select-all break-all text-sm">{detailPlaintext}</code>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        navigator.clipboard.writeText(detailPlaintext)
-                        toast({ title: '密钥已复制' })
-                      }}
-                      className="rounded p-1 text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
-                      title="复制密钥"
-                    >
-                      <Copy className="h-4 w-4" />
-                    </button>
-                  </div>
+              <div className="rounded-md border bg-muted p-3">
+                <div className="flex items-start gap-2">
+                  <code className="min-w-0 flex-1 select-all break-all text-sm">{detailPlaintext}</code>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(detailPlaintext)
+                      toast({ title: '令牌已复制' })
+                    }}
+                    className="rounded p-1 text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
+                    title="复制令牌"
+                  >
+                    <Copy className="h-4 w-4" />
+                  </button>
                 </div>
               </div>
 

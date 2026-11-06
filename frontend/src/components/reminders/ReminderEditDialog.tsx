@@ -242,17 +242,22 @@ export function ReminderEditDialog({ reminder, open, onClose, onSaved }: Props) 
             />
           </div>
 
-          <ScheduleForm
-            value={{
-              calendar: input.calendar,
-              schedule_type: input.schedule_type,
-              schedule_spec: input.schedule_spec,
-            }}
-            onChange={patchSchedule}
-          />
+          <div className="space-y-1">
+            <ScheduleForm
+              value={{
+                calendar: input.calendar,
+                schedule_type: input.schedule_type,
+                schedule_spec: input.schedule_spec,
+              }}
+              onChange={patchSchedule}
+            />
+            <p className="text-xs text-muted-foreground">
+              时间按站点时区（{siteTimezone}）解释；如需更换请到「设置」页修改。
+            </p>
+          </div>
 
           <div className="space-y-2">
-            <Label>通知</Label>
+            <Label>通知渠道</Label>
             <ChannelMultiSelect
               channels={channels}
               value={input.channel_ids}
@@ -260,9 +265,6 @@ export function ReminderEditDialog({ reminder, open, onClose, onSaved }: Props) 
               onOpenChange={setChannelOpen}
               onChange={(channelIds) => patch('channel_ids', channelIds)}
             />
-            <p className="text-xs text-muted-foreground">
-              时间按站点时区（{siteTimezone}）解释；如需更换请到「设置」页修改。
-            </p>
           </div>
 
           <div className="rounded-md border p-3">

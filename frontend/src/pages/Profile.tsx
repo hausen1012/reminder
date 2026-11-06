@@ -43,7 +43,7 @@ const SECTIONS = [
   {
     id: 'ai',
     label: 'AI 助手',
-    description: '开启后可用自然语言对话来创建通知通道与提醒；助手生成的写操作需要你确认后才生效',
+    description: '开启后可用自然语言对话来创建通知渠道与提醒；助手生成的写操作需要你确认后才生效',
   },
 ] as const
 

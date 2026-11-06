@@ -214,10 +214,10 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        {/* 卡片 3：通知健康 */}
+        {/* 卡片 3：发送成功率 */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">通知健康</CardTitle>
+            <CardTitle className="text-sm font-medium">发送成功率</CardTitle>
             <Send className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>

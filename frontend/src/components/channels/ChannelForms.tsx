@@ -221,7 +221,7 @@ export function DingTalkForm({ config, onChange, isEdit }: SubFormProps) {
         <Label>加签密钥（可选）</Label>
         <Input
           type="password"
-          placeholder={isEdit && hasOriginalSecret ? '留空表示不修改；清空请输入空格' : '机器人安全设置 - 加签'}
+          placeholder={isEdit && hasOriginalSecret ? '留空表示不修改' : '机器人安全设置 - 加签'}
           value={secretInput}
           onChange={(e) => {
             const v = e.target.value
