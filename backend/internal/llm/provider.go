@@ -67,6 +67,10 @@ type Request struct {
 type Reply struct {
 	Text      string
 	ToolCalls []ToolCall
+	// Truncated 表示回复因达到 max_tokens 被截断（Anthropic 的 max_tokens、
+	// OpenAI 的 length）。此时工具调用可能只传了一半，调用方应停止本轮对话，
+	// 而不是继续执行残缺的工具参数。
+	Truncated bool
 	// Raw 是厂商原始响应，交给上层塞进下一次请求的 Turn.Raw 逐字回放。
 	Raw any
 }

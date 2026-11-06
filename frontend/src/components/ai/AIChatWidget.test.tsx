@@ -10,7 +10,7 @@ vi.mock('@/lib/api', async () => {
     ...actual,
     getAISettings: vi.fn(),
     listAIActions: vi.fn(),
-    sendAIChat: vi.fn(),
+    sendAIChatStream: vi.fn(),
     applyAIAction: vi.fn(),
     rejectAIAction: vi.fn(),
   }
@@ -21,9 +21,9 @@ import {
   getAISettings,
   listAIActions,
   rejectAIAction,
-  sendAIChat,
+  sendAIChatStream,
 } from '@/lib/api'
-import type { AIAction, AISettings } from '@/types'
+import type { AIAction, AIChatResult, AISettings } from '@/types'
 
 const enabledSettings: AISettings = {
   enabled: true,
@@ -32,6 +32,8 @@ const enabledSettings: AISettings = {
   model: 'claude-opus-5-5',
   api_key: '***',
   custom_prompt: '',
+  max_tokens: 4096,
+  max_retries: 10,
 }
 
 const pendingAction: AIAction = {
@@ -56,7 +58,7 @@ describe('AI 助手浮窗', () => {
     sessionStorage.clear()
     vi.mocked(getAISettings).mockReset()
     vi.mocked(listAIActions).mockReset().mockResolvedValue([])
-    vi.mocked(sendAIChat).mockReset()
+    vi.mocked(sendAIChatStream).mockReset()
     vi.mocked(applyAIAction).mockReset()
     vi.mocked(rejectAIAction).mockReset()
   })
@@ -92,7 +94,7 @@ describe('AI 助手浮窗', () => {
 
   it('发送消息后展示回复，并把对话写进 sessionStorage', async () => {
     vi.mocked(getAISettings).mockResolvedValue(enabledSettings)
-    vi.mocked(sendAIChat).mockResolvedValue({ reply: '已生成待确认卡片', actions: [] })
+    vi.mocked(sendAIChatStream).mockResolvedValue({ reply: '已生成待确认卡片', actions: [] })
     renderWidget()
 
     await userEvent.click(await screen.findByLabelText('打开 AI 助手'))
@@ -100,7 +102,13 @@ describe('AI 助手浮窗', () => {
     await userEvent.click(screen.getByRole('button', { name: /发送/ }))
 
     await waitFor(() => expect(screen.getByText('已生成待确认卡片')).toBeInTheDocument())
-    expect(vi.mocked(sendAIChat)).toHaveBeenCalledWith('明天九点提醒我喝水', [], 'claude-opus-5-5')
+    expect(vi.mocked(sendAIChatStream)).toHaveBeenCalledWith(
+      '明天九点提醒我喝水',
+      [],
+      'claude-opus-5-5',
+      expect.any(Function),
+      expect.any(AbortSignal),
+    )
 
     const stored = JSON.parse(sessionStorage.getItem('ai-chat-history') ?? '[]')
     expect(stored).toEqual([
@@ -111,7 +119,7 @@ describe('AI 助手浮窗', () => {
 
   it('后续请求带上已有历史（多轮上下文）', async () => {
     vi.mocked(getAISettings).mockResolvedValue(enabledSettings)
-    vi.mocked(sendAIChat).mockResolvedValue({ reply: '好的', actions: [] })
+    vi.mocked(sendAIChatStream).mockResolvedValue({ reply: '好的', actions: [] })
     renderWidget()
 
     await userEvent.click(await screen.findByLabelText('打开 AI 助手'))
@@ -122,15 +130,17 @@ describe('AI 助手浮窗', () => {
 
     await userEvent.type(box, '第二条')
     await userEvent.click(screen.getByRole('button', { name: /发送/ }))
-    await waitFor(() => expect(vi.mocked(sendAIChat)).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(vi.mocked(sendAIChatStream)).toHaveBeenCalledTimes(2))
 
-    expect(vi.mocked(sendAIChat).mock.calls[1]).toEqual([
+    expect(vi.mocked(sendAIChatStream).mock.calls[1]).toEqual([
       '第二条',
       [
         { role: 'user', content: '第一条' },
         { role: 'assistant', content: '好的' },
       ],
       'claude-opus-5-5',
+      expect.any(Function),
+      expect.any(AbortSignal),
     ])
   })
 
@@ -212,9 +222,82 @@ describe('AI 助手浮窗', () => {
     await waitFor(() => expect(screen.queryByText('创建提醒：喝水')).toBeNull())
   })
 
+  it('发送过程中展示服务端推送的重试状态', async () => {
+    vi.mocked(getAISettings).mockResolvedValue(enabledSettings)
+    // 用一个挂起的 Promise 把「发送中」的状态留住，再手动触发进度回调
+    let resolveChat: (v: AIChatResult) => void = () => {}
+    vi.mocked(sendAIChatStream).mockImplementation(
+      (_msg, _history, _model, onProgress) =>
+        new Promise((resolve) => {
+          resolveChat = resolve
+          onProgress?.({
+            kind: 'retry',
+            retry: { attempt: 2, max: 10, delay_ms: 400, reason: '服务繁忙（限流）' },
+          })
+        }),
+    )
+    renderWidget()
+
+    await userEvent.click(await screen.findByLabelText('打开 AI 助手'))
+    await userEvent.type(screen.getByPlaceholderText(/描述你要的提醒或通知渠道/), '你好')
+    await userEvent.click(screen.getByRole('button', { name: /发送/ }))
+
+    expect(await screen.findByText(/第 2\/10 次重试：服务繁忙/)).toBeInTheDocument()
+
+    resolveChat({ reply: '好了', actions: [] })
+    await waitFor(() => expect(screen.getByText('好了')).toBeInTheDocument())
+    // 结束后进度行消失
+    expect(screen.queryByText(/第 2\/10 次重试/)).toBeNull()
+  })
+
+  it('重试后成功会提示重试次数', async () => {
+    vi.mocked(getAISettings).mockResolvedValue(enabledSettings)
+    vi.mocked(sendAIChatStream).mockResolvedValue({ reply: '好了', actions: [], retries: 3 })
+    renderWidget()
+
+    await userEvent.click(await screen.findByLabelText('打开 AI 助手'))
+    await userEvent.type(screen.getByPlaceholderText(/描述你要的提醒或通知渠道/), '你好')
+    await userEvent.click(screen.getByRole('button', { name: /发送/ }))
+
+    expect(await screen.findByText('已自动重试 3 次后成功')).toBeInTheDocument()
+  })
+
+  it('发送中是图标化的红色中止按钮，点击后回滚消息并提示', async () => {
+    vi.mocked(getAISettings).mockResolvedValue(enabledSettings)
+    // 挂起请求，让「发送中」的状态停留住
+    vi.mocked(sendAIChatStream).mockImplementation(
+      (_msg, _history, _model, _onProgress, signal) =>
+        new Promise((_resolve, reject) => {
+          signal?.addEventListener('abort', () => {
+            reject(new DOMException('aborted', 'AbortError'))
+          })
+        }),
+    )
+    renderWidget()
+
+    await userEvent.click(await screen.findByLabelText('打开 AI 助手'))
+    const box = screen.getByPlaceholderText(/描述你要的提醒或通知渠道/) as HTMLTextAreaElement
+    await userEvent.type(box, '明天提醒我')
+    // 发送前是「发送」图标按钮
+    expect(screen.getByRole('button', { name: '发送' })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: '发送' }))
+
+    // 发送中：发送按钮消失，出现中止按钮
+    const stop = await screen.findByRole('button', { name: '中止' })
+    expect(screen.queryByRole('button', { name: '发送' })).toBeNull()
+
+    await userEvent.click(stop)
+
+    await waitFor(() => expect(screen.getByText('已中止本次请求')).toBeInTheDocument())
+    // 消息回滚：既不在历史里，也回到输入框；按钮恢复成「发送」
+    expect(JSON.parse(sessionStorage.getItem('ai-chat-history') ?? '[]')).toEqual([])
+    expect(box.value).toBe('明天提醒我')
+    await waitFor(() => expect(screen.getByRole('button', { name: '发送' })).toBeInTheDocument())
+  })
+
   it('请求失败时回填输入框并提示', async () => {
     vi.mocked(getAISettings).mockResolvedValue(enabledSettings)
-    vi.mocked(sendAIChat).mockRejectedValue({
+    vi.mocked(sendAIChatStream).mockRejectedValue({
       response: { data: { error: { code: 'validation_failed', message: 'AI 调用失败' } } },
     })
     renderWidget()

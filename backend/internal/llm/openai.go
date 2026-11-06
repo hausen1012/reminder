@@ -170,14 +170,18 @@ func (p *OpenAIProvider) Chat(ctx context.Context, req Request) (*Reply, error) 
 		if out.Error != nil && out.Error.Message != "" {
 			msg = out.Error.Message
 		}
-		return nil, fmt.Errorf("AI 服务返回错误（HTTP %d）: %s", resp.StatusCode, msg)
+		return nil, &HTTPStatusError{
+			Status:  resp.StatusCode,
+			Message: fmt.Sprintf("AI 服务返回错误（HTTP %d）: %s", resp.StatusCode, msg),
+		}
 	}
 	if len(out.Choices) == 0 {
 		return nil, fmt.Errorf("AI 服务未返回内容")
 	}
 
 	choice := out.Choices[0].Message
-	reply := &Reply{Text: choice.Content}
+	// finish_reason=length 表示被 max_tokens 截断，工具参数可能不完整
+	reply := &Reply{Text: choice.Content, Truncated: out.Choices[0].FinishReason == "length"}
 	for _, c := range choice.ToolCalls {
 		input := strings.TrimSpace(c.Function.Arguments)
 		if input == "" {

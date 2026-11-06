@@ -283,6 +283,8 @@ describe('api AI 助手', () => {
       model: 'm',
       api_key: '***',
       custom_prompt: '',
+      max_tokens: 4096,
+      max_retries: 10,
     }
     await api.updateAISettings(input)
     expect(mockRequest).toHaveBeenCalledWith('put', '/ai/settings', input)
@@ -297,6 +299,8 @@ describe('api AI 助手', () => {
       model: 'm',
       api_key: '',
       custom_prompt: '',
+      max_tokens: 4096,
+      max_retries: 10,
     }
     expect(await api.testAIConnection(input)).toEqual({ reply: 'OK' })
     expect(mockRequest).toHaveBeenCalledWith('post', '/ai/test', input)

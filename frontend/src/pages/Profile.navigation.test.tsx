@@ -48,6 +48,8 @@ describe('Profile 分区导航', () => {
       model: 'claude-opus-5-5',
       api_key: '',
       custom_prompt: '',
+      max_tokens: 4096,
+      max_retries: 10,
     })
   })
 

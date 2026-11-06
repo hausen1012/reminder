@@ -14,6 +14,7 @@ import {
   MessageSquare,
   Send,
   Sparkles,
+  Square,
   Trash2,
   X,
 } from 'lucide-react'
@@ -35,11 +36,11 @@ import {
   getAISettings,
   listAIActions,
   rejectAIAction,
-  sendAIChat,
+  sendAIChatStream,
   updateAISettings,
 } from '@/lib/api'
 import { AI_ACTION_LABEL } from '@/types'
-import type { AIAction, AIChatMessage } from '@/types'
+import type { AIAction, AIChatMessage, AIChatProgress } from '@/types'
 import { cn } from '@/lib/utils'
 
 const STORAGE_KEY = 'ai-chat-history'
@@ -95,11 +96,15 @@ export function AIChatWidget() {
   const [actions, setActions] = useState<AIAction[]>([])
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
+  // 服务端推送的过程状态（思考中 / 第 n 次重试）；null 表示没有可显示的内容
+  const [progress, setProgress] = useState<AIChatProgress | null>(null)
   const [currentModel, setCurrentModel] = useState<string>('')
   const [availableModels, setAvailableModels] = useState<string[]>([])
   const [isCustomModel, setIsCustomModel] = useState(false)
   const [customModelInput, setCustomModelInput] = useState('')
   const bottomRef = useRef<HTMLDivElement>(null)
+  // 当前进行中请求的取消句柄；null 表示没有可中止的请求
+  const abortRef = useRef<AbortController | null>(null)
 
   const loadSettings = useCallback(async () => {
     try {
@@ -195,12 +200,24 @@ export function AIChatWidget() {
     const text = input.trim()
     if (!text || sending) return
     setSending(true)
+    setProgress(null)
     const nextHistory = [...history, { role: 'user' as const, content: text }]
     setHistory(nextHistory)
     setInput('')
+
+    // 每次发送都新建一个 controller：中止只影响本次请求
+    const controller = new AbortController()
+    abortRef.current = controller
+
     try {
       // 只上传对话文本；本次消息单列，历史不含它
-      const res = await sendAIChat(text, history, currentModel || undefined)
+      const res = await sendAIChatStream(
+        text,
+        history,
+        currentModel || undefined,
+        (p) => setProgress(p),
+        controller.signal,
+      )
       const withReply: AIChatMessage[] = [
         ...nextHistory,
         { role: 'assistant', content: res?.reply ?? '' },
@@ -210,14 +227,33 @@ export function AIChatWidget() {
       if (res?.actions?.length) {
         setActions((prev) => mergeActions(prev, res.actions))
       }
+      if (res?.retries && res.retries > 0) {
+        toast({ title: `已自动重试 ${res.retries} 次后成功` })
+      }
     } catch (err) {
+      // 用户主动中止不是错误：把问题还给输入框，方便改一改再发
+      if (controller.signal.aborted) {
+        setHistory(history)
+        setInput(text)
+        toast({ title: '已中止本次请求' })
+        return
+      }
       // 失败时回滚这条用户消息，让输入框内容还在，用户可以直接重发
       setHistory(history)
       setInput(text)
       toast({ title: '请求失败', description: extractApiError(err), variant: 'destructive' })
     } finally {
+      if (abortRef.current === controller) {
+        abortRef.current = null
+      }
       setSending(false)
+      setProgress(null)
     }
+  }
+
+  /** 中止正在进行的请求：断开 SSE 连接，服务端会随 ctx 取消一并清理本轮草稿。 */
+  function handleAbort() {
+    abortRef.current?.abort()
   }
 
   async function handleApply(action: AIAction) {
@@ -414,7 +450,9 @@ export function AIChatWidget() {
             {sending && (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Loader2 className="h-4 w-4 animate-spin" />
-                助手正在思考…
+                <span className={progress?.kind === 'retry' ? 'text-amber-600' : undefined}>
+                  {progressText(progress)}
+                </span>
               </div>
             )}
 
@@ -461,15 +499,33 @@ export function AIChatWidget() {
               disabled={sending}
             />
             <div className="flex items-center justify-between">
-              <span className="text-[11px] text-muted-foreground">Ctrl / ⌘ + Enter 发送</span>
-              <Button size="sm" onClick={handleSend} disabled={sending || !input.trim()}>
-                {sending ? (
-                  <Loader2 className="mr-1 h-4 w-4 animate-spin" />
-                ) : (
-                  <Send className="mr-1 h-4 w-4" />
-                )}
-                发送
-              </Button>
+              <span className="text-[11px] text-muted-foreground">
+                {sending ? '可随时中止，不会留下半截草稿' : 'Ctrl / ⌘ + Enter 发送'}
+              </span>
+              {sending ? (
+                // 发送中：换成红色中止按钮，点击断开流并回滚本条消息
+                <Button
+                  size="icon"
+                  variant="destructive"
+                  className="h-8 w-8 rounded-full"
+                  onClick={handleAbort}
+                  aria-label="中止"
+                  title="中止本次请求"
+                >
+                  <Square className="h-3.5 w-3.5 fill-current" />
+                </Button>
+              ) : (
+                <Button
+                  size="icon"
+                  className="h-8 w-8 rounded-full"
+                  onClick={handleSend}
+                  disabled={!input.trim()}
+                  aria-label="发送"
+                  title="发送"
+                >
+                  <Send className="h-4 w-4" />
+                </Button>
+              )}
             </div>
           </div>
         </div>
@@ -530,6 +586,15 @@ function ActionCard({
       </div>
     </div>
   )
+}
+
+/** 把服务端推送的进度翻译成一行给用户看的文案。 */
+function progressText(p: AIChatProgress | null): string {
+  if (!p) return '助手正在思考…'
+  if (p.kind === 'retry') {
+    return `第 ${p.retry.attempt}/${p.retry.max} 次重试：${p.retry.reason}`
+  }
+  return p.status.text || '助手正在思考…'
 }
 
 /** 合并草稿列表：按 id 去重，保留后端返回的最新状态。 */

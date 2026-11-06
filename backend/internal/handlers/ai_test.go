@@ -35,6 +35,7 @@ func newAITestEngine(t *testing.T) (*gin.Engine, *services.AIService) {
 	r.POST("/ai/models", h.FetchModels)
 	r.GET("/ai/actions", h.ListActions)
 	r.POST("/ai/chat", h.Chat)
+	r.POST("/ai/chat/stream", h.ChatStream)
 	r.POST("/ai/actions/:id/apply", h.ApplyAction)
 	r.POST("/ai/actions/:id/reject", h.RejectAction)
 	return r, svc
@@ -139,7 +140,42 @@ func TestAISettingsCustomPrompt(t *testing.T) {
 	}
 }
 
-// 未启用时对话返回 400，并按统一错误体返回。
+// 流式对话：先推一条 thinking 状态；未启用时以 event: error 结束，且不再追加 JSON 错误体。
+func TestAIChatStreamEmitsStatusAndError(t *testing.T) {
+	r, _ := newAITestEngine(t)
+
+	w := doJSON(r, http.MethodPost, "/ai/chat/stream", map[string]any{"message": "你好"})
+	if w.Code != http.StatusOK {
+		t.Fatalf("状态码 = %d, body=%s", w.Code, w.Body.String())
+	}
+	if ct := w.Header().Get("Content-Type"); !strings.Contains(ct, "text/event-stream") {
+		t.Fatalf("Content-Type = %q", ct)
+	}
+	body := w.Body.String()
+	if !strings.Contains(body, "event: status") {
+		t.Fatalf("应先推 thinking 状态: %s", body)
+	}
+	if !strings.Contains(body, "event: error") || !strings.Contains(body, "未启用") {
+		t.Fatalf("未启用时应推 error 事件: %s", body)
+	}
+	if strings.Contains(body, `"code":200`) || strings.Contains(body, `"data":`) {
+		t.Fatalf("流式响应不应再追加 JSON 成功体: %s", body)
+	}
+}
+
+// 空消息属于业务校验，但此时已经开始推流，错误只能走 event: error。
+func TestAIChatStreamValidationErrorAsEvent(t *testing.T) {
+	r, _ := newAITestEngine(t)
+
+	w := doJSON(r, http.MethodPost, "/ai/chat/stream", map[string]any{"message": "   "})
+	if w.Code != http.StatusOK {
+		t.Fatalf("推流后不应再改状态码，实际 %d", w.Code)
+	}
+	body := w.Body.String()
+	if !strings.Contains(body, "event: error") || !strings.Contains(body, "消息不能为空") {
+		t.Fatalf("应推 error 事件: %s", body)
+	}
+}
 func TestAIChatDisabledReturns400(t *testing.T) {
 	r, _ := newAITestEngine(t)
 

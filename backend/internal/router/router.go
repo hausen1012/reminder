@@ -275,6 +275,7 @@ func Setup(staticFS embed.FS, cfg *config.Config) (*SetupResult, error) {
 			ai.POST("/models", aiHandler.FetchModels)
 			ai.GET("/actions", aiHandler.ListActions)
 			ai.POST("/chat", aiHandler.Chat)
+			ai.POST("/chat/stream", aiHandler.ChatStream)
 			ai.POST("/actions/:id/apply", aiHandler.ApplyAction)
 			ai.POST("/actions/:id/reject", aiHandler.RejectAction)
 		}

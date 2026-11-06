@@ -25,7 +25,12 @@ func NewAnthropicProvider(baseURL, apiKey, model string) *AnthropicProvider {
 	if strings.TrimSpace(model) == "" {
 		model = "claude-opus-5-5"
 	}
-	opts := []option.RequestOption{option.WithAPIKey(apiKey)}
+	opts := []option.RequestOption{
+		option.WithAPIKey(apiKey),
+		// 关掉 SDK 内置的自动重试：重试次数由上层 ChatWithRetry 按设置页配置统一控制，
+		// 两处都重试会让「最大重试次数」实际生效的次数被放大数倍。
+		option.WithMaxRetries(0),
+	}
 	official := strings.TrimSpace(baseURL) == ""
 	if !official {
 		opts = append(opts, option.WithBaseURL(strings.TrimRight(baseURL, "/")))
@@ -86,7 +91,11 @@ func (p *AnthropicProvider) Chat(ctx context.Context, req Request) (*Reply, erro
 		return nil, err
 	}
 
-	reply := &Reply{Raw: resp.ToParam()}
+	reply := &Reply{
+		Raw: resp.ToParam(),
+		// stop_reason=max_tokens 表示被输出上限截断：工具块可能不完整，上层应停止本轮
+		Truncated: resp.StopReason == anthropic.BetaStopReasonMaxTokens,
+	}
 	for _, block := range resp.Content {
 		switch v := block.AsAny().(type) {
 		case anthropic.BetaTextBlock:

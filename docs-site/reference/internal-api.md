@@ -130,6 +130,7 @@ JWT 有效期为 72 小时。改密码后旧 JWT 仍然有效直到过期——�
 | `PUT` | `/api/ai/settings` | 保存 AI 设置 |
 | `POST` | `/api/ai/test` | 测试厂商连通性 |
 | `POST` | `/api/ai/chat` | 发送消息，返回回复与本轮待确认操作（无状态，对话不入库） |
+| `POST` | `/api/ai/chat/stream` | 同上，用 SSE 推送思考与重试状态 |
 | `GET` | `/api/ai/actions` | 列出待确认草稿（`?status=pending`） |
 | `POST` | `/api/ai/actions/:id/apply` | 执行待确认操作 |
 | `POST` | `/api/ai/actions/:id/reject` | 拒绝待确认操作 |

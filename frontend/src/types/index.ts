@@ -232,6 +232,10 @@ export interface AISettings {
   api_key: string
   /** 用户自定义的追加提示词，与内置规则拼接后发给模型 */
   custom_prompt: string
+  /** 单次回复的输出 Token 上限（max_tokens），0 表示用后端默认值 */
+  max_tokens: number
+  /** 接口调用失败后的最大重试次数，0 表示不重试 */
+  max_retries: number
 }
 
 export interface AISettingsInput {
@@ -242,6 +246,8 @@ export interface AISettingsInput {
   models?: string[]
   api_key: string
   custom_prompt: string
+  max_tokens: number
+  max_retries: number
 }
 
 export type AIActionKind =
@@ -272,7 +278,28 @@ export interface AIChatMessage {
 export interface AIChatResult {
   reply: string
   actions: AIAction[]
+  /** 本次对话因临时性失败重试的总次数 */
+  retries?: number
 }
+
+/** AI 对话过程中的状态事件（SSE）。 */
+export interface AIChatStatus {
+  phase: 'thinking' | 'tools'
+  text: string
+}
+
+/** 一次即将开始的重试。 */
+export interface AIChatRetry {
+  attempt: number
+  max: number
+  delay_ms: number
+  reason: string
+}
+
+/** 对话进度：由 SSE 回调驱动，null 表示空闲。 */
+export type AIChatProgress =
+  | { kind: 'status'; status: AIChatStatus }
+  | { kind: 'retry'; retry: AIChatRetry }
 
 export const AI_ACTION_LABEL: Record<AIActionKind, string> = {
   create_channel: '新建通知渠道',

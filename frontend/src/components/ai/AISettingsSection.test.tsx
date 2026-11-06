@@ -39,6 +39,8 @@ describe('AI 设置分区', () => {
       model: 'deepseek-chat',
       api_key: '***',
       custom_prompt: '',
+      max_tokens: 4096,
+      max_retries: 10,
     })
     renderSection()
 
@@ -57,6 +59,8 @@ describe('AI 设置分区', () => {
       model: 'claude-opus-5-5',
       api_key: '***',
       custom_prompt: '',
+      max_tokens: 4096,
+      max_retries: 10,
     })
     vi.mocked(updateAISettings).mockImplementation(async (input) => ({
       ...input,
@@ -93,6 +97,8 @@ describe('AI 设置分区', () => {
       model: 'claude-opus-5-5',
       api_key: '***',
       custom_prompt: '称呼我为老板',
+      max_tokens: 4096,
+      max_retries: 10,
     })
     vi.mocked(updateAISettings).mockImplementation(async (input) => ({
       ...input,
@@ -114,6 +120,41 @@ describe('AI 设置分区', () => {
     })
   })
 
+  it('回显并提交最大上下文窗口与最大重试次数', async () => {
+    vi.mocked(getAISettings).mockResolvedValue({
+      enabled: true,
+      provider: 'anthropic',
+      base_url: '',
+      model: 'claude-opus-5-5',
+      api_key: '***',
+      custom_prompt: '',
+      max_tokens: 8192,
+      max_retries: 3,
+    })
+    vi.mocked(updateAISettings).mockImplementation(async (input) => ({
+      ...input,
+      api_key: '***',
+    }))
+    renderSection()
+
+    const tokens = await screen.findByLabelText('最大上下文窗口（Token）')
+    const retries = screen.getByLabelText('最大重试次数')
+    expect(tokens).toHaveValue(8192)
+    expect(retries).toHaveValue(3)
+
+    await userEvent.clear(tokens)
+    await userEvent.type(tokens, '16384')
+    await userEvent.clear(retries)
+    await userEvent.type(retries, '5')
+    await userEvent.click(screen.getByRole('button', { name: '保存' }))
+
+    await waitFor(() => {
+      expect(vi.mocked(updateAISettings)).toHaveBeenCalledWith(
+        expect.objectContaining({ max_tokens: 16384, max_retries: 5 }),
+      )
+    })
+  })
+
   it('测试连接成功时弹出回复内容', async () => {
     vi.mocked(getAISettings).mockResolvedValue({
       enabled: true,
@@ -122,6 +163,8 @@ describe('AI 设置分区', () => {
       model: 'claude-opus-5-5',
       api_key: '***',
       custom_prompt: '',
+      max_tokens: 4096,
+      max_retries: 10,
     })
     vi.mocked(testAIConnection).mockResolvedValue({ reply: 'OK' })
     renderSection()

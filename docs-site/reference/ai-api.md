@@ -21,7 +21,9 @@
   "base_url": "https://api.deepseek.com",
   "model": "deepseek-chat",
   "api_key": "sk-xxx",
-  "custom_prompt": "称呼我为老板，回复尽量一句话说完"
+  "custom_prompt": "称呼我为老板，回复尽量一句话说完",
+  "max_tokens": 4096,
+  "max_retries": 10
 }
 ```
 
@@ -32,6 +34,8 @@
 | `model` | 模型名；留空时按厂商给默认值 |
 | `api_key` | 传 `"***"` 表示保留已保存的密钥；传空串表示清除；传新值则覆盖 |
 | `custom_prompt` | 追加在内置系统提示词之后的用户自定义内容；空串表示不用。最多 4000 字，超出返回 `validation_failed` |
+| `max_tokens` | 单次回复的输出上限（`max_tokens`）。`0` 或省略表示用默认值 `4096`，合法范围 256–200000，越界返回 `validation_failed` |
+| `max_retries` | 接口失败后的最大重试次数。**省略**表示用默认值 `10`；显式传 `0` 表示不重试。合法范围 0–100（负数越界），越界返回 `validation_failed` |
 
 `custom_prompt` 会跟在内置规则之后、并注明「冲突时以内置规则为准」，
 因此不能用来绕过待确认机制。`GET /api/ai/settings` 会原样返回该字段（它不是密钥，不做脱敏）。
@@ -51,6 +55,7 @@
 | 方法 | 路径 | 说明 |
 |---|---|---|
 | `POST` | `/api/ai/chat` | 发送一条消息，返回回复文本 + 本轮生成的待确认操作 |
+| `POST` | `/api/ai/chat/stream` | 同上，但用 SSE 推送「思考中 / 正在重试 / 完成」状态 |
 
 `POST /api/ai/chat` 请求体：
 
@@ -72,6 +77,7 @@
   "message": "ok",
   "data": {
     "reply": "已生成待确认卡片，点击确认后生效",
+    "retries": 0,
     "actions": [
       {
         "id": "6f0c...",
@@ -94,6 +100,42 @@
 与空内容会被忽略。
 
 `actions` 只包含**本轮**工具调用新生成的草稿；历史待确认草稿请走下面的列表接口。
+
+`retries` 是本次对话中因临时性失败而重试的总次数（所有工具轮次累加），正常情况为 `0`。
+:::
+
+### 状态流（SSE）
+
+请求体与 `/api/ai/chat` 完全相同，响应为 `text/event-stream`。它**不流式输出回复文本**，
+只推过程状态——真正让人干等的是重试与工具执行，而不是逐字显示。
+
+事件格式（每个 `data` 都是一行 JSON）：
+
+```
+event: status
+data: {"phase":"thinking","text":"助手正在思考…"}
+
+event: retry
+data: {"attempt":1,"max":10,"delay_ms":200,"reason":"服务繁忙（限流）"}
+
+event: done
+data: {"reply":"…","actions":[…],"retries":1}
+
+event: error
+data: {"code":"validation_failed","message":"AI 调用失败: …"}
+```
+
+| 事件 | 何时推送 |
+|---|---|
+| `status` | 每轮开始思考前、工具执行前；`phase` 为 `thinking` / `tools` |
+| `retry` | 每次重试**即将开始等待之前**；`delay_ms` 是接下来会等多久，`reason` 是失败原因的简述 |
+| `done` | 正常结束，`data` 与 `/api/ai/chat` 的 `data` 结构一致 |
+| `error` | 已经开推流之后出错；结构同统一错误体里的 `error` 对象 |
+
+::: warning 开推流后不再走 JSON 错误体
+HTTP 状态恒为 `200`，错误通过 `event: error` 下发；这样前端只需要一套事件解析。
+只有在写第一个字节之前就失败（例如请求体不是合法 JSON）时，才仍返回常规的
+`{"error":{...}}` 与 4xx 状态码。
 :::
 
 ## 待确认操作
@@ -151,6 +193,10 @@
 ## 涉及的配置键
 
 AI 设置存在 `config` 表，前缀 `ai_`：`ai_enabled`、`ai_provider`、`ai_base_url`、
-`ai_model`、`ai_api_key_enc`、`ai_custom_prompt`。它们不通过 `/api/config` 暴露。
+`ai_model`、`ai_api_key_enc`、`ai_custom_prompt`、`ai_max_tokens`、`ai_max_retries`。
+它们不通过 `/api/config` 暴露。
 
 `ai_custom_prompt` 为明文（不是密钥），值为空时该行被删除，回退到只用内置提示词。
+`ai_max_tokens` / `ai_max_retries` 存的是十进制字符串；库里值缺失或非法时回退默认值
+（分别是 `4096` 与 `10`），不会把 0 传给厂商。`ai_max_retries` 存为 `0` 是有效设置，
+表示明确关闭重试。

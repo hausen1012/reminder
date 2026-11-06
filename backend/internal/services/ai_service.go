@@ -17,6 +17,7 @@ import (
 	"log/slog"
 	"net/http"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -42,6 +43,24 @@ const (
 	KeyAIAPIKey   = "ai_api_key_enc"
 	// KeyAIPrompt 是用户自定义的追加提示词，与内置系统提示词拼接后一起发给模型。
 	KeyAIPrompt = "ai_custom_prompt"
+	// KeyAIMaxTokens 是单次回复的输出 Token 上限（对应厂商的 max_tokens）。
+	KeyAIMaxTokens = "ai_max_tokens"
+	// KeyAIMaxRetries 是接口调用失败后的最大重试次数。
+	KeyAIMaxRetries = "ai_max_retries"
+)
+
+// AI 调用的默认与边界值。
+const (
+	// defaultMaxTokens 与旧的写死值一致：不配置时行为不变。
+	defaultMaxTokens = 4096
+	minMaxTokens     = 256
+	maxMaxTokens     = 200000
+	// defaultMaxRetries 是接口失败后的默认重试次数。
+	//
+	// 限流（429）与服务端 5xx 是常见的临时故障，多试几次通常能过；
+	// 10 次配合指数退避，最坏等待在 20 秒量级，仍在面板请求超时内。
+	defaultMaxRetries = 10
+	maxMaxRetries     = 100
 )
 
 // maxToolRounds 是单次对话里工具调用的最大轮数。
@@ -77,29 +96,38 @@ func NewAIService(db *gorm.DB, box *secretbox.Box, tz *timezone.Provider, remind
 
 // AISettings 是对外的 AI 设置视图：密钥只回 "***" 表示"已配置"。
 type AISettings struct {
-	Enabled      bool     `json:"enabled"`
-	Provider     string   `json:"provider"` // anthropic | openai
-	BaseURL      string   `json:"base_url"`
-	Model        string   `json:"model"`
-	Models       []string `json:"models"` // 备选模型列表
+	Enabled  bool     `json:"enabled"`
+	Provider string   `json:"provider"` // anthropic | openai
+	BaseURL  string   `json:"base_url"`
+	Model    string   `json:"model"`
+	Models   []string `json:"models"` // 备选模型列表
 	// APIKey 恒为脱敏值：有密钥时是 "***"，否则为空串。
 	APIKey string `json:"api_key"`
 	// CustomPrompt 是用户自定义的追加提示词。
 	CustomPrompt string `json:"custom_prompt"`
+	// MaxTokens 是单次回复的输出 Token 上限（max_tokens）。
+	MaxTokens int64 `json:"max_tokens"`
+	// MaxRetries 是接口调用失败后的最大重试次数。
+	MaxRetries int `json:"max_retries"`
 }
 
 // AISettingsInput 是保存设置的入参。
 //
 // api_key 传 "***" 表示保留原密钥，传空串表示清除。
 type AISettingsInput struct {
-	Enabled      bool     `json:"enabled"`
-	Provider     string   `json:"provider"`
-	BaseURL      string   `json:"base_url"`
-	Model        string   `json:"model"`
-	Models       []string `json:"models"`
-	APIKey       string   `json:"api_key"`
+	Enabled  bool     `json:"enabled"`
+	Provider string   `json:"provider"`
+	BaseURL  string   `json:"base_url"`
+	Model    string   `json:"model"`
+	Models   []string `json:"models"`
+	APIKey   string   `json:"api_key"`
 	// CustomPrompt 为空表示不使用自定义提示词（清空已保存的内容）。
 	CustomPrompt string `json:"custom_prompt"`
+	// MaxTokens 为 0 或未传时使用默认值；超出边界返回 validation_failed。
+	MaxTokens int64 `json:"max_tokens"`
+	// MaxRetries 是接口失败后的重试次数。不传（null）表示用默认值；
+	// 显式传 0 表示不重试，因此这里用指针区分「没传」与「传了 0」。
+	MaxRetries *int `json:"max_retries"`
 }
 
 // GetSettings 读取设置（密钥脱敏）。
@@ -114,6 +142,8 @@ func (s *AIService) GetSettings() (*AISettings, error) {
 		BaseURL:      kv[KeyAIBaseURL],
 		Model:        kv[KeyAIModel],
 		CustomPrompt: kv[KeyAIPrompt],
+		MaxTokens:    parseMaxTokens(kv[KeyAIMaxTokens]),
+		MaxRetries:   parseMaxRetries(kv[KeyAIMaxRetries]),
 	}
 	if out.Provider == "" {
 		out.Provider = "anthropic"
@@ -162,6 +192,14 @@ func (s *AIService) SaveSettings(in AISettingsInput) (*AISettings, error) {
 		return nil, middleware.NewAppError(middleware.CodeValidationFailed,
 			fmt.Sprintf("自定义提示词过长（最多 %d 字）", maxCustomPromptRunes)).WithField("custom_prompt")
 	}
+	maxTokens, err := normalizeMaxTokens(in.MaxTokens)
+	if err != nil {
+		return nil, err
+	}
+	maxRetries, err := normalizeMaxRetries(in.MaxRetries)
+	if err != nil {
+		return nil, err
+	}
 	if in.Enabled && strings.TrimSpace(in.APIKey) == "" {
 		// 允许使用已保存的密钥：只有既没传新密钥、库里也没有时才拒绝。
 		kv, err := s.configMap()
@@ -194,12 +232,14 @@ func (s *AIService) SaveSettings(in AISettingsInput) (*AISettings, error) {
 	modelsJSON, _ := json.Marshal(cleanedModels)
 
 	updates := map[string]string{
-		KeyAIEnabled:  boolString(in.Enabled),
-		KeyAIProvider: provider,
-		KeyAIBaseURL:  baseURL,
-		KeyAIModel:    model,
-		KeyAIModels:   string(modelsJSON),
-		KeyAIPrompt:   customPrompt,
+		KeyAIEnabled:    boolString(in.Enabled),
+		KeyAIProvider:   provider,
+		KeyAIBaseURL:    baseURL,
+		KeyAIModel:      model,
+		KeyAIModels:     string(modelsJSON),
+		KeyAIPrompt:     customPrompt,
+		KeyAIMaxTokens:  strconv.FormatInt(maxTokens, 10),
+		KeyAIMaxRetries: strconv.Itoa(maxRetries),
 	}
 	if in.APIKey == sensitivePlaceholder {
 		// 占位符 = 保留原密钥，不写库
@@ -217,7 +257,8 @@ func (s *AIService) SaveSettings(in AISettingsInput) (*AISettings, error) {
 			return nil, err
 		}
 	}
-	slog.Info("AI 设置已更新", "enabled", in.Enabled, "provider", provider, "model", model)
+	slog.Info("AI 设置已更新", "enabled", in.Enabled, "provider", provider, "model", model,
+		"max_tokens", maxTokens, "max_retries", maxRetries)
 	return s.GetSettings()
 }
 
@@ -233,11 +274,11 @@ func (s *AIService) TestConnection(ctx context.Context, in AISettingsInput) (str
 	if err != nil {
 		return "", middleware.NewAppError(middleware.CodeValidationFailed, err.Error())
 	}
-	reply, err := p.Chat(ctx, llm.Request{
+	reply, err := llm.ChatWithRetry(ctx, p, llm.Request{
 		System:    "你是连通性测试助手。",
 		Turns:     []llm.Turn{{Role: "user", Text: "请只回复：OK"}},
 		MaxTokens: 256,
-	})
+	}, cfg.MaxRetries)
 	if err != nil {
 		return "", middleware.NewAppError(middleware.CodeValidationFailed, "连接失败: "+err.Error())
 	}
@@ -412,13 +453,60 @@ type ChatResult struct {
 	Reply string `json:"reply"`
 	// Actions 是本轮生成的待确认草稿。
 	Actions []models.AIAction `json:"actions"`
+	// Retries 是本次对话中因临时性失败而重试的总次数（所有工具轮次累加）。
+	Retries int `json:"retries"`
 }
+
+// 对话过程中的状态事件名（SSE 的 event 字段）。
+const (
+	ChatEventStatus = "status"
+	ChatEventRetry  = "retry"
+	ChatEventDone   = "done"
+	ChatEventError  = "error"
+)
+
+// ChatStatus 是「我们在干什么」的状态快照。
+//
+// 面板只需要一句人话，不需要模型内部细节：phase 用于前端区分样式，
+// text 直接展示给用户。
+type ChatStatus struct {
+	Phase string `json:"phase"` // thinking | tools
+	Text  string `json:"text"`
+}
+
+// ChatRetry 是一次即将开始的重试。
+//
+// DelayMs 是接下来会等待的退避时长，前端可以据此显示倒计时。
+type ChatRetry struct {
+	Attempt int    `json:"attempt"`
+	Max     int    `json:"max"`
+	DelayMs int64  `json:"delay_ms"`
+	Reason  string `json:"reason"`
+}
+
+// ChatEventSink 接收对话过程中的状态事件。
+//
+// 回调在请求的 goroutine 里同步执行，实现必须立即返回：
+// 它阻塞多久，对话就暂停多久。sink 为 nil 时所有事件被丢弃。
+type ChatEventSink func(event string, data any)
 
 // Chat 处理一次用户输入：拼历史 → 跑工具循环 → 返回回复与草稿。
 //
 // 服务端不保存对话：history 由前端上传，接口本身无状态。
-// 非流式实现：前端显示 loading，返回体一次性带齐回复与本轮草稿。
 func (s *AIService) Chat(ctx context.Context, in ChatInput) (*ChatResult, error) {
+	return s.ChatStream(ctx, in, nil)
+}
+
+// ChatStream 与 Chat 相同，但会把过程中的状态事件推给 sink。
+//
+// 分成两层是为了让「状态流」只是可选装饰：老接口与非流式调用不关心进度，
+// 传 nil 即可，编排逻辑只有一份。
+func (s *AIService) ChatStream(ctx context.Context, in ChatInput, sink ChatEventSink) (*ChatResult, error) {
+	emit := func(event string, data any) {
+		if sink != nil {
+			sink(event, data)
+		}
+	}
 	message := strings.TrimSpace(in.Message)
 	if message == "" {
 		return nil, middleware.NewAppError(middleware.CodeValidationFailed, "消息不能为空").WithField("message")
@@ -472,12 +560,27 @@ func (s *AIService) Chat(ctx context.Context, in ChatInput) (*ChatResult, error)
 	}()
 
 	var replyText string
+	truncated := false
+	retries := 0
 	for round := 0; round < maxToolRounds; round++ {
-		reply, err := p.Chat(ctx, llm.Request{
+		emit(ChatEventStatus, ChatStatus{Phase: "thinking", Text: "助手正在思考…"})
+		reply, err := llm.ChatWithRetryNotify(ctx, p, llm.Request{
 			System:    system,
 			Turns:     turns,
 			Tools:     tools,
-			MaxTokens: 4096,
+			MaxTokens: cfg.MaxTokens,
+		}, cfg.MaxRetries, func(attempt, max int, delay time.Duration, cause error) {
+			retries++
+			emit(ChatEventRetry, ChatRetry{
+				Attempt: attempt,
+				Max:     max,
+				DelayMs: delay.Milliseconds(),
+				Reason:  llm.RetryReason(cause),
+			})
+			emit(ChatEventStatus, ChatStatus{
+				Phase: "thinking",
+				Text:  fmt.Sprintf("第 %d/%d 次重试：%s", attempt, max, llm.RetryReason(cause)),
+			})
 		})
 		if err != nil {
 			return nil, middleware.NewAppError(middleware.CodeValidationFailed, "AI 调用失败: "+err.Error())
@@ -486,7 +589,17 @@ func (s *AIService) Chat(ctx context.Context, in ChatInput) (*ChatResult, error)
 		if len(reply.ToolCalls) == 0 {
 			break
 		}
+		// 达到输出上限时，工具参数可能被截断（JSON 不完整），执行只会得到脏草稿。
+		// 这里直接结束本轮：已生成的草稿仍返回给用户确认，但不再继续跑工具循环。
+		if reply.Truncated {
+			truncated = true
+			break
+		}
 
+		emit(ChatEventStatus, ChatStatus{
+			Phase: "tools",
+			Text:  fmt.Sprintf("正在执行 %d 个工具…", len(reply.ToolCalls)),
+		})
 		turns = append(turns, llm.Turn{
 			Role:      "assistant",
 			Text:      reply.Text,
@@ -520,6 +633,15 @@ func (s *AIService) Chat(ctx context.Context, in ChatInput) (*ChatResult, error)
 		}
 		turns = append(turns, llm.Turn{Role: "user", ToolResults: results})
 	}
+	if truncated {
+		// 明确告诉用户「到此为止」的原因：工具参数被截断时继续执行会写坏数据。
+		note := fmt.Sprintf("（回复达到最大上下文窗口 %d Token 已停止，请精简提问或调大设置页的上限）", cfg.MaxTokens)
+		if replyText == "" {
+			replyText = note
+		} else {
+			replyText += "\n\n" + note
+		}
+	}
 	if replyText == "" {
 		replyText = "（助手没有返回文本，请重试或换个说法）"
 	}
@@ -529,7 +651,7 @@ func (s *AIService) Chat(ctx context.Context, in ChatInput) (*ChatResult, error)
 		return nil, err
 	}
 	success = true
-	return &ChatResult{Reply: replyText, Actions: actions}, nil
+	return &ChatResult{Reply: replyText, Actions: actions, Retries: retries}, nil
 }
 
 // ListActions 按状态列出草稿；status 为空时返回全部（最多 50 条，按时间倒序）。
@@ -831,6 +953,56 @@ type aiConfig struct {
 	BaseURL  string
 	Model    string
 	APIKey   string // 明文，仅在构造 provider 时短暂持有
+	// MaxTokens 是单次回复的输出上限。
+	MaxTokens int64
+	// MaxRetries 是接口调用失败后的重试次数。
+	MaxRetries int
+}
+
+// parseMaxTokens 把配置表里的字符串解析成输出上限；缺失或非法时回退默认值。
+func parseMaxTokens(raw string) int64 {
+	n, err := strconv.ParseInt(strings.TrimSpace(raw), 10, 64)
+	if err != nil || n < minMaxTokens || n > maxMaxTokens {
+		return defaultMaxTokens
+	}
+	return n
+}
+
+// parseMaxRetries 把配置表里的字符串解析成重试次数；缺失或非法时回退默认值。
+func parseMaxRetries(raw string) int {
+	n, err := strconv.Atoi(strings.TrimSpace(raw))
+	if err != nil || n < 0 || n > maxMaxRetries {
+		return defaultMaxRetries
+	}
+	return n
+}
+
+// normalizeMaxTokens 校验并归一化入参里的输出上限。
+//
+// 0 表示「未填写」，用默认值；正数必须在 [minMaxTokens, maxMaxTokens] 内。
+func normalizeMaxTokens(n int64) (int64, error) {
+	if n == 0 {
+		return defaultMaxTokens, nil
+	}
+	if n < minMaxTokens || n > maxMaxTokens {
+		return 0, middleware.NewAppError(middleware.CodeValidationFailed,
+			fmt.Sprintf("最大上下文窗口需在 %d 到 %d 之间", minMaxTokens, maxMaxTokens)).WithField("max_tokens")
+	}
+	return n, nil
+}
+
+// normalizeMaxRetries 校验并归一化入参里的重试次数。
+//
+// nil（未传）用默认值；显式传 0 表示「不重试」，是合法设置。
+func normalizeMaxRetries(n *int) (int, error) {
+	if n == nil {
+		return defaultMaxRetries, nil
+	}
+	if *n < 0 || *n > maxMaxRetries {
+		return 0, middleware.NewAppError(middleware.CodeValidationFailed,
+			fmt.Sprintf("最大重试次数需在 0 到 %d 之间", maxMaxRetries)).WithField("max_retries")
+	}
+	return *n, nil
 }
 
 // resolveConfig 合并入参与库中设置，得到可用的配置。
@@ -843,10 +1015,12 @@ func (s *AIService) resolveConfig(in AISettingsInput) (*aiConfig, error) {
 		return nil, err
 	}
 	cfg := &aiConfig{
-		Enabled:  kv[KeyAIEnabled] == "true",
-		Provider: kv[KeyAIProvider],
-		BaseURL:  kv[KeyAIBaseURL],
-		Model:    kv[KeyAIModel],
+		Enabled:    kv[KeyAIEnabled] == "true",
+		Provider:   kv[KeyAIProvider],
+		BaseURL:    kv[KeyAIBaseURL],
+		Model:      kv[KeyAIModel],
+		MaxTokens:  parseMaxTokens(kv[KeyAIMaxTokens]),
+		MaxRetries: parseMaxRetries(kv[KeyAIMaxRetries]),
 	}
 	if cfg.Provider == "" {
 		cfg.Provider = "anthropic"
@@ -869,6 +1043,14 @@ func (s *AIService) resolveConfig(in AISettingsInput) (*aiConfig, error) {
 	}
 	if in.Enabled {
 		cfg.Enabled = true
+	}
+	if in.MaxTokens > 0 {
+		cfg.MaxTokens = in.MaxTokens
+	}
+	// 入参的 max_retries 只有显式传入（非 nil）才覆盖：
+	// TestConnection / FetchModels 这些内部调用不带该字段，不能因此把重试改成默认之外的语义。
+	if in.MaxRetries != nil {
+		cfg.MaxRetries = *in.MaxRetries
 	}
 
 	// 密钥优先级：入参明文 > 库中密文

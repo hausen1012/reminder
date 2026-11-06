@@ -39,6 +39,11 @@ const PROVIDER_LABEL: Record<AIProvider, string> = {
   anthropic: 'Anthropic',
 }
 
+// 与后端 services 包的边界保持一致，前端只做提示，真正的校验在后端
+const MIN_MAX_TOKENS = 256
+const MAX_MAX_TOKENS = 200000
+const MAX_MAX_RETRIES = 100
+
 // 常见厂商的默认地址与模型，选中后自动填入，仍可手工修改
 const PRESETS: Record<string, { base_url: string; model: string; models: string[] }> = {
   anthropic: {
@@ -78,6 +83,10 @@ export function AISettingsSection() {
   const [apiKey, setApiKey] = useState('')
   const [showKey, setShowKey] = useState(false)
   const [customPrompt, setCustomPrompt] = useState('')
+  // 单次回复的输出上限（max_tokens）；0 表示交给后端默认值
+  const [maxTokens, setMaxTokens] = useState(4096)
+  // 接口失败后的最大重试次数；0 表示不重试（后端只在字段缺省时才用默认的 10）
+  const [maxRetries, setMaxRetries] = useState(10)
   const [hasKey, setHasKey] = useState(false)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -96,6 +105,8 @@ export function AISettingsSection() {
         setHasKey(s.api_key === '***')
         setApiKey('') // 输入框留空表示"不修改"；只有 hasKey 时才有原值
         setCustomPrompt(s.custom_prompt ?? '')
+        setMaxTokens(s.max_tokens || 4096)
+        setMaxRetries(s.max_retries ?? 10)
       })
       .catch(() => {})
       .finally(() => setLoading(false))
@@ -113,6 +124,8 @@ export function AISettingsSection() {
       models: cleanedModels,
       api_key: key,
       custom_prompt: customPrompt.trim(),
+      max_tokens: maxTokens,
+      max_retries: maxRetries,
     }
   }
 
@@ -125,6 +138,11 @@ export function AISettingsSection() {
       setApiKey('')
       if (saved.models && saved.models.length > 0) {
         setModels(saved.models)
+      }
+      // 后端会把 0 归一化成默认值，回填让输入框显示真正生效的数字
+      if (saved.max_tokens > 0) setMaxTokens(saved.max_tokens)
+      if (typeof saved.max_retries === 'number' && saved.max_retries >= 0) {
+        setMaxRetries(saved.max_retries)
       }
       toast({ title: 'AI 设置已保存' })
     } catch (err) {
@@ -414,6 +432,40 @@ export function AISettingsSection() {
         <p className="text-xs text-muted-foreground">
           追加在内置规则之后，用于补充称呼、语气与业务约定（最多 4000 字）。
           它不能改变工具使用与「待确认后才生效」等硬性规则；留空表示只用内置提示词。
+        </p>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="ai-max-tokens">最大上下文窗口（Token）</Label>
+        <Input
+          id="ai-max-tokens"
+          type="number"
+          min={MIN_MAX_TOKENS}
+          max={MAX_MAX_TOKENS}
+          step={256}
+          value={maxTokens}
+          onChange={(e) => setMaxTokens(Number(e.target.value))}
+        />
+        <p className="text-xs text-muted-foreground">
+          单次回复的输出上限（max_tokens），默认 4096。模型达到该值会停止生成，
+          本轮不再继续工具调用，避免把截断的参数写成草稿。取值范围 {MIN_MAX_TOKENS}–{MAX_MAX_TOKENS}。
+        </p>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="ai-max-retries">最大重试次数</Label>
+        <Input
+          id="ai-max-retries"
+          type="number"
+          min={0}
+          max={MAX_MAX_RETRIES}
+          step={1}
+          value={maxRetries}
+          onChange={(e) => setMaxRetries(Number(e.target.value))}
+        />
+        <p className="text-xs text-muted-foreground">
+          接口失败（限流、超时、网络错误、服务端 5xx）后的自动重试次数，默认 10。
+          填 0 表示不重试；密钥错误、参数错误这类不会重试。
         </p>
       </div>
 

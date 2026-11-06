@@ -625,6 +625,204 @@ func TestAISaveSettings_CustomPromptTooLong(t *testing.T) {
 	}
 }
 
+// AI 输出上限与重试次数：默认值、读写回显与非法值校验。
+func TestAISettingsMaxTokensAndRetries(t *testing.T) {
+	svc, _, _ := newAITestService(t, &llm.Reply{Text: "x"})
+
+	// 未配置时读回默认值
+	out, err := svc.GetSettings()
+	if err != nil {
+		t.Fatalf("GetSettings 失败: %v", err)
+	}
+	if out.MaxTokens != defaultMaxTokens {
+		t.Fatalf("默认 max_tokens = %d，期望 %d", out.MaxTokens, defaultMaxTokens)
+	}
+	if out.MaxRetries != defaultMaxRetries {
+		t.Fatalf("默认 max_retries = %d，期望 %d", out.MaxRetries, defaultMaxRetries)
+	}
+
+	// 保存后读回
+	three := 3
+	out, err = svc.SaveSettings(AISettingsInput{
+		Provider:   "openai",
+		Model:      "deepseek-chat",
+		APIKey:     "sk-x",
+		MaxTokens:  8192,
+		MaxRetries: &three,
+	})
+	if err != nil {
+		t.Fatalf("保存失败: %v", err)
+	}
+	if out.MaxTokens != 8192 || out.MaxRetries != 3 {
+		t.Fatalf("读回值不符: max_tokens=%d max_retries=%d", out.MaxTokens, out.MaxRetries)
+	}
+
+	// 解析进运行时配置，Chat 会用它构造请求
+	cfg, err := svc.resolveConfig(AISettingsInput{})
+	if err != nil {
+		t.Fatalf("解析配置失败: %v", err)
+	}
+	if cfg.MaxTokens != 8192 || cfg.MaxRetries != 3 {
+		t.Fatalf("运行时配置不符: %+v", cfg)
+	}
+
+	// 越界的 token 上限与重试次数应被拒绝
+	if _, err := svc.SaveSettings(AISettingsInput{Provider: "openai", APIKey: "sk-x", MaxTokens: minMaxTokens - 1}); err == nil {
+		t.Fatal("过小的 max_tokens 应被拒绝")
+	}
+	if _, err := svc.SaveSettings(AISettingsInput{Provider: "openai", APIKey: "sk-x", MaxTokens: maxMaxTokens + 1}); err == nil {
+		t.Fatal("过大的 max_tokens 应被拒绝")
+	}
+	minusOne := -1
+	if _, err := svc.SaveSettings(AISettingsInput{Provider: "openai", APIKey: "sk-x", MaxRetries: &minusOne}); err == nil {
+		t.Fatal("负数 max_retries 应被拒绝")
+	}
+	tooMany := maxMaxRetries + 1
+	if _, err := svc.SaveSettings(AISettingsInput{Provider: "openai", APIKey: "sk-x", MaxRetries: &tooMany}); err == nil {
+		t.Fatal("过大的 max_retries 应被拒绝")
+	}
+
+	// 显式传 0 是合法设置：表示不重试
+	zero := 0
+	out, err = svc.SaveSettings(AISettingsInput{Provider: "openai", APIKey: "sk-x", MaxRetries: &zero})
+	if err != nil {
+		t.Fatalf("显式 0 次重试应被接受: %v", err)
+	}
+	if out.MaxRetries != 0 {
+		t.Fatalf("显式 0 次重试读回 = %d", out.MaxRetries)
+	}
+	// 但库里 0 与「未配置」区分得开：重读设置仍为 0，而空串回退默认 10
+	if out, _ = svc.GetSettings(); out.MaxRetries != 0 {
+		t.Fatalf("库里存 0 后读回 = %d", out.MaxRetries)
+	}
+	if err := svc.upsertConfig(KeyAIMaxRetries, ""); err != nil {
+		t.Fatalf("清空失败: %v", err)
+	}
+	if out, _ = svc.GetSettings(); out.MaxRetries != defaultMaxRetries {
+		t.Fatalf("未配置时应回退默认 %d，实际 %d", defaultMaxRetries, out.MaxRetries)
+	}
+}
+
+// 配置表里存了脏值时回退到默认值，而不是把 0 传给厂商。
+func TestAIParseSettingsFallsBackOnGarbage(t *testing.T) {
+	svc, _, _ := newAITestService(t, &llm.Reply{Text: "x"})
+	if err := svc.upsertConfig(KeyAIMaxTokens, "abc"); err != nil {
+		t.Fatalf("写入失败: %v", err)
+	}
+	if err := svc.upsertConfig(KeyAIMaxRetries, "-5"); err != nil {
+		t.Fatalf("写入失败: %v", err)
+	}
+	out, err := svc.GetSettings()
+	if err != nil {
+		t.Fatalf("GetSettings 失败: %v", err)
+	}
+	if out.MaxTokens != defaultMaxTokens || out.MaxRetries != defaultMaxRetries {
+		t.Fatalf("脏值应回退默认: max_tokens=%d max_retries=%d", out.MaxTokens, out.MaxRetries)
+	}
+}
+
+// 配置的输出上限要真正传给 Provider 的请求。
+func TestAIChatPassesMaxTokens(t *testing.T) {
+	svc, fake, _ := newAITestService(t, &llm.Reply{Text: "ok"})
+	if _, err := svc.SaveSettings(AISettingsInput{
+		Enabled: true, Provider: "openai", Model: "deepseek-chat", APIKey: "sk-x", MaxTokens: 1234,
+	}); err != nil {
+		t.Fatalf("保存失败: %v", err)
+	}
+
+	if _, err := chat(svc, "hi"); err != nil {
+		t.Fatalf("Chat 失败: %v", err)
+	}
+	if got := fake.calls[0].MaxTokens; got != 1234 {
+		t.Fatalf("MaxTokens = %d，期望 1234", got)
+	}
+}
+
+// 模型输出达到上限时停止本轮，不再执行被截断的工具调用。
+func TestAIChat_StopsWhenReplyTruncated(t *testing.T) {
+	svc, fake, db := newAITestService(t,
+		&llm.Reply{
+			Text:      "我要创建提醒",
+			ToolCalls: []llm.ToolCall{{ID: "c1", Name: "create_reminder", Input: json.RawMessage(`{"title":"喝水"`)}},
+			Truncated: true,
+		},
+	)
+
+	res, err := chat(svc, "提醒我喝水")
+	if err != nil {
+		t.Fatalf("Chat 失败: %v", err)
+	}
+	if len(fake.calls) != 1 {
+		t.Fatalf("截断后不应继续请求，实际 %d 次", len(fake.calls))
+	}
+	if !strings.Contains(res.Reply, "最大上下文窗口") {
+		t.Fatalf("应提示已停止，实际 %q", res.Reply)
+	}
+	if len(res.Actions) != 0 {
+		t.Fatalf("截断的工具调用不应生成草稿，实际 %d 条", len(res.Actions))
+	}
+	var count int64
+	db.Model(&models.AIAction{}).Count(&count)
+	if count != 0 {
+		t.Fatalf("库里不应有草稿，实际 %d 条", count)
+	}
+}
+
+// 重试事件要透传给 sink，且结果里的 retries 计数与实际重试次数一致。
+func TestAIChatStream_EmitsRetryEvents(t *testing.T) {
+	// 只失败一次，真实的 200ms 退避可以接受
+	svc, _, _ := newAITestService(t)
+	svc.providerOverride = &flakyProvider{failTimes: 1}
+
+	var events []string
+	var retries []ChatRetry
+	res, err := svc.ChatStream(context.Background(), ChatInput{Message: "你好"}, func(event string, data any) {
+		events = append(events, event)
+		if r, ok := data.(ChatRetry); ok {
+			retries = append(retries, r)
+		}
+	})
+	if err != nil {
+		t.Fatalf("ChatStream 失败: %v", err)
+	}
+	if res.Retries != 1 {
+		t.Fatalf("retries = %d，期望 1", res.Retries)
+	}
+	if len(retries) != 1 || retries[0].Attempt != 1 || retries[0].Max != defaultMaxRetries {
+		t.Fatalf("重试事件不符: %+v", retries)
+	}
+	if retries[0].Reason == "" {
+		t.Fatal("重试事件应带原因")
+	}
+	if !containsString(events, ChatEventStatus) {
+		t.Fatalf("应推 thinking 状态事件: %v", events)
+	}
+}
+
+// flakyProvider 前 failTimes 次返回可重试错误，之后返回文本。
+type flakyProvider struct {
+	failTimes int
+	calls     int
+}
+
+func (p *flakyProvider) Chat(_ context.Context, _ llm.Request) (*llm.Reply, error) {
+	p.calls++
+	if p.calls <= p.failTimes {
+		return nil, &llm.HTTPStatusError{Status: 429, Message: "rate limited"}
+	}
+	return &llm.Reply{Text: "好了"}, nil
+}
+
+// containsString 判断切片里是否有某字符串。
+func containsString(list []string, want string) bool {
+	for _, s := range list {
+		if s == want {
+			return true
+		}
+	}
+	return false
+}
+
 // PurgeActions 只删超过保留期的草稿，保留期内的（无论状态）都不动。
 func TestAIPurgeActions(t *testing.T) {
 	svc, _, db := newAITestService(t, &llm.Reply{Text: "ok"})

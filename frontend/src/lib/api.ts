@@ -4,7 +4,10 @@ import type {
   ApiResponse,
   AIAction,
   AIChatMessage,
+  AIChatProgress,
   AIChatResult,
+  AIChatRetry,
+  AIChatStatus,
   AISettings,
   AISettingsInput,
   Channel,
@@ -392,6 +395,124 @@ export async function sendAIChat(
     { timeout: 120000 },
   )
   return res.data.data
+}
+
+/**
+ * 发一轮对话，并接收服务端推送的过程状态。
+ *
+ * 用 SSE 而不是完整 token 流：本系统的助手要跑多轮工具调用，逐字打字机的
+ * 改造成本高价值低；真正让用户干等的是「重试」与「工具执行」这两个阶段。
+ * 所以服务端只推 status / retry / done / error 四类事件，正文仍一次性返回。
+ *
+ * 这里用 fetch 而不是 axios：axios 在浏览器里拿不到增量响应体。
+ * 事件格式与后端 handlers.AIHandler.ChatStream 的注释一一对应。
+ */
+export async function sendAIChatStream(
+  message: string,
+  history: AIChatMessage[],
+  model: string | undefined,
+  onProgress?: (progress: AIChatProgress) => void,
+  signal?: AbortSignal,
+): Promise<AIChatResult> {
+  const payload: { message: string; history: AIChatMessage[]; model?: string } = {
+    message,
+    history,
+  }
+  if (model) {
+    payload.model = model
+  }
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    Accept: 'text/event-stream',
+  }
+  const token = localStorage.getItem('token')
+  if (token) headers.Authorization = `Bearer ${token}`
+
+  const res = await fetch('/api/ai/chat/stream', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(payload),
+    signal,
+  })
+
+  if (res.status === 401) {
+    localStorage.removeItem('token')
+    window.location.href = '/#/login'
+  }
+
+  // 请求体解析失败等「还没开始推流就出错」的情况仍是普通 JSON 错误体
+  if (!res.ok || !res.headers.get('content-type')?.includes('text/event-stream')) {
+    const text = await res.text()
+    let body: unknown = text
+    try {
+      body = JSON.parse(text)
+    } catch {
+      // 非 JSON 就原样保留，extractApiError 会退化成 text
+    }
+    throw { response: { data: body, status: res.status } }
+  }
+
+  if (!res.body) {
+    throw new Error('浏览器不支持流式响应')
+  }
+
+  let result: AIChatResult | null = null
+  let streamErr: unknown = null
+  const reader = res.body.getReader()
+  const decoder = new TextDecoder()
+  let buf = ''
+
+  const handleEvent = (event: string, data: string) => {
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(data)
+    } catch {
+      return
+    }
+    switch (event) {
+      case 'status':
+        onProgress?.({ kind: 'status', status: parsed as AIChatStatus })
+        break
+      case 'retry':
+        onProgress?.({ kind: 'retry', retry: parsed as AIChatRetry })
+        break
+      case 'done':
+        result = parsed as AIChatResult
+        break
+      case 'error':
+        streamErr = { response: { data: { error: parsed } } }
+        break
+    }
+  }
+
+  // SSE 以空行分隔事件，data 可能跨多行（这里服务端只发单行 JSON）
+  const drain = (flush: boolean) => {
+    const blocks = buf.split('\n\n')
+    buf = flush ? '' : (blocks.pop() ?? '')
+    for (const block of blocks) {
+      let event = 'message'
+      const dataLines: string[] = []
+      for (const line of block.split('\n')) {
+        if (line.startsWith('event:')) event = line.slice(6).trim()
+        else if (line.startsWith('data:')) dataLines.push(line.slice(5).trim())
+      }
+      if (dataLines.length > 0) handleEvent(event, dataLines.join('\n'))
+    }
+  }
+
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buf += decoder.decode(value, { stream: true })
+    drain(false)
+  }
+  buf += decoder.decode()
+  drain(true)
+
+  if (streamErr) throw streamErr
+  if (!result) throw new Error('对话未正常结束，请重试')
+  return result
 }
 
 /** 拉取待确认草稿（刷新页面后恢复用）。 */
