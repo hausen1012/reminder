@@ -232,8 +232,6 @@ export interface AISettings {
   api_key: string
   /** 用户自定义的追加提示词，与内置规则拼接后发给模型 */
   custom_prompt: string
-  /** 单次回复的输出 Token 上限（max_tokens），0 表示用后端默认值 */
-  max_tokens: number
   /** 接口调用失败后的最大重试次数，0 表示不重试 */
   max_retries: number
 }
@@ -246,7 +244,6 @@ export interface AISettingsInput {
   models?: string[]
   api_key: string
   custom_prompt: string
-  max_tokens: number
   max_retries: number
 }
 

@@ -283,7 +283,6 @@ describe('api AI 助手', () => {
       model: 'm',
       api_key: '***',
       custom_prompt: '',
-      max_tokens: 4096,
       max_retries: 10,
     }
     await api.updateAISettings(input)
@@ -299,7 +298,6 @@ describe('api AI 助手', () => {
       model: 'm',
       api_key: '',
       custom_prompt: '',
-      max_tokens: 4096,
       max_retries: 10,
     }
     expect(await api.testAIConnection(input)).toEqual({ reply: 'OK' })

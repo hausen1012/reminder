@@ -22,7 +22,6 @@
   "model": "deepseek-chat",
   "api_key": "sk-xxx",
   "custom_prompt": "称呼我为老板，回复尽量一句话说完",
-  "max_tokens": 4096,
   "max_retries": 10
 }
 ```
@@ -34,7 +33,6 @@
 | `model` | 模型名；留空时按厂商给默认值 |
 | `api_key` | 传 `"***"` 表示保留已保存的密钥；传空串表示清除；传新值则覆盖 |
 | `custom_prompt` | 追加在内置系统提示词之后的用户自定义内容；空串表示不用。最多 4000 字，超出返回 `validation_failed` |
-| `max_tokens` | 单次回复的输出上限（`max_tokens`）。`0` 或省略表示用默认值 `4096`，合法范围 256–200000，越界返回 `validation_failed` |
 | `max_retries` | 接口失败后的最大重试次数。**省略**表示用默认值 `10`；显式传 `0` 表示不重试。合法范围 0–100（负数越界），越界返回 `validation_failed` |
 
 `custom_prompt` 会跟在内置规则之后、并注明「冲突时以内置规则为准」，
@@ -200,10 +198,12 @@ HTTP 状态恒为 `200`，错误通过 `event: error` 下发；这样前端只�
 ## 涉及的配置键
 
 AI 设置存在 `config` 表，前缀 `ai_`：`ai_enabled`、`ai_provider`、`ai_base_url`、
-`ai_model`、`ai_api_key_enc`、`ai_custom_prompt`、`ai_max_tokens`、`ai_max_retries`。
+`ai_model`、`ai_api_key_enc`、`ai_custom_prompt`、`ai_max_retries`。
 它们不通过 `/api/config` 暴露。
 
 `ai_custom_prompt` 为明文（不是密钥），值为空时该行被删除，回退到只用内置提示词。
-`ai_max_tokens` / `ai_max_retries` 存的是十进制字符串；库里值缺失或非法时回退默认值
-（分别是 `4096` 与 `10`），不会把 0 传给厂商。`ai_max_retries` 存为 `0` 是有效设置，
-表示明确关闭重试。
+`ai_max_retries` 存的是十进制字符串；库里值缺失或非法时回退默认值 `10`；
+存为 `0` 是有效设置，表示明确关闭重试。
+
+单次回复的输出上限不再可配：`max_tokens` 固定为 `4096` 由后端下发，
+设置接口不识别该字段（传了会被忽略）。旧版本可能残留 `ai_max_tokens` 行，代码已不再读取，可忽略。

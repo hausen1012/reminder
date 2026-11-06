@@ -40,8 +40,6 @@ const PROVIDER_LABEL: Record<AIProvider, string> = {
 }
 
 // 与后端 services 包的边界保持一致，前端只做提示，真正的校验在后端
-const MIN_MAX_TOKENS = 256
-const MAX_MAX_TOKENS = 200000
 const MAX_MAX_RETRIES = 100
 
 // 常见厂商的默认地址与模型，选中后自动填入，仍可手工修改
@@ -83,8 +81,6 @@ export function AISettingsSection() {
   const [apiKey, setApiKey] = useState('')
   const [showKey, setShowKey] = useState(false)
   const [customPrompt, setCustomPrompt] = useState('')
-  // 单次回复的输出上限（max_tokens）；0 表示交给后端默认值
-  const [maxTokens, setMaxTokens] = useState(4096)
   // 接口失败后的最大重试次数；0 表示不重试（后端只在字段缺省时才用默认的 10）
   const [maxRetries, setMaxRetries] = useState(10)
   const [hasKey, setHasKey] = useState(false)
@@ -105,7 +101,6 @@ export function AISettingsSection() {
         setHasKey(s.api_key === '***')
         setApiKey('') // 输入框留空表示"不修改"；只有 hasKey 时才有原值
         setCustomPrompt(s.custom_prompt ?? '')
-        setMaxTokens(s.max_tokens || 4096)
         setMaxRetries(s.max_retries ?? 10)
       })
       .catch(() => {})
@@ -124,7 +119,6 @@ export function AISettingsSection() {
       models: cleanedModels,
       api_key: key,
       custom_prompt: customPrompt.trim(),
-      max_tokens: maxTokens,
       max_retries: maxRetries,
     }
   }
@@ -139,8 +133,7 @@ export function AISettingsSection() {
       if (saved.models && saved.models.length > 0) {
         setModels(saved.models)
       }
-      // 后端会把 0 归一化成默认值，回填让输入框显示真正生效的数字
-      if (saved.max_tokens > 0) setMaxTokens(saved.max_tokens)
+      // 回填后端归一化后的值，让输入框显示真正生效的重试次数
       if (typeof saved.max_retries === 'number' && saved.max_retries >= 0) {
         setMaxRetries(saved.max_retries)
       }
@@ -417,23 +410,6 @@ export function AISettingsSection() {
             ))
           )}
         </div>
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="ai-max-tokens">最大上下文窗口（Token）</Label>
-        <Input
-          id="ai-max-tokens"
-          type="number"
-          min={MIN_MAX_TOKENS}
-          max={MAX_MAX_TOKENS}
-          step={256}
-          value={maxTokens}
-          onChange={(e) => setMaxTokens(Number(e.target.value))}
-        />
-        <p className="text-xs text-muted-foreground">
-          单次回复的输出上限（max_tokens），默认 4096。模型达到该值会停止生成，
-          本轮不再继续工具调用，避免把截断的参数写成草稿。取值范围 {MIN_MAX_TOKENS}–{MAX_MAX_TOKENS}。
-        </p>
       </div>
 
       <div className="space-y-2">

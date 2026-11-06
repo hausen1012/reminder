@@ -30,7 +30,6 @@ describe('Profile 关于项目', () => {
       model: 'claude-opus-5-5',
       api_key: '',
       custom_prompt: '',
-      max_tokens: 4096,
       max_retries: 10,
     })
   })

@@ -625,17 +625,14 @@ func TestAISaveSettings_CustomPromptTooLong(t *testing.T) {
 	}
 }
 
-// AI 输出上限与重试次数：默认值、读写回显与非法值校验。
-func TestAISettingsMaxTokensAndRetries(t *testing.T) {
+// AI 重试次数：默认值、读写回显与非法值校验。
+func TestAISettingsRetries(t *testing.T) {
 	svc, _, _ := newAITestService(t, &llm.Reply{Text: "x"})
 
 	// 未配置时读回默认值
 	out, err := svc.GetSettings()
 	if err != nil {
 		t.Fatalf("GetSettings 失败: %v", err)
-	}
-	if out.MaxTokens != defaultMaxTokens {
-		t.Fatalf("默认 max_tokens = %d，期望 %d", out.MaxTokens, defaultMaxTokens)
 	}
 	if out.MaxRetries != defaultMaxRetries {
 		t.Fatalf("默认 max_retries = %d，期望 %d", out.MaxRetries, defaultMaxRetries)
@@ -647,14 +644,13 @@ func TestAISettingsMaxTokensAndRetries(t *testing.T) {
 		Provider:   "openai",
 		Model:      "deepseek-chat",
 		APIKey:     "sk-x",
-		MaxTokens:  8192,
 		MaxRetries: &three,
 	})
 	if err != nil {
 		t.Fatalf("保存失败: %v", err)
 	}
-	if out.MaxTokens != 8192 || out.MaxRetries != 3 {
-		t.Fatalf("读回值不符: max_tokens=%d max_retries=%d", out.MaxTokens, out.MaxRetries)
+	if out.MaxRetries != 3 {
+		t.Fatalf("读回值不符: max_retries=%d", out.MaxRetries)
 	}
 
 	// 解析进运行时配置，Chat 会用它构造请求
@@ -662,17 +658,11 @@ func TestAISettingsMaxTokensAndRetries(t *testing.T) {
 	if err != nil {
 		t.Fatalf("解析配置失败: %v", err)
 	}
-	if cfg.MaxTokens != 8192 || cfg.MaxRetries != 3 {
+	if cfg.MaxRetries != 3 {
 		t.Fatalf("运行时配置不符: %+v", cfg)
 	}
 
-	// 越界的 token 上限与重试次数应被拒绝
-	if _, err := svc.SaveSettings(AISettingsInput{Provider: "openai", APIKey: "sk-x", MaxTokens: minMaxTokens - 1}); err == nil {
-		t.Fatal("过小的 max_tokens 应被拒绝")
-	}
-	if _, err := svc.SaveSettings(AISettingsInput{Provider: "openai", APIKey: "sk-x", MaxTokens: maxMaxTokens + 1}); err == nil {
-		t.Fatal("过大的 max_tokens 应被拒绝")
-	}
+	// 越界的重试次数应被拒绝
 	minusOne := -1
 	if _, err := svc.SaveSettings(AISettingsInput{Provider: "openai", APIKey: "sk-x", MaxRetries: &minusOne}); err == nil {
 		t.Fatal("负数 max_retries 应被拒绝")
@@ -706,9 +696,6 @@ func TestAISettingsMaxTokensAndRetries(t *testing.T) {
 // 配置表里存了脏值时回退到默认值，而不是把 0 传给厂商。
 func TestAIParseSettingsFallsBackOnGarbage(t *testing.T) {
 	svc, _, _ := newAITestService(t, &llm.Reply{Text: "x"})
-	if err := svc.upsertConfig(KeyAIMaxTokens, "abc"); err != nil {
-		t.Fatalf("写入失败: %v", err)
-	}
 	if err := svc.upsertConfig(KeyAIMaxRetries, "-5"); err != nil {
 		t.Fatalf("写入失败: %v", err)
 	}
@@ -716,25 +703,29 @@ func TestAIParseSettingsFallsBackOnGarbage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetSettings 失败: %v", err)
 	}
-	if out.MaxTokens != defaultMaxTokens || out.MaxRetries != defaultMaxRetries {
-		t.Fatalf("脏值应回退默认: max_tokens=%d max_retries=%d", out.MaxTokens, out.MaxRetries)
+	if out.MaxRetries != defaultMaxRetries {
+		t.Fatalf("脏值应回退默认: max_retries=%d", out.MaxRetries)
 	}
 }
 
-// 配置的输出上限要真正传给 Provider 的请求。
-func TestAIChatPassesMaxTokens(t *testing.T) {
+// 单次输出上限是固定值，不再从设置读取；旧库里残留的 ai_max_tokens 不应影响请求。
+func TestAIChatUsesFixedMaxTokens(t *testing.T) {
 	svc, fake, _ := newAITestService(t, &llm.Reply{Text: "ok"})
 	if _, err := svc.SaveSettings(AISettingsInput{
-		Enabled: true, Provider: "openai", Model: "deepseek-chat", APIKey: "sk-x", MaxTokens: 1234,
+		Enabled: true, Provider: "openai", Model: "deepseek-chat", APIKey: "sk-x",
 	}); err != nil {
 		t.Fatalf("保存失败: %v", err)
+	}
+	// 模拟升级前留下的配置项
+	if err := svc.upsertConfig("ai_max_tokens", "1234"); err != nil {
+		t.Fatalf("写入失败: %v", err)
 	}
 
 	if _, err := chat(svc, "hi"); err != nil {
 		t.Fatalf("Chat 失败: %v", err)
 	}
-	if got := fake.calls[0].MaxTokens; got != 1234 {
-		t.Fatalf("MaxTokens = %d，期望 1234", got)
+	if got := fake.calls[0].MaxTokens; got != chatMaxTokens {
+		t.Fatalf("MaxTokens = %d，期望固定值 %d", got, chatMaxTokens)
 	}
 }
 
@@ -755,7 +746,7 @@ func TestAIChat_StopsWhenReplyTruncated(t *testing.T) {
 	if len(fake.calls) != 1 {
 		t.Fatalf("截断后不应继续请求，实际 %d 次", len(fake.calls))
 	}
-	if !strings.Contains(res.Reply, "最大上下文窗口") {
+	if !strings.Contains(res.Reply, "单次输出上限") {
 		t.Fatalf("应提示已停止，实际 %q", res.Reply)
 	}
 	if len(res.Actions) != 0 {

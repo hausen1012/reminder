@@ -43,18 +43,18 @@ const (
 	KeyAIAPIKey   = "ai_api_key_enc"
 	// KeyAIPrompt 是用户自定义的追加提示词，与内置系统提示词拼接后一起发给模型。
 	KeyAIPrompt = "ai_custom_prompt"
-	// KeyAIMaxTokens 是单次回复的输出 Token 上限（对应厂商的 max_tokens）。
-	KeyAIMaxTokens = "ai_max_tokens"
 	// KeyAIMaxRetries 是接口调用失败后的最大重试次数。
 	KeyAIMaxRetries = "ai_max_retries"
 )
 
+// chatMaxTokens 是单次回复的输出上限（厂商的 max_tokens）。
+//
+// 它不是用户可调设置：总上下文窗口由模型本身固定，max_tokens 只限制单次输出的长度，
+// 暴露到设置页只会让人误以为能扩大上下文。4096 足够一轮工具调用与一段总结。
+const chatMaxTokens = 4096
+
 // AI 调用的默认与边界值。
 const (
-	// defaultMaxTokens 与旧的写死值一致：不配置时行为不变。
-	defaultMaxTokens = 4096
-	minMaxTokens     = 256
-	maxMaxTokens     = 200000
 	// defaultMaxRetries 是接口失败后的默认重试次数。
 	//
 	// 限流（429）与服务端 5xx 是常见的临时故障，多试几次通常能过；
@@ -105,8 +105,6 @@ type AISettings struct {
 	APIKey string `json:"api_key"`
 	// CustomPrompt 是用户自定义的追加提示词。
 	CustomPrompt string `json:"custom_prompt"`
-	// MaxTokens 是单次回复的输出 Token 上限（max_tokens）。
-	MaxTokens int64 `json:"max_tokens"`
 	// MaxRetries 是接口调用失败后的最大重试次数。
 	MaxRetries int `json:"max_retries"`
 }
@@ -123,8 +121,6 @@ type AISettingsInput struct {
 	APIKey   string   `json:"api_key"`
 	// CustomPrompt 为空表示不使用自定义提示词（清空已保存的内容）。
 	CustomPrompt string `json:"custom_prompt"`
-	// MaxTokens 为 0 或未传时使用默认值；超出边界返回 validation_failed。
-	MaxTokens int64 `json:"max_tokens"`
 	// MaxRetries 是接口失败后的重试次数。不传（null）表示用默认值；
 	// 显式传 0 表示不重试，因此这里用指针区分「没传」与「传了 0」。
 	MaxRetries *int `json:"max_retries"`
@@ -142,7 +138,6 @@ func (s *AIService) GetSettings() (*AISettings, error) {
 		BaseURL:      kv[KeyAIBaseURL],
 		Model:        kv[KeyAIModel],
 		CustomPrompt: kv[KeyAIPrompt],
-		MaxTokens:    parseMaxTokens(kv[KeyAIMaxTokens]),
 		MaxRetries:   parseMaxRetries(kv[KeyAIMaxRetries]),
 	}
 	if out.Provider == "" {
@@ -192,10 +187,6 @@ func (s *AIService) SaveSettings(in AISettingsInput) (*AISettings, error) {
 		return nil, middleware.NewAppError(middleware.CodeValidationFailed,
 			fmt.Sprintf("自定义提示词过长（最多 %d 字）", maxCustomPromptRunes)).WithField("custom_prompt")
 	}
-	maxTokens, err := normalizeMaxTokens(in.MaxTokens)
-	if err != nil {
-		return nil, err
-	}
 	maxRetries, err := normalizeMaxRetries(in.MaxRetries)
 	if err != nil {
 		return nil, err
@@ -238,7 +229,6 @@ func (s *AIService) SaveSettings(in AISettingsInput) (*AISettings, error) {
 		KeyAIModel:      model,
 		KeyAIModels:     string(modelsJSON),
 		KeyAIPrompt:     customPrompt,
-		KeyAIMaxTokens:  strconv.FormatInt(maxTokens, 10),
 		KeyAIMaxRetries: strconv.Itoa(maxRetries),
 	}
 	if in.APIKey == sensitivePlaceholder {
@@ -258,7 +248,7 @@ func (s *AIService) SaveSettings(in AISettingsInput) (*AISettings, error) {
 		}
 	}
 	slog.Info("AI 设置已更新", "enabled", in.Enabled, "provider", provider, "model", model,
-		"max_tokens", maxTokens, "max_retries", maxRetries)
+		"max_retries", maxRetries)
 	return s.GetSettings()
 }
 
@@ -568,7 +558,7 @@ func (s *AIService) ChatStream(ctx context.Context, in ChatInput, sink ChatEvent
 			System:    system,
 			Turns:     turns,
 			Tools:     tools,
-			MaxTokens: cfg.MaxTokens,
+			MaxTokens: chatMaxTokens,
 		}, cfg.MaxRetries, func(attempt, max int, delay time.Duration, cause error) {
 			retries++
 			emit(ChatEventRetry, ChatRetry{
@@ -635,7 +625,7 @@ func (s *AIService) ChatStream(ctx context.Context, in ChatInput, sink ChatEvent
 	}
 	if truncated {
 		// 明确告诉用户「到此为止」的原因：工具参数被截断时继续执行会写坏数据。
-		note := fmt.Sprintf("（回复达到最大上下文窗口 %d Token 已停止，请精简提问或调大设置页的上限）", cfg.MaxTokens)
+		note := fmt.Sprintf("（回复达到单次输出上限 %d Token 已停止，请精简提问或分多次操作）", chatMaxTokens)
 		if replyText == "" {
 			replyText = note
 		} else {
@@ -953,19 +943,8 @@ type aiConfig struct {
 	BaseURL  string
 	Model    string
 	APIKey   string // 明文，仅在构造 provider 时短暂持有
-	// MaxTokens 是单次回复的输出上限。
-	MaxTokens int64
 	// MaxRetries 是接口调用失败后的重试次数。
 	MaxRetries int
-}
-
-// parseMaxTokens 把配置表里的字符串解析成输出上限；缺失或非法时回退默认值。
-func parseMaxTokens(raw string) int64 {
-	n, err := strconv.ParseInt(strings.TrimSpace(raw), 10, 64)
-	if err != nil || n < minMaxTokens || n > maxMaxTokens {
-		return defaultMaxTokens
-	}
-	return n
 }
 
 // parseMaxRetries 把配置表里的字符串解析成重试次数；缺失或非法时回退默认值。
@@ -975,20 +954,6 @@ func parseMaxRetries(raw string) int {
 		return defaultMaxRetries
 	}
 	return n
-}
-
-// normalizeMaxTokens 校验并归一化入参里的输出上限。
-//
-// 0 表示「未填写」，用默认值；正数必须在 [minMaxTokens, maxMaxTokens] 内。
-func normalizeMaxTokens(n int64) (int64, error) {
-	if n == 0 {
-		return defaultMaxTokens, nil
-	}
-	if n < minMaxTokens || n > maxMaxTokens {
-		return 0, middleware.NewAppError(middleware.CodeValidationFailed,
-			fmt.Sprintf("最大上下文窗口需在 %d 到 %d 之间", minMaxTokens, maxMaxTokens)).WithField("max_tokens")
-	}
-	return n, nil
 }
 
 // normalizeMaxRetries 校验并归一化入参里的重试次数。
@@ -1019,7 +984,6 @@ func (s *AIService) resolveConfig(in AISettingsInput) (*aiConfig, error) {
 		Provider:   kv[KeyAIProvider],
 		BaseURL:    kv[KeyAIBaseURL],
 		Model:      kv[KeyAIModel],
-		MaxTokens:  parseMaxTokens(kv[KeyAIMaxTokens]),
 		MaxRetries: parseMaxRetries(kv[KeyAIMaxRetries]),
 	}
 	if cfg.Provider == "" {
@@ -1043,9 +1007,6 @@ func (s *AIService) resolveConfig(in AISettingsInput) (*aiConfig, error) {
 	}
 	if in.Enabled {
 		cfg.Enabled = true
-	}
-	if in.MaxTokens > 0 {
-		cfg.MaxTokens = in.MaxTokens
 	}
 	// 入参的 max_retries 只有显式传入（非 nil）才覆盖：
 	// TestConnection / FetchModels 这些内部调用不带该字段，不能因此把重试改成默认之外的语义。
