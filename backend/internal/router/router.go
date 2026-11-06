@@ -85,6 +85,12 @@ func Setup(staticFS embed.FS, cfg *config.Config) (*SetupResult, error) {
 	if err != nil {
 		return nil, fmt.Errorf("初始化 secretbox 失败: %w", err)
 	}
+	// 未配置 ENCRYPTION_KEY 时用的是编译进二进制的固定密钥，
+	// 数据库文件一旦泄漏，通道密码与令牌明文等同于明文暴露。
+	// 这不是启动错误（保持开箱即用），但必须让运维在日志里看到。
+	if cfg.EncryptionKey == "" {
+		slog.Warn("ENCRYPTION_KEY 未配置，敏感字段使用内置固定密钥加密，等同于明文；生产环境请显式配置")
+	}
 
 	// 站点时区：先用环境变量 TIMEZONE 给出的默认值，随后由库里的设置覆盖。
 	// 这一层是可变引用，设置页改时区后所有服务立刻读到新值。
@@ -169,7 +175,7 @@ func Setup(staticFS embed.FS, cfg *config.Config) (*SetupResult, error) {
 	channelHandler := &handlers.ChannelHandler{Svc: channelSvc}
 	reminderHandler := &handlers.ReminderHandler{Svc: reminderSvc}
 	logHandler := &handlers.LogHandler{Svc: logSvc}
-	confirmHandler := &handlers.ConfirmHandler{Svc: confirmSvc}
+	confirmHandler := &handlers.ConfirmHandler{Svc: confirmSvc, TZ: tz}
 	tokenHandler := &handlers.TokenHandler{Svc: tokenSvc}
 	externalHandler := &handlers.ExternalHandler{ReminderSvc: reminderSvc, TokenSvc: tokenSvc, ChannelSvc: channelSvc}
 	schedulerHandler := &handlers.SchedulerHandler{Engine: engine, Sweeper: sweeper}

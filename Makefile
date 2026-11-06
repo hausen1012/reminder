@@ -14,9 +14,14 @@ dev-frontend:
 
 # Build frontend + copy to backend for Go embedding
 # The embed path //go:embed web/* in cmd/server/main.go resolves relative to cmd/server/
+#
+# 先清空 web/ 再拷贝：go:embed 会把目录内所有文件打进二进制，
+# 不清空时上一次构建残留的带 hash 资源会一直累积，二进制只增不减。
+# .gitkeep 要保留——CI 依赖它让目录在空仓库里也能编译。
 build-frontend:
 	cd frontend && npm run build
 	mkdir -p backend/cmd/server/web
+	find backend/cmd/server/web -mindepth 1 ! -name '.gitkeep' -exec rm -rf {} +
 	cp -r frontend/dist/* backend/cmd/server/web/
 
 # Build backend binary (local OS)

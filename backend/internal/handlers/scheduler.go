@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"log/slog"
+	"net/http"
 	"strconv"
 	"time"
 
@@ -18,6 +20,10 @@ type HealthHandler struct {
 }
 
 // Check GET /api/health
+//
+// 状态码本身即结论：数据库可连且调度器在运行时返回 200 + status=healthy，
+// 否则返回 503 + status=unhealthy。监控系统按 2xx/5xx 判断即可，
+// 不必解析响应体——之前这里无论内部状态如何都回 200 healthy，等于健康检查失效。
 func (h *HealthHandler) Check(c *gin.Context) {
 	dbAlive := false
 	if h.DB != nil {
@@ -26,25 +32,59 @@ func (h *HealthHandler) Check(c *gin.Context) {
 		}
 	}
 
+	engineRunning := h.Engine != nil && h.Engine.IsRunning()
+	sweeperRunning := h.Sweeper != nil && h.Sweeper.IsRunning()
+
 	var reminderCount, logCount int64
-	if h.DB != nil {
-		h.DB.Model(&models.Reminder{}).Count(&reminderCount)
-		h.DB.Model(&models.DeliveryLog{}).Count(&logCount)
+	if h.DB != nil && dbAlive {
+		if err := h.DB.Model(&models.Reminder{}).Count(&reminderCount).Error; err != nil {
+			slog.Warn("健康检查统计提醒数失败", "error", err)
+		}
+		if err := h.DB.Model(&models.DeliveryLog{}).Count(&logCount).Error; err != nil {
+			slog.Warn("健康检查统计日志数失败", "error", err)
+		}
 	}
 
-	successJSON(c, gin.H{
-		"status":           "healthy",
-		"db_alive":         dbAlive,
-		"db_reminders":     reminderCount,
-		"db_delivery_logs": logCount,
-		"scheduler": gin.H{
-			"registered":   h.Engine.RegisteredCount(),
-			"last_fire_at": h.Engine.LastFireTime().Format(time.RFC3339),
+	status := "healthy"
+	if !dbAlive || !engineRunning {
+		status = "unhealthy"
+	}
+
+	var lastFireAt string
+	registered := 0
+	if h.Engine != nil {
+		registered = h.Engine.RegisteredCount()
+		if t := h.Engine.LastFireTime(); !t.IsZero() {
+			lastFireAt = t.Format(time.RFC3339)
+		}
+	}
+
+	body := gin.H{
+		"code":    200,
+		"message": "ok",
+		"data": gin.H{
+			"status":           status,
+			"db_alive":         dbAlive,
+			"db_reminders":     reminderCount,
+			"db_delivery_logs": logCount,
+			"scheduler": gin.H{
+				"running":      engineRunning,
+				"registered":   registered,
+				"last_fire_at": lastFireAt,
+			},
+			"sweeper": gin.H{
+				"running": sweeperRunning,
+			},
 		},
-		"sweeper": gin.H{
-			"running": h.Sweeper.IsRunning(),
-		},
-	})
+	}
+
+	httpStatus := http.StatusOK
+	if status != "healthy" {
+		httpStatus = http.StatusServiceUnavailable
+		body["code"] = httpStatus
+		body["message"] = "服务不可用"
+	}
+	c.JSON(httpStatus, body)
 }
 
 // SchedulerHandler 返回调度器（Engine + Sweeper）运行时状态。

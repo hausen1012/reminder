@@ -359,19 +359,23 @@ func (s *ReminderService) Delete(id uint) error {
 }
 
 // BatchDelete 批量硬删除提醒并从调度器移除。
+//
+// 两步删除放在同一个事务里：与单条 Delete 保持一致。
+// 分开执行时，若第二步失败，会留下「关联表已清、提醒还在」的脏数据——
+// 该提醒仍会出现在列表里，但绑定关系已经没了，用户只能手动删除。
 func (s *ReminderService) BatchDelete(ids []uint) error {
 	if len(ids) == 0 {
 		return nil
 	}
-	// 先删关联表
-	if err := s.DB.Where("reminder_id IN ?", ids).Delete(&models.ReminderChannel{}).Error; err != nil {
+	if err := s.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("reminder_id IN ?", ids).Delete(&models.ReminderChannel{}).Error; err != nil {
+			return err
+		}
+		return tx.Where("id IN ?", ids).Unscoped().Delete(&models.Reminder{}).Error
+	}); err != nil {
 		return err
 	}
-	// 再删提醒
-	if err := s.DB.Where("id IN ?", ids).Unscoped().Delete(&models.Reminder{}).Error; err != nil {
-		return err
-	}
-	// 再清理调度器和确认重试（避免事务内调用 s.DB 造成 SQLite 单连接死锁）
+	// 事务提交后再清理调度器和确认重试（避免事务内调用 s.DB 造成 SQLite 单连接死锁）
 	for _, id := range ids {
 		if s.Engine != nil {
 			s.Engine.Remove(id)

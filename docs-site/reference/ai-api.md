@@ -11,6 +11,7 @@
 | `GET` | `/api/ai/settings` | 读取 AI 设置，密钥回显为 `***` |
 | `PUT` | `/api/ai/settings` | 保存设置 |
 | `POST` | `/api/ai/test` | 用当前/待保存的配置发一次最小请求 |
+| `POST` | `/api/ai/models` | 按当前/待保存的配置拉取厂商的可用模型列表 |
 
 `PUT /api/ai/settings` 请求体：
 
@@ -47,6 +48,15 @@
 ```
 
 连接失败返回 `validation_failed`，`message` 里带上对端的原始错误，便于判断是密钥错、地址错还是模型名错。
+
+`POST /api/ai/models` 的请求体与 `PUT /api/ai/settings` 相同（同样以 `"***"` 表示沿用已保存的密钥），返回：
+
+```json
+{ "code": 200, "message": "ok", "data": { "items": ["deepseek-chat", "deepseek-reasoner"] } }
+```
+
+设置页的「获取模型列表」按钮用它填充下拉候选。拉取失败（地址错、密钥错、厂商不提供该接口）
+返回 `validation_failed`，此时仍可手动填写模型名。
 
 ## 对话
 

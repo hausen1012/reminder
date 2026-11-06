@@ -79,6 +79,86 @@ func TestHealthCheck(t *testing.T) {
 	}
 }
 
+// newHealthEngine 构造只挂健康检查的最小路由。
+func newHealthEngine(h *HealthHandler) *gin.Engine {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.Use(middleware.ErrorHandler())
+	r.GET("/health", h.Check)
+	return r
+}
+
+// 调度器停止时健康检查应返回 503 + unhealthy，而不是恒定的 200 healthy。
+//
+// 监控系统按状态码判断，若这里永远 200，调度器挂掉也不会告警。
+func TestHealthCheck_UnhealthyWhenSchedulerStopped(t *testing.T) {
+	engine, sweeper := newTestScheduler(t)
+	db := newTestDB(t)
+	engine.Stop()
+
+	h := &HealthHandler{DB: db, Engine: engine, Sweeper: sweeper}
+	w := doJSON(newHealthEngine(h), http.MethodGet, "/health", nil)
+	if w.Code != http.StatusServiceUnavailable {
+		t.Fatalf("状态码 = %d, 期望 503, body=%s", w.Code, w.Body.String())
+	}
+
+	var resp struct {
+		Code int `json:"code"`
+		Data struct {
+			Status    string `json:"status"`
+			DBAlive   bool   `json:"db_alive"`
+			Scheduler struct {
+				Running bool `json:"running"`
+			} `json:"scheduler"`
+		} `json:"data"`
+	}
+	decodeJSON(t, w, &resp)
+	if resp.Data.Status != "unhealthy" {
+		t.Fatalf("status = %q, 期望 unhealthy", resp.Data.Status)
+	}
+	if resp.Data.Scheduler.Running {
+		t.Fatal("调度器应报告已停止")
+	}
+	if !resp.Data.DBAlive {
+		t.Fatal("数据库仍可连接，db_alive 应为 true")
+	}
+	if resp.Code != http.StatusServiceUnavailable {
+		t.Fatalf("响应体 code = %d, 期望 503", resp.Code)
+	}
+}
+
+// 数据库不可用时健康检查应返回 503。
+func TestHealthCheck_UnhealthyWhenDBUnavailable(t *testing.T) {
+	engine, sweeper := newTestScheduler(t)
+	db := newTestDB(t)
+	// 关掉底层连接，模拟数据库不可用
+	sqlDB, err := db.DB()
+	if err != nil {
+		t.Fatalf("获取 sql.DB 失败: %v", err)
+	}
+	_ = sqlDB.Close()
+
+	h := &HealthHandler{DB: db, Engine: engine, Sweeper: sweeper}
+	w := doJSON(newHealthEngine(h), http.MethodGet, "/health", nil)
+	if w.Code != http.StatusServiceUnavailable {
+		t.Fatalf("状态码 = %d, 期望 503, body=%s", w.Code, w.Body.String())
+	}
+
+	var resp struct {
+		Data struct {
+			Status  string `json:"status"`
+			DBAlive bool   `json:"db_alive"`
+		} `json:"data"`
+	}
+	decodeJSON(t, w, &resp)
+	if resp.Data.DBAlive {
+		t.Fatal("db_alive 应为 false")
+	}
+	if resp.Data.Status != "unhealthy" {
+		t.Fatalf("status = %q, 期望 unhealthy", resp.Data.Status)
+	}
+}
+
 // 调度器状态接口应返回 engine 与 sweeper 状态。
 func TestSchedulerStatus(t *testing.T) {
 	r := newSchedulerStatusEngine(t)

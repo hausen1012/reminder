@@ -117,10 +117,36 @@ JWT 有效期为 72 小时。改密码后旧 JWT 仍然有效直到过期——�
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| `GET` | `/api/health` | 健康检查，**无需鉴权** |
+| `GET` | `/api/health` | 健康检查，**无需鉴权**；异常时返回 `503` |
 | `GET` | `/api/scheduler/status` | 调度器状态与注册明细，支持分页 |
-| `GET` | `/api/config` | 站点配置键值对 |
+| `GET` | `/api/config` | 站点配置键值对（仅白名单内的键） |
 | `PUT` | `/api/config` | 批量更新配置，值为空串表示删除该键 |
+
+### 健康检查的状态码
+
+`/api/health` 用状态码表达结论，监控系统不需要解析响应体：
+
+| 情况 | HTTP 状态码 | `data.status` |
+|---|---|---|
+| 数据库可连且调度器运行中 | `200` | `healthy` |
+| 数据库不可用或调度器已停止 | `503` | `unhealthy` |
+
+兜底扫描器（sweeper）是否运行单独记录在 `data.sweeper.running`，不影响整体结论。
+
+### `/api/config` 的白名单
+
+这个接口只接受下面三个键，传其它键（包括 `ai_` 前缀的 AI 设置）一律返回
+`400 validation_failed`，`error.field` 为被拒绝的键名：
+
+| 键 | 说明 |
+|---|---|
+| `app_name` | 站点名称 |
+| `logo_svg` | 自定义 Logo 的 SVG 源码 |
+| `timezone` | 站点时区 |
+
+`GET /api/config` 同样只返回这三个键。AI 设置必须走 `/api/ai/settings`——
+那里有独立的加密与校验路径，通用配置接口不能绕过。
+白名单在服务层校验，整批写入前先整体检查：有一个非法键时，同一批次里的其它键也不会落库。
 
 ## AI 助手
 
@@ -129,6 +155,7 @@ JWT 有效期为 72 小时。改密码后旧 JWT 仍然有效直到过期——�
 | `GET` | `/api/ai/settings` | 读取 AI 设置，密钥回显为 `***` |
 | `PUT` | `/api/ai/settings` | 保存 AI 设置 |
 | `POST` | `/api/ai/test` | 测试厂商连通性 |
+| `POST` | `/api/ai/models` | 按当前配置拉取可用模型列表，返回 `{ "items": [...] }` |
 | `POST` | `/api/ai/chat` | 发送消息，返回回复与本轮待确认操作（无状态，对话不入库） |
 | `POST` | `/api/ai/chat/stream` | 同上，用 SSE 推送思考与重试状态 |
 | `GET` | `/api/ai/actions` | 列出待确认草稿（`?status=pending`） |

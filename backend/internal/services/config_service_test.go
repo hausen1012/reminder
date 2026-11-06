@@ -13,24 +13,24 @@ func TestConfigService_UpsertAndGet(t *testing.T) {
 	db := openTestDB(t)
 	svc := NewConfigService(db, testTZ(time.FixedZone("CST", 8*3600)))
 
-	if err := svc.UpsertMap(map[string]string{"a": "1", "b": "2"}); err != nil {
+	if err := svc.UpsertMap(map[string]string{"app_name": "提醒", "logo_svg": "<svg/>"}); err != nil {
 		t.Fatalf("写入失败: %v", err)
 	}
 	got, err := svc.GetAll()
 	if err != nil {
 		t.Fatalf("读取失败: %v", err)
 	}
-	if got["a"] != "1" || got["b"] != "2" {
+	if got["app_name"] != "提醒" || got["logo_svg"] != "<svg/>" {
 		t.Fatalf("读取不一致: %v", got)
 	}
 
 	// 覆盖
-	if err := svc.UpsertMap(map[string]string{"a": "9"}); err != nil {
+	if err := svc.UpsertMap(map[string]string{"app_name": "改名"}); err != nil {
 		t.Fatalf("覆盖失败: %v", err)
 	}
 	got, _ = svc.GetAll()
-	if got["a"] != "9" {
-		t.Fatalf("覆盖后 a = %q, 期望 9", got["a"])
+	if got["app_name"] != "改名" {
+		t.Fatalf("覆盖后 app_name = %q, 期望 改名", got["app_name"])
 	}
 }
 
@@ -39,19 +39,19 @@ func TestConfigService_EmptyValueDeletes(t *testing.T) {
 	db := openTestDB(t)
 	svc := NewConfigService(db, testTZ(time.FixedZone("CST", 8*3600)))
 
-	if err := svc.UpsertMap(map[string]string{"keep": "v", "drop": "v"}); err != nil {
+	if err := svc.UpsertMap(map[string]string{"app_name": "提醒", "logo_svg": "v"}); err != nil {
 		t.Fatalf("写入失败: %v", err)
 	}
-	if err := svc.UpsertMap(map[string]string{"drop": ""}); err != nil {
+	if err := svc.UpsertMap(map[string]string{"logo_svg": ""}); err != nil {
 		t.Fatalf("删除失败: %v", err)
 	}
 
 	got, _ := svc.GetAll()
-	if _, ok := got["drop"]; ok {
-		t.Fatalf("drop 应被删除，实际仍在: %v", got)
+	if _, ok := got["logo_svg"]; ok {
+		t.Fatalf("logo_svg 应被删除，实际仍在: %v", got)
 	}
-	if got["keep"] != "v" {
-		t.Fatalf("keep 不应受影响: %v", got)
+	if got["app_name"] != "提醒" {
+		t.Fatalf("app_name 不应受影响: %v", got)
 	}
 }
 
@@ -217,5 +217,66 @@ func TestConfigService_ClearTimezoneFallsBack(t *testing.T) {
 	}
 	if called != 2 {
 		t.Fatalf("两次变更都应触发回调，实际 %d", called)
+	}
+}
+
+// 白名单之外的 key 必须被拒绝：否则可以借通用配置接口绕过
+// /api/ai/settings 的加密与校验，把 AI 密钥等敏感内容直接写进 config 表。
+func TestConfigService_UpsertRejectsUnknownKey(t *testing.T) {
+	db := openTestDB(t)
+	svc := NewConfigService(db, testTZ(time.FixedZone("CST", 8*3600)))
+
+	err := svc.UpsertMap(map[string]string{"app_name": "提醒", "ai_api_key_enc": "明文密钥"})
+	if err == nil {
+		t.Fatal("白名单之外的 key 应报错")
+	}
+	appErr, ok := err.(*middleware.AppError)
+	if !ok || appErr.Code != middleware.CodeValidationFailed {
+		t.Fatalf("应为校验错误，实际 %v", err)
+	}
+	if appErr.Field != "ai_api_key_enc" {
+		t.Fatalf("field = %q，期望 ai_api_key_enc", appErr.Field)
+	}
+
+	// 整批都不应落库：校验发生在写库之前
+	got, _ := svc.GetAll()
+	if _, ok := got["app_name"]; ok {
+		t.Fatalf("校验失败时同批次的其他 key 也不应写入: %v", got)
+	}
+	var count int64
+	db.Table("configs").Where("key = ?", "ai_api_key_enc").Count(&count)
+	if count != 0 {
+		t.Fatal("非法 key 不应写入数据库")
+	}
+}
+
+// GetAll 只返回白名单内的 key，不把 AI 设置等内部配置带到浏览器。
+func TestConfigService_GetAllFiltersUnknownKeys(t *testing.T) {
+	db := openTestDB(t)
+	svc := NewConfigService(db, testTZ(time.FixedZone("CST", 8*3600)))
+
+	// 绕过服务直接写库，模拟历史数据或其它写入路径留下的内部配置
+	rows := []struct{ k, v string }{
+		{"app_name", "提醒"},
+		{"ai_api_key_enc", "ENCRYPTED"},
+		{"ai_provider", "openai"},
+	}
+	for _, r := range rows {
+		if err := db.Exec("INSERT INTO configs (key, value) VALUES (?, ?)", r.k, r.v).Error; err != nil {
+			t.Fatalf("写库失败: %v", err)
+		}
+	}
+
+	got, err := svc.GetAll()
+	if err != nil {
+		t.Fatalf("读取失败: %v", err)
+	}
+	if got["app_name"] != "提醒" {
+		t.Fatalf("白名单内的 key 应返回: %v", got)
+	}
+	for _, k := range []string{"ai_api_key_enc", "ai_provider"} {
+		if _, ok := got[k]; ok {
+			t.Fatalf("%s 不应出现在 /api/config 的返回里: %v", k, got)
+		}
 	}
 }

@@ -12,6 +12,20 @@ import (
 // KeyTimezone 是站点时区在 config 表中的 key。
 const KeyTimezone = "timezone"
 
+// 站点配置的 key 白名单。
+//
+// config 表本身是通用的键值表，但 /api/config 是一个给面板用的通用接口：
+// 若不设边界，调用方可以借它读写任意 key——最严重的是写入 ai_api_key_enc，
+// 绕过 /api/ai/settings 的加密与校验路径，把 AI 密钥写成明文或垃圾值；
+// GetAll 全量返回还会把这类密钥带到浏览器。
+//
+// AI 设置（ai_ 前缀）只走 /api/ai/settings，不在此列。
+var allowedConfigKeys = map[string]struct{}{
+	"app_name":  {},
+	"logo_svg":  {},
+	KeyTimezone: {},
+}
+
 // ConfigService 管理站点配置。
 type ConfigService struct {
 	DB *gorm.DB
@@ -25,16 +39,20 @@ func NewConfigService(db *gorm.DB, tz *timezone.Provider) *ConfigService {
 	return &ConfigService{DB: db, TZ: tz}
 }
 
-// GetAll 读取全部配置，返回 key→value 映射。
+// GetAll 读取允许公开的站点配置，返回 key→value 映射。
 //
+// 只返回白名单里的 key：表里可能还有 AI 设置等不该经通用接口外泄的内容。
 // 时区未在库里设置过时补上默认值，让设置页始终有一个可编辑的当前值。
 func (s *ConfigService) GetAll() (map[string]string, error) {
 	var rows []models.Config
 	if err := s.DB.Find(&rows).Error; err != nil {
 		return nil, err
 	}
-	out := make(map[string]string, len(rows)+1)
+	out := make(map[string]string, len(allowedConfigKeys))
 	for _, r := range rows {
+		if _, ok := allowedConfigKeys[r.Key]; !ok {
+			continue
+		}
 		out[r.Key] = r.Value
 	}
 	if _, ok := out[KeyTimezone]; !ok && s.TZ != nil {
@@ -43,13 +61,20 @@ func (s *ConfigService) GetAll() (map[string]string, error) {
 	return out, nil
 }
 
-// UpsertMap 批量更新配置。
+// UpsertMap 批量更新站点配置。
 // value 为空字符串时删除对应 key。
 //
+// 只接受白名单里的 key，其它一律拒绝：见 allowedConfigKeys 的说明。
+// 先在写库之前整体校验，避免「写了一半才发现某个 key 非法」。
 // timezone 会先校验：非法时区直接返回校验错误，保证落库的永远是能解析的值。
 // 时区只有在值确实变化时才触发重建：设置页每次保存都会把全部配置回传，
 // 没改时区却重注册全部提醒会产生无谓的调度抖动。
 func (s *ConfigService) UpsertMap(cfg map[string]string) error {
+	for k := range cfg {
+		if _, ok := allowedConfigKeys[k]; !ok {
+			return middleware.NewAppError(middleware.CodeValidationFailed, "不支持的配置项: "+k).WithField(k)
+		}
+	}
 	if v, ok := cfg[KeyTimezone]; ok && v != "" && !timezone.Valid(v) {
 		return middleware.NewAppError(middleware.CodeValidationFailed, "未知时区: "+v).WithField(KeyTimezone)
 	}

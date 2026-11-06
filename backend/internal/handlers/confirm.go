@@ -13,11 +13,24 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/reminder/backend/internal/models"
 	"github.com/reminder/backend/internal/services"
+	"github.com/reminder/backend/internal/timezone"
 )
 
 // ConfirmHandler 处理确认链接。
 type ConfirmHandler struct {
 	Svc *services.ConfirmService
+	// TZ 是站点时区：确认页上的时间必须按站点时区展示。
+	// models.Time 一律以 UTC 落库，直接 Format 会让用户看到早 8 小时的时间。
+	// 为空时退回 time.Local（启动时已对齐到站点时区，仅损失运行期改时区的热更新）。
+	TZ *timezone.Provider
+}
+
+// loc 返回用于展示的时间位置。
+func (h *ConfirmHandler) loc() *time.Location {
+	if h.TZ != nil {
+		return h.TZ.Get()
+	}
+	return time.Local
 }
 
 // Confirm 处理 GET /c/:token
@@ -35,25 +48,33 @@ func (h *ConfirmHandler) Confirm(c *gin.Context) {
 	dl, err := h.Svc.ConsumeToken(token)
 	if err != nil {
 		if errors.Is(err, services.ErrConfirmTokenUsed) && dl != nil {
-			c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(confirmAlreadyPage(dl)))
+			c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(confirmAlreadyPage(dl, h.loc())))
 			return
 		}
 		c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(confirmErrorPage(err.Error())))
 		return
 	}
 
-	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(confirmSuccessPage(dl)))
+	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(confirmSuccessPage(dl, h.loc())))
+}
+
+// formatInZone 把归一化为 UTC 的时间按站点时区格式化成 "2006-01-02 15:04:05"。
+func formatInZone(t models.Time, loc *time.Location) string {
+	if loc == nil {
+		loc = time.Local
+	}
+	return t.Std().In(loc).Format("2006-01-02 15:04:05")
 }
 
 // confirmSuccessPage 确认成功页
-func confirmSuccessPage(dl *models.DeliveryLog) string {
+func confirmSuccessPage(dl *models.DeliveryLog, loc *time.Location) string {
 	title := "已确认"
 	if dl.Title != "" {
 		title = dl.Title
 	}
-	confirmedAt := time.Now().Format("2006-01-02 15:04:05")
+	confirmedAt := formatInZone(models.TimeNow(), loc)
 	if dl.ConfirmedAt != nil {
-		confirmedAt = dl.ConfirmedAt.Format("2006-01-02 15:04:05")
+		confirmedAt = formatInZone(*dl.ConfirmedAt, loc)
 	}
 	return fmt.Sprintf(`<!DOCTYPE html>
 <html lang="zh-CN">
@@ -85,14 +106,14 @@ p{font-size:14px;color:#666;line-height:1.6}
 
 // confirmAlreadyPage 重复点击页：把「已被使用」渲染成中性的成功态，
 // 显示首次确认时间，让用户清楚「这件事已经处理过了」。
-func confirmAlreadyPage(dl *models.DeliveryLog) string {
+func confirmAlreadyPage(dl *models.DeliveryLog, loc *time.Location) string {
 	title := "该提醒"
 	if dl.Title != "" {
 		title = dl.Title
 	}
 	confirmedAt := "此前"
 	if dl.ConfirmedAt != nil {
-		confirmedAt = dl.ConfirmedAt.Format("2006-01-02 15:04:05")
+		confirmedAt = formatInZone(*dl.ConfirmedAt, loc)
 	}
 	return fmt.Sprintf(`<!DOCTYPE html>
 <html lang="zh-CN">

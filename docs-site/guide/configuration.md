@@ -42,7 +42,7 @@ $b = New-Object byte[] 32
 ```
 
 未配置时会退回到编译进二进制的固定密钥，安全等级等同于明文——**数据库文件泄漏即等于密码泄漏**。
-生产环境务必显式配置。
+生产环境务必显式配置。启动日志里会出现一条 `ENCRYPTION_KEY 未配置` 的 `WARN`，看到它就该补上。
 
 ::: danger 换密钥会导致旧数据读不出来
 通道配置与令牌明文都以密文入库。更换 `ENCRYPTION_KEY` 后，已有通道的敏感字段与
@@ -145,6 +145,10 @@ $b = New-Object byte[] 32
 | `timezone` | 站点时区（如 `Asia/Shanghai`）。保存后立即生效，所有启用提醒按新时区重算下次触发时间并写回数据库。值未变化时不触发重建 |
 
 值为空字符串时表示删除该配置项，回退到内置默认（`timezone` 回退到 `Asia/Shanghai`）。
+
+`/api/config` 是一组**白名单**接口：只接受上表中的三个键，写入其它键（包括 `ai_` 前缀）
+一律返回 `400 validation_failed`，读取时也只返回这三个键。这样通用配置接口无法绕过
+AI 设置的加密与校验路径去写密钥。详见[内置 API](/reference/internal-api#api-config-的白名单)。
 
 AI 助手相关配置也以 `ai_` 前缀存在同一张表里，但**不通过 `/api/config` 读写**，
 而是走专门的 `GET/PUT /api/ai/settings`：

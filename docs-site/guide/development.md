@@ -54,7 +54,6 @@ frontend/
       channels/ reminders/ tokens/ layout/
     contexts/  lib/  types/  test/
 docs-site/             文档站点（VitePress）
-docs/design/           设计与实施记录（按日期命名的历史方案）
 ```
 
 前端展示时间统一走 `src/lib/datetime.ts`（`formatInZone` / `formatNextFireInZone`），

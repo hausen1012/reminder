@@ -125,11 +125,18 @@ curl http://localhost:8765/api/health
     "db_alive": true,
     "db_reminders": 12,
     "db_delivery_logs": 340,
-    "scheduler": { "registered": 10, "last_fire_at": "2026-07-01T09:00:00+08:00" },
+    "scheduler": { "running": true, "registered": 10, "last_fire_at": "2026-07-01T09:00:00+08:00" },
     "sweeper": { "running": true }
   }
 }
 ```
+
+**状态码本身就是结论**：数据库可连且调度器运行中时返回 `200` + `status: "healthy"`；
+数据库不可用或调度器已停止时返回 `503` + `status: "unhealthy"`（此时 `code` 也是 `503`）。
+监控系统直接按 2xx / 5xx 判断即可，不需要解析响应体。
+
+兜底扫描器是否运行单独记在 `data.sweeper.running`，不改变整体结论——
+它停掉时仍会返回 `200`，因为主调度器还在工作；想连这一层一起盯，就额外判断该字段。
 
 这个接口不需要认证，可以直接接到监控系统做存活与业务指标采集。
 

@@ -33,7 +33,7 @@ func TestConfirm_SuccessPageEscapesTitle(t *testing.T) {
 		t.Fatalf("创建确认令牌失败: %v", err)
 	}
 
-	h := &ConfirmHandler{Svc: svc}
+	h := newConfirmHandler(svc)
 	r := newConfirmEngine(h)
 
 	w := doJSON(r, http.MethodGet, "/c/"+token, nil)
@@ -64,7 +64,7 @@ func TestConfirm_MarksConfirmed(t *testing.T) {
 	}
 	token, _ := svc.CreateToken(dl.ID, time.Hour)
 
-	h := &ConfirmHandler{Svc: svc}
+	h := newConfirmHandler(svc)
 	w := doJSON(newConfirmEngine(h), http.MethodGet, "/c/"+token, nil)
 	if w.Code != http.StatusOK {
 		t.Fatalf("状态码 = %d", w.Code)
@@ -96,8 +96,14 @@ func TestConfirm_MarksConfirmed(t *testing.T) {
 	if !containsSub(body2, "之前已确认") {
 		t.Fatalf("重复点击应提示此前已确认: %s", body2)
 	}
-	if !containsSub(body2, got.ConfirmedAt.Format("2006-01-02 15:04:05")) {
-		t.Fatalf("应展示首次确认时间: %s", body2)
+	// 确认时间按站点时区（用例注入东八区）展示，而不是 UTC
+	wantTime := got.ConfirmedAt.Std().In(cstZone()).Format("2006-01-02 15:04:05")
+	if !containsSub(body2, wantTime) {
+		t.Fatalf("应展示站点时区下的首次确认时间 %s: %s", wantTime, body2)
+	}
+	// 反向校验：直接 Format（UTC）的文本不该出现，除非东西八区恰好相同
+	if utc := got.ConfirmedAt.Std().UTC().Format("2006-01-02 15:04:05"); utc != wantTime && containsSub(body2, utc) {
+		t.Fatalf("确认时间不应按 UTC 展示: %s", body2)
 	}
 
 	// 重复点击不应改变首次确认时间
@@ -113,7 +119,7 @@ func TestConfirm_MarksConfirmed(t *testing.T) {
 // 无效 token 应返回错误页而非 500。
 func TestConfirm_InvalidToken(t *testing.T) {
 	db := newTestDB(t)
-	h := &ConfirmHandler{Svc: services.NewConfirmService(db, testConfig())}
+	h := newConfirmHandler(services.NewConfirmService(db, testConfig()))
 
 	w := doJSON(newConfirmEngine(h), http.MethodGet, "/c/nonexistent-token", nil)
 	if w.Code != http.StatusOK {
@@ -135,7 +141,7 @@ func TestConfirm_ExpiredToken(t *testing.T) {
 	}
 	token, _ := svc.CreateToken(dl.ID, -time.Hour) // 已过期
 
-	h := &ConfirmHandler{Svc: svc}
+	h := newConfirmHandler(svc)
 	w := doJSON(newConfirmEngine(h), http.MethodGet, "/c/"+token, nil)
 	if !containsSub(w.Body.String(), "已过期") {
 		t.Fatalf("应提示已过期: %s", w.Body.String())
@@ -180,4 +186,12 @@ func newConfirmEngine(h *ConfirmHandler) *gin.Engine {
 	r := gin.New()
 	r.GET("/c/:token", h.Confirm)
 	return r
+}
+
+// newConfirmHandler 构造带固定站点时区的确认处理器。
+//
+// 确认页上的时间必须按站点时区展示，用例统一注入东八区，
+// 避免结果随执行机器的本地时区漂移。
+func newConfirmHandler(svc *services.ConfirmService) *ConfirmHandler {
+	return &ConfirmHandler{Svc: svc, TZ: testTZ(cstZone())}
 }

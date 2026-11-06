@@ -297,6 +297,49 @@ func TestReminderBatchDelete(t *testing.T) {
 	}
 }
 
+// 批量删除是原子的：两步必须同生共死。
+//
+// 用触发器让「删除提醒」这一步必然失败，断言关联表未被单独删掉——
+// 否则会留下「提醒还在、绑定关系没了」的脏数据。
+func TestReminderBatchDelete_AtomicOnFailure(t *testing.T) {
+	db := openTestDB(t)
+	svc := newReminderStack(t, db)
+	ch := createChannel(t, db, "log", true)
+
+	in := validOnceInput()
+	in.Title = "原子性"
+	in.ChannelIDs = []uint{ch.ID}
+	v, err := svc.Create(in)
+	if err != nil {
+		t.Fatalf("创建失败: %v", err)
+	}
+
+	// 让 reminders 的删除失败，模拟事务中途出错
+	if err := db.Exec(
+		"CREATE TRIGGER fail_reminder_delete BEFORE DELETE ON reminders " +
+			"BEGIN SELECT RAISE(ABORT, 'boom'); END",
+	).Error; err != nil {
+		t.Fatalf("创建触发器失败: %v", err)
+	}
+	t.Cleanup(func() { db.Exec("DROP TRIGGER IF EXISTS fail_reminder_delete") })
+
+	if err := svc.BatchDelete([]uint{v.ID}); err == nil {
+		t.Fatal("删除应失败")
+	}
+
+	// 事务回滚：关联表与提醒都应完好
+	var joinCount int64
+	db.Model(&models.ReminderChannel{}).Where("reminder_id = ?", v.ID).Count(&joinCount)
+	if joinCount != 1 {
+		t.Fatalf("事务回滚后关联表应保留 1 条，实际 %d 条", joinCount)
+	}
+	var remaining int64
+	db.Model(&models.Reminder{}).Where("id = ?", v.ID).Count(&remaining)
+	if remaining != 1 {
+		t.Fatalf("事务回滚后提醒应仍存在，实际 %d 条", remaining)
+	}
+}
+
 // 列表：source / enabled / search 过滤与分页应生效。
 func TestReminderList_FiltersAndPaging(t *testing.T) {
 	db := openTestDB(t)
