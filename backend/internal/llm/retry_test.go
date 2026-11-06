@@ -210,6 +210,35 @@ func TestOpenAIProvider_RetriesOn5xx(t *testing.T) {
 	}
 }
 
+// 反向代理或网关返回非 JSON 的 HTML 502/503 页面时，同样应被识别为 HTTPStatusError 并重试。
+func TestOpenAIProvider_RetriesOnHTML5xx(t *testing.T) {
+	shrinkRetryDelays(t)
+	var attempts int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if atomic.AddInt32(&attempts, 1) < 2 {
+			w.WriteHeader(http.StatusBadGateway)
+			_, _ = w.Write([]byte(`<html><body>502 Bad Gateway</body></html>`))
+			return
+		}
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"role":"assistant","content":"恢复正常"}}]}`))
+	}))
+	defer srv.Close()
+
+	p := NewOpenAIProvider(srv.URL, "", "m")
+	reply, err := ChatWithRetry(context.Background(), p, Request{
+		Turns: []Turn{{Role: "user", Text: "hi"}},
+	}, 3)
+	if err != nil {
+		t.Fatalf("应重试后成功: %v", err)
+	}
+	if reply.Text != "恢复正常" {
+		t.Fatalf("reply = %q", reply.Text)
+	}
+	if got := atomic.LoadInt32(&attempts); got != 2 {
+		t.Fatalf("请求次数 = %d，期望 2", got)
+	}
+}
+
 // finish_reason=length 应标记为截断。
 func TestOpenAIProvider_TruncatedFlag(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

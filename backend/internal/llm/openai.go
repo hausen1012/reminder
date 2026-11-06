@@ -161,13 +161,25 @@ func (p *OpenAIProvider) Chat(ctx context.Context, req Request) (*Reply, error) 
 	defer resp.Body.Close()
 
 	respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	if resp.StatusCode >= 400 {
+		var errOut oaResponse
+		msg := truncate(respBody, 300)
+		if err := json.Unmarshal(respBody, &errOut); err == nil && errOut.Error != nil && errOut.Error.Message != "" {
+			msg = errOut.Error.Message
+		}
+		return nil, &HTTPStatusError{
+			Status:  resp.StatusCode,
+			Message: fmt.Sprintf("AI 服务返回错误（HTTP %d）: %s", resp.StatusCode, msg),
+		}
+	}
+
 	var out oaResponse
 	if err := json.Unmarshal(respBody, &out); err != nil {
 		return nil, fmt.Errorf("解析 AI 响应失败（HTTP %d）: %s", resp.StatusCode, truncate(respBody, 300))
 	}
-	if resp.StatusCode >= 400 || out.Error != nil {
+	if out.Error != nil {
 		msg := truncate(respBody, 300)
-		if out.Error != nil && out.Error.Message != "" {
+		if out.Error.Message != "" {
 			msg = out.Error.Message
 		}
 		return nil, &HTTPStatusError{

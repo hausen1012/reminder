@@ -486,8 +486,10 @@ export async function sendAIChatStream(
     }
   }
 
-  // SSE 以空行分隔事件，data 可能跨多行（这里服务端只发单行 JSON）
+  // SSE 以空行分隔事件，data 可能跨多行（这里服务端只发单行 JSON）。
+  // 统一换行符：避免反向代理或网关把换行规范化为 CRLF（\r\n\r\n）导致分块失败。
   const drain = (flush: boolean) => {
+    buf = buf.replace(/\r\n/g, '\n')
     const blocks = buf.split('\n\n')
     buf = flush ? '' : (blocks.pop() ?? '')
     for (const block of blocks) {

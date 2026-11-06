@@ -118,6 +118,23 @@ describe('sendAIChatStream', () => {
     })
   })
 
+  it('支持解析 CRLF (\\r\\n\\r\\n) 换行的 SSE 事件流', async () => {
+    fetchMock.mockResolvedValue(
+      streamResponse([
+        'event: status\r\ndata: {"phase":"thinking","text":"思考中"}\r\n\r\n',
+        'event: done\r\ndata: {"reply":"成功","actions":[]}\r\n\r\n',
+      ]),
+    )
+
+    const seen: AIChatProgress[] = []
+    const res = await sendAIChatStream('你好', [], undefined, (p) => seen.push(p))
+
+    expect(res.reply).toBe('成功')
+    expect(seen).toEqual([
+      { kind: 'status', status: { phase: 'thinking', text: '思考中' } },
+    ])
+  })
+
   it('没有 done 事件时报错，避免把半截当成功', async () => {
     fetchMock.mockResolvedValue(
       streamResponse(['event: status\ndata: {"phase":"thinking","text":"…"}\n\n']),
