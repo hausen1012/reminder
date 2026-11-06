@@ -327,21 +327,21 @@ export default function LogsPage() {
           {/* 桌面端表格 */}
           <div className="hidden md:block">
             <div className="overflow-x-auto">
-              <table className="w-full text-sm table-fixed">
+              <table className="w-full text-[13px] table-fixed">
                 <thead className="border-b bg-muted/40 text-left text-xs uppercase text-muted-foreground">
                   <tr>
-                    <th className="px-4 py-3 w-10">
+                    <th className="px-4 py-2.5 w-10">
                       <Checkbox
                         checked={items.length > 0 && selectedIds.size === items.length}
                         onCheckedChange={toggleSelectAll}
                       />
                     </th>
-                    <th className="px-4 py-3 w-[20rem]">标题</th>
-                    <th className="px-4 py-3 w-44">触发时间</th>
-                    <th className="px-4 py-3 w-28">状态</th>
-                    <th className="px-4 py-3 w-16">来源</th>
-                    <th className="px-4 py-3 w-16">确认</th>
-                    <th className="px-4 py-3 w-24 text-right">操作</th>
+                    <th className="px-4 py-2.5 w-[20rem]">标题</th>
+                    <th className="px-4 py-2.5 w-44">触发时间</th>
+                    <th className="px-4 py-2.5 w-28">状态</th>
+                    <th className="px-4 py-2.5 w-16">来源</th>
+                    <th className="px-4 py-2.5 w-16">确认</th>
+                    <th className="px-4 py-2.5 w-24 text-right">操作</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -351,7 +351,7 @@ export default function LogsPage() {
                     return (
                     <Fragment key={main.id}>
                       <tr className="border-b hover:bg-muted/30">
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-2.5">
                           <div className="flex items-center gap-1">
                             <Checkbox
                               checked={selectedIds.has(main.id)}
@@ -368,26 +368,26 @@ export default function LogsPage() {
                             )}
                           </div>
                         </td>
-                        <td className="px-4 py-3 max-w-[20rem]">
+                        <td className="px-4 py-2.5 max-w-[20rem]">
                           <div className="font-medium truncate" title={main.title || main.reminder_title}>
                             {main.reminder_title || main.title}
                           </div>
                         </td>
-                        <td className="px-4 py-3 text-xs">
+                        <td className="px-4 py-2.5 text-xs">
                           {formatInZone(main.fired_at, tz)}
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-2.5">
                           <Badge variant="outline" className={`gap-1 ${mainColor}`}>
                             <MainStatusIcon className="h-3 w-3" />
                             {STATUS_LABEL[main.status] ?? main.status}
                           </Badge>
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-2.5">
                           <Badge variant="secondary" className={SOURCE_BADGE_CLASS[main.source]}>
                             {sourceLabel(main.source)}
                           </Badge>
                         </td>
-                        <td className="px-4 py-3 text-xs">
+                        <td className="px-4 py-2.5 text-xs">
                           {main.confirmed ? (
                             <span className="text-green-600">已确认</span>
                           ) : main.confirm_chain_id ? (
@@ -396,8 +396,8 @@ export default function LogsPage() {
                             <span className="text-muted-foreground">—</span>
                           )}
                         </td>
-                        <td className="px-4 py-3 text-right">
-                          <Button size="sm" variant="ghost" onClick={() => handleDetail(main.id)}>
+                        <td className="px-4 py-2.5 text-right">
+                          <Button size="sm" variant="ghost" className="h-8" onClick={() => handleDetail(main.id)}>
                             <ExternalLink className="h-4 w-4 mr-1" />
                             详情
                           </Button>
@@ -422,7 +422,7 @@ export default function LogsPage() {
                           <td />
                           <td />
                           <td className="px-4 py-2 text-right">
-                            <Button size="sm" variant="ghost" onClick={() => handleDetail(sub.id)}>
+                            <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => handleDetail(sub.id)}>
                               详情
                             </Button>
                           </td>
