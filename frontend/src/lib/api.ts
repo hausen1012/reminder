@@ -363,16 +363,32 @@ export async function testAIConnection(input: AISettingsInput) {
   return res.data.data
 }
 
+export async function fetchAIModels(input: AISettingsInput) {
+  const res = await api.post<ApiResponse<{ items: string[] }>>('/ai/models', input)
+  return res.data.data?.items ?? []
+}
+
 /**
  * 发一轮对话。
  *
  * 接口是无状态的：历史由前端持有并随请求上传，服务端不保存聊天记录。
  * 超时放宽到 120 秒——工具循环可能持续数十秒。
  */
-export async function sendAIChat(message: string, history: AIChatMessage[]) {
+export async function sendAIChat(
+  message: string,
+  history: AIChatMessage[],
+  model?: string,
+) {
+  const payload: { message: string; history: AIChatMessage[]; model?: string } = {
+    message,
+    history,
+  }
+  if (model) {
+    payload.model = model
+  }
   const res = await api.post<ApiResponse<AIChatResult>>(
     '/ai/chat',
-    { message, history },
+    payload,
     { timeout: 120000 },
   )
   return res.data.data

@@ -43,7 +43,7 @@ describe('AI 设置分区', () => {
     renderSection()
 
     await waitFor(() => {
-      expect(screen.getByDisplayValue('deepseek-chat')).toBeInTheDocument()
+      expect(screen.getAllByDisplayValue('deepseek-chat')[0]).toBeInTheDocument()
     })
     expect(screen.getByDisplayValue('https://api.deepseek.com')).toBeInTheDocument()
     expect(screen.getByPlaceholderText('已配置，留空表示不修改')).toBeInTheDocument()

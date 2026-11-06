@@ -32,6 +32,7 @@ func newAITestEngine(t *testing.T) (*gin.Engine, *services.AIService) {
 	r.Use(middleware.ErrorHandler())
 	r.GET("/ai/settings", h.GetSettings)
 	r.PUT("/ai/settings", h.UpdateSettings)
+	r.POST("/ai/models", h.FetchModels)
 	r.GET("/ai/actions", h.ListActions)
 	r.POST("/ai/chat", h.Chat)
 	r.POST("/ai/actions/:id/apply", h.ApplyAction)
@@ -197,5 +198,30 @@ func TestAIListActionsEmpty(t *testing.T) {
 	decodeJSON(t, w, &resp)
 	if resp.Data.Items == nil {
 		t.Fatal("items 不应为 null")
+	}
+}
+
+// 设置保存备选模型并在读取时回显。
+func TestAISettingsModelsPersistence(t *testing.T) {
+	r, _ := newAITestEngine(t)
+
+	w := doJSON(r, http.MethodPut, "/ai/settings", services.AISettingsInput{
+		Enabled:  true,
+		Provider: "openai",
+		Model:    "deepseek-chat",
+		Models:   []string{"deepseek-chat", "deepseek-reasoner", "gpt-4o"},
+		BaseURL:  "https://api.deepseek.com",
+		APIKey:   "sk-abc",
+	})
+	if w.Code != http.StatusOK {
+		t.Fatalf("保存状态码 = %d", w.Code)
+	}
+
+	var get struct {
+		Data services.AISettings `json:"data"`
+	}
+	decodeJSON(t, doJSON(r, http.MethodGet, "/ai/settings", nil), &get)
+	if len(get.Data.Models) != 3 {
+		t.Fatalf("期望 models 长度为 3，实际为 %d: %v", len(get.Data.Models), get.Data.Models)
 	}
 }

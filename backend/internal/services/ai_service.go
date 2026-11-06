@@ -13,7 +13,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
+	"net/http"
+	"sort"
 	"strings"
 	"time"
 
@@ -35,6 +38,7 @@ const (
 	KeyAIProvider = "ai_provider"
 	KeyAIBaseURL  = "ai_base_url"
 	KeyAIModel    = "ai_model"
+	KeyAIModels   = "ai_models"
 	KeyAIAPIKey   = "ai_api_key_enc"
 	// KeyAIPrompt 是用户自定义的追加提示词，与内置系统提示词拼接后一起发给模型。
 	KeyAIPrompt = "ai_custom_prompt"
@@ -73,10 +77,11 @@ func NewAIService(db *gorm.DB, box *secretbox.Box, tz *timezone.Provider, remind
 
 // AISettings 是对外的 AI 设置视图：密钥只回 "***" 表示"已配置"。
 type AISettings struct {
-	Enabled  bool   `json:"enabled"`
-	Provider string `json:"provider"` // anthropic | openai
-	BaseURL  string `json:"base_url"`
-	Model    string `json:"model"`
+	Enabled      bool     `json:"enabled"`
+	Provider     string   `json:"provider"` // anthropic | openai
+	BaseURL      string   `json:"base_url"`
+	Model        string   `json:"model"`
+	Models       []string `json:"models"` // 备选模型列表
 	// APIKey 恒为脱敏值：有密钥时是 "***"，否则为空串。
 	APIKey string `json:"api_key"`
 	// CustomPrompt 是用户自定义的追加提示词。
@@ -87,11 +92,12 @@ type AISettings struct {
 //
 // api_key 传 "***" 表示保留原密钥，传空串表示清除。
 type AISettingsInput struct {
-	Enabled  bool   `json:"enabled"`
-	Provider string `json:"provider"`
-	BaseURL  string `json:"base_url"`
-	Model    string `json:"model"`
-	APIKey   string `json:"api_key"`
+	Enabled      bool     `json:"enabled"`
+	Provider     string   `json:"provider"`
+	BaseURL      string   `json:"base_url"`
+	Model        string   `json:"model"`
+	Models       []string `json:"models"`
+	APIKey       string   `json:"api_key"`
 	// CustomPrompt 为空表示不使用自定义提示词（清空已保存的内容）。
 	CustomPrompt string `json:"custom_prompt"`
 }
@@ -115,6 +121,16 @@ func (s *AIService) GetSettings() (*AISettings, error) {
 	if kv[KeyAIAPIKey] != "" {
 		out.APIKey = sensitivePlaceholder
 	}
+	var models []string
+	if rawModels, ok := kv[KeyAIModels]; ok {
+		_ = json.Unmarshal([]byte(rawModels), &models)
+	} else if out.Model != "" {
+		models = []string{out.Model}
+	}
+	if models == nil {
+		models = []string{}
+	}
+	out.Models = models
 	return out, nil
 }
 
@@ -129,7 +145,7 @@ func (s *AIService) SaveSettings(in AISettingsInput) (*AISettings, error) {
 			"provider 仅支持 anthropic / openai").WithField("provider")
 	}
 	model := strings.TrimSpace(in.Model)
-	if model == "" {
+	if model == "" && in.Enabled {
 		if provider == "anthropic" {
 			model = "claude-opus-5-5"
 		} else {
@@ -158,11 +174,31 @@ func (s *AIService) SaveSettings(in AISettingsInput) (*AISettings, error) {
 		}
 	}
 
+	var cleanedModels []string
+	seen := make(map[string]bool)
+	for _, m := range in.Models {
+		m = strings.TrimSpace(m)
+		if m != "" && !seen[m] {
+			seen[m] = true
+			cleanedModels = append(cleanedModels, m)
+		}
+	}
+	// 仅当调用方完全未传 in.Models (nil) 时才尝试把 model 加入列表；
+	// 若调用方显式传了切片（哪怕为空 []），完全尊重入参，不强行塞入默认值
+	if in.Models == nil && model != "" && !seen[model] {
+		cleanedModels = append([]string{model}, cleanedModels...)
+	}
+	if cleanedModels == nil {
+		cleanedModels = []string{}
+	}
+	modelsJSON, _ := json.Marshal(cleanedModels)
+
 	updates := map[string]string{
 		KeyAIEnabled:  boolString(in.Enabled),
 		KeyAIProvider: provider,
 		KeyAIBaseURL:  baseURL,
 		KeyAIModel:    model,
+		KeyAIModels:   string(modelsJSON),
 		KeyAIPrompt:   customPrompt,
 	}
 	if in.APIKey == sensitivePlaceholder {
@@ -208,6 +244,151 @@ func (s *AIService) TestConnection(ctx context.Context, in AISettingsInput) (str
 	return strings.TrimSpace(reply.Text), nil
 }
 
+// FetchModels 获取指定厂商或配置下的可用模型列表。
+//
+// 优先使用入参里的 provider、baseURL 与 api_key；传占位符或空串时回落到库中已保存的密钥。
+func (s *AIService) FetchModels(ctx context.Context, in AISettingsInput) ([]string, error) {
+	cfg, err := s.resolveConfig(in)
+	if err != nil {
+		return nil, err
+	}
+	switch cfg.Provider {
+	case "anthropic":
+		return s.fetchAnthropicModels(ctx, cfg)
+	case "openai":
+		return s.fetchOpenAIModels(ctx, cfg)
+	default:
+		return nil, middleware.NewAppError(middleware.CodeValidationFailed, fmt.Sprintf("不支持的厂商协议: %s", cfg.Provider))
+	}
+}
+
+func (s *AIService) fetchOpenAIModels(ctx context.Context, cfg *aiConfig) ([]string, error) {
+	base := strings.TrimRight(strings.TrimSpace(cfg.BaseURL), "/")
+	if base == "" {
+		base = "https://api.openai.com/v1"
+	}
+	if !strings.HasSuffix(base, "/v1") && !strings.Contains(base, "/v1/") {
+		base += "/v1"
+	}
+	url := base + "/models"
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	if cfg.APIKey != "" {
+		req.Header.Set("Authorization", "Bearer "+cfg.APIKey)
+	}
+
+	client := &http.Client{Timeout: 15 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, middleware.NewAppError(middleware.CodeValidationFailed, "请求模型列表失败: "+err.Error())
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, middleware.NewAppError(middleware.CodeValidationFailed, "读取模型响应失败: "+err.Error())
+	}
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, middleware.NewAppError(middleware.CodeValidationFailed, fmt.Sprintf("获取模型失败 (HTTP %d): %s", resp.StatusCode, string(body)))
+	}
+
+	var parsed struct {
+		Data []struct {
+			ID string `json:"id"`
+		} `json:"data"`
+		Models []struct {
+			Name string `json:"name"`
+			ID   string `json:"id"`
+		} `json:"models"`
+	}
+	if err := json.Unmarshal(body, &parsed); err != nil {
+		return nil, middleware.NewAppError(middleware.CodeValidationFailed, "解析模型列表响应失败: "+err.Error())
+	}
+
+	set := make(map[string]struct{})
+	for _, item := range parsed.Data {
+		if id := strings.TrimSpace(item.ID); id != "" {
+			set[id] = struct{}{}
+		}
+	}
+	for _, item := range parsed.Models {
+		id := strings.TrimSpace(item.ID)
+		if id == "" {
+			id = strings.TrimSpace(item.Name)
+		}
+		if id != "" {
+			set[id] = struct{}{}
+		}
+	}
+
+	models := make([]string, 0, len(set))
+	for id := range set {
+		models = append(models, id)
+	}
+	sort.Strings(models)
+	return models, nil
+}
+
+func (s *AIService) fetchAnthropicModels(ctx context.Context, cfg *aiConfig) ([]string, error) {
+	if cfg.APIKey == "" {
+		return nil, middleware.NewAppError(middleware.CodeValidationFailed, "未配置 API Key")
+	}
+	base := strings.TrimRight(strings.TrimSpace(cfg.BaseURL), "/")
+	if base == "" {
+		base = "https://api.anthropic.com"
+	}
+	url := base + "/v1/models"
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("x-api-key", cfg.APIKey)
+	req.Header.Set("anthropic-version", "2023-06-01")
+
+	client := &http.Client{Timeout: 15 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, middleware.NewAppError(middleware.CodeValidationFailed, "请求 Anthropic 模型列表失败: "+err.Error())
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, middleware.NewAppError(middleware.CodeValidationFailed, "读取 Anthropic 模型响应失败: "+err.Error())
+	}
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, middleware.NewAppError(middleware.CodeValidationFailed, fmt.Sprintf("获取 Anthropic 模型失败 (HTTP %d): %s", resp.StatusCode, string(body)))
+	}
+
+	var parsed struct {
+		Data []struct {
+			ID string `json:"id"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(body, &parsed); err != nil {
+		return nil, middleware.NewAppError(middleware.CodeValidationFailed, "解析 Anthropic 模型列表失败: "+err.Error())
+	}
+
+	set := make(map[string]struct{})
+	for _, item := range parsed.Data {
+		if id := strings.TrimSpace(item.ID); id != "" {
+			set[id] = struct{}{}
+		}
+	}
+	models := make([]string, 0, len(set))
+	for id := range set {
+		models = append(models, id)
+	}
+	sort.Strings(models)
+	return models, nil
+}
+
 // ChatMessage 是客户端回传的一轮历史消息。
 //
 // 只保留角色与文本：工具调用过程不需要跨请求回放，
@@ -222,6 +403,8 @@ type ChatInput struct {
 	Message string `json:"message"`
 	// History 是客户端持有的此前对话（不含本次 message），用于多轮上下文。
 	History []ChatMessage `json:"history,omitempty"`
+	// Model 允许客户端临时指定或切换本次对话使用的模型。留空时使用全局已保存的模型。
+	Model string `json:"model,omitempty"`
 }
 
 // ChatResult 是一次对话的结果。
@@ -244,7 +427,7 @@ func (s *AIService) Chat(ctx context.Context, in ChatInput) (*ChatResult, error)
 		return nil, middleware.NewAppError(middleware.CodeValidationFailed, "消息过长（最多 4000 字）").WithField("message")
 	}
 
-	cfg, err := s.resolveConfig(AISettingsInput{})
+	cfg, err := s.resolveConfig(AISettingsInput{Model: strings.TrimSpace(in.Model)})
 	if err != nil {
 		return nil, err
 	}

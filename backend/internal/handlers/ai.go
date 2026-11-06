@@ -50,6 +50,21 @@ func (h *AIHandler) Test(c *gin.Context) {
 	successJSON(c, gin.H{"reply": reply})
 }
 
+// FetchModels POST /api/ai/models
+func (h *AIHandler) FetchModels(c *gin.Context) {
+	var in services.AISettingsInput
+	if err := c.ShouldBindJSON(&in); err != nil {
+		abortBindErr(c, err, "请求体格式错误")
+		return
+	}
+	models, err := h.Svc.FetchModels(c.Request.Context(), in)
+	if err != nil {
+		abortErr(c, err)
+		return
+	}
+	successJSON(c, gin.H{"items": models})
+}
+
 // Chat POST /api/ai/chat
 //
 // 无状态接口：对话历史由前端随请求上传，服务端不保存聊天记录。

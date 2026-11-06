@@ -100,7 +100,7 @@ describe('AI 助手浮窗', () => {
     await userEvent.click(screen.getByRole('button', { name: /发送/ }))
 
     await waitFor(() => expect(screen.getByText('已生成待确认卡片')).toBeInTheDocument())
-    expect(vi.mocked(sendAIChat)).toHaveBeenCalledWith('明天九点提醒我喝水', [])
+    expect(vi.mocked(sendAIChat)).toHaveBeenCalledWith('明天九点提醒我喝水', [], 'claude-opus-5-5')
 
     const stored = JSON.parse(sessionStorage.getItem('ai-chat-history') ?? '[]')
     expect(stored).toEqual([
@@ -130,7 +130,21 @@ describe('AI 助手浮窗', () => {
         { role: 'user', content: '第一条' },
         { role: 'assistant', content: '好的' },
       ],
+      'claude-opus-5-5',
     ])
+  })
+
+  it('支持在对话面板中展示当前模型', async () => {
+    vi.mocked(getAISettings).mockResolvedValue({
+      ...enabledSettings,
+      model: 'deepseek-chat',
+      models: ['deepseek-chat', 'deepseek-reasoner'],
+    })
+    renderWidget()
+
+    await userEvent.click(await screen.findByLabelText('打开 AI 助手'))
+    expect(await screen.findByText('当前模型')).toBeInTheDocument()
+    expect(screen.getByText('deepseek-chat')).toBeInTheDocument()
   })
 
   it('刷新后从 sessionStorage 恢复对话', async () => {

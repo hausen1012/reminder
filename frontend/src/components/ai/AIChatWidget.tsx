@@ -9,6 +9,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   Bot,
   Check,
+  Cpu,
   Loader2,
   MessageSquare,
   Send,
@@ -18,7 +19,15 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { useToast } from '@/components/ui/use-toast'
 import {
   applyAIAction,
@@ -27,6 +36,7 @@ import {
   listAIActions,
   rejectAIAction,
   sendAIChat,
+  updateAISettings,
 } from '@/lib/api'
 import { AI_ACTION_LABEL } from '@/types'
 import type { AIAction, AIChatMessage } from '@/types'
@@ -85,15 +95,32 @@ export function AIChatWidget() {
   const [actions, setActions] = useState<AIAction[]>([])
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
+  const [currentModel, setCurrentModel] = useState<string>('')
+  const [availableModels, setAvailableModels] = useState<string[]>([])
+  const [isCustomModel, setIsCustomModel] = useState(false)
+  const [customModelInput, setCustomModelInput] = useState('')
   const bottomRef = useRef<HTMLDivElement>(null)
 
-  // 设置只读一次：未启用时不渲染按钮，避免在页面上留一个点开就报错的入口
-  useEffect(() => {
-    getAISettings()
-      .then((s) => setEnabled(Boolean(s?.enabled)))
-      .catch(() => setEnabled(false))
-      .finally(() => setLoaded(true))
+  const loadSettings = useCallback(async () => {
+    try {
+      const s = await getAISettings()
+      if (!s) return
+      setEnabled(Boolean(s.enabled))
+      const modelList = s.models && s.models.length > 0
+        ? s.models
+        : (s.model ? [s.model] : [])
+      setAvailableModels(modelList)
+      setCurrentModel((prev) => prev || s.model || (modelList[0] ?? ''))
+    } catch {
+      setEnabled(false)
+    } finally {
+      setLoaded(true)
+    }
   }, [])
+
+  useEffect(() => {
+    loadSettings()
+  }, [loadSettings])
 
   const refreshActions = useCallback(async () => {
     try {
@@ -111,13 +138,58 @@ export function AIChatWidget() {
 
   useEffect(() => {
     if (!open) return
+    loadSettings()
     refreshActions()
-  }, [open, refreshActions])
+  }, [open, loadSettings, refreshActions])
 
   useEffect(() => {
     if (!open) return
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [history, sending, open])
+
+  async function handleModelChange(val: string) {
+    if (val === '__custom__') {
+      setIsCustomModel(true)
+      return
+    }
+    setCurrentModel(val)
+    toast({ title: '已切换模型', description: val })
+    // 同步到设置让偏好持久化
+    try {
+      const s = await getAISettings()
+      if (s) {
+        await updateAISettings({
+          ...s,
+          model: val,
+          api_key: s.api_key === '***' ? '***' : '',
+        })
+      }
+    } catch {
+      // 静默降级
+    }
+  }
+
+  function handleCustomModelConfirm() {
+    const val = customModelInput.trim()
+    if (!val) return
+    if (!availableModels.includes(val)) {
+      setAvailableModels((prev) => [val, ...prev])
+    }
+    setCurrentModel(val)
+    setIsCustomModel(false)
+    setCustomModelInput('')
+    toast({ title: '已切换模型', description: val })
+    getAISettings().then((s) => {
+      if (s) {
+        updateAISettings({
+          ...s,
+          model: val,
+          models: Array.from(new Set([val, ...(s.models || [])])),
+          api_key: s.api_key === '***' ? '***' : '',
+        }).catch(() => {})
+      }
+    }).catch(() => {})
+  }
 
   async function handleSend() {
     const text = input.trim()
@@ -128,7 +200,7 @@ export function AIChatWidget() {
     setInput('')
     try {
       // 只上传对话文本；本次消息单列，历史不含它
-      const res = await sendAIChat(text, history)
+      const res = await sendAIChat(text, history, currentModel || undefined)
       const withReply: AIChatMessage[] = [
         ...nextHistory,
         { role: 'assistant', content: res?.reply ?? '' },
@@ -239,6 +311,75 @@ export function AIChatWidget() {
                 <X className="h-4 w-4" />
               </Button>
             </div>
+          </div>
+
+          {/* 模型切换条 */}
+          <div className="flex items-center justify-between border-b bg-muted/40 px-3.5 py-1.5 text-xs">
+            <div className="flex items-center gap-1.5 text-muted-foreground shrink-0">
+              <Cpu className="h-3.5 w-3.5 text-primary" />
+              <span className="font-medium">当前模型</span>
+            </div>
+            {isCustomModel ? (
+              <div className="flex items-center gap-1 flex-1 max-w-[240px] ml-2">
+                <Input
+                  placeholder="输入模型名称"
+                  value={customModelInput}
+                  onChange={(e) => setCustomModelInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      handleCustomModelConfirm()
+                    } else if (e.key === 'Escape') {
+                      setIsCustomModel(false)
+                    }
+                  }}
+                  autoFocus
+                  className="h-6 text-xs px-2"
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="default"
+                  className="h-6 px-2 text-xs"
+                  onClick={handleCustomModelConfirm}
+                >
+                  确定
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  className="h-6 px-1.5 text-xs"
+                  onClick={() => setIsCustomModel(false)}
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1">
+                <Select
+                  value={availableModels.includes(currentModel) ? currentModel : ''}
+                  onValueChange={handleModelChange}
+                >
+                  <SelectTrigger
+                    className="h-6 max-w-[200px] border-none bg-background/80 px-2 text-xs font-medium shadow-none hover:bg-background"
+                    aria-label="切换模型"
+                  >
+                    <SelectValue placeholder={currentModel || '选择模型'} />
+                  </SelectTrigger>
+                  <SelectContent align="end">
+                    {availableModels.map((m) => (
+                      <SelectItem key={m} value={m} className="text-xs">
+                        {m}
+                      </SelectItem>
+                    ))}
+                    <SelectItem value="__custom__" className="text-xs text-primary font-medium">
+                      + 手动输入其他模型…
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
 
           <div className="flex-1 space-y-3 overflow-y-auto p-4">
