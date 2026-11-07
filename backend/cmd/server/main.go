@@ -30,7 +30,7 @@ func main() {
 	slog.Info("启动配置",
 		"port", cfg.Port,
 		"db_path", cfg.DBPath,
-		"base_url", cfg.BaseURL,
+		"site_url", cfg.SiteURL,
 		"timezone", cfg.Timezone,
 		"log_file", cfg.LogFile,
 		"log_format", getEnv("LOG_FORMAT", "text"),

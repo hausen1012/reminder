@@ -220,6 +220,55 @@ func TestConfigService_ClearTimezoneFallsBack(t *testing.T) {
 	}
 }
 
+// 站点地址：库里没有时回显环境变量给的初始值，写入后以库为准并被规整，
+// 非法地址整批拒绝，清空则删除 key 回到回退值。
+func TestConfigService_SiteURL(t *testing.T) {
+	db := openTestDB(t)
+	svc := NewConfigService(db, testTZ(time.FixedZone("CST", 8*3600)))
+	svc.SiteURLFallback = "http://localhost:8765"
+
+	got, err := svc.GetAll()
+	if err != nil {
+		t.Fatalf("读取失败: %v", err)
+	}
+	if got[KeySiteURL] != "http://localhost:8765" {
+		t.Fatalf("未设置时应回显环境变量值，实际 %q", got[KeySiteURL])
+	}
+
+	// 结尾斜杠与首尾空白被规整掉，否则会拼出 https://a.com//c/token
+	if err := svc.UpsertMap(map[string]string{KeySiteURL: "  https://reminder.example.com/  "}); err != nil {
+		t.Fatalf("写入失败: %v", err)
+	}
+	got, _ = svc.GetAll()
+	if got[KeySiteURL] != "https://reminder.example.com" {
+		t.Fatalf("落库值 = %q，结尾斜杠应被去掉", got[KeySiteURL])
+	}
+
+	// 没有协议头属于非法地址，整批都不落库
+	err = svc.UpsertMap(map[string]string{"app_name": "提醒", KeySiteURL: "reminder.example.com"})
+	if err == nil {
+		t.Fatal("缺少协议头应报错")
+	}
+	appErr, ok := err.(*middleware.AppError)
+	if !ok || appErr.Code != middleware.CodeValidationFailed || appErr.Field != KeySiteURL {
+		t.Fatalf("应为 site_url 校验错误，实际 %v", err)
+	}
+	got, _ = svc.GetAll()
+	if _, ok := got["app_name"]; ok {
+		t.Fatalf("校验失败时同批次其他 key 也不应写入: %v", got)
+	}
+
+	// 清空 = 删除该 key，重新回退到环境变量值
+	if err := svc.UpsertMap(map[string]string{KeySiteURL: ""}); err != nil {
+		t.Fatalf("清空失败: %v", err)
+	}
+	var count int64
+	db.Table("configs").Where("key = ?", KeySiteURL).Count(&count)
+	if count != 0 {
+		t.Fatal("清空配置后不应留下空值行")
+	}
+}
+
 // 白名单之外的 key 必须被拒绝：否则可以借通用配置接口绕过
 // /api/ai/settings 的加密与校验，把 AI 密钥等敏感内容直接写进 config 表。
 func TestConfigService_UpsertRejectsUnknownKey(t *testing.T) {

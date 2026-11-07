@@ -12,10 +12,10 @@ import (
 )
 
 // newConfirmSvc 构造确认服务。
-func newConfirmSvc(t *testing.T, baseURL string) (*ConfirmService, *gorm.DB) {
+func newConfirmSvc(t *testing.T, siteURL string) (*ConfirmService, *gorm.DB) {
 	t.Helper()
 	db := openTestDB(t)
-	return NewConfirmService(db, &config.Config{BaseURL: baseURL}), db
+	return NewConfirmService(db, &config.Config{SiteURL: siteURL}), db
 }
 
 // seedLogWithChain 插入一条可用于确认的投递日志。
@@ -278,13 +278,31 @@ func TestConfirmConsumeToken_ConcurrentOnlyOneWins(t *testing.T) {
 func TestConfirmBuildURL(t *testing.T) {
 	db := openTestDB(t)
 
-	svc := NewConfirmService(db, &config.Config{BaseURL: "https://example.com"})
+	svc := NewConfirmService(db, &config.Config{SiteURL: "https://example.com"})
 	if got := svc.BuildURL("abc"); got != "https://example.com/c/abc" {
 		t.Fatalf("BuildURL = %q", got)
 	}
 
-	empty := NewConfirmService(db, &config.Config{BaseURL: ""})
+	empty := NewConfirmService(db, &config.Config{SiteURL: ""})
 	if got := empty.BuildURL("abc"); got == "" || !containsSub(got, "/c/abc") {
 		t.Fatalf("base 为空时应使用默认值，实际 %q", got)
+	}
+}
+
+// 库里配置的站点地址优先于环境变量，且改完立刻对之后的拼接生效（无需重启）。
+func TestConfirmBuildURL_DBOverridesEnv(t *testing.T) {
+	db := openTestDB(t)
+	svc := NewConfirmService(db, &config.Config{SiteURL: "https://from-env.example"})
+
+	if got := svc.BuildURL("t1"); got != "https://from-env.example/c/t1" {
+		t.Fatalf("未落库时应回退环境变量，实际 %q", got)
+	}
+
+	if err := db.Exec("INSERT INTO configs (key, value) VALUES (?, ?)", KeySiteURL, "https://from-db.example/").Error; err != nil {
+		t.Fatalf("写库失败: %v", err)
+	}
+	// 同一个服务实例，不重建：下一次拼接就走库里的值
+	if got := svc.BuildURL("t2"); got != "https://from-db.example/c/t2" {
+		t.Fatalf("应以库里的地址为准并去掉结尾斜杠，实际 %q", got)
 	}
 }

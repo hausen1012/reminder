@@ -53,7 +53,7 @@ make docker        # 或使用 Docker 部署
 ### 配置
 
 全部通过环境变量配置，可用项见 `.env.example`。生产环境至少应设置
-管理员账号、`BASE_URL`、`JWT_SECRET` 与 `ENCRYPTION_KEY`。
+管理员账号、`SITE_URL`（确认链接的域名，也可登录后到「设置 → 站点地址」修改）、`JWT_SECRET` 与 `ENCRYPTION_KEY`。
 
 ## 技术栈
 

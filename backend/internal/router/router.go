@@ -107,6 +107,8 @@ func Setup(staticFS embed.FS, cfg *config.Config) (*SetupResult, error) {
 	reminderSvc := services.NewReminderService(database.DB, engine, tz, dispatchSvc, confirmMgr)
 
 	configSvc := services.NewConfigService(database.DB, tz)
+	// 站点地址的回退值来自环境变量 SITE_URL；库里配置了就以库为准（读取在各处拼接时现做）。
+	configSvc.SiteURLFallback = cfg.SiteURL
 	configSvc.OnTimezoneChanged = engine.ReloadTimezone
 	// 读库里的站点时区（若存在）并应用，必须早于调度器注册
 	configSvc.LoadTimezone()
@@ -138,7 +140,7 @@ func Setup(staticFS embed.FS, cfg *config.Config) (*SetupResult, error) {
 	sweeper.Start()
 
 	// 自动清理日志（每天凌晨 3 点）
-	logSvc := services.NewLogService(database.DB, cfg.BaseURL)
+	logSvc := services.NewLogService(database.DB, cfg.SiteURL)
 	if cfg.LogAutoPurgeDays > 0 {
 		purgeAfter := time.Duration(cfg.LogAutoPurgeDays) * 24 * time.Hour
 		if _, err := engine.AddPurgeCron(logSvc, purgeAfter); err != nil {

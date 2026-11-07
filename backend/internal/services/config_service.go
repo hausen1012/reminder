@@ -1,7 +1,9 @@
 package services
 
 import (
+	"errors"
 	"log/slog"
+	"strings"
 
 	"github.com/reminder/backend/internal/middleware"
 	"github.com/reminder/backend/internal/models"
@@ -11,6 +13,12 @@ import (
 
 // KeyTimezone 是站点时区在 config 表中的 key。
 const KeyTimezone = "timezone"
+
+// KeySiteURL 是站点对外地址在 config 表中的 key。
+//
+// 它决定确认链接（/c/:token）用哪个域名拼接：用户点开链接的通常是手机，
+// 地址必须手机可达。环境变量 SITE_URL 只在库里没有该配置时作为回退值。
+const KeySiteURL = "site_url"
 
 // 站点配置的 key 白名单。
 //
@@ -24,12 +32,16 @@ var allowedConfigKeys = map[string]struct{}{
 	"app_name":  {},
 	"logo_svg":  {},
 	KeyTimezone: {},
+	KeySiteURL:  {},
 }
 
 // ConfigService 管理站点配置。
 type ConfigService struct {
 	DB *gorm.DB
 	TZ *timezone.Provider
+	// SiteURLFallback 是环境变量 SITE_URL 给出的初始值：
+	// 库里没有 site_url 时，它就是实际生效的地址，也用于设置页回显。
+	SiteURLFallback string
 	// OnTimezoneChanged 在站点时区变更后回调，用于重建调度器里的 cron 实例。
 	OnTimezoneChanged func()
 }
@@ -58,6 +70,11 @@ func (s *ConfigService) GetAll() (map[string]string, error) {
 	if _, ok := out[KeyTimezone]; !ok && s.TZ != nil {
 		out[KeyTimezone] = s.TZ.Name()
 	}
+	// 对外地址同理：库里没设置过时回显环境变量给的初始值，
+	// 设置页才有可编辑的当前值，而不是空白框。
+	if _, ok := out[KeySiteURL]; !ok && s.SiteURLFallback != "" {
+		out[KeySiteURL] = s.SiteURLFallback
+	}
 	return out, nil
 }
 
@@ -78,8 +95,21 @@ func (s *ConfigService) UpsertMap(cfg map[string]string) error {
 	if v, ok := cfg[KeyTimezone]; ok && v != "" && !timezone.Valid(v) {
 		return middleware.NewAppError(middleware.CodeValidationFailed, "未知时区: "+v).WithField(KeyTimezone)
 	}
-
+	// 地址必须是 http(s)，并去掉结尾斜杠（否则会拼出 https://a.com//c/token）。
+	// 只改内存副本，不动调用方传进来的 map。
+	toWrite := make(map[string]string, len(cfg))
 	for k, v := range cfg {
+		toWrite[k] = v
+	}
+	if v, ok := toWrite[KeySiteURL]; ok && v != "" {
+		normalized, err := normalizeSiteURL(v)
+		if err != nil {
+			return middleware.NewAppError(middleware.CodeValidationFailed, err.Error()).WithField(KeySiteURL)
+		}
+		toWrite[KeySiteURL] = normalized
+	}
+
+	for k, v := range toWrite {
 		if v == "" {
 			if err := s.DB.Delete(&models.Config{}, "key = ?", k).Error; err != nil {
 				return err
@@ -100,6 +130,39 @@ func (s *ConfigService) UpsertMap(cfg map[string]string) error {
 		s.applyTimezone(v)
 	}
 	return nil
+}
+
+// normalizeSiteURL 校验并规整站点地址：必须是 http(s)，去掉首尾空白与结尾斜杠。
+//
+// 结尾斜杠会让拼接结果变成 https://a.com//c/token。
+// 空串不在校验范围内：它表示「清除配置」，由调用方回退到环境变量。
+func normalizeSiteURL(raw string) (string, error) {
+	v := strings.TrimSpace(raw)
+	lower := strings.ToLower(v)
+	if !strings.HasPrefix(lower, "http://") && !strings.HasPrefix(lower, "https://") {
+		return "", errors.New("站点地址必须以 http:// 或 https:// 开头")
+	}
+	return strings.TrimRight(v, "/"), nil
+}
+
+// siteURL 返回拼接确认链接用的站点地址。
+//
+// 优先取设置页保存的值（config 表 key=site_url），没有时回退到环境变量 SITE_URL，
+// 再回退到默认地址。每次现读库而不是启动时快照：这个地址常常是部署完才发现填错的，
+// 用户改完就该对之后的发送生效，不该要求重启进程。
+// 现读的代价是一条按主键查的 SELECT，而它只发生在渲染确认链接时（投递或日志详情），
+// 频率远低于调度本身。
+func siteURL(db *gorm.DB, fallback string) string {
+	var row models.Config
+	if err := db.First(&row, "key = ?", KeySiteURL).Error; err == nil && row.Value != "" {
+		// 库里的值可能是校验规则上线前写入的，这里同样去掉结尾斜杠
+		return strings.TrimRight(strings.TrimSpace(row.Value), "/")
+	}
+	base := strings.TrimRight(strings.TrimSpace(fallback), "/")
+	if base == "" {
+		return "http://localhost:8765"
+	}
+	return base
 }
 
 // LoadTimezone 在启动时把库里的时区应用到 Provider。

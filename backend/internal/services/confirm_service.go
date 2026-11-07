@@ -151,11 +151,15 @@ func (s *ConfirmService) ConsumeToken(token string) (*models.DeliveryLog, error)
 	return &dl, nil
 }
 
-// BuildURL 用 BaseURL 拼接完整的确认 URL。
+// BuildURL 拼接完整的确认 URL。
+//
+// 域名优先取设置页的「站点地址」（config 表 key=site_url），没有时回退到环境变量
+// SITE_URL。用户点开链接的往往是手机，地址必须手机可达；部署后才发现填错的情况很常见，
+// 所以这里现读库，改完无需重启。
 func (s *ConfirmService) BuildURL(token string) string {
-	base := s.Cfg.BaseURL
-	if base == "" {
-		base = "http://localhost:8765"
+	fallback := ""
+	if s.Cfg != nil {
+		fallback = s.Cfg.SiteURL
 	}
-	return base + "/c/" + token
+	return siteURL(s.DB, fallback) + "/c/" + token
 }

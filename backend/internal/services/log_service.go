@@ -16,17 +16,19 @@ import (
 
 // LogService 负责 DeliveryLog 的查询与清理。
 type LogService struct {
-	DB        *gorm.DB
-	PublicURL string // 用于拼接 confirm_url
+	DB *gorm.DB
+	// SiteURL 是环境变量 SITE_URL 给出的回退地址：
+	// 库里设置了站点地址（config 表 key=site_url）时以库为准。
+	SiteURL string
 }
 
 // NewLogService 构造日志服务。
-func NewLogService(db *gorm.DB, publicURL ...string) *LogService {
+func NewLogService(db *gorm.DB, fallback ...string) *LogService {
 	url := "http://localhost:8765"
-	if len(publicURL) > 0 && publicURL[0] != "" {
-		url = publicURL[0]
+	if len(fallback) > 0 && fallback[0] != "" {
+		url = fallback[0]
 	}
-	return &LogService{DB: db, PublicURL: url}
+	return &LogService{DB: db, SiteURL: url}
 }
 
 // LogFilter 日志列表过滤条件。
@@ -302,7 +304,7 @@ func (s *LogService) PurgeCount(olderThan time.Duration, all bool) (int64, error
 	return count, nil
 }
 
-// confirmURL 拼接确认链接。
+// confirmURL 拼接确认链接，同样以库里的站点地址为准。
 func (s *LogService) confirmURL(token string) string {
-	return s.PublicURL + "/c/" + token
+	return siteURL(s.DB, s.SiteURL) + "/c/" + token
 }

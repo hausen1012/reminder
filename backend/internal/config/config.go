@@ -33,7 +33,7 @@ type Config struct {
 
 	// 提醒助手相关新增配置
 	EncryptionKey        string // base64 编码的 32 字节 AES-256 密钥；为空则使用内置 fallback（不安全）
-	BaseURL              string // 用于拼接 confirm_url 的对外可访问根
+	SiteURL              string // 站点对外地址（来自环境变量 SITE_URL），用于拼接确认链接
 	Timezone             string // 站点时区的环境变量默认值，例如 Asia/Shanghai
 	SweepIntervalSec     int    // 补漏扫描间隔，单位秒
 	MissToleranceMinutes int    // 漏触发容忍上限，超过则标记为 expired 不发送
@@ -56,7 +56,7 @@ func Load() *Config {
 		Password:  getEnv("PASSWORD", "admin123"),
 
 		EncryptionKey:        getEnv("ENCRYPTION_KEY", ""),
-		BaseURL:              getEnv("BASE_URL", "http://localhost:8765"),
+		SiteURL:              getEnv("SITE_URL", "http://localhost:8765"),
 		Timezone:             getEnv("TIMEZONE", "Asia/Shanghai"),
 		SweepIntervalSec:     getEnvInt("SWEEP_INTERVAL_SEC", 60),
 		MissToleranceMinutes: getEnvInt("MISS_TOLERANCE_MINUTES", 60),

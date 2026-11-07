@@ -39,7 +39,7 @@ func cstZone() *time.Location {
 
 // testCfg 返回测试用配置。
 func testCfg() *config.Config {
-	return &config.Config{BaseURL: "http://example.test"}
+	return &config.Config{SiteURL: "http://example.test"}
 }
 
 // containsSub 判断字符串是否包含子串。
@@ -80,7 +80,7 @@ func newConfirmTestStack(t *testing.T, db *gorm.DB) *confirmTestStack {
 	channelSvc := &ChannelService{DB: db, TZ: tz}
 	dispatch := NewDispatchService(db, channelSvc, tz)
 	dispatch.RetryDelays = []time.Duration{0}
-	confirmSvc := NewConfirmService(db, &config.Config{BaseURL: "http://example.test"})
+	confirmSvc := NewConfirmService(db, &config.Config{SiteURL: "http://example.test"})
 	confirmMgr := NewConfirmRetryManager(db, dispatch, confirmSvc, tz)
 	dispatch.ConfirmMgr = confirmMgr
 	reminderSvc := NewReminderService(db, noopEngine{}, tz, dispatch, confirmMgr)

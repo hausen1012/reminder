@@ -35,7 +35,8 @@ func TestConfigUpsertAndDelete(t *testing.T) {
 		Data map[string]string `json:"data"`
 	}
 
-	// 初始只有时区默认值（站点时区未在库里设置过时也会回显当前生效值）
+	// 初始只有时区默认值（未落库时也回显当前生效值）；
+	// site_url 的回显依赖 SiteURLFallback，这里没配所以不出现
 	decodeJSON(t, doJSON(r, http.MethodGet, "/config", nil), &getResp)
 	if len(getResp.Data) != 1 || getResp.Data["timezone"] == "" {
 		t.Fatalf("初始应只有 timezone 默认值，实际 %v", getResp.Data)

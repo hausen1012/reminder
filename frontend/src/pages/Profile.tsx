@@ -90,13 +90,18 @@ export default function Profile() {
   const [appName, setAppName] = useState('')
   const [logoSvg, setLogoSvg] = useState('')
   const [timezone, setTimezone] = useState('Asia/Shanghai')
+  // 站点对外地址：决定确认链接（/c/:token）用哪个域名拼接。
+  // 用户点开链接的通常是手机，所以这个地址必须是手机能访问到的，不能是 localhost。
+  const [siteUrl, setSiteUrl] = useState('')
   const [saving, setSaving] = useState(false)
   const [savingTz, setSavingTz] = useState(false)
+  const [savingSiteUrl, setSavingSiteUrl] = useState(false)
 
   useEffect(() => {
     setAppName(config.app_name ?? '')
     setLogoSvg(config.logo_svg ?? '')
     setTimezone(config.timezone ?? 'Asia/Shanghai')
+    setSiteUrl(config.site_url ?? '')
   }, [config])
 
   async function handleBrandSave(e: FormEvent) {
@@ -112,6 +117,22 @@ export default function Profile() {
       toast({ title: '保存失败', variant: 'destructive' })
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function handleSiteUrlSave(e: FormEvent) {
+    e.preventDefault()
+    setSavingSiteUrl(true)
+    try {
+      await updateConfig({ site_url: siteUrl })
+      toast({
+        title: '站点地址已更新',
+        description: '之后发送的提醒会用新地址拼接确认链接',
+      })
+    } catch (err) {
+      toast({ title: '保存失败', description: extractApiError(err), variant: 'destructive' })
+    } finally {
+      setSavingSiteUrl(false)
     }
   }
 
@@ -320,6 +341,41 @@ export default function Profile() {
                         </div>
                         <Button type="submit" size="sm" disabled={saving}>
                           {saving ? '保存中...' : '保存'}
+                        </Button>
+                      </form>
+                    </CardContent>
+                  </Card>
+
+                  {/* 站点地址 */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base font-medium">站点地址</CardTitle>
+                      <CardDescription>确认链接使用这个地址，必须能在手机上打开</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <form onSubmit={handleSiteUrlSave} className="space-y-5 max-w-xl">
+                        <div className="space-y-2">
+                          <Label htmlFor="site-url">对外访问地址</Label>
+                          <Input
+                            id="site-url"
+                            value={siteUrl}
+                            onChange={(e) => setSiteUrl(e.target.value)}
+                            placeholder="https://reminder.example.com"
+                            inputMode="url"
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            「需要确认」的提醒会在正文里附带 <code>/c/&lt;token&gt;</code> 链接，用此地址拼成完整 URL。
+                            填 <code>localhost</code> 时手机上点开会是空的——请填内网 IP、域名或反向代理地址。
+                            修改后对之后发送的提醒生效，已发出的消息不会改写。
+                          </p>
+                          {siteUrl && (
+                            <p className="text-xs text-muted-foreground break-all">
+                              预览：{siteUrl.replace(/\/+$/, '')}/c/example-token
+                            </p>
+                          )}
+                        </div>
+                        <Button type="submit" size="sm" disabled={savingSiteUrl}>
+                          {savingSiteUrl ? '保存中...' : '保存'}
                         </Button>
                       </form>
                     </CardContent>

@@ -9,10 +9,10 @@ import (
 )
 
 // newLogSvc 构造日志服务。
-func newLogSvc(t *testing.T, baseURL string) (*LogService, *gorm.DB) {
+func newLogSvc(t *testing.T, siteURL string) (*LogService, *gorm.DB) {
 	t.Helper()
 	db := openTestDB(t)
-	return NewLogService(db, baseURL), db
+	return NewLogService(db, siteURL), db
 }
 
 // seedDeliveryLog 插入一条投递日志。
@@ -270,18 +270,18 @@ func TestLogBatchDelete(t *testing.T) {
 	}
 }
 
-// NewLogService 不传 baseURL 时应使用默认值。
+// NewLogService 不传站点地址时应使用默认值；传入后跟随其变化。
 func TestNewLogService_DefaultURL(t *testing.T) {
 	db := openTestDB(t)
 
 	svc := NewLogService(db)
-	if svc.PublicURL == "" {
-		t.Fatal("应使用默认 PublicURL")
+	if svc.SiteURL == "" {
+		t.Fatal("应使用默认 SiteURL")
 	}
 
 	svc2 := NewLogService(db, "")
-	if svc2.PublicURL == "" {
-		t.Fatal("空字符串应回退到默认 PublicURL")
+	if svc2.SiteURL == "" {
+		t.Fatal("空字符串应回退到默认 SiteURL")
 	}
 }
 

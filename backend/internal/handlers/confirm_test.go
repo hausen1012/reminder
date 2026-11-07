@@ -177,7 +177,7 @@ func TestEscapeHTML_Combined(t *testing.T) {
 
 // testConfig 返回测试用配置。
 func testConfig() *config.Config {
-	return &config.Config{BaseURL: "http://example.test"}
+	return &config.Config{SiteURL: "http://example.test"}
 }
 
 // newConfirmEngine 构造只挂确认路由的引擎。

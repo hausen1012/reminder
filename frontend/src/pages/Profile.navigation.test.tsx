@@ -39,7 +39,11 @@ function navButton(name: string) {
 describe('Profile 分区导航', () => {
   beforeEach(() => {
     localStorage.setItem('token', 'test-token')
-    vi.mocked(getConfig).mockResolvedValue({ timezone: 'Europe/Berlin', app_name: '提醒' })
+    vi.mocked(getConfig).mockResolvedValue({
+      timezone: 'Europe/Berlin',
+      app_name: '提醒',
+      site_url: 'https://reminder.example.com',
+    })
     vi.mocked(updateConfig).mockImplementation(async (cfg) => cfg)
     vi.mocked(getAISettings).mockResolvedValue({
       enabled: false,
@@ -68,6 +72,7 @@ describe('Profile 分区导航', () => {
     await userEvent.click(navButton('基础设置'))
     expect(screen.getByRole('heading', { name: '基础设置' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: '站点信息' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '站点地址' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: '时区设置' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: '关于项目' })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: '账户信息' })).not.toBeInTheDocument()
@@ -94,11 +99,28 @@ describe('Profile 分区导航', () => {
     })
 
     const buttons = screen.getAllByRole('button', { name: '保存' })
-    // 时区卡片中的保存按钮为第二个（第一个是站点信息的保存）
-    await userEvent.click(buttons[1])
+    // 保存按钮顺序：站点信息、站点地址、时区
+    await userEvent.click(buttons[2])
 
     await waitFor(() => {
       expect(vi.mocked(updateConfig)).toHaveBeenCalledWith({ timezone: 'Europe/Berlin' })
+    })
+  })
+
+  it('回显并保存站点地址', async () => {
+    renderProfile()
+    await userEvent.click(navButton('基础设置'))
+
+    const input = await screen.findByLabelText('对外访问地址')
+    await waitFor(() => expect(input).toHaveValue('https://reminder.example.com'))
+
+    await userEvent.clear(input)
+    await userEvent.type(input, 'http://192.168.1.10:8765')
+    const buttons = screen.getAllByRole('button', { name: '保存' })
+    await userEvent.click(buttons[1])
+
+    await waitFor(() => {
+      expect(vi.mocked(updateConfig)).toHaveBeenCalledWith({ site_url: 'http://192.168.1.10:8765' })
     })
   })
 })
