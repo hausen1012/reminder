@@ -52,6 +52,10 @@ export default defineConfig({
             urlPattern: /^\/api\//,
             handler: 'NetworkOnly',
           },
+          {
+            urlPattern: /^\/c\//,
+            handler: 'NetworkOnly',
+          },
         ],
       },
     }),
@@ -65,6 +69,10 @@ export default defineConfig({
     allowedHosts: true,
     proxy: {
       '/api': {
+        target: 'http://localhost:8765',
+        changeOrigin: true,
+      },
+      '/c': {
         target: 'http://localhost:8765',
         changeOrigin: true,
       },
