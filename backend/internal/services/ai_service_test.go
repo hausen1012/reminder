@@ -339,6 +339,117 @@ func TestAIUpdateReminderMergesExistingFields(t *testing.T) {
 	}
 }
 
+// 用户要求「需要确认」时：create_reminder 必须把确认策略真正写进草稿，
+// 确认执行后提醒上的 require_confirm / 重发参数要落库，而不是只写在正文里。
+func TestAIChat_CreateReminderWithConfirm(t *testing.T) {
+	svc, _, db := newAITestService(t,
+		toolCall("create_reminder", `{
+			"title":"测试提醒",
+			"content":"记得确认",
+			"schedule_type":"once",
+			"schedule_spec":{"at":"2030-01-01T09:00:00"},
+			"channel_ids":[1],
+			"require_confirm":true,
+			"confirm_retry_interval_sec":60,
+			"confirm_max_retries":3
+		}`),
+		&llm.Reply{Text: "已生成待确认卡片"},
+	)
+	res, err := chat(svc, "建一个一分钟后需要确认的测试提醒，重试 3 次，间隔 60 秒")
+	if err != nil {
+		t.Fatalf("Chat 失败: %v", err)
+	}
+	if len(res.Actions) != 1 {
+		t.Fatalf("应生成 1 条待确认操作，实际 %d", len(res.Actions))
+	}
+	// 摘要要让用户在卡片上就能核对确认策略
+	if !strings.Contains(res.Actions[0].Summary, "需确认") {
+		t.Fatalf("摘要应包含确认策略，实际 %q", res.Actions[0].Summary)
+	}
+
+	act, err := svc.ApplyAction(res.Actions[0].ID)
+	if err != nil {
+		t.Fatalf("ApplyAction 失败: %v", err)
+	}
+	var got models.Reminder
+	if err := db.First(&got, "title = ?", "测试提醒").Error; err != nil {
+		t.Fatalf("查询提醒失败: %v", err)
+	}
+	if !got.RequireConfirm {
+		t.Fatal("require_confirm 未落库：确认机制不会生效")
+	}
+	if got.ConfirmRetryIntervalSec != 60 || got.ConfirmMaxRetries != 3 {
+		t.Fatalf("重发参数 = %d/%d，期望 60/3", got.ConfirmRetryIntervalSec, got.ConfirmMaxRetries)
+	}
+	if !strings.HasPrefix(act.ResultRef, "reminder:") {
+		t.Fatalf("result_ref = %q", act.ResultRef)
+	}
+}
+
+// 只说了「需要确认」而没给间隔与次数时，应按表单默认值补齐而不是让工具报错。
+func TestToolCreateReminder_ConfirmDefaults(t *testing.T) {
+	svc, _, db := newAITestService(t, &llm.Reply{Text: "ok"})
+	if _, err := svc.toolCreateReminder(context.Background(), json.RawMessage(`{
+		"title":"吃药","schedule_type":"once",
+		"schedule_spec":{"at":"2030-01-01T09:00:00"},"channel_ids":[1],
+		"require_confirm":true
+	}`)); err != nil {
+		t.Fatalf("缺省重发参数时不应报错: %v", err)
+	}
+	var act models.AIAction
+	if err := db.Where("status = ?", "pending").First(&act).Error; err != nil {
+		t.Fatalf("查询草稿失败: %v", err)
+	}
+	if _, err := svc.ApplyAction(act.ID); err != nil {
+		t.Fatalf("ApplyAction 失败: %v", err)
+	}
+	var got models.Reminder
+	if err := db.First(&got, "title = ?", "吃药").Error; err != nil {
+		t.Fatalf("查询提醒失败: %v", err)
+	}
+	if got.ConfirmRetryIntervalSec != defaultConfirmRetryIntervalSec || got.ConfirmMaxRetries != defaultConfirmMaxRetries {
+		t.Fatalf("默认重发参数 = %d/%d，期望 %d/%d",
+			got.ConfirmRetryIntervalSec, got.ConfirmMaxRetries,
+			defaultConfirmRetryIntervalSec, defaultConfirmMaxRetries)
+	}
+}
+
+// 更新提醒时把 require_confirm 打开，未给重发参数应沿用原值（原值为 0 时补默认）。
+func TestToolUpdateReminder_EnableConfirm(t *testing.T) {
+	svc, _, db := newAITestService(t, &llm.Reply{Text: "ok"})
+	created, err := svc.ReminderSvc.Create(ReminderInput{
+		Title:        "原标题",
+		ScheduleType: "once",
+		ScheduleSpec: map[string]any{"at": "2030-01-01T09:00:00"},
+		ChannelIDs:   []uint{1},
+	})
+	if err != nil {
+		t.Fatalf("创建提醒失败: %v", err)
+	}
+
+	out, err := svc.toolUpdateReminder(context.Background(), json.RawMessage(`{"id":1,"require_confirm":true}`))
+	if err != nil {
+		t.Fatalf("toolUpdateReminder 失败: %v", err)
+	}
+	if !strings.Contains(out, "draft_id") {
+		t.Fatalf("应返回 draft_id: %s", out)
+	}
+	var act models.AIAction
+	if err := db.Where("status = ?", "pending").First(&act).Error; err != nil {
+		t.Fatalf("查询草稿失败: %v", err)
+	}
+	if _, err := svc.ApplyAction(act.ID); err != nil {
+		t.Fatalf("ApplyAction 失败: %v", err)
+	}
+	var got models.Reminder
+	if err := db.First(&got, created.ID).Error; err != nil {
+		t.Fatalf("查询提醒失败: %v", err)
+	}
+	if !got.RequireConfirm || got.ConfirmMaxRetries != defaultConfirmMaxRetries {
+		t.Fatalf("确认配置未生效: require=%v retries=%d", got.RequireConfirm, got.ConfirmMaxRetries)
+	}
+}
+
 // 未配置通道时 create_reminder 应报错，让模型自行纠正。
 func TestToolCreateReminder_RequiresChannels(t *testing.T) {
 	svc, _, _ := newAITestService(t, &llm.Reply{Text: "ok"})
@@ -554,6 +665,49 @@ func TestAIToolDefinitions(t *testing.T) {
 	}
 	if len(want) != 0 {
 		t.Fatalf("缺少工具: %v", want)
+	}
+}
+
+// create_reminder / update_reminder 的 schema 必须暴露确认相关字段，
+// 否则模型没有能力表达「需要确认、重发 N 次」。
+func TestAIToolDefinitions_ExposeConfirmFields(t *testing.T) {
+	svc, _, _ := newAITestService(t, &llm.Reply{Text: "x"})
+	confirmFields := []string{"require_confirm", "confirm_retry_interval_sec", "confirm_max_retries"}
+	for _, d := range svc.toolDefinitions() {
+		if d.spec.Name != "create_reminder" && d.spec.Name != "update_reminder" {
+			continue
+		}
+		props, _ := d.spec.InputSchema["properties"].(map[string]any)
+		for _, f := range confirmFields {
+			if _, ok := props[f]; !ok {
+				t.Fatalf("工具 %s 缺少字段 %s", d.spec.Name, f)
+			}
+		}
+	}
+}
+
+// list_reminders 的结果要带上确认配置，模型才能判断「这条提醒是否需要确认」。
+func TestToolListReminders_IncludesConfirm(t *testing.T) {
+	svc, _, _ := newAITestService(t, &llm.Reply{Text: "x"})
+	if _, err := svc.ReminderSvc.Create(ReminderInput{
+		Title:                   "吃药",
+		ScheduleType:            "once",
+		ScheduleSpec:            map[string]any{"at": "2030-01-01T09:00:00"},
+		ChannelIDs:              []uint{1},
+		RequireConfirm:          true,
+		ConfirmRetryIntervalSec: 60,
+		ConfirmMaxRetries:       3,
+	}); err != nil {
+		t.Fatalf("创建提醒失败: %v", err)
+	}
+	out, err := svc.toolListReminders(context.Background(), json.RawMessage(`{}`))
+	if err != nil {
+		t.Fatalf("toolListReminders 失败: %v", err)
+	}
+	for _, want := range []string{`"require_confirm":true`, `"confirm_retry_interval_sec":60`, `"confirm_max_retries":3`} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("工具结果缺少 %s: %s", want, out)
+		}
 	}
 }
 

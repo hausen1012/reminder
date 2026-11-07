@@ -172,9 +172,13 @@ HTTP 状态恒为 `200`，错误通过 `event: error` 下发；这样前端只�
 | `kind` | 执行动作 |
 |---|---|
 | `create_channel` | 调用通道服务新建通道（名称冲突等由通道服务报错） |
-| `create_reminder` | 新建提醒，来源记为 `ai` |
-| `update_reminder` | 用草稿里的完整入参覆盖提醒 |
+| `create_reminder` | 新建提醒，来源记为 `ai`；草稿入参中的 `require_confirm` / `confirm_retry_interval_sec` / `confirm_max_retries` 一并落库 |
+| `update_reminder` | 用草稿里的完整入参覆盖提醒（含确认配置） |
 | `delete_reminder` | 永久删除该提醒 |
+
+确认配置由模型从用户话里提取：只要求「需要确认」而未给数值，或缺省值低于下限
+（间隔 < 60 秒、次数 < 1）时，工具层按 300 秒 / 3 次补齐，草稿摘要会标注该策略。
+`list_reminders` 的结果包含这三个字段，便于模型判断提醒当前的确认状态。
 
 错误约定：
 

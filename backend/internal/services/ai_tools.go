@@ -24,6 +24,15 @@ type toolDefinition struct {
 	run  func(ctx context.Context, input json.RawMessage) (string, error)
 }
 
+// 开启「需要确认」但模型没给重发参数时的兜底值，与提醒表单的默认值一致。
+//
+// 用户常说「这个提醒需要确认」而不提间隔与次数；工具层补默认值比让服务层
+// 报「重发间隔最小 60 秒」更符合预期，模型也不用猜。
+const (
+	defaultConfirmRetryIntervalSec = 300
+	defaultConfirmMaxRetries       = 3
+)
+
 // channelTypeSchema 供 create_channel 使用。
 var channelTypeSchema = map[string]any{
 	"type":        "string",
@@ -66,7 +75,8 @@ func (s *AIService) toolDefinitions() []toolDefinition {
 			spec: llm.Tool{
 				Name: "create_reminder",
 				Description: "提出创建一条提醒。不会立即创建，会生成一张待用户确认的卡片。" +
-					"必须提供 title、schedule_type、schedule_spec、channel_ids。",
+					"必须提供 title、schedule_type、schedule_spec、channel_ids。" +
+					"用户要求「需要确认 / 没确认就催我」时传 require_confirm=true。",
 				InputSchema: map[string]any{
 					"type": "object",
 					"properties": map[string]any{
@@ -77,6 +87,19 @@ func (s *AIService) toolDefinitions() []toolDefinition {
 						"schedule_type":  map[string]any{"type": "string", "enum": []string{"once", "interval", "cron"}},
 						"schedule_spec":  map[string]any{"type": "object", "description": scheduleSpecSchemaDescription},
 						"channel_ids":    map[string]any{"type": "array", "items": map[string]any{"type": "integer"}, "description": "通知通道 id 列表，来自 list_channels"},
+						"require_confirm": map[string]any{
+							"type": "boolean",
+							"description": "是否需要确认。用户要求「需要确认 / 没点确认就重发 / 直到我确认」时必须传 true，" +
+								"并配置下面两个重发参数（不传则用默认 300 秒、3 次）",
+						},
+						"confirm_retry_interval_sec": map[string]any{
+							"type": "integer", "minimum": 60,
+							"description": "确认重发间隔（秒），最小 60，默认 300。仅 require_confirm=true 时有意义",
+						},
+						"confirm_max_retries": map[string]any{
+							"type": "integer", "minimum": 1,
+							"description": "确认最大重发次数，至少 1，默认 3。仅 require_confirm=true 时有意义",
+						},
 					},
 					"required": []string{"title", "schedule_type", "schedule_spec", "channel_ids"},
 				},
@@ -99,6 +122,12 @@ func (s *AIService) toolDefinitions() []toolDefinition {
 						"schedule_spec": map[string]any{"type": "object"},
 						"channel_ids":   map[string]any{"type": "array", "items": map[string]any{"type": "integer"}},
 						"enabled":       map[string]any{"type": "boolean"},
+						"require_confirm": map[string]any{
+							"type":        "boolean",
+							"description": "是否需要确认；设为 true 时未给重发参数则沿用原值，原值为空则用默认 300 秒、3 次",
+						},
+						"confirm_retry_interval_sec": map[string]any{"type": "integer", "minimum": 60, "description": "确认重发间隔（秒）"},
+						"confirm_max_retries":        map[string]any{"type": "integer", "minimum": 1, "description": "确认最大重发次数"},
 					},
 					"required": []string{"id"},
 				},
@@ -177,28 +206,34 @@ func (s *AIService) toolListReminders(_ context.Context, raw json.RawMessage) (s
 		return "", err
 	}
 	type item struct {
-		ID           uint           `json:"id"`
-		Title        string         `json:"title"`
-		Content      string         `json:"content"`
-		Calendar     string         `json:"calendar"`
-		ScheduleType string         `json:"schedule_type"`
-		ScheduleSpec map[string]any `json:"schedule_spec"`
-		Enabled      bool           `json:"enabled"`
-		ChannelIDs   []uint         `json:"channel_ids"`
-		NextFireAt   string         `json:"next_fire_at_local,omitempty"`
+		ID                      uint           `json:"id"`
+		Title                   string         `json:"title"`
+		Content                 string         `json:"content"`
+		Calendar                string         `json:"calendar"`
+		ScheduleType            string         `json:"schedule_type"`
+		ScheduleSpec            map[string]any `json:"schedule_spec"`
+		Enabled                 bool           `json:"enabled"`
+		ChannelIDs              []uint         `json:"channel_ids"`
+		RequireConfirm          bool           `json:"require_confirm"`
+		ConfirmRetryIntervalSec int            `json:"confirm_retry_interval_sec"`
+		ConfirmMaxRetries       int            `json:"confirm_max_retries"`
+		NextFireAt              string         `json:"next_fire_at_local,omitempty"`
 	}
 	out := make([]item, 0, len(views))
 	for _, v := range views {
 		out = append(out, item{
-			ID:           v.ID,
-			Title:        v.Title,
-			Content:      truncateRunes(v.Content, 200),
-			Calendar:     v.Calendar,
-			ScheduleType: v.ScheduleType,
-			ScheduleSpec: v.ScheduleSpec,
-			Enabled:      v.Enabled,
-			ChannelIDs:   v.ChannelIDs,
-			NextFireAt:   v.NextFireAtLocal,
+			ID:                      v.ID,
+			Title:                   v.Title,
+			Content:                 truncateRunes(v.Content, 200),
+			Calendar:                v.Calendar,
+			ScheduleType:            v.ScheduleType,
+			ScheduleSpec:            v.ScheduleSpec,
+			Enabled:                 v.Enabled,
+			ChannelIDs:              v.ChannelIDs,
+			RequireConfirm:          v.RequireConfirm,
+			ConfirmRetryIntervalSec: v.ConfirmRetryIntervalSec,
+			ConfirmMaxRetries:       v.ConfirmMaxRetries,
+			NextFireAt:              v.NextFireAtLocal,
 		})
 	}
 	return toJSONString(map[string]any{"reminders": out}), nil
@@ -220,12 +255,13 @@ func (s *AIService) toolCreateReminder(_ context.Context, raw json.RawMessage) (
 	if len(in.ChannelIDs) == 0 {
 		return "", errors.New("channel_ids 不能为空：请先调用 list_channels 选择通道")
 	}
+	normalizeConfirmParams(&in)
 	// 提前跑一遍服务层校验，让模型拿到明确错误后自行修正，而不是把
 	// 无法创建的草稿留给用户。
 	if err := s.ReminderSvc.validate(&in); err != nil {
 		return "", err
 	}
-	return s.createAction("create_reminder", "创建提醒："+in.Title, in)
+	return s.createAction("create_reminder", "创建提醒："+in.Title+confirmSummarySuffix(in), in)
 }
 
 // toolUpdateReminder 生成一条修改提醒的待确认草稿。
@@ -278,6 +314,7 @@ func (s *AIService) toolUpdateReminder(_ context.Context, raw json.RawMessage) (
 		ConfirmMaxRetries:       asPositiveInt(merged["confirm_max_retries"]),
 		Source:                  "ai",
 	}
+	normalizeConfirmParams(&input)
 	if v, ok := merged["enabled"]; ok {
 		b, _ := v.(bool)
 		input.Enabled = &b
@@ -285,7 +322,7 @@ func (s *AIService) toolUpdateReminder(_ context.Context, raw json.RawMessage) (
 	if err := s.ReminderSvc.validate(&input); err != nil {
 		return "", err
 	}
-	return s.createAction("update_reminder", fmt.Sprintf("修改提醒 #%d：%s", id, input.Title),
+	return s.createAction("update_reminder", fmt.Sprintf("修改提醒 #%d：%s", id, input.Title)+confirmSummarySuffix(input),
 		map[string]any{"id": id, "input": input})
 }
 
@@ -344,6 +381,32 @@ func (s *AIService) createAction(kind, summary string, payload any) (string, err
 		"status":   "pending",
 		"note":     "已生成待确认操作，尚未生效。请告诉用户点击卡片上的「确认执行」后才会真正创建。",
 	}), nil
+}
+
+// normalizeConfirmParams 为「需要确认」的提醒补齐重发参数。
+//
+// 模型通常只会传 require_confirm=true，但服务层校验要求间隔 ≥60 秒、次数 ≥1，
+// 缺参数会让整个工具调用失败，模型往往改不明白。这里按表单默认值补齐：
+// 用户能接受的默认值，胜过一张建不出来的草稿。
+func normalizeConfirmParams(in *ReminderInput) {
+	if !in.RequireConfirm {
+		return
+	}
+	if in.ConfirmRetryIntervalSec < 60 {
+		in.ConfirmRetryIntervalSec = defaultConfirmRetryIntervalSec
+	}
+	if in.ConfirmMaxRetries < 1 {
+		in.ConfirmMaxRetries = defaultConfirmMaxRetries
+	}
+}
+
+// confirmSummarySuffix 把确认策略拼进草稿摘要，让用户在卡片上就能核对。
+func confirmSummarySuffix(in ReminderInput) string {
+	if !in.RequireConfirm {
+		return ""
+	}
+	return fmt.Sprintf("（需确认，未确认每 %d 秒重发，共 %d 次）",
+		in.ConfirmRetryIntervalSec, in.ConfirmMaxRetries)
 }
 
 // jsonInt 从 JSON 对象里取整数。

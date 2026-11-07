@@ -921,7 +921,10 @@ func (s *AIService) systemPrompt(custom string) string {
 5. create_* / update_reminder / delete_reminder 只会生成「待确认操作」，不会立即生效。
    回复用户时要说"已生成待确认卡片，点击确认后生效"，绝不要声称"已创建/已删除"。
 6. 用户说"每天/每周/工作日"这类周期描述时，优先用 cron；"每 N 分钟/小时"用 interval；只发生一次用 once。
-7. 回答简洁，用中文。不要输出 JSON，除非用户明确要求。`,
+7. 用户要求"需要确认 / 没点确认就重发 / 催我到确认为止"时，传 require_confirm=true，
+   并按用户说的重发间隔与次数填 confirm_retry_interval_sec（最小 60 秒）与 confirm_max_retries（至少 1）；
+   用户没说具体数值就用默认 300 秒、3 次，不要把这些要求写进正文冒充配置。
+8. 回答简洁，用中文。不要输出 JSON，除非用户明确要求。`,
 		s.TZ.Name(), now.Format("2006-01-02T15:04:05 Mon"))
 
 	custom = strings.TrimSpace(custom)
