@@ -4,7 +4,6 @@
 package handlers
 
 import (
-	"log/slog"
 	"net/http"
 	"strconv"
 
@@ -25,25 +24,22 @@ func parseID(c *gin.Context, key string) (uint, error) {
 // abortBindErr 统一处理请求体解析失败。
 //
 // 对外只回一句用户能看懂的话（不暴露 JSON 字段名等内部细节），
-// 但把底层原因（缺字段、类型不对、JSON 语法错）写进日志：
-// 只有「请求体格式错误」这句话的日志，排查时等于没有信息。
+// 但把底层原因（缺字段、类型不对、JSON 语法错）挂到 AppError.Cause 上：
+// ErrorHandler 会把它写进「请求返回业务错误」那条日志，不必在这里再打一条，
+// 否则同一次失败在日志里出现两遍。
 //
 // 请求体超过 BodyLimit 上限时单独返回 413：这种情况既不是用户填错，
 // 也不该让人从「格式错误」里猜。
 func abortBindErr(c *gin.Context, err error, message string) {
-	if err != nil {
-		slog.Warn("请求体解析失败",
-			"path", c.Request.URL.Path,
-			"request_id", middleware.RequestIDOf(c),
-			"content_type", c.ContentType(),
-			"error", err,
-		)
-	}
-	if middleware.IsBodyTooLarge(err) {
-		abortErr(c, middleware.NewAppError(middleware.CodePayloadTooLarge, "请求体超过大小限制"))
+	if err == nil {
 		return
 	}
-	abortErr(c, middleware.NewAppError(middleware.CodeValidationFailed, message))
+	if middleware.IsBodyTooLarge(err) {
+		abortErr(c, middleware.NewAppError(middleware.CodePayloadTooLarge, "请求体超过大小限制").WithCause(err))
+		return
+	}
+	appErr := middleware.NewAppError(middleware.CodeValidationFailed, message).WithCause(err)
+	abortErr(c, appErr)
 }
 
 // abortErr 是处理 service 错误的统一入口：AppError 走中间件渲染，其余视为 unknown。

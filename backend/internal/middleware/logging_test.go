@@ -8,8 +8,10 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/reminder/backend/internal/logger"
 )
 
 // captureSlog 把全局 slog 临时重定向到内存 buffer。
@@ -17,9 +19,15 @@ import (
 // slog.SetDefault 是进程级状态，因此用到它的用例不要 t.Parallel。
 func captureSlog(t *testing.T) *bytes.Buffer {
 	t.Helper()
+	return captureSlogAt(t, slog.LevelDebug)
+}
+
+// captureSlogAt 用指定级别捕获日志。
+func captureSlogAt(t *testing.T, level slog.Level) *bytes.Buffer {
+	t.Helper()
 	buf := &bytes.Buffer{}
 	old := slog.Default()
-	slog.SetDefault(slog.New(slog.NewTextHandler(buf, &slog.HandlerOptions{Level: slog.LevelDebug})))
+	slog.SetDefault(slog.New(slog.NewTextHandler(buf, &slog.HandlerOptions{Level: level})))
 	t.Cleanup(func() { slog.SetDefault(old) })
 	return buf
 }
@@ -121,7 +129,10 @@ func TestErrorHandler_LogsPanicWithStack(t *testing.T) {
 	}
 }
 
-// 请求日志按状态码分级：2xx=INFO、4xx=WARN、5xx=ERROR。
+// 请求日志按状态码分级：2xx=DEBUG、4xx=WARN、5xx=ERROR。
+//
+// 2xx 降到 Debug 是有意的：面板每 10 秒轮询一次监控接口，
+// Info 级别下这些日志会把真正的问题淹没。
 func TestSlogLogger_LevelByStatus(t *testing.T) {
 	cases := []struct {
 		name   string
@@ -129,7 +140,7 @@ func TestSlogLogger_LevelByStatus(t *testing.T) {
 		level  string
 		code   ErrorCode
 	}{
-		{"成功", http.StatusOK, "level=INFO", ""},
+		{"成功", http.StatusOK, "level=DEBUG", ""},
 		{"客户端错误", http.StatusBadRequest, "level=WARN", CodeValidationFailed},
 		{"服务端错误", http.StatusInternalServerError, "level=ERROR", CodeInternalError},
 	}
@@ -163,6 +174,38 @@ func TestSlogLogger_LevelByStatus(t *testing.T) {
 	}
 }
 
+// Info 级别下成功的访问日志应当完全不输出。
+//
+// 这是「日志不要全是轮询请求」的核心保证：默认配置下只有异常与慢请求可见。
+func TestSlogLogger_SuccessSilentAtInfo(t *testing.T) {
+	logs := captureSlogAt(t, slog.LevelInfo)
+
+	r := newLoggingRouter()
+	r.GET("/api/scheduler/status", func(c *gin.Context) { c.Status(http.StatusOK) })
+	r.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/api/scheduler/status", nil))
+
+	if out := logs.String(); strings.Contains(out, "msg=request") {
+		t.Fatalf("info 级别下不应输出成功请求的访问日志:\n%s", out)
+	}
+}
+
+// 成功但慢的请求要提到 Warn：慢查询与外部超时不能因为没有非 2xx 状态码而被漏掉。
+func TestSlogLogger_SlowSuccessIsWarn(t *testing.T) {
+	logs := captureSlogAt(t, slog.LevelInfo)
+
+	r := newLoggingRouter()
+	r.GET("/slow", func(c *gin.Context) {
+		time.Sleep(slowRequestThreshold + 10*time.Millisecond)
+		c.Status(http.StatusOK)
+	})
+	r.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/slow", nil))
+
+	out := logs.String()
+	if !strings.Contains(out, "msg=request") || !strings.Contains(out, "level=WARN") {
+		t.Fatalf("超过 1 秒的成功请求应为 WARN:\n%s", out)
+	}
+}
+
 // 请求日志应带上身份与路由模板，便于按用户/接口聚合。
 func TestSlogLogger_IncludesIdentityAndRoute(t *testing.T) {
 	logs := captureSlog(t)
@@ -180,5 +223,51 @@ func TestSlogLogger_IncludesIdentityAndRoute(t *testing.T) {
 		if !strings.Contains(out, want) {
 			t.Fatalf("请求日志缺少 %q:\n%s", want, out)
 		}
+	}
+}
+
+// RequestID 必须把 id 写进请求 ctx，业务层才能用 logger.FromContext 自动带上。
+func TestRequestID_InjectsIntoContext(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.Use(RequestID())
+
+	var fromCtx string
+	r.GET("/x", func(c *gin.Context) {
+		fromCtx = logger.RequestIDFromContext(c.Request.Context())
+		c.Status(http.StatusOK)
+	})
+
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/x", nil))
+
+	if fromCtx == "" || fromCtx != w.Header().Get(HeaderRequestID) {
+		t.Fatalf("ctx 里的 request_id = %q，响应头 = %q，两者应一致且非空",
+			fromCtx, w.Header().Get(HeaderRequestID))
+	}
+}
+
+// 业务层用 logger.FromContext 打日志时，不需要手写 request_id 也能和访问日志对上。
+func TestLoggerFromContext_CarriesRequestID(t *testing.T) {
+	logs := captureSlog(t)
+
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.Use(RequestID())
+	r.GET("/x", func(c *gin.Context) {
+		logger.FromContext(c.Request.Context()).Warn("业务日志", "reminder", 7)
+		c.Status(http.StatusOK)
+	})
+
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/x", nil))
+
+	out := logs.String()
+	id := w.Header().Get(HeaderRequestID)
+	if !strings.Contains(out, "业务日志") || !strings.Contains(out, "request_id="+id) {
+		t.Fatalf("业务日志应自动带 request_id=%s:\n%s", id, out)
+	}
+	if !strings.Contains(out, "reminder=7") {
+		t.Fatalf("业务日志缺少自定义字段:\n%s", out)
 	}
 }

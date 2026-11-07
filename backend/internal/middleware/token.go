@@ -5,12 +5,12 @@
 package middleware
 
 import (
-	"log/slog"
 	"net/http"
 	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/reminder/backend/internal/logger"
 )
 
 // TokenVerifier 是 TokenService.Verify 的函数签名。
@@ -88,7 +88,8 @@ func TokenAuth(verify TokenVerifier, toucher TokenToucher, limiter *RateLimiter)
 	return func(c *gin.Context) {
 		key := c.GetHeader("X-AUTH")
 		if key == "" {
-			slog.Warn("外部令牌鉴权失败", "path", c.Request.URL.Path, "request_id", RequestIDOf(c), "reason", "缺少 X-AUTH 请求头")
+			logger.FromContext(c.Request.Context()).Warn("外部令牌鉴权失败",
+				"path", c.Request.URL.Path, "reason", "缺少 X-AUTH 请求头")
 			c.AbortWithStatusJSON(http.StatusUnauthorized,
 				ErrorBody(CodeUnauthorized, "缺少 X-AUTH 请求头", ""))
 			return
@@ -97,15 +98,16 @@ func TokenAuth(verify TokenVerifier, toucher TokenToucher, limiter *RateLimiter)
 		tokenID, ok := verify(key)
 		if !ok {
 			// 只记令牌前缀，不记明文或哈希：日志本身不该成为凭据来源。
-			slog.Warn("外部令牌鉴权失败", "path", c.Request.URL.Path, "request_id", RequestIDOf(c),
-				"reason", "令牌无效", "token_prefix", tokenPrefix(key))
+			logger.FromContext(c.Request.Context()).Warn("外部令牌鉴权失败",
+				"path", c.Request.URL.Path, "reason", "令牌无效", "token_prefix", tokenPrefix(key))
 			c.AbortWithStatusJSON(http.StatusUnauthorized,
 				ErrorBody(CodeUnauthorized, "令牌无效", ""))
 			return
 		}
 
 		if !limiter.Allow(tokenID, 60) {
-			slog.Warn("外部令牌触发限流", "path", c.Request.URL.Path, "request_id", RequestIDOf(c), "token_id", tokenID)
+			logger.FromContext(c.Request.Context()).Warn("外部令牌触发限流",
+				"path", c.Request.URL.Path, "token_id", tokenID)
 			c.AbortWithStatusJSON(http.StatusTooManyRequests,
 				ErrorBody(CodeRateLimited, "请求过于频繁", ""))
 			return

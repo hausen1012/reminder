@@ -23,6 +23,7 @@ import (
 
 	"github.com/reminder/backend/internal/crypto/secretbox"
 	"github.com/reminder/backend/internal/llm"
+	"github.com/reminder/backend/internal/logger"
 	"github.com/reminder/backend/internal/middleware"
 	"github.com/reminder/backend/internal/models"
 	"github.com/reminder/backend/internal/timezone"
@@ -505,21 +506,32 @@ func (s *AIService) ChatStream(ctx context.Context, in ChatInput, sink ChatEvent
 		return nil, middleware.NewAppError(middleware.CodeValidationFailed, "消息过长（最多 4000 字）").WithField("message")
 	}
 
+	// 本文件里的日志统一走 logger.FromContext：一条对话的多轮工具调用、
+	// 每次重试都带同一个 request_id，能和访问日志串起来看。
+	log := logger.FromContext(ctx)
+	log.Info("AI 对话开始", "msg_len", len([]rune(message)),
+		"history_turns", len(in.History), "requested_model", in.Model)
+
 	cfg, err := s.resolveConfig(AISettingsInput{Model: strings.TrimSpace(in.Model)})
 	if err != nil {
+		log.Warn("AI 对话结束：读取设置失败", "error", err)
 		return nil, err
 	}
 	if !cfg.Enabled {
+		log.Warn("AI 对话结束：助手未启用")
 		return nil, middleware.NewAppError(middleware.CodeValidationFailed, "AI 助手未启用，请先到设置页开启")
 	}
 	p := s.providerOverride
 	if p == nil {
 		created, err := newProvider(cfg)
 		if err != nil {
+			log.Warn("AI 对话结束：构造 Provider 失败",
+				"provider", cfg.Provider, "base_url", cfg.BaseURL, "error", err)
 			return nil, middleware.NewAppError(middleware.CodeValidationFailed, err.Error())
 		}
 		p = created
 	}
+	log = log.With("provider", cfg.Provider, "model", cfg.Model)
 
 	// 提示词每轮请求只解析一次：库里的自定义内容在本次对话内保持一致
 	system, err := s.SystemPrompt()
@@ -544,7 +556,7 @@ func (s *AIService) ChatStream(ctx context.Context, in ChatInput, sink ChatEvent
 		if !success && len(createdIDs) > 0 {
 			// 对话因报错（如模型 429、网络超时等）未正常结束，回滚清理本轮生成的草稿，避免变成孤儿待确认记录
 			if delErr := s.DB.Where("id IN ?", createdIDs).Delete(&models.AIAction{}).Error; delErr != nil {
-				slog.Error("清理未完成对话的 AI 草稿失败", "error", delErr, "ids", createdIDs)
+				logger.FromContext(ctx).Error("清理未完成对话的 AI 草稿失败", "error", delErr, "ids", createdIDs)
 			}
 		}
 	}()
@@ -552,7 +564,9 @@ func (s *AIService) ChatStream(ctx context.Context, in ChatInput, sink ChatEvent
 	var replyText string
 	truncated := false
 	retries := 0
+	rounds := 0
 	for round := 0; round < maxToolRounds; round++ {
+		rounds = round + 1
 		emit(ChatEventStatus, ChatStatus{Phase: "thinking", Text: "助手正在思考…"})
 		reply, err := llm.ChatWithRetryNotify(ctx, p, llm.Request{
 			System:    system,
@@ -573,6 +587,13 @@ func (s *AIService) ChatStream(ctx context.Context, in ChatInput, sink ChatEvent
 			})
 		})
 		if err != nil {
+			// 失败时把「用户问了什么」一起记下来：只记错误字符串时，
+			// 事后没法复现是哪类提问触发了限流或参数错误。
+			// 上游状态码 / 响应体由 ErrorAttrs 展开，它们是判断 429 还是 400 的依据。
+			log.Warn("AI 对话结束：调用失败", llm.ErrorAttrsWith(err,
+				"round", rounds, "retries", retries, "tool_rounds_limit", maxToolRounds,
+				"turns", len(turns), "tools", len(tools),
+				"user_message", truncateRunes(message, 500))...)
 			return nil, middleware.NewAppError(middleware.CodeValidationFailed, "AI 调用失败: "+err.Error())
 		}
 		replyText = strings.TrimSpace(reply.Text)
@@ -597,12 +618,16 @@ func (s *AIService) ChatStream(ctx context.Context, in ChatInput, sink ChatEvent
 			Raw:       reply.Raw,
 		})
 		results := make([]llm.ToolResult, 0, len(reply.ToolCalls))
+		toolNames := make([]string, 0, len(reply.ToolCalls))
+		var toolErrs []any
 		for _, call := range reply.ToolCalls {
+			toolNames = append(toolNames, call.Name)
 			def, ok := byName[call.Name]
 			if !ok {
 				results = append(results, llm.ToolResult{
 					CallID: call.ID, Name: call.Name, Content: "未知工具: " + call.Name, IsError: true,
 				})
+				toolErrs = append(toolErrs, call.Name+": 未知工具")
 				continue
 			}
 			out, runErr := def.run(ctx, call.Input)
@@ -614,6 +639,8 @@ func (s *AIService) ChatStream(ctx context.Context, in ChatInput, sink ChatEvent
 			})
 			if runErr != nil {
 				results[len(results)-1].Content = runErr.Error()
+				// 工具失败是「AI 回答了但不能用」的主要原因，必须能在日志里看到
+				toolErrs = append(toolErrs, call.Name+": "+runErr.Error())
 				continue
 			}
 			// 写工具会在结果里带上 draft_id，记下来用于本轮回传草稿
@@ -621,6 +648,11 @@ func (s *AIService) ChatStream(ctx context.Context, in ChatInput, sink ChatEvent
 				createdIDs = append(createdIDs, id)
 			}
 		}
+		// 工具轮次的明细属于 Debug：正常运行一次对话可能跑好几轮，
+		// 每轮一条 Info 会把日志刷满。失败信息在上面那条 Warn 里已经落过。
+		log.Debug("AI 工具轮次完成",
+			"round", rounds, "tools", toolNames, "errors", toolErrs,
+			"drafts", len(createdIDs))
 		turns = append(turns, llm.Turn{Role: "user", ToolResults: results})
 	}
 	if truncated {
@@ -638,9 +670,16 @@ func (s *AIService) ChatStream(ctx context.Context, in ChatInput, sink ChatEvent
 
 	actions, err := s.actionsByIDs(createdIDs)
 	if err != nil {
+		log.Warn("AI 对话结束：读取草稿失败", "drafts", createdIDs, "error", err)
 		return nil, err
 	}
 	success = true
+	// 每次对话一条汇总：问了什么、跑了几轮、重试几次、生成了几个草稿。
+	// 排查「AI 没按要求干活」时，这条比逐轮打点有用得多。
+	log.Info("AI 对话完成",
+		"rounds", rounds, "retries", retries, "drafts", len(createdIDs),
+		"truncated", truncated, "reply_len", len([]rune(replyText)),
+		"user_message", truncateRunes(message, 500))
 	return &ChatResult{Reply: replyText, Actions: actions, Retries: retries}, nil
 }
 

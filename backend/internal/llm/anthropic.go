@@ -7,6 +7,7 @@ import (
 
 	"github.com/anthropics/anthropic-sdk-go/v2"
 	"github.com/anthropics/anthropic-sdk-go/v2/option"
+	"github.com/reminder/backend/internal/logger"
 )
 
 // AnthropicProvider 基于官方 Go SDK 调用 Claude。
@@ -88,6 +89,14 @@ func (p *AnthropicProvider) Chat(ctx context.Context, req Request) (*Reply, erro
 
 	resp, err := p.client.Beta.Messages.New(ctx, params)
 	if err != nil {
+		// 错误里的状态码、请求 id 与上游文案是排查限流/鉴权的关键；
+		// logger.FromContext 会带上本次面板请求的 request_id。
+		attrs := []any{
+			"provider", "anthropic", "model", p.model,
+			"official", p.official, "msgs", len(msgs), "tools", len(req.Tools),
+		}
+		attrs = append(attrs, ErrorAttrs(err)...)
+		logger.FromContext(ctx).Warn("AI 请求返回错误", attrs...)
 		return nil, err
 	}
 
@@ -96,6 +105,12 @@ func (p *AnthropicProvider) Chat(ctx context.Context, req Request) (*Reply, erro
 		// stop_reason=max_tokens 表示被输出上限截断：工具块可能不完整，上层应停止本轮
 		Truncated: resp.StopReason == anthropic.BetaStopReasonMaxTokens,
 	}
+	logger.FromContext(ctx).Debug("AI 请求完成",
+		"provider", "anthropic", "model", p.model,
+		"stop_reason", string(resp.StopReason),
+		"input_tokens", resp.Usage.InputTokens, "output_tokens", resp.Usage.OutputTokens,
+		"cache_read_tokens", resp.Usage.CacheReadInputTokens,
+		"truncated", reply.Truncated)
 	for _, block := range resp.Content {
 		switch v := block.AsAny().(type) {
 		case anthropic.BetaTextBlock:

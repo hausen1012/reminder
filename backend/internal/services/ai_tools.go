@@ -474,13 +474,13 @@ func toJSONString(v any) string {
 	return string(b)
 }
 
-// truncateRunes 按字符截断，避免截出半个汉字。
+// truncateRunes 按字符截断，避免截出半个汉字；截断时补省略号。
 func truncateRunes(s string, n int) string {
 	r := []rune(s)
 	if len(r) <= n {
 		return s
 	}
-	return string(r[:n])
+	return string(r[:n]) + "…"
 }
 
 // draftIDOf 从工具结果 JSON 里取出 draft_id；不是写工具的结果时返回空串。

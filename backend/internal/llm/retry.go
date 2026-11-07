@@ -17,6 +17,11 @@ import (
 type HTTPStatusError struct {
 	Status  int
 	Message string
+	// Body 是上游响应体的截断副本，只进日志不进用户可见错误。
+	//
+	// 中转站经常把真实原因（例如「inference exceeds tpm/rpm limit」）
+	// 放在响应体里而不是 message 字段，排错时这一段最关键。
+	Body string
 }
 
 // Error 返回给上层看的错误文本（保持与旧实现的格式一致）。

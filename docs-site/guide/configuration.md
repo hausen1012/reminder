@@ -86,8 +86,8 @@ $b = New-Object byte[] 32
 | `MISS_TOLERANCE_MINUTES` | `60` | 漏触发容忍窗口（分钟）。早于该窗口的漏触发直接标记为 `expired`，不再补发 |
 | `LOG_AUTO_PURGE_DAYS` | `0` | 日志自动清理保留天数；`0` 表示不自动清理。大于 0 时每天凌晨 3 点清理一次 |
 | `LOG_FILE` | `/var/log/reminder` | 日志目录。日志总是同时写标准错误，目录创建失败时只剩标准错误 |
-| `LOG_FORMAT` | `text` | 日志输出格式。`text` 便于人工排查，`json` 便于接入日志采集（Loki / ELK 等） |
-| `LOG_LEVEL` | `info` | 最低日志级别：`debug` / `info` / `warn` / `error`。`debug` 会额外打印每条 SQL 与通道发送的细节步骤 |
+| `LOG_FORMAT` | `text` | 日志输出格式。`text` 是 `[INFO] 时间 \| request_id \| 消息 k=v` 的一行制式，便于人工排查；`json` 便于接入日志采集（Loki / ELK 等） |
+| `LOG_LEVEL` | `info` | 最低日志级别：`debug` / `info` / `warn` / `error`。默认级别下**成功请求的访问日志不输出**（降到 `debug`）；`debug` 会额外打印每条 SQL、访问日志与通道发送细节 |
 
 ### 请求与访问控制
 
@@ -121,19 +121,25 @@ $b = New-Object byte[] 32
 | 级别 | 什么时候出现 |
 |---|---|
 | `error` | 服务端故障：SQL 失败、panic、内部错误（响应 5xx）、提醒注册调度器失败、投递最终失败 |
-| `warn` | 客户端问题或可恢复异常：4xx 响应、鉴权失败、限流、单次通道发送失败与重试、解密失败 |
-| `info` | 生命周期与业务节点：启动配置、投递开始/完成、登录、时区变更、清理任务 |
-| `debug` | 排查细节：每条 SQL、通道发送的请求构造与响应、单通道成功 |
+| `warn` | 客户端问题或可恢复异常：4xx 响应、鉴权失败、限流、单次通道发送失败与重试、解密失败、耗时超过 1 秒的成功请求、AI 上游报错 |
+| `info` | 生命周期与业务节点：启动配置、投递完成汇总、AI 对话开始/完成、登录、时区变更、清理任务 |
+| `debug` | 排查细节：每条 SQL、成功请求的访问日志、投递中间步骤、AI 工具轮次、通道发送的请求构造与响应 |
 
 一次请求产生的日志可以用 `request_id` 串起来：响应头 `X-Request-ID` 与日志里的
-`request_id` 字段是同一个值（客户端自带该请求头时原样沿用，便于对接网关追踪）。
+`request_id` 列是同一个值（客户端自带该请求头时原样沿用，便于对接网关追踪）。
 请求日志还带 `route`（路由模板，便于聚合）、`user_id` / `token_id`（调用方身份）
 与 `latency`、`bytes`；失败请求的原因由单独一条 `请求返回业务错误` 记录，
-含 `error_code` / `error_message` / `field`。
+含 `error_code` / `error_message` / `field`，底层原因在同一条的 `error` 字段里。
 
 ::: tip 排查投递问题
 交付日志页里能看到通道级的错误文案；服务端日志里同一个 `log=<投递日志 ID>` 的
 `通道发送失败` 记录则给出每次尝试的 `permanent`、`attempt` 与耗时，两者可以对照看。
+:::
+
+::: tip 排查 AI 对话问题
+AI 上游报错会单独记一条 `AI 请求返回错误`（含 `status` 与上游响应体 `body`），
+对话结束时再记一条 `AI 对话结束：调用失败`（含用户原话 `user_message`、第几轮 `round`、
+已重试次数 `retries`）。同一个 `request_id` 下这几条能还原「问了什么、为什么失败」。
 :::
 
 `MISS_TOLERANCE_MINUTES` 需要跟你的使用习惯匹配：如果希望「哪怕服务器宕机半天，恢复后仍要收到提醒」，

@@ -75,40 +75,76 @@
 
 应用日志默认同时写到标准错误与 `LOG_FILE` 目录下按日期命名的文件（如 `2026-11-03.log`）。
 
+### 格式
+
+默认是给人看的一行一条：
+
+```
+[INFO] 2026/11/07 - 20:31:39 | 7bc69bc7850af4d0 | AI 对话完成 provider=openai model=deepseek-v4.1-flash rounds=2 retries=0 drafts=1 truncated=false reply_len=86 user_message="帮我建一个每天九点的提醒"
+[WARN] 2026/11/07 - 20:34:41 | 7bc69bc7850af4d0 | AI 请求返回错误 provider=openai model=deepseek-v4.1-flash status=429 msgs=5 tools=6 elapsed_ms=38512 body="{\"error\":{\"message\":\"inference exceeds tpm/rpm limit\"}}" src=internal/llm/openai.go:184
+```
+
+- 第二列是本次请求的 `request_id`，与响应头 `X-Request-ID` 相同；同一请求的所有日志都能用它串起来。
+- `src`（源码位置）只在 `WARN` / `ERROR` 出现，信息级日志不再带。
+- 值里含空格时会加引号，其余不加。
+
+需要接入日志采集（Loki / ELK 等）时设置 `LOG_FORMAT=json` 输出 JSON。
+
 ### 级别
 
-用 `LOG_LEVEL` 调整输出级别，默认 `info`：
+用 `LOG_LEVEL` 调整输出级别，默认 `info`。**默认级别下只保留值得看的日志**：
 
 | 级别 | 内容 |
 |---|---|
 | `error` | SQL 失败、panic、内部错误（5xx 响应）、投递最终失败、调度注册失败 |
-| `warn` | 4xx 响应、鉴权失败与限流、单次发送失败与重试、敏感字段解密失败、慢查询（> 500ms） |
-| `info` | 启动配置、投递开始/完成、登录成功、时区变更、自动清理 |
-| `debug` | 每条 SQL、通道发送细节（请求 URL 已脱敏、响应体、单通道成功）、时区未变化时的跳过 |
+| `warn` | 4xx 响应、鉴权失败与限流、单次发送失败与重试、敏感字段解密失败、慢查询（> 500ms）、**耗时超过 1 秒的成功请求**、AI 上游报错 |
+| `info` | 启动配置、投递完成汇总、AI 对话开始/完成、登录成功、时区变更、自动清理 |
+| `debug` | 每条 SQL、访问日志里的成功请求、投递中间步骤、AI 工具轮次明细、通道发送细节 |
+
+::: tip 成功请求默认不记
+面板每 10 秒轮询一次监控接口，若每个 2xx 都记 `info`，一天下来日志里只有轮询记录。
+因此访问日志在 2xx/3xx 时降到 `debug`：不关心时看不到，需要排查「请求到底进没进来」时
+临时把 `LOG_LEVEL` 调成 `debug` 即可。成功但超过 1 秒的请求仍会以 `warn` 出现。
+:::
 
 排查线上问题时常用的两种做法：
 
 ```bash
 # 只看真正的问题
-grep 'level=ERROR\|level=WARN' /var/log/reminder/2026-11-03.log
+grep -E '^\[(WARN|ERR)\]' /var/log/reminder/2026-11-03.log
 
-# 追一次通知的完整投递过程
-grep 'log=128' /var/log/reminder/2026-11-03.log
+# 追一次请求的完整过程（访问日志 + 业务日志 + AI 上游报错）
+grep '7bc69bc7850af4d0' /var/log/reminder/2026-11-03.log
 ```
 
 ### 字段
 
 | 字段 | 说明 |
 |---|---|
-| `time` / `level` / `msg` / `src` | 时间、级别、消息、源码位置 |
-| `request_id` | 请求级追踪 ID，与响应头 `X-Request-ID` 相同 |
+| `time` / `level` / `msg` | 时间、级别、消息（`src` 仅在 warn 及以上输出） |
+| `request_id` | 请求级追踪 ID，独立成列，与响应头 `X-Request-ID` 相同 |
 | `method` / `path` / `route` / `status` / `latency` / `bytes` | HTTP 访问日志 |
 | `user_id` / `token_id` | 调用方身份（JWT 用户 / 外部令牌） |
-| `error_code` / `error_message` / `field` | 失败请求的业务错误，与接口响应体一一对应 |
+| `error_code` / `error_message` / `field` | 失败请求的业务错误，与接口响应体一一对应；`field` 为空时省略 |
+| `error` | 底层错误原因（含请求体解析失败的原始信息），只进日志不进响应体 |
 | `reminder` / `log` / `channel` / `attempt` | 投递链路上的提醒 ID、投递日志 ID、通道 ID 与尝试序号 |
+| `provider` / `model` / `status` / `body` / `elapsed_ms` / `upstream_request_id` | AI 调用：厂商、模型、上游状态码、上游响应体（截断 1000 字）、耗时 |
+| `user_message` / `rounds` / `retries` / `drafts` | AI 对话：用户提问（截断 500 字）、工具轮次、重试次数、生成的草稿数 |
 
-所有凭据（通道密钥、Webhook Authorization、确认链接令牌、令牌明文）都不会写入日志；
-需要区分是哪个凭据时只记长度或前缀。`log` 通道是唯一例外——它的用途就是把正文打出来。
+所有凭据（通道密钥、Webhook Authorization、确认链接令牌、令牌明文、AI API Key）都不会写入日志；
+需要区分是哪个凭据时只记长度或前缀。AI 请求地址里的 query（如 `?key=sk-xxx`）会被脱敏成 `***`。
+`log` 通道是唯一例外——它的用途就是把正文打出来。
+
+### AI 对话出问题时看什么
+
+一次 AI 对话按下面几条日志串（同一个 `request_id`）：
+
+1. `AI 对话开始`——用户问了什么（`msg_len` / `history_turns` / 请求的模型）；
+2. `AI 请求返回错误`（上游）——`status`、上游响应体 `body`、耗时；429 通常是限流，
+   401/403 是密钥或权限，400 是参数；
+3. `AI 对话结束：调用失败`——`round`（第几轮工具调用）、`retries`（已经重试几次）、
+   `user_message`（用户原话），以及展开后的上游错误字段；
+4. 成功时只有一条 `AI 对话完成` 汇总，工具轮次明细在 `LOG_LEVEL=debug` 下才会出现。
 
 ## 健康检查
 

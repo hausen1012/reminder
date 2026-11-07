@@ -395,7 +395,7 @@ func (e *Engine) ListRegistered() []RegisteredEntry {
 	if err := e.db.Select("id, next_fire_at, title, last_fired_at, schedule_type").
 		Where("id IN ?", ids).
 		Find(&reminders).Error; err != nil {
-		slog.Error("ListRegistered 查询提醒失败", "err", err)
+		slog.Error("ListRegistered 查询提醒失败", "error", err)
 	}
 
 	reminderMap := make(map[uint]models.Reminder, len(reminders))
@@ -416,7 +416,7 @@ func (e *Engine) ListRegistered() []RegisteredEntry {
 		Where("reminder_channels.reminder_id IN ?", ids).
 		Order("channels.name ASC").
 		Scan(&chRows).Error; err != nil {
-		slog.Error("ListRegistered 查询通道失败", "err", err)
+		slog.Error("ListRegistered 查询通道失败", "error", err)
 	}
 
 	chMap := make(map[uint][]ChannelInfo)

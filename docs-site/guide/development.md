@@ -25,6 +25,19 @@ Linux 装 `gcc`）。
 | `make docker` | 用 compose 构建并启动 |
 | `make clean` | 清理构建产物 |
 
+::: tip 开发脚本默认 `LOG_LEVEL=debug`
+`make dev` / `make dev-backend` / `dev.sh` / `dev.ps1` 都会把后端日志级别设为 `debug`，
+本地能看到每条 SQL、访问日志与投递中间步骤。想临时降噪，在外部先设好环境变量即可，
+脚本不会覆盖已有值：
+
+```bash
+make dev-backend LOG_LEVEL=info
+LOG_LEVEL=info ./dev.sh
+```
+
+部署（`make docker` 或直接跑二进制）不受影响，仍以容器/系统的 `LOG_LEVEL` 为准，默认 `info`。
+:::
+
 ## 目录约定
 
 ```
@@ -33,7 +46,7 @@ backend/
   internal/
     config/            环境变量解析
     database/          连接与迁移
-    logger/            全局 slog 配置
+    logger/            全局 slog 配置、文本格式、请求级 logger
     models/            GORM 模型
     handlers/          HTTP 处理器
     services/          业务逻辑
@@ -129,26 +142,30 @@ handler 里只需 `abortErr(c, err)`，不要自己拼错误响应体。这样�
 
 | 场景 | 做法 |
 |---|---|
-| 要记 URL | `notifier.redactURL` / `redactURLString`，会抹掉 query 取值与 userinfo |
+| 要记 URL | `notifier.redactURL` / `redactURLString`，会抹掉 query 取值与 userinfo；`llm.redactURLString` 同理 |
 | 要记 header | `notifier.headerKeys`，只出名字不出值 |
 | 要记渲染后的正文 / 变量 | 只记长度（`body_len`、`vars_count`），不记内容 |
+| 要记 AI 上游错误 | `llm.ErrorAttrs(err)` / `ErrorAttrsWith(err, ...)`，展开出 `status` / `body` / `upstream_request_id` |
 
 正文里可能带 `{{confirm_url}}`（一次性确认令牌），变量里还可能带用户内容，
 记全文等于把令牌与隐私一起写进日志。`log` 通道是唯一例外——它的用途就是把正文打出来。
+AI 对话的 `user_message` 是另一个例外：只截断 500 字后记录，用于复现出问题的提问。
 
 ### 写日志的约定
 
+- **请求内用 `logger.FromContext(ctx)`**：它返回带 `request_id` 的 logger，
+  不用再手工拼 `request_id` 字段。中间件在 `RequestID` 里把 id 写进请求 ctx，
+  service 层拿到的 ctx 会一路带下去。
 - **级别要选对**：失败路径用 `Warn` / `Error`，不要用 `Info`——否则设置
-  `LOG_LEVEL=warn` 时真正的故障会被一起藏掉。`Info` 只留给生命周期与业务节点。
-- **错误必须带 `error` 字段**：`slog.Warn("...", "error", err)`，不要只写一句
+  `LOG_LEVEL=warn` 时真正的故障会被一起藏掉。`Info` 只留给生命周期与业务节点，
+  `Debug` 留给中间步骤与高频成功明细（访问日志的 2xx、投递阶段日志、AI 工具轮次）。
+- **错误必须带 `error` 字段**：`log.Warn("...", "error", err)`，不要只写一句
   「失败了」。
 - **HTTP 错误只记一次**：handler 用 `abortErr`，由 `ErrorHandler` 统一记录并分级；
-  请求体解析失败用 `abortBindErr(c, err, "请求体格式错误")`，它会记下底层原因。
-  不要在 handler 里再补一条日志。
-- **带上下文**：请求内加 `request_id`（`middleware.RequestIDOf(c)`）；
-  投递链路带 `reminder` / `log` / `channel` / `attempt`，便于 `grep` 串起来。
-- **调试细节用 `Debug`**：高频成功路径（每条 SQL、单通道发送成功）不要用 `Info`，
-  否则日志会被淹没。
+  请求体解析失败用 `abortBindErr(c, err, "请求体格式错误")`，底层原因会挂到
+  `AppError.Cause` 上，在同一条日志的 `error` 字段里输出。不要在 handler 里再补一条。
+- **带上下文**：投递链路带 `reminder` / `log` / `channel` / `attempt`，便于 `grep` 串起来。
+- **单条日志别太长**：用户输入、上游响应体要截断（500 / 1000 字），并只记必要的字段。
 
 ## 文档站点
 

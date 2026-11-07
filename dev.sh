@@ -40,6 +40,9 @@ trap cleanup SIGINT SIGTERM
 
 echo "Starting backend (Go/Gin)..."
 cd "$ROOT_DIR/backend"
+# 开发默认开 debug：本地只看得到 SQL、访问日志与投递中间步骤才方便排查。
+# 想临时降噪就 `LOG_LEVEL=info ./dev.sh`（外部值优先于这里的默认值）。
+LOG_LEVEL="${LOG_LEVEL:-debug}" \
 LOG_FILE="$ROOT_DIR/logs" DB_PATH="$ROOT_DIR/data/reminder.db" go run ./cmd/server/ &
 BACKEND_PID=$!
 

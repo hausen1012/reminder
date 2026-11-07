@@ -21,7 +21,6 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -88,17 +87,16 @@ func Init(logDir string) {
 
 	multi := io.MultiWriter(writers...)
 
-	// 统一时间格式：xxxx-xx-xx HH:mm:ss，source 缩短为 package/file.go:N
+	// 统一时间格式与源码位置：
+	//   - JSON 输出下由 ReplaceAttr 改写 time / source；
+	//   - text 输出由 textHandler 自己排版（见 format.go），这里只需对齐 JSON。
 	replace := func(_ []string, a slog.Attr) slog.Attr {
 		switch a.Key {
 		case slog.TimeKey:
 			return slog.String("time", a.Value.Time().Format("2006-01-02 15:04:05"))
 		case slog.SourceKey:
 			if src, ok := a.Value.Any().(*slog.Source); ok && src != nil {
-				if idx := strings.Index(src.File, "internal/"); idx >= 0 {
-					return slog.String("src", src.File[idx:]+":"+strconv.Itoa(src.Line))
-				}
-				return slog.String("src", src.File+":"+strconv.Itoa(src.Line))
+				return slog.String("src", shortenSource(src.File, src.Line))
 			}
 		}
 		return a
@@ -106,8 +104,10 @@ func Init(logDir string) {
 	level := parseLevel(os.Getenv("LOG_LEVEL"))
 	activeLevel.Store(int32(level))
 	opts := &slog.HandlerOptions{
-		Level:       level,
-		AddSource:   true,
+		Level:     level,
+		AddSource: true,
+		// ReplaceAttr 只对 JSONHandler 生效：textHandler 自己排版，
+		// 不需要也不应该再经一次属性改写。
 		ReplaceAttr: replace,
 	}
 
@@ -117,7 +117,7 @@ func Init(logDir string) {
 	case "json":
 		h = slog.NewJSONHandler(multi, opts)
 	default:
-		h = slog.NewTextHandler(multi, opts)
+		h = newTextHandler(multi, opts)
 	}
 
 	slog.SetDefault(slog.New(h))

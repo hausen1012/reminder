@@ -166,7 +166,7 @@ func (s *TokenService) TouchLastUsed(keyID uint) {
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
-				slog.Error("TouchLastUsed goroutine panic", "recover", r)
+				slog.Error("更新令牌使用时间协程 panic", "recover", r)
 			}
 		}()
 		now := models.TimeNow()

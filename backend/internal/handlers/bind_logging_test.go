@@ -25,6 +25,9 @@ func captureSlog(t *testing.T) *bytes.Buffer {
 
 // 请求体解析失败时，对外仍是一句可读提示，但日志里必须能看到底层原因
 // （缺字段 / 类型不对 / JSON 语法错），否则「请求体格式错误」等于没记。
+//
+// 现在底层原因挂在 AppError.Cause 上，由 ErrorHandler 统一输出：
+// 一次失败只留一条日志，不会出现「解析失败 + 业务错误」两条重复记录。
 func TestAbortBindErr_LogsUnderlyingReason(t *testing.T) {
 	logs := captureSlog(t)
 
@@ -49,8 +52,8 @@ func TestAbortBindErr_LogsUnderlyingReason(t *testing.T) {
 	}
 
 	out := logs.String()
-	if !strings.Contains(out, "请求体解析失败") {
-		t.Fatalf("缺少请求体解析失败日志:\n%s", out)
+	if !strings.Contains(out, "请求返回业务错误") {
+		t.Fatalf("缺少业务错误日志:\n%s", out)
 	}
 	// 类型错误的具体原因应出现在日志里
 	if !strings.Contains(out, "cannot unmarshal") && !strings.Contains(out, "Unmarshal") {
@@ -61,6 +64,10 @@ func TestAbortBindErr_LogsUnderlyingReason(t *testing.T) {
 	}
 	if !strings.Contains(out, "request_id=") {
 		t.Fatalf("日志应带 request_id:\n%s", out)
+	}
+	// 同一次失败只记一条：底层的 bind 错误不再单独打点
+	if n := strings.Count(out, "level=WARN"); n != 1 {
+		t.Fatalf("请求体解析失败应只产生一条 WARN 日志，实际 %d 条:\n%s", n, out)
 	}
 }
 
@@ -81,7 +88,8 @@ func TestAbortBindErr_EmptyBody(t *testing.T) {
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("状态码 = %d，期望 400", w.Code)
 	}
-	if !strings.Contains(logs.String(), "请求体解析失败") {
-		t.Fatalf("空请求体也应记录日志:\n%s", logs.String())
+	out := logs.String()
+	if !strings.Contains(out, "请求返回业务错误") || !strings.Contains(out, "error=") {
+		t.Fatalf("空请求体也应记录底层原因:\n%s", out)
 	}
 }

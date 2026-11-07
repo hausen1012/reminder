@@ -8,6 +8,7 @@ import (
 	"runtime/debug"
 
 	"github.com/gin-gonic/gin"
+	"github.com/reminder/backend/internal/logger"
 )
 
 // ErrorCode 是统一的应用错误码。
@@ -31,6 +32,11 @@ type AppError struct {
 	Field   string    `json:"field,omitempty"`
 	// Status 可选地指定 HTTP 状态码；为 0 时按 Code 推断
 	Status int `json:"-"`
+	// Cause 是底层原因（如 JSON 解析错误），只进日志不进响应体。
+	//
+	// 有了它，handler 就不必为了留下排查线索而自己再打一条日志：
+	// ErrorHandler 统一输出一条，既带对外文案也带底层原因。
+	Cause error `json:"-"`
 }
 
 func (e *AppError) Error() string {
@@ -40,6 +46,9 @@ func (e *AppError) Error() string {
 	return fmt.Sprintf("%s: %s", e.Code, e.Message)
 }
 
+// Unwrap 暴露底层原因，便于 errors.Is / errors.As 继续向下判断。
+func (e *AppError) Unwrap() error { return e.Cause }
+
 // NewAppError 构造一个 AppError。
 func NewAppError(code ErrorCode, message string) *AppError {
 	return &AppError{Code: code, Message: message}
@@ -48,6 +57,12 @@ func NewAppError(code ErrorCode, message string) *AppError {
 // WithField 链式追加字段名。
 func (e *AppError) WithField(field string) *AppError {
 	e.Field = field
+	return e
+}
+
+// WithCause 链式追加底层原因（只进日志）。
+func (e *AppError) WithCause(cause error) *AppError {
+	e.Cause = cause
 	return e
 }
 
@@ -132,12 +147,20 @@ func ErrorHandler() gin.HandlerFunc {
 			if status >= http.StatusInternalServerError {
 				level = slog.LevelError
 			}
-			logWithRequest(c, level, "请求返回业务错误",
+			logArgs := []any{
 				"status", status,
 				"error_code", string(ae.Code),
 				"error_message", ae.Message,
-				"field", ae.Field,
-			)
+			}
+			// field 为空是常态（大多数业务错误不针对具体字段），不必输出一个空 kv。
+			if ae.Field != "" {
+				logArgs = append(logArgs, "field", ae.Field)
+			}
+			// 底层原因只进日志：对外仍是同一句可读文案，排查时才看得到真因。
+			if ae.Cause != nil {
+				logArgs = append(logArgs, "error", ae.Cause)
+			}
+			logWithRequest(c, level, "请求返回业务错误", logArgs...)
 			c.AbortWithStatusJSON(status, ErrorBody(ae.Code, ae.Message, ae.Field))
 			return
 		}
@@ -152,15 +175,13 @@ func ErrorHandler() gin.HandlerFunc {
 
 // logWithRequest 输出带请求上下文的日志。
 //
-// method / path / request_id 让一条错误日志可以脱离请求日志单独定位；
-// request_id 为空（未装配 RequestID 中间件的测试路由）时自动省略。
+// request_id 由 logger.FromContext 从 ctx 里取（RequestID 中间件写入），
+// 因此这里只补 method / path；没有 request_id 的测试路由会退化成默认 logger。
 func logWithRequest(c *gin.Context, level slog.Level, msg string, args ...any) {
 	attrs := []any{
 		"method", c.Request.Method,
 		"path", c.Request.URL.Path,
 	}
-	if id := RequestIDOf(c); id != "" {
-		attrs = append(attrs, "request_id", id)
-	}
-	slog.Log(c.Request.Context(), level, msg, append(attrs, args...)...)
+	attrs = append(attrs, args...)
+	logger.FromContext(c.Request.Context()).Log(c.Request.Context(), level, msg, attrs...)
 }

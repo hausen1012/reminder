@@ -1,13 +1,13 @@
 package handlers
 
 import (
-	"log/slog"
 	"math"
 	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/reminder/backend/internal/logger"
 	"github.com/reminder/backend/internal/middleware"
 	"github.com/reminder/backend/internal/services"
 )
@@ -41,8 +41,9 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	if h.Limiter != nil {
 		limiterKey = middleware.LoginKey(c, req.Username)
 		if allowed, retryAfter := h.Limiter.AllowWithRetryAfter(limiterKey); !allowed {
-			slog.Warn("登录被限流", "path", c.Request.URL.Path, "request_id", middleware.RequestIDOf(c),
-				"username", req.Username, "ip", c.ClientIP(), "retry_after", retryAfter)
+			logger.FromContext(c.Request.Context()).Warn("登录被限流",
+				"path", c.Request.URL.Path, "username", req.Username,
+				"ip", c.ClientIP(), "retry_after", retryAfter)
 			// 按锁定的剩余时长填 Retry-After，而不是写死一个值：
 			// 锁定时长可配置，写死会让客户端在锁定结束前反复重试。
 			c.Header("Retry-After", strconv.Itoa(RetryAfterSeconds(retryAfter)))
@@ -58,7 +59,9 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		}
 		// 失败原因（用户不存在 / 密码错）对外统一为同一句，但日志要分开记：
 		// 只有「登录失败」三个字，事后无法判断是撞库还是用户记错密码。
-		slog.Warn("登录失败", "path", c.Request.URL.Path, "request_id", middleware.RequestIDOf(c), "username", req.Username, "error", err)
+		logger.FromContext(c.Request.Context()).Warn("登录失败",
+			"path", c.Request.URL.Path, "username", req.Username,
+			"ip", c.ClientIP(), "error", err)
 		abortErr(c, err)
 		return
 	}
@@ -73,11 +76,13 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	})
 	tokenStr, err := token.SignedString([]byte(h.JWTSecret))
 	if err != nil {
-		slog.Error("签发 JWT 失败", "path", c.Request.URL.Path, "request_id", middleware.RequestIDOf(c), "user_id", user.ID, "error", err)
+		logger.FromContext(c.Request.Context()).Error("签发 JWT 失败",
+			"path", c.Request.URL.Path, "user_id", user.ID, "error", err)
 		abortErr(c, err)
 		return
 	}
-	slog.Info("登录成功", "user_id", user.ID, "username", user.Username, "request_id", middleware.RequestIDOf(c))
+	logger.FromContext(c.Request.Context()).Info("登录成功",
+		"user_id", user.ID, "username", user.Username)
 
 	successJSON(c, gin.H{
 		"token": tokenStr,

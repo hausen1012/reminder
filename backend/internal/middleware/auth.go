@@ -1,12 +1,12 @@
 package middleware
 
 import (
-	"log/slog"
 	"net/http"
 	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/reminder/backend/internal/logger"
 )
 
 // jwtClaims 是 JWT 中我们关心的字段。
@@ -39,10 +39,13 @@ func JWTAuth(secret string) gin.HandlerFunc {
 		if err != nil || !token.Valid {
 			// 对外仍是同一句「无效或已过期」，但日志里要能区分到底是验签失败、
 			// 过期还是格式错误：不记下来，线上只能猜。
+			// request_id 由 logger.FromContext 从 ctx 里自动带上。
 			if err != nil {
-				slog.Warn("JWT 校验失败", "path", c.Request.URL.Path, "request_id", RequestIDOf(c), "error", err)
+				logger.FromContext(c.Request.Context()).Warn("JWT 校验失败",
+					"path", c.Request.URL.Path, "error", err)
 			} else {
-				slog.Warn("JWT 校验失败", "path", c.Request.URL.Path, "request_id", RequestIDOf(c), "error", "token.Valid=false")
+				logger.FromContext(c.Request.Context()).Warn("JWT 校验失败",
+					"path", c.Request.URL.Path, "reason", "token.Valid=false")
 			}
 			abortUnauthorized(c, "认证令牌无效或已过期")
 			return

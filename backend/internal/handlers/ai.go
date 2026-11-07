@@ -4,10 +4,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log/slog"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/reminder/backend/internal/logger"
 	"github.com/reminder/backend/internal/middleware"
 	"github.com/reminder/backend/internal/services"
 )
@@ -124,7 +124,7 @@ func (h *AIHandler) ChatStream(c *gin.Context) {
 	writeEvent := func(event string, data any) {
 		raw, err := json.Marshal(data)
 		if err != nil {
-			slog.Warn("序列化 AI 事件失败", "event", event, "error", err)
+			logger.FromContext(c.Request.Context()).Warn("序列化 AI 事件失败", "event", event, "error", err)
 			return
 		}
 		if _, err := fmt.Fprintf(c.Writer, "event: %s\ndata: %s\n\n", event, raw); err != nil {
@@ -148,7 +148,9 @@ func (h *AIHandler) ChatStream(c *gin.Context) {
 			writeEvent(services.ChatEventError, middleware.ErrorBody(ae.Code, ae.Message, ae.Field)["error"])
 			return
 		}
-		slog.Error("AI 对话流式接口未处理错误", "error", err)
+		// SSE 已经写出，错误只能走 event: error 通知前端；
+		// 服务端这边留一条 Error 日志，带上 request_id 便于和上游报错对齐。
+		logger.FromContext(c.Request.Context()).Error("AI 对话流式接口未处理错误", "error", err)
 		writeEvent(services.ChatEventError,
 			middleware.ErrorBody(middleware.CodeInternalError, "服务器内部错误", "")["error"])
 		return

@@ -29,7 +29,9 @@ $BackendArgs = @(
     "-NoLogo"
     "-NoExit"
     "-Command"
-    "`$Host.UI.RawUI.WindowTitle = '$BackendTitle'; `$env:LOG_FILE = '$RootDir\logs'; `$env:DB_PATH = '$RootDir\data\reminder.db'; cd '$RootDir\backend'; go run ./cmd/server/"
+    # 开发默认开 debug：本地只看得到 SQL、访问日志与投递中间步骤才方便排查。
+    # 想临时降噪就先 `$env:LOG_LEVEL = 'info'` 再运行本脚本（外部值优先于这里的默认值）。
+    "`$Host.UI.RawUI.WindowTitle = '$BackendTitle'; if (-not `$env:LOG_LEVEL) { `$env:LOG_LEVEL = 'debug' }; `$env:LOG_FILE = '$RootDir\logs'; `$env:DB_PATH = '$RootDir\data\reminder.db'; cd '$RootDir\backend'; go run ./cmd/server/"
 )
 $backendJob = Start-Process -WindowStyle Normal -PassThru -FilePath "powershell" -ArgumentList $BackendArgs
 

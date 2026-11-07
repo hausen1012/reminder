@@ -7,6 +7,7 @@ import (
 	"sync/atomic"
 
 	"github.com/gin-gonic/gin"
+	"github.com/reminder/backend/internal/logger"
 )
 
 // HeaderRequestID 是请求 ID 的响应头名。
@@ -22,6 +23,10 @@ const ctxRequestID = "request_id"
 var requestIDSeq atomic.Uint64
 
 // RequestID 为每个请求分配请求 ID，并写入响应头。
+//
+// 请求 ID 还会写进请求的 context：业务层用 logger.FromContext(ctx) 就能拿到
+// 带 request_id 的 logger，不必在每个调用点手写字段。写进 context 而不是只放
+// gin.Context，是因为 service 层拿不到 gin.Context，只能拿到 ctx。
 func RequestID() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		id := strings.TrimSpace(c.GetHeader(HeaderRequestID))
@@ -31,6 +36,7 @@ func RequestID() gin.HandlerFunc {
 		}
 		c.Set(ctxRequestID, id)
 		c.Header(HeaderRequestID, id)
+		c.Request = c.Request.WithContext(logger.ContextWithRequestID(c.Request.Context(), id))
 		c.Next()
 	}
 }

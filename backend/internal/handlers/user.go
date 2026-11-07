@@ -1,9 +1,8 @@
 package handlers
 
 import (
-	"log/slog"
-
 	"github.com/gin-gonic/gin"
+	"github.com/reminder/backend/internal/logger"
 	"github.com/reminder/backend/internal/middleware"
 	"github.com/reminder/backend/internal/services"
 )
@@ -34,7 +33,7 @@ func (h *UserHandler) UpdatePassword(c *gin.Context) {
 	}
 
 	if err := h.Svc.ChangePassword(userID, req.OldPassword, req.NewPassword); err != nil {
-		slog.Warn("修改密码失败", "user_id", userID, "request_id", middleware.RequestIDOf(c), "error", err)
+		logger.FromContext(c.Request.Context()).Warn("修改密码失败", "user_id", userID, "error", err)
 		abortErr(c, err)
 		return
 	}

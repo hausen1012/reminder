@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/reminder/backend/internal/logger"
 )
 
 // OpenAIProvider 用 OpenAI Chat Completions 协议对接任意兼容厂商。
@@ -81,6 +83,10 @@ type oaResponse struct {
 		Message      oaMessage `json:"message"`
 		FinishReason string    `json:"finish_reason"`
 	} `json:"choices"`
+	Usage struct {
+		PromptTokens     int64 `json:"prompt_tokens"`
+		CompletionTokens int64 `json:"completion_tokens"`
+	} `json:"usage"`
 	Error *struct {
 		Message string `json:"message"`
 		Type    string `json:"type"`
@@ -154,8 +160,14 @@ func (p *OpenAIProvider) Chat(ctx context.Context, req Request) (*Reply, error) 
 		httpReq.Header.Set("Authorization", "Bearer "+p.apiKey)
 	}
 
+	reqURL := p.baseURL + "/chat/completions"
+	started := time.Now()
 	resp, err := p.client.Do(httpReq)
 	if err != nil {
+		logger.FromContext(ctx).Warn("AI 请求失败",
+			"provider", "openai", "model", p.model, "url", redactURLString(reqURL),
+			"msgs", len(msgs), "tools", len(body.Tools),
+			"elapsed_ms", time.Since(started).Milliseconds(), "error", err)
 		return nil, fmt.Errorf("请求 AI 服务失败: %w", err)
 	}
 	defer resp.Body.Close()
@@ -167,14 +179,25 @@ func (p *OpenAIProvider) Chat(ctx context.Context, req Request) (*Reply, error) 
 		if err := json.Unmarshal(respBody, &errOut); err == nil && errOut.Error != nil && errOut.Error.Message != "" {
 			msg = errOut.Error.Message
 		}
+		// 状态码与响应体是排查上游限流/鉴权问题的关键，这里完整留痕；
+		// request_id 由 logger.FromContext 自动带上，能和面板请求对上。
+		logger.FromContext(ctx).Warn("AI 请求返回错误",
+			"provider", "openai", "model", p.model, "status", resp.StatusCode,
+			"msgs", len(msgs), "tools", len(body.Tools),
+			"elapsed_ms", time.Since(started).Milliseconds(),
+			"body", truncate(respBody, 1000))
 		return nil, &HTTPStatusError{
 			Status:  resp.StatusCode,
 			Message: fmt.Sprintf("AI 服务返回错误（HTTP %d）: %s", resp.StatusCode, msg),
+			Body:    truncate(respBody, 1000),
 		}
 	}
 
 	var out oaResponse
 	if err := json.Unmarshal(respBody, &out); err != nil {
+		logger.FromContext(ctx).Error("解析 AI 响应失败",
+			"provider", "openai", "model", p.model, "status", resp.StatusCode,
+			"body", truncate(respBody, 1000), "error", err)
 		return nil, fmt.Errorf("解析 AI 响应失败（HTTP %d）: %s", resp.StatusCode, truncate(respBody, 300))
 	}
 	if out.Error != nil {
@@ -185,9 +208,12 @@ func (p *OpenAIProvider) Chat(ctx context.Context, req Request) (*Reply, error) 
 		return nil, &HTTPStatusError{
 			Status:  resp.StatusCode,
 			Message: fmt.Sprintf("AI 服务返回错误（HTTP %d）: %s", resp.StatusCode, msg),
+			Body:    truncate(respBody, 1000),
 		}
 	}
 	if len(out.Choices) == 0 {
+		logger.FromContext(ctx).Error("AI 服务未返回内容",
+			"provider", "openai", "model", p.model, "body", truncate(respBody, 1000))
 		return nil, fmt.Errorf("AI 服务未返回内容")
 	}
 
@@ -205,6 +231,11 @@ func (p *OpenAIProvider) Chat(ctx context.Context, req Request) (*Reply, error) 
 			Input: json.RawMessage(input),
 		})
 	}
+	logger.FromContext(ctx).Debug("AI 请求完成",
+		"provider", "openai", "model", p.model,
+		"elapsed_ms", time.Since(started).Milliseconds(),
+		"tool_calls", len(reply.ToolCalls), "truncated", reply.Truncated,
+		"prompt_tokens", out.Usage.PromptTokens, "completion_tokens", out.Usage.CompletionTokens)
 	return reply, nil
 }
 
