@@ -366,6 +366,109 @@ func TestBuildRenderedMessage(t *testing.T) {
 	}
 }
 
+// 标题里的占位符渲染后也应回写 vars["title"]，供 Webhook 模板等下游使用。
+func TestBuildRenderedMessage_WritesBackTitle(t *testing.T) {
+	vars := map[string]string{"title": "原标题", "now_date": "2026-01-01"}
+	msg := buildRenderedMessage("标题 {{now_date}}", "正文", "text", vars)
+
+	if msg.Subject != "标题 2026-01-01" {
+		t.Fatalf("subject = %q", msg.Subject)
+	}
+	if vars["title"] != msg.Subject {
+		t.Fatalf("vars[title] = %q，应回写为渲染结果", vars["title"])
+	}
+}
+
+// Webhook 模板里的 {{title}} 应拿到展开后的标题。
+func TestDispatchWebhookTemplateGetsRenderedTitle(t *testing.T) {
+	var gotBody map[string]string
+	sink := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewDecoder(r.Body).Decode(&gotBody)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer sink.Close()
+
+	db := openTestDB(t)
+	dispatch := newDispatchStack(t, db)
+
+	cfg, _ := json.Marshal(map[string]any{
+		"method":        "POST",
+		"url":           sink.URL,
+		"body_template": `{"title":"{{title}}","content":"{{content}}"}`,
+	})
+	ch := &models.Channel{Name: testutil.UniqueName("webhook"), Type: "webhook", Enabled: true, Config: cfg}
+	if err := db.Create(ch).Error; err != nil {
+		t.Fatalf("创建通道失败: %v", err)
+	}
+
+	r := &models.Reminder{
+		Title:        "标题 {{now_date}}",
+		Content:      "正文",
+		Calendar:     "solar",
+		ScheduleType: "once",
+		Enabled:      true,
+		Source:       "web",
+	}
+	if err := db.Create(r).Error; err != nil {
+		t.Fatalf("创建提醒失败: %v", err)
+	}
+	bindChannels(t, db, r.ID, ch.ID)
+
+	dispatch.Run(context.Background(), r, createPendingLog(t, db, r))
+
+	if strings.Contains(gotBody["title"], "{{") {
+		t.Fatalf("Webhook 的 {{title}} 仍有残留占位符: %q", gotBody["title"])
+	}
+	if !strings.HasPrefix(gotBody["title"], "标题 ") {
+		t.Fatalf("Webhook 的 {{title}} 不是渲染后的标题: %q", gotBody["title"])
+	}
+}
+
+// 正文写带空格的 {{ confirm_url }} 时，渲染结果已含链接，不得再自动追加一条。
+func TestDispatchDoesNotAppendConfirmURLTwice(t *testing.T) {
+	var gotBody map[string]string
+	sink := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewDecoder(r.Body).Decode(&gotBody)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer sink.Close()
+
+	db := openTestDB(t)
+	stack := newConfirmTestStack(t, db)
+
+	cfg, _ := json.Marshal(map[string]any{
+		"method":        "POST",
+		"url":           sink.URL,
+		"body_template": `{"content":"{{content}}"}`,
+	})
+	ch := &models.Channel{Name: testutil.UniqueName("webhook"), Type: "webhook", Enabled: true, Config: cfg}
+	if err := db.Create(ch).Error; err != nil {
+		t.Fatalf("创建通道失败: %v", err)
+	}
+	r := &models.Reminder{
+		Title:                   "确认",
+		Content:                 "请点击 {{ confirm_url }} 完成确认",
+		Calendar:                "solar",
+		ScheduleType:            "once",
+		Enabled:                 true,
+		RequireConfirm:          true,
+		ConfirmRetryIntervalSec: 60,
+		ConfirmMaxRetries:       1,
+		Source:                  "web",
+		NextFireAt:              models.TimePtrOf(time.Now().Add(time.Hour)),
+	}
+	if err := db.Create(r).Error; err != nil {
+		t.Fatalf("创建提醒失败: %v", err)
+	}
+	bindChannels(t, db, r.ID, ch.ID)
+
+	stack.dispatch.Run(context.Background(), r, createPendingLog(t, db, r))
+
+	if n := strings.Count(gotBody["content"], "/c/"); n != 1 {
+		t.Fatalf("确认链接出现 %d 次，应只有 1 次:\n%s", n, gotBody["content"])
+	}
+}
+
 // buildVars 应包含设计文档列出的全部内置变量。
 func TestBuildVars(t *testing.T) {
 	loc := time.FixedZone("CST", 8*3600)
@@ -401,9 +504,12 @@ func TestBuildVars(t *testing.T) {
 	if vars["weekday"] != "周五" {
 		t.Fatalf("weekday = %q，期望 周五", vars["weekday"])
 	}
-	// lunar_date 应含"农历"
+	// lunar_date 应含"农历"，年份为中文数字
 	if !containsSub(vars["lunar_date"], "农历") {
 		t.Fatalf("lunar_date = %q", vars["lunar_date"])
+	}
+	if vars["lunar_date"] != "农历二〇二六年四月二十" {
+		t.Fatalf("lunar_date = %q，期望中文数字纪年", vars["lunar_date"])
 	}
 }
 
@@ -512,6 +618,13 @@ func TestWebhookLogRedactsCredentials(t *testing.T) {
 // createConfirmReminderWithWebhook 用 webhook 通道创建"需要确认"的提醒。
 func createConfirmReminderWithWebhook(t *testing.T, db *gorm.DB, intervalSec, maxRetries int, url string) *models.Reminder {
 	t.Helper()
+	return createConfirmReminderWithWebhookContent(t, db, intervalSec, maxRetries, url,
+		"确认机制测试", "请点击 {{confirm_url}} 完成确认")
+}
+
+// createConfirmReminderWithWebhookContent 同 createConfirmReminderWithWebhook，可指定标题与正文。
+func createConfirmReminderWithWebhookContent(t *testing.T, db *gorm.DB, intervalSec, maxRetries int, url, title, content string) *models.Reminder {
+	t.Helper()
 	cfg, _ := json.Marshal(map[string]any{"method": "POST", "url": url})
 	channel := &models.Channel{
 		Name:    testutil.UniqueName("webhook"),
@@ -524,8 +637,8 @@ func createConfirmReminderWithWebhook(t *testing.T, db *gorm.DB, intervalSec, ma
 	}
 	next := time.Now().Add(time.Hour).UTC()
 	reminder := &models.Reminder{
-		Title:                   "确认机制测试",
-		Content:                 "请点击 {{confirm_url}} 完成确认",
+		Title:                   title,
+		Content:                 content,
 		Calendar:                "solar",
 		ScheduleType:            "once",
 		Enabled:                 true,

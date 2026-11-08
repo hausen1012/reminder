@@ -163,3 +163,5 @@ npm run docs:build    # 构建静态站点到 .vitepress/dist
 ```
 
 站点在 push 到 `main` 时由 GitHub Actions 自动构建并发布到 GitHub Pages。
+
+页面里的行内代码写 `{{变量名}}` 时照常写反引号即可：`.vitepress/config.mts` 里的 markdown-it 规则会给含 `{{` 的行内代码加 `v-pre`，避免被当成 Vue 插值渲染成空。

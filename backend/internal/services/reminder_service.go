@@ -468,6 +468,7 @@ func (s *ReminderService) TestDryRun(ctx context.Context, title, content, conten
 	vars := buildVars(&models.Reminder{
 		Title:      title,
 		Content:    content,
+		Source:     "web",
 		NextFireAt: models.TimePtrOf(now),
 	}, now, now, s.TZ.Get())
 

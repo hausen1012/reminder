@@ -4,6 +4,8 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -422,6 +424,37 @@ func TestChannelDryRun(t *testing.T) {
 	}
 	if err := svc.DryRun(t.Context(), "log", map[string]any{}); err != nil {
 		t.Fatalf("log 类型试发应成功: %v", err)
+	}
+}
+
+// 试发消息里的 vars 必须是展开后的标题与正文，Webhook 模板引用时不残留占位符。
+func TestChannelDryRunVarsAreRendered(t *testing.T) {
+	var got map[string]string
+	sink := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewDecoder(r.Body).Decode(&got)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer sink.Close()
+
+	svc, _ := newChannelSvcForTest(t)
+	err := svc.DryRun(t.Context(), "webhook", map[string]any{
+		"method":        "POST",
+		"url":           sink.URL,
+		"body_template": `{"title":"{{title}}","content":"{{content}}"}`,
+	})
+	if err != nil {
+		t.Fatalf("试发失败: %v", err)
+	}
+	for _, key := range []string{"title", "content"} {
+		if containsSub(got[key], "{{") {
+			t.Fatalf("试发的 %s 残留占位符: %q", key, got[key])
+		}
+		if got[key] == "" {
+			t.Fatalf("试发的 %s 为空", key)
+		}
+	}
+	if !containsSub(got["content"], "webhook") {
+		t.Fatalf("试发正文应含通道类型: %q", got["content"])
 	}
 }
 

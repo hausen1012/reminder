@@ -285,12 +285,15 @@ func (s *ChannelService) DryRun(ctx context.Context, chType string, config map[s
 	vars := map[string]string{
 		"channel_type": chType,
 		"now":          time.Now().In(s.TZ.Get()).Format("2006-01-02 15:04:05"),
-		"title":        subject,
-		"content":      body,
 	}
+	// 与正式投递一致：展开后的标题与正文回写 vars，Webhook 模板引用时不残留占位符
+	bodyRendered := notifier.Render(body, vars)
+	vars["content"] = bodyRendered
+	subjectRendered := notifier.Render(subject, vars)
+	vars["title"] = subjectRendered
 	rendered := notifier.Message{
-		Subject: notifier.Render(subject, vars),
-		Body:    notifier.Render(body, vars),
+		Subject: subjectRendered,
+		Body:    bodyRendered,
 		Vars:    vars,
 	}
 	if err := n.Send(ctx, plainConfig, rendered); err != nil {

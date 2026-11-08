@@ -603,6 +603,25 @@ func TestReminderTestDryRun(t *testing.T) {
 	}
 }
 
+// 试发没有真实的提醒记录，reminder_id 应为 0、来源按 web 渲染。
+func TestReminderTestDryRun_Vars(t *testing.T) {
+	logs := captureLogs(t)
+
+	db := openTestDB(t)
+	svc := newReminderStack(t, db)
+	ch := createChannel(t, db, "log", true)
+
+	err := svc.TestDryRun(t.Context(), "试发",
+		"id={{reminder_id}} src={{reminder_source}}", "text", []uint{ch.ID})
+	if err != nil {
+		t.Fatalf("试发应成功: %v", err)
+	}
+	out := logs.String()
+	if !containsSub(out, "id=0 src=web") {
+		t.Fatalf("试发变量不正确:\n%s", out)
+	}
+}
+
 // loadChannelsByIDs 只加载 enabled 的通道。
 func TestLoadChannelsByIDs(t *testing.T) {
 	db := openTestDB(t)

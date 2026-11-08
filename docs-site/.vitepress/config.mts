@@ -11,6 +11,24 @@ export default defineConfig({
   cleanUrls: true,
   lastUpdated: true,
 
+  // 行内代码里的 {{var}} 会被 Vue 模板编译器当作插值表达式，渲染成空。
+  // 统一给含 {{ 的行内代码加 v-pre，保持原样显示。
+  markdown: {
+    config(md) {
+      const renderInlineCode = md.renderer.rules.code_inline
+      md.renderer.rules.code_inline = (tokens, idx, options, env, self) => {
+        const token = tokens[idx]
+        if (token.content.includes('{{')) {
+          return '<code v-pre>' + md.utils.escapeHtml(token.content) + '</code>'
+        }
+        if (renderInlineCode) {
+          return renderInlineCode(tokens, idx, options, env, self)
+        }
+        return self.renderToken(tokens, idx, options)
+      }
+    },
+  },
+
   head: [
     ['link', { rel: 'icon', type: 'image/svg+xml', href: '/reminder/favicon.svg' }],
     ['meta', { name: 'theme-color', content: '#0f172a' }],

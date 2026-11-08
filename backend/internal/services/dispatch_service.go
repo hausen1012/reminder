@@ -120,8 +120,8 @@ func (d *DispatchService) Run(ctx context.Context, r *models.Reminder, deliveryL
 
 	body := notifier.Render(r.Content, vars)
 	slog.Debug("内容渲染完成", "reminder", r.ID, "body_len", len(body), "confirm", confirmChainID != "")
-	if confirmChainID != "" && !strings.Contains(r.Content, "{{confirm_url}}") {
-		cu, _ := vars["confirm_url"]
+	// 判据用渲染结果而不是原始模板：占位符允许前后空格，按模板字面量匹配会漏判并重复追加
+	if cu := vars["confirm_url"]; cu != "" && !strings.Contains(body, cu) {
 		slog.Debug("自动追加确认链接", "reminder", r.ID)
 		switch r.ContentFormat {
 		case "html":
@@ -134,8 +134,10 @@ func (d *DispatchService) Run(ctx context.Context, r *models.Reminder, deliveryL
 	}
 	// 渲染后的 body 写回 vars，保证下游（如 webhook 的 {{content}}）拿到展开后的内容
 	vars["content"] = body
+	subject := notifier.Render(r.Title, vars)
+	vars["title"] = subject
 	rendered := notifier.Message{
-		Subject: notifier.Render(r.Title, vars),
+		Subject: subject,
 		Body:    body,
 		Format:  r.ContentFormat,
 		Vars:    vars,
