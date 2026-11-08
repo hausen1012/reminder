@@ -111,11 +111,14 @@ cd frontend && npm run test:coverage
 
 1. 在 `notifier/` 下实现 `Notifier` 接口（`Type()` 与 `Send()`）
 2. 在 `notifier.go` 的 `Registry` 里注册
-3. 在 `channel_service.go` 的 `validType` 与 `requireFields` 里加上类型与必填校验
-4. 在前端 `ChannelEditDialog` 里挂上对应的表单组件
-5. 补充发送逻辑与校验的单元测试
+3. 在 `notifier/spec.go` 的 `specs` 里补上元数据（显示名、字段定义、格式与长度能力），并加进 `specOrder`
+4. 补充发送逻辑的单元测试
 
-四处的类型字符串必须完全一致，否则运行时会报「未知通道类型」。
+`registry_test.go` 会校验 `Registry` 与 `specs` 的键一一对应，漏掉任一处测试即失败。
+必填校验、AI 工具的类型枚举、`/api/channels/types` 都由元数据派生，无需另行维护。
+
+前端只在类型存在联动逻辑时才需要定制表单（参考 `ChannelForms.tsx`），
+其余类型由 `ChannelGenericForm` 按字段定义渲染。
 
 ## 错误处理约定
 

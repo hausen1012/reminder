@@ -16,6 +16,9 @@ import {
   Building2,
   Link2,
   FileText,
+  Send,
+  Bell,
+  Share2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -77,6 +80,11 @@ const CHANNEL_ICONS: Record<string, typeof Mail> = {
   smtp: Mail,
   dingtalk: MessageCircle,
   wecom: Building2,
+  feishu: MessageCircle,
+  telegram: Send,
+  bark: Bell,
+  ntfy: Bell,
+  apprise: Share2,
   webhook: Link2,
   log: FileText,
 }

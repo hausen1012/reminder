@@ -25,7 +25,7 @@
 | 变量 | 默认值 | 说明 |
 |---|---|---|
 | `JWT_SECRET` | 随机生成 | 登录令牌（JWT）的签名密钥。留空时每次启动随机生成，**重启后旧令牌全部失效**，需要重新登录 |
-| `ENCRYPTION_KEY` | 内置 fallback | 通道敏感字段（SMTP 密码、钉钉加签密钥、Webhook Authorization）与**令牌明文**的加密密钥 |
+| `ENCRYPTION_KEY` | 内置 fallback | 通道敏感字段（SMTP 密码、机器人加签密钥、Bot Token、Webhook Authorization 等）与**令牌明文**的加密密钥 |
 
 `ENCRYPTION_KEY` 要求是 **base64 编码的 32 字节**（AES-256）。生成方式：
 
