@@ -223,6 +223,8 @@ func (d *DispatchService) sendWithRetry(ctx context.Context, ch *models.Channel,
 		d.writeAttempt(deliveryLogID, ch, 1, "failed", err.Error(), 0)
 		return false
 	}
+	// 各通道长度上限不同，按通道各自截断
+	msg = notifier.LimitBody(ch.Type, msg)
 	plainConfig, err := d.ChannelSvc.DecryptedConfig(ch)
 	if err != nil {
 		slog.Error("解密通道配置失败，无法发送", "log", deliveryLogID, "channel", ch.ID, "name", ch.Name, "type", ch.Type, "error", err)
@@ -349,6 +351,7 @@ func (d *DispatchService) sendDryRun(ctx context.Context, ch *models.Channel, ms
 	if err != nil {
 		return err
 	}
+	msg = notifier.LimitBody(ch.Type, msg)
 	plainConfig, err := d.ChannelSvc.DecryptedConfig(ch)
 	if err != nil {
 		return fmt.Errorf("解密配置失败: %w", err)

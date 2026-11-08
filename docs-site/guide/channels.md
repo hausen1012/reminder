@@ -10,6 +10,7 @@
 | `smtp` | 邮件，通过任意 SMTP 服务器发送 | 是 |
 | `dingtalk` | 钉钉群机器人 Webhook | 是 |
 | `wecom` | 企业微信群机器人 Webhook | 是 |
+| `feishu` | 飞书群自定义机器人 Webhook | 是 |
 | `webhook` | 通用 HTTP 回调，可自定义方法、头、Body 模板 | 是 |
 | `log` | 输出到服务端日志，用于本地调试 | 否 |
 
@@ -69,6 +70,17 @@
 | `mentioned_mobile_list` | 需要 @ 的手机号列表 |
 
 格式处理与钉钉一致：markdown 走 markdown 类型，其余降级为 text。
+
+## 飞书机器人
+
+| 字段 | 说明 |
+|---|---|
+| `webhook_url` | 群机器人 Webhook 地址（`https://open.feishu.cn/open-apis/bot/v2/hook/...`） |
+| `secret_enc` | 签名校验密钥，机器人安全设置选了「签名校验」时必填，加密存储 |
+| `at_all` | 是否在消息开头 @ 所有人；需要所在群开启「@ 所有人」功能 |
+
+飞书自定义机器人只发送纯文本消息：`markdown` 与 `html` 正文都会先转换为纯文本。
+正文超过 4000 字时会被截断并追加省略号（对端请求体上限为 20 KB）。
 
 ## 通用 Webhook
 

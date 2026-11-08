@@ -47,6 +47,7 @@ var Registry = map[string]Notifier{
 	"smtp":     &smtpNotifier{},
 	"dingtalk": &dingtalkNotifier{},
 	"wecom":    &wecomNotifier{},
+	"feishu":   &feishuNotifier{},
 	"webhook":  &webhookNotifier{},
 	"log":      &logNotifier{},
 }

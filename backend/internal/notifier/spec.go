@@ -96,6 +96,18 @@ var specs = map[string]Spec{
 			{Key: "mentioned_mobile_list", Label: "@ 成员手机号", Kind: FieldList, Placeholder: "多个手机号用英文逗号分隔"},
 		},
 	},
+	"feishu": {
+		Type:        "feishu",
+		Label:       "飞书机器人",
+		Description: "飞书群自定义机器人 Webhook",
+		Fields: []FieldSpec{
+			{Key: "webhook_url", Label: "Webhook URL", Kind: FieldText, Placeholder: "https://open.feishu.cn/open-apis/bot/v2/hook/...", Required: true},
+			{Key: "secret_enc", Label: "签名校验密钥", Kind: FieldPassword, Help: "机器人安全设置选择「签名校验」时必填"},
+			{Key: "at_all", Label: "@ 所有人", Kind: FieldSwitch, Help: "需要群开启 @ 所有人 功能"},
+		},
+		// 飞书文本消息请求体上限 20 KB，这里留足余量
+		MaxBodyLen: 4000,
+	},
 	"webhook": {
 		Type:             "webhook",
 		Label:            "通用 Webhook",
@@ -123,7 +135,7 @@ var specs = map[string]Spec{
 }
 
 // specOrder 决定类型枚举与前端下拉框的顺序。
-var specOrder = []string{"smtp", "dingtalk", "wecom", "webhook", "log"}
+var specOrder = []string{"smtp", "dingtalk", "wecom", "feishu", "webhook", "log"}
 
 // SpecOf 按类型取元数据。
 func SpecOf(typ string) (Spec, bool) {
