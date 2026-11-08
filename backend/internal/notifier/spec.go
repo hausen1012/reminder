@@ -119,6 +119,38 @@ var specs = map[string]Spec{
 		},
 		MaxBodyLen: 4096,
 	},
+	"bark": {
+		Type:        "bark",
+		Label:       "Bark",
+		Description: "iOS 推送，支持官方与自建服务端",
+		Fields: []FieldSpec{
+			{Key: "device_key_enc", Label: "Device Key", Kind: FieldPassword, Required: true, Help: "Bark App 首页显示的推送 Key"},
+			{Key: "server_url", Label: "服务端地址", Kind: FieldText, Placeholder: "https://api.day.app", Default: DefaultBarkServer, Help: "自建服务端填自己的地址"},
+			{Key: "group", Label: "分组", Kind: FieldText, Placeholder: "通知分组名"},
+			{Key: "sound", Label: "铃声", Kind: FieldText, Placeholder: "如 alarm"},
+			{Key: "icon", Label: "图标 URL", Kind: FieldText, Placeholder: "https://example.com/icon.png"},
+		},
+		MaxBodyLen: 2000,
+	},
+	"ntfy": {
+		Type:        "ntfy",
+		Label:       "ntfy",
+		Description: "发布到 ntfy 话题，支持自建服务端",
+		Fields: []FieldSpec{
+			{Key: "server_url", Label: "服务端地址", Kind: FieldText, Placeholder: "https://ntfy.sh", Default: DefaultNtfyServer, Help: "自建服务端填自己的地址"},
+			{Key: "topic", Label: "话题", Kind: FieldText, Placeholder: "topic 名，仅字母数字与 _ -", Required: true, Help: "公开话题任何人只要知道名字就能订阅"},
+			{Key: "token_enc", Label: "访问令牌", Kind: FieldPassword, Help: "服务端启用鉴权时填写，以 Bearer 形式发送"},
+			{Key: "priority", Label: "优先级", Kind: FieldSelect, Default: "default", Options: []Option{
+				{Value: "min", Label: "最低"},
+				{Value: "low", Label: "低"},
+				{Value: "default", Label: "默认"},
+				{Value: "high", Label: "高"},
+				{Value: "urgent", Label: "紧急"},
+			}},
+			{Key: "tags", Label: "标签", Kind: FieldText, Placeholder: "多个标签用英文逗号分隔，如 warning,robot"},
+		},
+		MaxBodyLen: 1200,
+	},
 	"webhook": {
 		Type:             "webhook",
 		Label:            "通用 Webhook",
@@ -146,7 +178,7 @@ var specs = map[string]Spec{
 }
 
 // specOrder 决定类型枚举与前端下拉框的顺序。
-var specOrder = []string{"smtp", "dingtalk", "wecom", "feishu", "telegram", "webhook", "log"}
+var specOrder = []string{"smtp", "dingtalk", "wecom", "feishu", "telegram", "bark", "ntfy", "webhook", "log"}
 
 // SpecOf 按类型取元数据。
 func SpecOf(typ string) (Spec, bool) {
