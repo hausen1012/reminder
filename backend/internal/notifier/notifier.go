@@ -51,6 +51,7 @@ var Registry = map[string]Notifier{
 	"telegram": &telegramNotifier{},
 	"bark":     &barkNotifier{},
 	"ntfy":     &ntfyNotifier{},
+	"apprise":  &appriseNotifier{},
 	"webhook":  &webhookNotifier{},
 	"log":      &logNotifier{},
 }

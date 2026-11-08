@@ -151,6 +151,23 @@ var specs = map[string]Spec{
 		},
 		MaxBodyLen: 1200,
 	},
+	"apprise": {
+		Type:        "apprise",
+		Label:       "Apprise",
+		Description: "通过 Apprise API 服务转发到任意受支持的渠道",
+		Fields: []FieldSpec{
+			{Key: "api_url", Label: "API 地址", Kind: FieldText, Placeholder: "http://localhost:8000", Required: true, Default: "http://localhost:8000"},
+			{Key: "key_enc", Label: "配置 KEY", Kind: FieldPassword, Help: "Apprise API 里保存的配置 KEY；留空时必须在 URLs 里填写目标"},
+			{Key: "urls", Label: "URLs", Kind: FieldTextarea, Placeholder: "每行一个 Apprise URL，填写后按无状态模式发送", Help: "示例：discord://webhook_id/webhook_token"},
+			{Key: "type", Label: "消息类型", Kind: FieldSelect, Default: "info", Options: []Option{
+				{Value: "info", Label: "info"},
+				{Value: "success", Label: "success"},
+				{Value: "warning", Label: "warning"},
+				{Value: "failure", Label: "failure"},
+			}},
+		},
+		MaxBodyLen: 2000,
+	},
 	"webhook": {
 		Type:             "webhook",
 		Label:            "通用 Webhook",
@@ -178,7 +195,7 @@ var specs = map[string]Spec{
 }
 
 // specOrder 决定类型枚举与前端下拉框的顺序。
-var specOrder = []string{"smtp", "dingtalk", "wecom", "feishu", "telegram", "bark", "ntfy", "webhook", "log"}
+var specOrder = []string{"smtp", "dingtalk", "wecom", "feishu", "telegram", "bark", "ntfy", "apprise", "webhook", "log"}
 
 // SpecOf 按类型取元数据。
 func SpecOf(typ string) (Spec, bool) {

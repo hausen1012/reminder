@@ -14,6 +14,7 @@
 | `telegram` | Telegram Bot，发送到指定会话 | 是 |
 | `bark` | Bark iOS 推送，支持自建服务端 | 是 |
 | `ntfy` | ntfy 话题推送，支持自建服务端与访问令牌 | 是 |
+| `apprise` | 通过 Apprise API 服务转发到其支持的全部渠道 | 是 |
 | `webhook` | 通用 HTTP 回调，可自定义方法、头、Body 模板 | 是 |
 | `log` | 输出到服务端日志，用于本地调试 | 否 |
 
@@ -135,6 +136,28 @@ iOS 推送通道，可以走 Bark 官方服务端，也可以指向自建实例�
 ::: warning 公开话题任何人都能订阅
 未开启鉴权的 ntfy 服务端上，话题名就是唯一凭据。话题名尽量随机，或在服务端开启访问控制。
 :::
+
+## Apprise
+
+对接已部署的 [Apprise API](https://github.com/caronc/apprise-api) 服务，
+借助它把同一条消息转发到自身未内置的渠道。
+
+| 字段 | 说明 |
+|---|---|
+| `api_url` | Apprise API 服务地址，如 `http://localhost:8000` |
+| `key_enc` | Apprise API 里保存的配置 KEY，加密存储 |
+| `urls` | 目标列表，每行一个 Apprise URL；填了之后按无状态模式发送 |
+| `type` | 消息类型：`info` / `success` / `warning` / `failure` |
+
+两种模式：
+
+- **状态化**：只填 `key_enc`，服务端使用该 KEY 已保存的目标列表发送
+- **无状态**：填 `urls`（`key_enc` 只用于鉴权、可留空），目标随请求下发
+
+`key_enc` 与 `urls` 至少要填一个。正文超过 2000 字时会被截断并追加省略号。
+
+服务端返回非 200 时按状态码区分：`424`（没有任何目标发送成功）与 `4xx` 视为永久错误，
+`429`、`5xx` 会重试。
 
 ## 通用 Webhook
 
