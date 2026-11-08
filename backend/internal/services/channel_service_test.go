@@ -170,6 +170,11 @@ func TestChannelCreate_RequiresTypeFields(t *testing.T) {
 		{"dingtalk 缺 webhook", ChannelInput{Name: "b", Type: "dingtalk", Config: map[string]any{}}},
 		{"wecom 缺 webhook", ChannelInput{Name: "c", Type: "wecom", Config: map[string]any{}}},
 		{"webhook 缺 url", ChannelInput{Name: "d", Type: "webhook", Config: map[string]any{}}},
+		{"feishu 缺 webhook", ChannelInput{Name: "e", Type: "feishu", Config: map[string]any{}}},
+		{"telegram 缺 token", ChannelInput{Name: "f", Type: "telegram", Config: map[string]any{"chat_id": "1"}}},
+		{"bark 缺 device key", ChannelInput{Name: "g", Type: "bark", Config: map[string]any{}}},
+		{"ntfy 缺 topic", ChannelInput{Name: "h", Type: "ntfy", Config: map[string]any{"server_url": "https://ntfy.sh"}}},
+		{"apprise 缺 key 与 urls", ChannelInput{Name: "i", Type: "apprise", Config: map[string]any{"api_url": "http://localhost:8000"}}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

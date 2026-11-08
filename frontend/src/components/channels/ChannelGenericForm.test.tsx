@@ -10,7 +10,6 @@ const SPEC: ChannelTypeSpec = {
   type: 'demo',
   label: '演示通道',
   description: '演示用',
-  supports_markdown: false,
   max_body_len: 0,
   fields: [
     { key: 'name', label: '名称', kind: 'text', required: true, placeholder: '请输入名称' },

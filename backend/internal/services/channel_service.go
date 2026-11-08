@@ -428,6 +428,20 @@ func requireFields(typ string, cfg map[string]any) error {
 			return middleware.NewAppError(middleware.CodeValidationFailed, "缺少必填字段").WithField("config." + f.Key)
 		}
 	}
+	if len(spec.RequireAny) > 0 {
+		filled := false
+		for _, key := range spec.RequireAny {
+			if !isBlankField(cfg[key]) {
+				filled = true
+				break
+			}
+		}
+		if !filled {
+			return middleware.NewAppError(middleware.CodeValidationFailed,
+				"以下字段至少填写一个："+strings.Join(spec.RequireAny, "、")).
+				WithField("config." + spec.RequireAny[0])
+		}
+	}
 	return nil
 }
 

@@ -45,8 +45,8 @@ type Spec struct {
 	Label       string      `json:"label"`
 	Description string      `json:"description"`
 	Fields      []FieldSpec `json:"fields"`
-	// SupportsMarkdown 表示该通道能原生渲染 markdown；否则发送前降级为纯文本。
-	SupportsMarkdown bool `json:"supports_markdown"`
+	// RequireAny 列出「至少填一个」的字段键；为空表示无此约束。
+	RequireAny []string `json:"require_any,omitempty"`
 	// MaxBodyLen 是正文最大字符数（按 rune 计），0 表示不限。超长时发送前截断。
 	MaxBodyLen int `json:"max_body_len"`
 }
@@ -54,10 +54,9 @@ type Spec struct {
 // specs 是全部通道类型的元数据。
 var specs = map[string]Spec{
 	"smtp": {
-		Type:             "smtp",
-		Label:            "邮件 SMTP",
-		Description:      "通过任意 SMTP 服务器发送邮件",
-		SupportsMarkdown: true,
+		Type:        "smtp",
+		Label:       "邮件 SMTP",
+		Description: "通过任意 SMTP 服务器发送邮件",
 		Fields: []FieldSpec{
 			{Key: "host", Label: "SMTP Host", Kind: FieldText, Placeholder: "smtp.example.com", Required: true},
 			{Key: "port", Label: "端口", Kind: FieldNumber, Placeholder: "587", Required: true, Default: 587},
@@ -74,10 +73,9 @@ var specs = map[string]Spec{
 		},
 	},
 	"dingtalk": {
-		Type:             "dingtalk",
-		Label:            "钉钉机器人",
-		Description:      "钉钉群自定义机器人 Webhook",
-		SupportsMarkdown: true,
+		Type:        "dingtalk",
+		Label:       "钉钉机器人",
+		Description: "钉钉群自定义机器人 Webhook",
 		Fields: []FieldSpec{
 			{Key: "webhook_url", Label: "Webhook URL", Kind: FieldText, Placeholder: "https://oapi.dingtalk.com/robot/send?access_token=...", Required: true},
 			{Key: "secret_enc", Label: "加签密钥", Kind: FieldPassword, Help: "机器人安全设置选择「加签」时必填"},
@@ -86,10 +84,9 @@ var specs = map[string]Spec{
 		},
 	},
 	"wecom": {
-		Type:             "wecom",
-		Label:            "企业微信机器人",
-		Description:      "企业微信群自定义机器人 Webhook",
-		SupportsMarkdown: true,
+		Type:        "wecom",
+		Label:       "企业微信机器人",
+		Description: "企业微信群自定义机器人 Webhook",
 		Fields: []FieldSpec{
 			{Key: "webhook_url", Label: "Webhook URL", Kind: FieldText, Placeholder: "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=...", Required: true},
 			{Key: "mentioned_list", Label: "@ 成员 userid", Kind: FieldList, Placeholder: "@all 表示所有人，多个用英文逗号分隔"},
@@ -155,6 +152,7 @@ var specs = map[string]Spec{
 		Type:        "apprise",
 		Label:       "Apprise",
 		Description: "通过 Apprise API 服务转发到任意受支持的渠道",
+		RequireAny:  []string{"key_enc", "urls"},
 		Fields: []FieldSpec{
 			{Key: "api_url", Label: "API 地址", Kind: FieldText, Placeholder: "http://localhost:8000", Required: true, Default: "http://localhost:8000"},
 			{Key: "key_enc", Label: "配置 KEY", Kind: FieldPassword, Help: "Apprise API 里保存的配置 KEY；留空时必须在 URLs 里填写目标"},
@@ -169,10 +167,9 @@ var specs = map[string]Spec{
 		MaxBodyLen: 2000,
 	},
 	"webhook": {
-		Type:             "webhook",
-		Label:            "通用 Webhook",
-		Description:      "可自定义方法、请求头与 Body 模板的 HTTP 回调",
-		SupportsMarkdown: true,
+		Type:        "webhook",
+		Label:       "通用 Webhook",
+		Description: "可自定义方法、请求头与 Body 模板的 HTTP 回调",
 		Fields: []FieldSpec{
 			{Key: "method", Label: "方法", Kind: FieldSelect, Default: "POST", Options: []Option{
 				{Value: "POST", Label: "POST"},

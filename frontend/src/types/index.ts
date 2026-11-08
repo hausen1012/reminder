@@ -48,7 +48,7 @@ export interface ChannelTypeSpec {
   label: string
   description: string
   fields: ChannelFieldSpec[]
-  supports_markdown: boolean
+  require_any?: string[]
   max_body_len: number
 }
 
