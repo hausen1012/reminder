@@ -1,6 +1,8 @@
-// 通知编辑对话框：根据 Type 切换四套表单。
-// 新建时 type 可选；编辑时 type 锁死。
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+// 通知编辑对话框：新建时 type 可选；编辑时 type 锁死。
+//
+// 类型清单与字段定义来自后端 /api/channels/types。smtp / dingtalk / wecom / webhook
+// 有联动逻辑，仍用 ChannelForms 里的定制表单；其余类型统一走通用表单。
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -19,10 +21,11 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useToast } from '@/components/ui/use-toast'
-import { SMTPForm, DingTalkForm, WeComForm, WebhookForm, LogForm } from './ChannelForms'
-import type { Channel, ChannelType } from '@/types'
-import { toChannelType } from '@/types'
+import { SMTPForm, DingTalkForm, WeComForm, WebhookForm } from './ChannelForms'
+import { ChannelGenericForm } from './ChannelGenericForm'
+import type { Channel, ChannelType, ChannelTypeSpec } from '@/types'
 import { createChannel, extractApiError, testChannelDryRun, updateChannel } from '@/lib/api'
+import { defaultConfigOf, findSpec, useChannelTypes } from '@/lib/channelSpec'
 
 interface Props {
   channel: Channel | null
@@ -31,87 +34,88 @@ interface Props {
   onSaved: () => void
 }
 
-const TYPE_OPTIONS: { value: ChannelType; label: string }[] = [
-  { value: 'smtp', label: '邮件 SMTP' },
-  { value: 'dingtalk', label: '钉钉机器人' },
-  { value: 'wecom', label: '企业微信机器人' },
-  { value: 'webhook', label: '通用 Webhook' },
-  { value: 'log', label: '日志输出' },
-]
+// 有定制表单的类型；其余一律走通用表单。
+const CUSTOM_FORMS = {
+  smtp: SMTPForm,
+  dingtalk: DingTalkForm,
+  wecom: WeComForm,
+  webhook: WebhookForm,
+} as const
 
-// 各类型默认 Config 模板，新建时初始化使用。
-function defaultConfig(type: ChannelType): Record<string, unknown> {
-  switch (type) {
-    case 'smtp':
-      return {
-        host: '',
-        port: 587,
-        username: '',
-        password_enc: '',
-        from_addr: '',
-        from_name: '',
-        to: [],
-        security_mode: 'starttls',
-      }
-    case 'dingtalk':
-      return { webhook_url: '', secret_enc: '' }
-    case 'wecom':
-      return { webhook_url: '' }
-    case 'webhook':
-      return {
-        method: 'POST',
-        url: '',
-        headers: {},
-        authorization_enc: '',
-        body_template: '',
-        query_template: {},
-        content_type: 'application/json',
-      }
-    case 'log':
-      return {}
+// 定制表单的初始配置；含 object 类型字段（headers / query_template）的不便由字段描述推导。
+const CUSTOM_DEFAULT_CONFIG: Record<string, Record<string, unknown>> = {
+  smtp: {
+    host: '',
+    port: 587,
+    username: '',
+    password_enc: '',
+    from_addr: '',
+    from_name: '',
+    to: [],
+    security_mode: 'starttls',
+  },
+  dingtalk: { webhook_url: '', secret_enc: '' },
+  wecom: { webhook_url: '' },
+  webhook: {
+    method: 'POST',
+    url: '',
+    headers: {},
+    authorization_enc: '',
+    body_template: '',
+    query_template: {},
+    content_type: 'application/json',
+  },
+}
+
+// buildDefaultConfig 返回新建通道时的初始配置：定制表单用固定模板，其余按字段定义推导。
+function buildDefaultConfig(
+  type: ChannelType,
+  specs: ChannelTypeSpec[],
+): Record<string, unknown> {
+  if (type in CUSTOM_DEFAULT_CONFIG) {
+    return { ...CUSTOM_DEFAULT_CONFIG[type] }
   }
+  return defaultConfigOf(findSpec(specs, type))
 }
 
 export function ChannelEditDialog({ channel, open, onClose, onSaved }: Props) {
+  const { specs } = useChannelTypes()
   const isEdit = Boolean(channel)
+  const initialType = channel?.type ?? 'smtp'
+  // 类型元数据晚到时只影响下拉框渲染；重置表单要用最新元数据，但不能因此覆盖用户输入，
+  // 所以放在 ref 里供重置逻辑读取。
+  const specsRef = useRef<ChannelTypeSpec[]>(specs)
+  specsRef.current = specs
   const [name, setName] = useState(channel?.name ?? '')
-  const [type, setType] = useState<ChannelType>(channel?.type ?? 'smtp')
-  const [config, setConfig] = useState<Record<string, unknown>>(channel?.config ?? defaultConfig(channel?.type ?? 'smtp'))
+  const [type, setType] = useState<ChannelType>(initialType)
+  const [config, setConfig] = useState<Record<string, unknown>>(
+    channel?.config ?? buildDefaultConfig(initialType, specs),
+  )
   const [saving, setSaving] = useState(false)
   const [testing, setTesting] = useState(false)
   const { toast } = useToast()
 
+  // 只在切换编辑对象时重置表单；类型元数据晚到不应覆盖用户已输入的内容。
   useEffect(() => {
     if (channel) {
       setName(channel.name)
       setType(channel.type)
-      setConfig(channel.config ?? defaultConfig(channel.type))
+      setConfig(channel.config ?? buildDefaultConfig(channel.type, specsRef.current))
     } else {
       setName('')
       setType('smtp')
-      setConfig(defaultConfig('smtp'))
+      setConfig(buildDefaultConfig('smtp', specsRef.current))
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channel])
 
   function handleTypeChange(next: ChannelType) {
     setType(next)
-    setConfig(defaultConfig(next))
+    setConfig(buildDefaultConfig(next, specs))
   }
 
-  const SubForm = useMemo(() => {
-    switch (type) {
-      case 'smtp':
-        return SMTPForm
-      case 'dingtalk':
-        return DingTalkForm
-      case 'wecom':
-        return WeComForm
-      case 'webhook':
-        return WebhookForm
-      case 'log':
-        return LogForm
-    }
-  }, [type])
+  const spec = findSpec(specs, type)
+  const CustomForm = CUSTOM_FORMS[type as keyof typeof CUSTOM_FORMS]
 
   async function handleTest() {
     setTesting(true)
@@ -171,13 +175,13 @@ export function ChannelEditDialog({ channel, open, onClose, onSaved }: Props) {
           </div>
           <div className="space-y-2">
             <Label htmlFor="channel-type">类型</Label>
-            <Select value={type} onValueChange={(v) => handleTypeChange(toChannelType(v))} disabled={isEdit}>
+            <Select value={type} onValueChange={handleTypeChange} disabled={isEdit}>
               <SelectTrigger id="channel-type">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {TYPE_OPTIONS.map((opt) => (
-                  <SelectItem key={opt.value} value={opt.value}>
+                {specs.map((opt) => (
+                  <SelectItem key={opt.type} value={opt.type}>
                     {opt.label}
                   </SelectItem>
                 ))}
@@ -188,7 +192,11 @@ export function ChannelEditDialog({ channel, open, onClose, onSaved }: Props) {
             )}
           </div>
 
-          <SubForm config={config} onChange={setConfig} isEdit={isEdit} />
+          {CustomForm ? (
+            <CustomForm config={config} onChange={setConfig} isEdit={isEdit} />
+          ) : spec ? (
+            <ChannelGenericForm spec={spec} config={config} onChange={setConfig} isEdit={isEdit} />
+          ) : null}
 
           <DialogFooter>
             <Button type="button" variant="secondary" onClick={handleTest} disabled={testing} title="向该通知发送一条测试消息">

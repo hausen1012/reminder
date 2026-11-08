@@ -1,5 +1,5 @@
-// 通道表单测试：五个表单共用一个受控包装，断言全部基于用户可见的文案/占位符。
-import { describe, expect, it, vi } from 'vitest'
+// 通道表单测试：定制表单共用一个受控包装，断言全部基于用户可见的文案/占位符。
+import { describe, expect, it } from 'vitest'
 import type { ComponentType } from 'react'
 import { useState } from 'react'
 import { render, screen } from '@testing-library/react'
@@ -13,7 +13,6 @@ import {
   DingTalkForm,
   WeComForm,
   WebhookForm,
-  LogForm,
   type SubFormProps,
 } from '@/components/channels/ChannelForms'
 
@@ -337,15 +336,5 @@ describe('WebhookForm', () => {
     await user.paste('{"t":"{{title}}"}')
 
     expect(readState().body_template).toBe('{"t":"{{title}}"}')
-  })
-})
-
-// --- 日志 ---
-
-describe('LogForm', () => {
-  it('渲染说明文案，不包含任何输入控件', () => {
-    render(<LogForm config={{}} onChange={vi.fn()} isEdit={false} />)
-    expect(screen.getByText(/日志通知无需额外配置/)).toBeInTheDocument()
-    expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
   })
 })

@@ -71,11 +71,13 @@ const encSuffix = "_enc"
 const sensitivePlaceholder = "***"
 
 func validType(t string) bool {
-	switch t {
-	case "smtp", "dingtalk", "wecom", "webhook", "log":
-		return true
-	}
-	return false
+	_, ok := notifier.SpecOf(t)
+	return ok
+}
+
+// Types 返回全部可用的通道类型元数据，供前端渲染类型下拉框与通用表单。
+func (s *ChannelService) Types() []notifier.Spec {
+	return notifier.Specs()
 }
 
 // Create 新建通道。Type 一旦创建不可变更。
@@ -412,39 +414,44 @@ func (s *ChannelService) validateInput(in ChannelInput, isUpdate bool, ch *model
 	return nil
 }
 
+// requireFields 按通道类型元数据校验必填字段：字符串类字段不得为空，列表类字段不得为空列表。
 func requireFields(typ string, cfg map[string]any) error {
-	missing := func(field string) error {
-		return middleware.NewAppError(middleware.CodeValidationFailed, "缺少必填字段").WithField(field)
+	spec, ok := notifier.SpecOf(typ)
+	if !ok {
+		return middleware.NewAppError(middleware.CodeValidationFailed, "未知通道类型").WithField("type")
 	}
-	switch typ {
-	case "smtp":
-		if asString(cfg["host"]) == "" {
-			return missing("config.host")
+	for _, f := range spec.Fields {
+		if !f.Required {
+			continue
 		}
-		if asPositiveInt(cfg["port"]) == 0 {
-			return missing("config.port")
+		if isBlankField(cfg[f.Key]) {
+			return middleware.NewAppError(middleware.CodeValidationFailed, "缺少必填字段").WithField("config." + f.Key)
 		}
-		if asString(cfg["from_addr"]) == "" {
-			return missing("config.from_addr")
-		}
-		if len(asStringSlice(cfg["to"])) == 0 {
-			return missing("config.to")
-		}
-	case "dingtalk":
-		if asString(cfg["webhook_url"]) == "" {
-			return missing("config.webhook_url")
-		}
-	case "wecom":
-		if asString(cfg["webhook_url"]) == "" {
-			return missing("config.webhook_url")
-		}
-	case "webhook":
-		if asString(cfg["url"]) == "" {
-			return missing("config.url")
-		}
-		// 日志通道无需配置
 	}
 	return nil
+}
+
+// isBlankField 判断配置项是否为空：字符串去空白后为空、数字非正、列表为空都算空。
+func isBlankField(v any) bool {
+	switch val := v.(type) {
+	case nil:
+		return true
+	case string:
+		return strings.TrimSpace(val) == ""
+	case []string:
+		return len(asStringSlice(val)) == 0
+	case []any:
+		return len(asStringSlice(val)) == 0
+	case int:
+		return val <= 0
+	case int32:
+		return val <= 0
+	case int64:
+		return val <= 0
+	case float64:
+		return val <= 0
+	}
+	return false
 }
 
 func asString(v any) string {

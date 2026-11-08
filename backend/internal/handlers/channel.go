@@ -137,6 +137,13 @@ func (h *ChannelHandler) Toggle(c *gin.Context) {
 	successJSON(c, v)
 }
 
+// Types GET /api/channels/types
+//
+// 返回全部通道类型的元数据（显示名、字段定义、能力），前端据此渲染类型下拉框与通用表单。
+func (h *ChannelHandler) Types(c *gin.Context) {
+	successJSON(c, h.Svc.Types())
+}
+
 // Stats GET /api/channels/stats?window=24h
 func (h *ChannelHandler) Stats(c *gin.Context) {
 	windowStr := c.DefaultQuery("window", "24h")

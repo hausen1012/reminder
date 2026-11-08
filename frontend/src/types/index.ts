@@ -15,7 +15,42 @@ export interface LoginResponse {
   user: User
 }
 
-export type ChannelType = 'smtp' | 'dingtalk' | 'wecom' | 'webhook' | 'log'
+// 通道类型由后端的类型元数据（/api/channels/types）决定，前端不再维护固定枚举。
+export type ChannelType = string
+
+export type ChannelFieldKind =
+  | 'text'
+  | 'password'
+  | 'number'
+  | 'textarea'
+  | 'switch'
+  | 'select'
+  | 'list'
+
+export interface ChannelFieldOption {
+  value: string
+  label: string
+}
+
+export interface ChannelFieldSpec {
+  key: string
+  label: string
+  kind: ChannelFieldKind
+  placeholder?: string
+  help?: string
+  required: boolean
+  default?: unknown
+  options?: ChannelFieldOption[]
+}
+
+export interface ChannelTypeSpec {
+  type: ChannelType
+  label: string
+  description: string
+  fields: ChannelFieldSpec[]
+  supports_markdown: boolean
+  max_body_len: number
+}
 
 export interface Channel {
   id: number
@@ -54,11 +89,6 @@ export type ContentFormat = 'text' | 'markdown' | 'html'
 export function toContentFormat(v: string): ContentFormat {
   if (v === 'text' || v === 'markdown' || v === 'html') return v
   return 'text'
-}
-
-export function toChannelType(v: string): ChannelType {
-  if (v === 'smtp' || v === 'dingtalk' || v === 'wecom' || v === 'webhook' || v === 'log') return v
-  return 'webhook'
 }
 
 export interface Reminder {

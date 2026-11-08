@@ -20,18 +20,12 @@ import {
   createChannel,
   batchDeleteChannels,
 } from '@/lib/api'
-import type { Channel, ChannelType } from '@/types'
-
-const TYPE_LABEL: Record<ChannelType, string> = {
-  smtp: '邮件',
-  dingtalk: '钉钉机器人',
-  wecom: '企业微信机器人',
-  webhook: 'WebHook',
-  log: '控制台日志',
-}
+import type { Channel } from '@/types'
+import { labelOf, useChannelTypes } from '@/lib/channelSpec'
 
 export default function ChannelsPage() {
   const tz = useSiteTimezone()
+  const { specs } = useChannelTypes()
   const [items, setItems] = useState<Channel[]>([])
   const [total, setTotal] = useState(0)
   const [limit, setLimit] = useState(10)
@@ -244,7 +238,7 @@ export default function ChannelsPage() {
                         <td className="px-4 py-2.5">
                           <span className="font-medium truncate block" title={ch.name}>{ch.name}</span>
                         </td>
-                        <td className="px-4 py-2.5 text-xs text-muted-foreground">{TYPE_LABEL[ch.type]}</td>
+                        <td className="px-4 py-2.5 text-xs text-muted-foreground">{labelOf(specs, ch.type)}</td>
                         <td className="px-4 py-2.5 text-xs whitespace-nowrap text-muted-foreground">
                           {formatInZone(ch.created_at, tz)}
                         </td>
@@ -283,7 +277,7 @@ export default function ChannelsPage() {
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium" title={ch.name}>{ch.name}</p>
                     <p className="mt-0.5 text-xs text-muted-foreground">
-                      {TYPE_LABEL[ch.type]} · 创建于 {formatInZone(ch.created_at, tz)}
+                      {labelOf(specs, ch.type)} · 创建于 {formatInZone(ch.created_at, tz)}
                     </p>
                   </div>
                   <span className={ch.enabled ? 'shrink-0 text-xs text-green-600' : 'shrink-0 text-xs text-muted-foreground'}>

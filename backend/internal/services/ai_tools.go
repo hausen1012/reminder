@@ -5,11 +5,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/reminder/backend/internal/llm"
 	"github.com/reminder/backend/internal/middleware"
 	"github.com/reminder/backend/internal/models"
+	"github.com/reminder/backend/internal/notifier"
 )
 
 // ai_tools 定义暴露给模型的工具；写操作只生成 AIAction 草稿，不直接落库。
@@ -26,11 +28,35 @@ const (
 	defaultConfirmMaxRetries       = 3
 )
 
-// channelTypeSchema 供 create_channel 使用。
-var channelTypeSchema = map[string]any{
-	"type":        "string",
-	"enum":        []string{"smtp", "dingtalk", "wecom", "webhook", "log"},
-	"description": "通道类型。smtp=邮件，dingtalk=钉钉机器人，wecom=企业微信机器人，webhook=通用 Webhook，log=仅打印到服务器日志",
+// channelTypeSchema 供 create_channel 使用；枚举与说明都由 notifier.Specs 派生。
+func channelTypeSchema() map[string]any {
+	specs := notifier.Specs()
+	enum := make([]string, 0, len(specs))
+	parts := make([]string, 0, len(specs))
+	lines := make([]string, 0, len(specs))
+	for _, s := range specs {
+		enum = append(enum, s.Type)
+		parts = append(parts, s.Type+"="+s.Label)
+		if keys := nonSensitiveFieldKeys(s); len(keys) > 0 {
+			lines = append(lines, "- "+s.Type+": "+keys)
+		} else {
+			lines = append(lines, "- "+s.Type+": 无需字段")
+		}
+	}
+	return map[string]any{
+		"type":        "string",
+		"enum":        enum,
+		"description": "通道类型。填写 config 时按类型提供字段：\n" + strings.Join(lines, "\n"),
+	}
+}
+
+// nonSensitiveFieldKeys 返回非敏感字段键名，敏感字段在配置里按 _enc 键名填写原文。
+func nonSensitiveFieldKeys(s notifier.Spec) string {
+	keys := make([]string, 0, len(s.Fields))
+	for _, f := range s.Fields {
+		keys = append(keys, f.Key)
+	}
+	return strings.Join(keys, ", ")
 }
 
 // scheduleSpecSchemaDescription 说明三种调度类型各自的 schedule_spec 结构。
@@ -146,17 +172,13 @@ func (s *AIService) toolDefinitions() []toolDefinition {
 		{
 			spec: llm.Tool{
 				Name: "create_channel",
-				Description: "提出创建一个通知通道，会生成待确认卡片。config 字段按 type 填写：\n" +
-					"- smtp: host, port, username, password_enc（密码原文）, from_addr, to（字符串数组）, security_mode(starttls|implicit_tls|plain)\n" +
-					"- dingtalk: webhook_url 与可选 secret_enc\n" +
-					"- wecom: webhook_url\n" +
-					"- webhook: method(GET|POST), url, 可选 headers/body_template/authorization_enc\n" +
-					"- log: 无需字段",
+				Description: "提出创建一个通知通道，会生成待确认卡片。config 的字段随 type 变化，" +
+					"以 type 字段说明里的清单为准；敏感字段按 _enc 键名直接填写原文。",
 				InputSchema: map[string]any{
 					"type": "object",
 					"properties": map[string]any{
 						"name":   map[string]any{"type": "string"},
-						"type":   channelTypeSchema,
+						"type":   channelTypeSchema(),
 						"config": map[string]any{"type": "object", "description": "通道配置，字段随 type 变化"},
 					},
 					"required": []string{"name", "type", "config"},

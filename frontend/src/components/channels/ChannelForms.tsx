@@ -1,7 +1,7 @@
 // 各类通知通道的配置表单。
 //
-// 五个表单共享同一套 SubFormProps（受控 config + onChange），差异只在字段集合，
-// 因此放在一个文件里：新增通道类型时照抄一段即可，字段读取的小工具也在同处。
+// 只有存在联动逻辑的类型（SMTP 端口随连接方式切换、Webhook 的键值编辑器）需要定制表单；
+// 其余类型由 ChannelGenericForm 依据后端字段描述渲染。
 //
 // 敏感字段（密码 / 加签密钥 / Authorization）统一约定：
 // 编辑态下原值以 "***" 占位回显，用户留空提交时回填 "***" 表示"保持不修改"，
@@ -378,18 +378,6 @@ export function WebhookForm({ config, onChange, isEdit }: SubFormProps) {
           />
         </div>
       )}
-    </div>
-  )
-}
-
-// --- 日志 ---
-
-export function LogForm({}: SubFormProps) {
-  return (
-    <div className="space-y-3 rounded-md border bg-card/30 p-4">
-      <p className="text-sm text-muted-foreground">
-        日志通知无需额外配置。该通知仅将内容输出到服务器控制台，不会调用任何外部服务。
-      </p>
     </div>
   )
 }

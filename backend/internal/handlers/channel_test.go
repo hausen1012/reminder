@@ -1,7 +1,9 @@
 package handlers
 
 import (
+	"encoding/json"
 	"net/http"
+	"slices"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -26,6 +28,7 @@ func newChannelTestEngine(t *testing.T) *gin.Engine {
 	r.Use(gin.Recovery())
 	r.Use(middleware.ErrorHandler())
 	r.GET("/channels", h.List)
+	r.GET("/channels/types", h.Types)
 	r.POST("/channels", h.Create)
 	r.GET("/channels/:id", h.Get)
 	r.PUT("/channels/:id", h.Update)
@@ -83,10 +86,48 @@ func TestChannelCreate_InvalidType(t *testing.T) {
 
 	w := doJSON(r, http.MethodPost, "/channels", map[string]any{
 		"name": "坏类型",
-		"type": "telegram",
+		"type": "no-such-type",
 	})
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("状态码 = %d, 期望 400, body=%s", w.Code, w.Body.String())
+	}
+}
+
+// 类型元数据接口应返回全部类型，且每项都带字段定义。
+func TestChannelTypes_ReturnsSpecs(t *testing.T) {
+	r := newChannelTestEngine(t)
+
+	w := doJSON(r, http.MethodGet, "/channels/types", nil)
+	if w.Code != http.StatusOK {
+		t.Fatalf("状态码 = %d, body=%s", w.Code, w.Body.String())
+	}
+	var resp struct {
+		Data []struct {
+			Type   string `json:"type"`
+			Label  string `json:"label"`
+			Fields []struct {
+				Key  string `json:"key"`
+				Kind string `json:"kind"`
+			} `json:"fields"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("解析响应失败: %v", err)
+	}
+	types := make([]string, 0, len(resp.Data))
+	for _, s := range resp.Data {
+		types = append(types, s.Type)
+		if s.Label == "" {
+			t.Errorf("类型 %q 缺少 label", s.Type)
+		}
+		if s.Type == "smtp" && len(s.Fields) == 0 {
+			t.Error("smtp 应带有字段定义")
+		}
+	}
+	for _, want := range []string{"smtp", "dingtalk", "wecom", "webhook", "log"} {
+		if !slices.Contains(types, want) {
+			t.Errorf("缺少类型 %q，实际 %v", want, types)
+		}
 	}
 }
 

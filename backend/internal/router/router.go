@@ -215,6 +215,7 @@ func Setup(staticFS embed.FS, cfg *config.Config) (*SetupResult, error) {
 		channels := protected.Group("/channels")
 		{
 			channels.GET("", channelHandler.List)
+			channels.GET("/types", channelHandler.Types) // 必须在 /:id 之前
 			channels.POST("", channelHandler.Create)
 			channels.GET("/:id", channelHandler.Get)
 			channels.PUT("/:id", channelHandler.Update)

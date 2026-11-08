@@ -65,6 +65,7 @@ JWT 有效期为 72 小时。改密码后旧 JWT 仍然有效直到过期——�
 | 方法 | 路径 | 说明 |
 |---|---|---|
 | `GET` | `/api/channels` | 列表。不带参数返回全量数组；带 `limit` 等参数返回 `{items,total}` |
+| `GET` | `/api/channels/types` | 全部通道类型的元数据：显示名、配置字段定义、格式与长度能力 |
 | `POST` | `/api/channels` | 新建 |
 | `GET` | `/api/channels/:id` | 详情（敏感字段脱敏为 `***`） |
 | `PUT` | `/api/channels/:id` | 更新（与旧配置合并，未传的字段保持原值） |

@@ -14,6 +14,7 @@ import type {
   ChannelInput,
   ChannelListResp,
   ChannelType,
+  ChannelTypeSpec,
   CreateTokenResult,
   DeliveryLog,
   LogFilter,
@@ -135,6 +136,11 @@ export async function listChannels() {
 export async function listChannelsPaged(q: ListChannelsQuery = {}) {
   const res = await api.get<ApiResponse<ChannelListResp>>('/channels', { params: q })
   return res.data.data
+}
+
+export async function listChannelTypes() {
+  const res = await api.get<ApiResponse<ChannelTypeSpec[]>>('/channels/types')
+  return res.data.data ?? []
 }
 
 export async function getChannel(id: number) {

@@ -42,7 +42,7 @@ type Notifier interface {
 
 // Registry 把通道类型映射到 Notifier 实例。
 //
-// key 必须与 ChannelService 的类型校验和前端 ChannelType 完全一致。
+// key 必须与 spec.go 里的 specs 完全一致，由 registry_test.go 保证。
 var Registry = map[string]Notifier{
 	"smtp":     &smtpNotifier{},
 	"dingtalk": &dingtalkNotifier{},
