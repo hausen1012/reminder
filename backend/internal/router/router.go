@@ -173,6 +173,7 @@ func Setup(staticFS embed.FS, cfg *config.Config) (*SetupResult, error) {
 
 	// 确认链接（无需认证）
 	r.GET("/c/:token", confirmHandler.Confirm)
+	r.POST("/c/:token", confirmHandler.Submit)
 
 	api := r.Group("/api")
 	{

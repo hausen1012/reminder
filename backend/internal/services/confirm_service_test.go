@@ -306,3 +306,72 @@ func TestConfirmBuildURL_DBOverridesEnv(t *testing.T) {
 		t.Fatalf("应以库里的地址为准并去掉结尾斜杠，实际 %q", got)
 	}
 }
+
+// InspectToken 应只查状态不消费令牌，并准确反映已使用/过期/不存在等状态。
+func TestConfirmInspectToken(t *testing.T) {
+	svc, db := newConfirmSvc(t, "http://x.test")
+
+	// 1. 正常未使用
+	dl := seedLogWithChain(t, db, nil)
+	token, err := svc.CreateToken(dl.ID, time.Hour)
+	if err != nil {
+		t.Fatalf("创建令牌失败: %v", err)
+	}
+
+	got, err := svc.InspectToken(token)
+	if err != nil {
+		t.Fatalf("InspectToken 失败: %v", err)
+	}
+	if got.ID != dl.ID {
+		t.Fatalf("返回日志 ID = %d, 期望 %d", got.ID, dl.ID)
+	}
+	if got.Confirmed {
+		t.Fatal("InspectToken 不应标记 confirmed")
+	}
+
+	var ct models.ConfirmToken
+	if err := db.Where("token = ?", token).First(&ct).Error; err != nil {
+		t.Fatalf("查令牌失败: %v", err)
+	}
+	if ct.UsedAt != nil {
+		t.Fatal("InspectToken 不应写入 used_at")
+	}
+
+	// 2. 已消费后查询
+	if _, err := svc.ConsumeToken(token); err != nil {
+		t.Fatalf("消费令牌失败: %v", err)
+	}
+	gotUsed, err := svc.InspectToken(token)
+	if !errors.Is(err, ErrConfirmTokenUsed) {
+		t.Fatalf("已使用令牌应返回 ErrConfirmTokenUsed，实际 %v", err)
+	}
+	if gotUsed == nil || gotUsed.ID != dl.ID {
+		t.Fatalf("已使用令牌仍应带回日志对象，实际 %+v", gotUsed)
+	}
+
+	// 3. 已过期
+	dlExpired := seedLogWithChain(t, db, nil)
+	expiredToken, err := svc.CreateToken(dlExpired.ID, -time.Hour)
+	if err != nil {
+		t.Fatalf("创建过期令牌失败: %v", err)
+	}
+	if _, err := svc.InspectToken(expiredToken); !errors.Is(err, ErrConfirmTokenExpired) {
+		t.Fatalf("过期令牌应返回 ErrConfirmTokenExpired，实际 %v", err)
+	}
+
+	// 4. 不存在
+	if _, err := svc.InspectToken("nonexistent-token"); !errors.Is(err, ErrConfirmTokenInvalid) {
+		t.Fatalf("不存在令牌应返回 ErrConfirmTokenInvalid，实际 %v", err)
+	}
+
+	// 5. 对应日志已删除
+	dlDeleted := seedLogWithChain(t, db, nil)
+	delToken, err := svc.CreateToken(dlDeleted.ID, time.Hour)
+	if err != nil {
+		t.Fatalf("创建令牌失败: %v", err)
+	}
+	db.Unscoped().Delete(&models.DeliveryLog{}, dlDeleted.ID)
+	if _, err := svc.InspectToken(delToken); !errors.Is(err, ErrConfirmLogMissing) {
+		t.Fatalf("日志已删除应返回 ErrConfirmLogMissing，实际 %v", err)
+	}
+}

@@ -59,6 +59,42 @@ func (s *ConfirmService) CreateToken(deliveryLogID uint, ttl time.Duration) (str
 	return token, nil
 }
 
+// InspectToken 查询令牌状态并返回对应的投递日志（不消费令牌）。
+//
+// 令牌已使用时返回 ErrConfirmTokenUsed 与日志（便于渲染已确认页）；
+// 令牌不存在返回 ErrConfirmTokenInvalid；已过期返回 ErrConfirmTokenExpired；
+// 对应日志已被清理返回 ErrConfirmLogMissing。
+func (s *ConfirmService) InspectToken(token string) (*models.DeliveryLog, error) {
+	var ct models.ConfirmToken
+	if err := s.DB.First(&ct, "token = ?", token).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrConfirmTokenInvalid
+		}
+		return nil, err
+	}
+
+	if ct.UsedAt != nil {
+		var dl models.DeliveryLog
+		if err := s.DB.First(&dl, ct.DeliveryLogID).Error; err == nil {
+			return &dl, ErrConfirmTokenUsed
+		}
+		return nil, ErrConfirmTokenUsed
+	}
+	if time.Now().After(ct.ExpiresAt.Time) {
+		return nil, ErrConfirmTokenExpired
+	}
+
+	var dl models.DeliveryLog
+	if err := s.DB.First(&dl, ct.DeliveryLogID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrConfirmLogMissing
+		}
+		return nil, err
+	}
+
+	return &dl, nil
+}
+
 // ConsumeToken 消费一个令牌，成功时标记 used_at 并把该链的日志标为已确认。
 //
 // 并发点击只有一次真正生效：used_at 用带 `used_at IS NULL` 条件的原子 UPDATE 写入，
