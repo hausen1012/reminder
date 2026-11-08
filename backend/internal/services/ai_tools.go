@@ -12,11 +12,7 @@ import (
 	"github.com/reminder/backend/internal/models"
 )
 
-// ai_tools 定义暴露给模型的工具，以及只读工具的执行逻辑。
-//
-// 写操作（创建通道 / 创建、修改、删除提醒）一律不直接落库：
-// 工具只生成一条 AIAction 草稿，由用户在前端点确认后才真正执行。
-// 这样模型误解意图时不会静默改动数据，也不会绕过服务层的校验。
+// ai_tools 定义暴露给模型的工具；写操作只生成 AIAction 草稿，不直接落库。
 
 // toolDefinition 是工具的 schema 与执行函数。
 type toolDefinition struct {
@@ -24,10 +20,7 @@ type toolDefinition struct {
 	run  func(ctx context.Context, input json.RawMessage) (string, error)
 }
 
-// 开启「需要确认」但模型没给重发参数时的兜底值，与提醒表单的默认值一致。
-//
-// 用户常说「这个提醒需要确认」而不提间隔与次数；工具层补默认值比让服务层
-// 报「重发间隔最小 60 秒」更符合预期，模型也不用猜。
+// 开启「需要确认」但模型没给重发参数时的兜底值，与提醒表单默认值一致。
 const (
 	defaultConfirmRetryIntervalSec = 300
 	defaultConfirmMaxRetries       = 3
@@ -256,8 +249,7 @@ func (s *AIService) toolCreateReminder(_ context.Context, raw json.RawMessage) (
 		return "", errors.New("channel_ids 不能为空：请先调用 list_channels 选择通道")
 	}
 	normalizeConfirmParams(&in)
-	// 提前跑一遍服务层校验，让模型拿到明确错误后自行修正，而不是把
-	// 无法创建的草稿留给用户。
+	// 提前跑一遍服务层校验，让模型直接拿到错误并自行修正
 	if err := s.ReminderSvc.validate(&in); err != nil {
 		return "", err
 	}
@@ -266,8 +258,7 @@ func (s *AIService) toolCreateReminder(_ context.Context, raw json.RawMessage) (
 
 // toolUpdateReminder 生成一条修改提醒的待确认草稿。
 //
-// 用「现有值 + 提交字段」合并成完整入参：服务层 Update 是全量覆盖语义，
-// 直接把模型给的片段传进去会把未提及的字段清空。
+// 服务层 Update 是全量覆盖语义，因此用「现有值 + 提交字段」合并成完整入参。
 func (s *AIService) toolUpdateReminder(_ context.Context, raw json.RawMessage) (string, error) {
 	var patch map[string]any
 	if err := json.Unmarshal(raw, &patch); err != nil {
@@ -353,10 +344,7 @@ func (s *AIService) toolCreateChannel(_ context.Context, raw json.RawMessage) (s
 	return s.createAction("create_channel", "创建通道："+in.Name, in)
 }
 
-// createAction 落一条待确认操作，并把 draft_id 告诉模型。
-//
-// 措辞刻意强调"尚未生效"：如果不说明，模型容易回复"已创建"，
-// 用户会以为数据已经落库。
+// createAction 落一条待确认操作，并把 draft_id 告诉模型；措辞强调「尚未生效」。
 func (s *AIService) createAction(kind, summary string, payload any) (string, error) {
 	raw, err := json.Marshal(payload)
 	if err != nil {
@@ -383,11 +371,7 @@ func (s *AIService) createAction(kind, summary string, payload any) (string, err
 	}), nil
 }
 
-// normalizeConfirmParams 为「需要确认」的提醒补齐重发参数。
-//
-// 模型通常只会传 require_confirm=true，但服务层校验要求间隔 ≥60 秒、次数 ≥1，
-// 缺参数会让整个工具调用失败，模型往往改不明白。这里按表单默认值补齐：
-// 用户能接受的默认值，胜过一张建不出来的草稿。
+// normalizeConfirmParams 为「需要确认」的提醒补齐重发参数，避免生成建不出来的草稿。
 func normalizeConfirmParams(in *ReminderInput) {
 	if !in.RequireConfirm {
 		return

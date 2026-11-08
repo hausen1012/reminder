@@ -1,11 +1,6 @@
-// Package testutil 汇集各包测试共用的脚手架。
+// Package testutil 汇集各包测试共用的脚手架（仅被 *_test.go 引用）。
 //
-// 只被 *_test.go 引用，不会进入最终产物。
-// 集中到一处的原因：内存 SQLite 的建库参数、固定时区的构造方式各包都要用，
-// 之前 handlers / services / scheduler / models 各自抄了一份几乎相同的实现。
-//
-// models 包因导入方向（testutil → database → models）无法引用本包，
-// 其时间类型用例仍在包内自带一个建库辅助函数。
+// models 包因导入方向（testutil → database → models）无法引用本包，其用例自带建库辅助函数。
 package testutil
 
 import (

@@ -1,7 +1,4 @@
-// token 提供外部令牌鉴权的 Gin 中间件。
-//
-// 客户端通过 X-AUTH 请求头传递明文令牌，
-// 中间件验 sha256、限流后注入 token_id 到 gin.Context。
+// token 提供外部令牌鉴权的 Gin 中间件：客户端用 X-AUTH 传明文，验 sha256、限流后注入 token_id。
 package middleware
 
 import (
@@ -36,10 +33,7 @@ func NewRateLimiter() *RateLimiter {
 	return &RateLimiter{slots: make(map[uint]*rateSlot)}
 }
 
-// Allow 检查是否允许请求通过。
-// limitPerMinute = 每分钟最大请求数。
-//
-// 顺手清理已过窗口的空闲槽位，避免长期运行时 slots 只增不减。
+// Allow 检查是否允许请求通过；顺手清理已过窗口的槽位。
 func (rl *RateLimiter) Allow(keyID uint, limitPerMinute int) bool {
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
@@ -67,9 +61,7 @@ func (rl *RateLimiter) Allow(keyID uint, limitPerMinute int) bool {
 	return true
 }
 
-// tokenPrefix 返回令牌的前 8 个字符，用于在日志里区分是哪个令牌。
-//
-// 只留前缀不足以还原明文（令牌是 24 字节随机串），但足以判断"是不是同一个调用方"。
+// tokenPrefix 返回令牌前 8 位，足以区分调用方又不泄露明文。
 func tokenPrefix(key string) string {
 	if len(key) <= 8 {
 		return "***"
@@ -77,10 +69,7 @@ func tokenPrefix(key string) string {
 	return key[:8] + "…"
 }
 
-// TokenAuth 返回中间件。
-//
-// verify 接收明文返回 tokenID；toucher 可选更新 last_used_at；
-// limiter 为空时默认 60/min。
+// TokenAuth 返回中间件；limiter 为空时默认 60 次/分钟。
 func TokenAuth(verify TokenVerifier, toucher TokenToucher, limiter *RateLimiter) gin.HandlerFunc {
 	if limiter == nil {
 		limiter = NewRateLimiter()
@@ -97,7 +86,7 @@ func TokenAuth(verify TokenVerifier, toucher TokenToucher, limiter *RateLimiter)
 
 		tokenID, ok := verify(key)
 		if !ok {
-			// 只记令牌前缀，不记明文或哈希：日志本身不该成为凭据来源。
+			// 只记令牌前缀，不记明文或哈希
 			logger.FromContext(c.Request.Context()).Warn("外部令牌鉴权失败",
 				"path", c.Request.URL.Path, "reason", "令牌无效", "token_prefix", tokenPrefix(key))
 			c.AbortWithStatusJSON(http.StatusUnauthorized,

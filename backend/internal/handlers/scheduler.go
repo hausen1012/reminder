@@ -21,9 +21,7 @@ type HealthHandler struct {
 
 // Check GET /api/health
 //
-// 状态码本身即结论：数据库可连且调度器在运行时返回 200 + status=healthy，
-// 否则返回 503 + status=unhealthy。监控系统按 2xx/5xx 判断即可，
-// 不必解析响应体——之前这里无论内部状态如何都回 200 healthy，等于健康检查失效。
+// 状态码即结论：数据库可连且调度器运行时返回 200 + healthy，否则 503 + unhealthy。
 func (h *HealthHandler) Check(c *gin.Context) {
 	dbAlive := false
 	if h.DB != nil {

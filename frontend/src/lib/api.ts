@@ -54,19 +54,13 @@ api.interceptors.response.use(
 /**
  * 从 axios error 中提取服务端返回的提示文案。
  *
- * 后端所有错误出口（业务 handler / 鉴权中间件 / panic 恢复）都经由
- * `middleware.ErrorBody` 渲染，统一格式为：
- *
- *   { "error": { "code": "not_found", "message": "提醒不存在", "field": "title" } }
- *
- * 正常路径读取 `data.error.message`。
+ * 后端错误统一为 { "error": { "code", "message", "field"? } }，取 `data.error.message`。
  */
 export function extractApiError(err: unknown, fallback = '操作失败'): string {
   const data: unknown = (err as { response?: { data?: unknown } })?.response?.data
   if (data && typeof data === 'object') {
     const obj = data as Record<string, unknown>
 
-    // 统一格式：{ error: { code, message, field? } }
     if (obj.error && typeof obj.error === 'object') {
       const errObj = obj.error as Record<string, unknown>
       if (typeof errObj.message === 'string' && errObj.message) return errObj.message

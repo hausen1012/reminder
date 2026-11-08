@@ -1,12 +1,5 @@
-// vars 构建一次触发的模板变量 map。
-//
-// 设计文档 §6.3 列出的内置变量：
-//   - now / now_date / now_time
-//   - fire_at  （触发计划时间，便于补漏场景与现在时间区分）
-//   - title / content     提醒标题与原始内容
-//   - lunar_date          当前公历日期对应的农历串
-//   - reminder_id / reminder_source
-//   - confirm_url         需要确认的提醒由 dispatch 注入
+// vars 构建一次触发的模板变量 map（now / fire_at / title / content / lunar_date /
+// reminder_id / reminder_source 等，confirm_url 由 dispatch 注入）。
 package services
 
 import (
@@ -20,10 +13,7 @@ import (
 
 var weekdays = []string{"周日", "周一", "周二", "周三", "周四", "周五", "周六"}
 
-// buildVars 构造一次触发渲染用的变量 map。
-//
-// firedAt 是真实开始执行 dispatch 的时间；planned 是计划触发时间。
-// loc 是配置时区，用于格式化展示。
+// buildVars 构造一次触发的渲染变量；firedAt 是实际投递时间，planned 是计划触发时间。
 func buildVars(r *models.Reminder, firedAt, planned time.Time, loc *time.Location) map[string]string {
 	if loc == nil {
 		loc = time.Local
@@ -49,20 +39,11 @@ func buildVars(r *models.Reminder, firedAt, planned time.Time, loc *time.Locatio
 	return vars
 }
 
-// buildRenderedMessage 是渲染提醒内容的唯一入口。
+// buildRenderedMessage 是渲染提醒内容的唯一入口：渲染 body 后写回 vars["content"]，
+// 保证下游（尤其 Webhook 模板）拿到的是展开后的内容。
 //
-// 要点（也是常被遗漏的坑）：
-//  1. 用 vars 渲染 body（展开 {{now_date}} {{lunar_date}}  占位符）
-//  2. 用渲染后的 body 覆盖 vars["content"]，
-//     保证下游各通道（尤其是 Webhook BodyTemplate）中的 {{content}} 拿到的是渲染结果而非原始模板
-//  3. 渲染结束后 vars 是最终态，所有后续的二次渲染（如 Webhook 的 body_template 二次渲染）
-//     都基于这套 vars
-//
-// 除两处例外，所有构造 notifier.Message 的调用方都应走此函数，不要手拼 notifier.Message{}：
-//   - DispatchService.Run：需要先注入 confirm_url、把确认链接追加到正文之后再渲染
-//   - ChannelService.DryRun：纯试发，没有确认链，变量集也不同
-//
-// 这两处若改用本函数，会改变渲染顺序或引入不相关的占位符，属于有意保留的分叉。
+// 例外：DispatchService.Run（需先注入 confirm_url）与 ChannelService.DryRun（纯试发）
+// 自行构造 Message，是有意保留的分叉。
 func buildRenderedMessage(title, content, contentFormat string, vars map[string]string) notifier.Message {
 	body := notifier.Render(content, vars)
 	vars["content"] = body
@@ -74,7 +55,7 @@ func buildRenderedMessage(title, content, contentFormat string, vars map[string]
 	}
 }
 
-// formatLunar 把公历时间转成"农历xxxx年x月初x"中文串，方便用户阅读。
+// formatLunar 把公历时间转成「农历xxxx年x月初x」中文串。
 func formatLunar(t time.Time) string {
 	sol := calendar.NewSolarFromYmd(t.Year(), int(t.Month()), t.Day())
 	lun := calendar.NewLunarFromSolar(sol)

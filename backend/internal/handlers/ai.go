@@ -91,9 +91,8 @@ func (h *AIHandler) Chat(c *gin.Context) {
 
 // ChatStream POST /api/ai/chat/stream
 //
-// 用 SSE 推送「思考中 / 正在重试 / 完成」状态。刻意不流式输出 token：
-// 本系统的助手要跑多轮工具调用，逐字回放价值有限，却要改造两套厂商协议；
-// 而重试与工具执行恰恰是用户等待最久、最需要被告知在做什么的阶段。
+// 用 SSE 推送「思考中 / 正在重试 / 完成」状态，不流式输出 token：
+// 真正让人干等的是重试与工具执行。
 //
 // 事件格式（每条 data 都是一行 JSON）：
 //
@@ -102,8 +101,7 @@ func (h *AIHandler) Chat(c *gin.Context) {
 //	event: done    data: {"reply":"...","actions":[...],"retries":1}
 //	event: error   data: {"code":"validation_failed","message":"..."}
 //
-// 注意：一旦开始写 SSE，就不能再走 abortErr —— 那会追加一个 JSON 响应体，
-// 前端会把它当成事件流解析失败。所以错误也走 event: error。
+// 一旦开始写 SSE 就不能再走 abortErr（那会追加 JSON 响应体），错误也走 event: error。
 func (h *AIHandler) ChatStream(c *gin.Context) {
 	var in services.ChatInput
 	if err := c.ShouldBindJSON(&in); err != nil {
@@ -115,8 +113,7 @@ func (h *AIHandler) ChatStream(c *gin.Context) {
 	c.Header("Content-Type", "text/event-stream; charset=utf-8")
 	c.Header("Cache-Control", "no-cache")
 	c.Header("Connection", "keep-alive")
-	// 关掉 nginx 一类反代的缓冲，否则事件会被攒到结束才一次性吐出，
-	// 「状态流」就退化成了「事后一次性返回」。
+	// 关掉反代缓冲，否则状态事件会被攒到结束才一次性吐出
 	c.Header("X-Accel-Buffering", "no")
 	c.Status(http.StatusOK)
 

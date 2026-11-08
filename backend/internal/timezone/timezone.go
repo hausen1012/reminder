@@ -1,10 +1,7 @@
-// Package timezone 提供可在运行时修改的站点时区。
+// Package timezone 提供可在运行时修改的站点时区（config 表 key=timezone，设置页改完热更新）。
 //
-// 站点时区保存在 config 表（key=timezone）中，启动时覆盖环境变量 TIMEZONE；
-// 在设置页修改后通过 Provider.Set 热更新，无需重启进程。
-//
-// 之所以需要这一层而不是直接传 *time.Location：调度器、投递、确认重发
-// 等处都要按"当前站点时区"解释本地时间字符串，跑起来之后时区仍可能变。
+// 调度、投递、确认重发都要按「当前站点时区」解释本地时间，而时区运行期可变，
+// 因此用 Provider 而非直接传 *time.Location。
 package timezone
 
 import (
@@ -23,8 +20,7 @@ type Provider struct {
 	loc  *time.Location
 }
 
-// New 用给定名字构造 Provider；名字为空或无效时回退到 Fallback，
-// Fallback 本身也解析不出来（镜像缺 tzdata）时退到 UTC。
+// New 用给定名字构造 Provider；名字为空或无效时回退到 Fallback（镜像缺 tzdata 时退到 UTC）。
 func New(name string) *Provider {
 	p := &Provider{}
 	if name == "" || p.Set(name) != nil {

@@ -1,11 +1,7 @@
-// ai_service 负责 AI 助手的设置、工具编排与"待确认操作"的落库与应用。
+// ai_service 负责 AI 助手的设置、工具编排与「待确认操作」的落库与应用。
 //
-// 设计要点：
-//  1. 厂商无关：对话协议由 internal/llm 的 Provider 适配，这里是编排层；
-//  2. 写操作不直接生效：工具只生成 AIAction 草稿，用户确认后才调用既有服务；
-//  3. 对话本身不入库：助手是面板右下角的浮动工具，聊天记录只存在于浏览器
-//     （sessionStorage），刷新页面能续上，关掉标签页就散——不占数据库、不积累隐私；
-//     落库的只有待确认草稿（安全机制本身）与加密后的 API Key。
+// 写操作不直接生效：工具只生成 AIAction 草稿，用户确认后才调用既有服务。
+// 对话本身不入库，落库的只有待确认草稿与加密后的 API Key。
 package services
 
 import (
@@ -32,9 +28,7 @@ import (
 
 // AI 设置在 config 表中的键名。
 //
-// 前缀 ai_ 与站点配置（app_name / timezone 等）区分开；
-// 这些键不通过 /api/config 暴露，改用 /api/ai/settings 读写，
-// 以免通用配置接口把密钥带出去。
+// ai_ 前缀与站点配置区分开；这些键不走 /api/config，改用 /api/ai/settings 读写。
 const (
 	KeyAIEnabled  = "ai_enabled"
 	KeyAIProvider = "ai_provider"
@@ -48,31 +42,20 @@ const (
 	KeyAIMaxRetries = "ai_max_retries"
 )
 
-// chatMaxTokens 是单次回复的输出上限（厂商的 max_tokens）。
-//
-// 它不是用户可调设置：总上下文窗口由模型本身固定，max_tokens 只限制单次输出的长度，
-// 暴露到设置页只会让人误以为能扩大上下文。4096 足够一轮工具调用与一段总结。
+// chatMaxTokens 是单次回复的输出上限（厂商的 max_tokens），不可配置。
 const chatMaxTokens = 4096
 
 // AI 调用的默认与边界值。
 const (
 	// defaultMaxRetries 是接口失败后的默认重试次数。
-	//
-	// 限流（429）与服务端 5xx 是常见的临时故障，多试几次通常能过；
-	// 10 次配合指数退避，最坏等待在 20 秒量级，仍在面板请求超时内。
 	defaultMaxRetries = 10
 	maxMaxRetries     = 100
 )
 
-// maxToolRounds 是单次对话里工具调用的最大轮数。
-//
-// 模型偶尔会陷入"查一遍、再查一遍"的循环，有上限才能保证请求必然结束。
+// maxToolRounds 是单次对话里工具调用的最大轮数，防止模型陷入循环。
 const maxToolRounds = 8
 
 // maxHistoryTurns 是客户端回灌的历史消息条数上限。
-//
-// 历史由前端持有并随请求上传，这里只做上限裁剪：
-// 超长历史既费 token，也会让模型纠结于早已失效的 id。
 const maxHistoryTurns = 30
 
 // AIService 提供 AI 助手的设置、工具执行与草稿管理。
@@ -82,8 +65,7 @@ type AIService struct {
 	TZ          *timezone.Provider
 	ReminderSvc *ReminderService
 	ChannelSvc  *ChannelService
-	// providerOverride 仅供测试注入 fake，避免真实网络调用；
-	// 生产路径每次请求都按当前设置构造 provider，保证设置页改完立即生效。
+	// providerOverride 仅供测试注入 fake。
 	providerOverride llm.Provider
 }
 
@@ -421,10 +403,7 @@ func (s *AIService) fetchAnthropicModels(ctx context.Context, cfg *aiConfig) ([]
 	return models, nil
 }
 
-// ChatMessage 是客户端回传的一轮历史消息。
-//
-// 只保留角色与文本：工具调用过程不需要跨请求回放，
-// 单次请求内的工具循环在服务端内存里完整构造。
+// ChatMessage 是客户端回传的一轮历史消息，只保留角色与文本。
 type ChatMessage struct {
 	Role    string `json:"role"` // user | assistant
 	Content string `json:"content"`
@@ -433,9 +412,9 @@ type ChatMessage struct {
 // ChatInput 是一次对话的入参。
 type ChatInput struct {
 	Message string `json:"message"`
-	// History 是客户端持有的此前对话（不含本次 message），用于多轮上下文。
+	// History 是客户端持有的此前对话（不含本次 message）。
 	History []ChatMessage `json:"history,omitempty"`
-	// Model 允许客户端临时指定或切换本次对话使用的模型。留空时使用全局已保存的模型。
+	// Model 临时覆盖本次对话使用的模型，留空用设置值。
 	Model string `json:"model,omitempty"`
 }
 
@@ -444,7 +423,7 @@ type ChatResult struct {
 	Reply string `json:"reply"`
 	// Actions 是本轮生成的待确认草稿。
 	Actions []models.AIAction `json:"actions"`
-	// Retries 是本次对话中因临时性失败而重试的总次数（所有工具轮次累加）。
+	// Retries 是本次对话因临时性失败重试的总次数。
 	Retries int `json:"retries"`
 }
 
@@ -456,18 +435,13 @@ const (
 	ChatEventError  = "error"
 )
 
-// ChatStatus 是「我们在干什么」的状态快照。
-//
-// 面板只需要一句人话，不需要模型内部细节：phase 用于前端区分样式，
-// text 直接展示给用户。
+// ChatStatus 是对话过程的进度快照。
 type ChatStatus struct {
 	Phase string `json:"phase"` // thinking | tools
 	Text  string `json:"text"`
 }
 
 // ChatRetry 是一次即将开始的重试。
-//
-// DelayMs 是接下来会等待的退避时长，前端可以据此显示倒计时。
 type ChatRetry struct {
 	Attempt int    `json:"attempt"`
 	Max     int    `json:"max"`
@@ -477,21 +451,15 @@ type ChatRetry struct {
 
 // ChatEventSink 接收对话过程中的状态事件。
 //
-// 回调在请求的 goroutine 里同步执行，实现必须立即返回：
-// 它阻塞多久，对话就暂停多久。sink 为 nil 时所有事件被丢弃。
+// 回调在请求的 goroutine 里同步执行，实现必须立即返回；sink 为 nil 时事件被丢弃。
 type ChatEventSink func(event string, data any)
 
 // Chat 处理一次用户输入：拼历史 → 跑工具循环 → 返回回复与草稿。
-//
-// 服务端不保存对话：history 由前端上传，接口本身无状态。
 func (s *AIService) Chat(ctx context.Context, in ChatInput) (*ChatResult, error) {
 	return s.ChatStream(ctx, in, nil)
 }
 
 // ChatStream 与 Chat 相同，但会把过程中的状态事件推给 sink。
-//
-// 分成两层是为了让「状态流」只是可选装饰：老接口与非流式调用不关心进度，
-// 传 nil 即可，编排逻辑只有一份。
 func (s *AIService) ChatStream(ctx context.Context, in ChatInput, sink ChatEventSink) (*ChatResult, error) {
 	emit := func(event string, data any) {
 		if sink != nil {
@@ -554,7 +522,7 @@ func (s *AIService) ChatStream(ctx context.Context, in ChatInput, sink ChatEvent
 	var success bool
 	defer func() {
 		if !success && len(createdIDs) > 0 {
-			// 对话因报错（如模型 429、网络超时等）未正常结束，回滚清理本轮生成的草稿，避免变成孤儿待确认记录
+			// 对话异常结束，清理本轮草稿，避免留下孤儿待确认记录
 			if delErr := s.DB.Where("id IN ?", createdIDs).Delete(&models.AIAction{}).Error; delErr != nil {
 				logger.FromContext(ctx).Error("清理未完成对话的 AI 草稿失败", "error", delErr, "ids", createdIDs)
 			}
@@ -587,9 +555,6 @@ func (s *AIService) ChatStream(ctx context.Context, in ChatInput, sink ChatEvent
 			})
 		})
 		if err != nil {
-			// 失败时把「用户问了什么」一起记下来：只记错误字符串时，
-			// 事后没法复现是哪类提问触发了限流或参数错误。
-			// 上游状态码 / 响应体由 ErrorAttrs 展开，它们是判断 429 还是 400 的依据。
 			log.Warn("AI 对话结束：调用失败", llm.ErrorAttrsWith(err,
 				"round", rounds, "retries", retries, "tool_rounds_limit", maxToolRounds,
 				"turns", len(turns), "tools", len(tools),
@@ -648,8 +613,7 @@ func (s *AIService) ChatStream(ctx context.Context, in ChatInput, sink ChatEvent
 				createdIDs = append(createdIDs, id)
 			}
 		}
-		// 工具轮次的明细属于 Debug：正常运行一次对话可能跑好几轮，
-		// 每轮一条 Info 会把日志刷满。失败信息在上面那条 Warn 里已经落过。
+		// 工具轮次明细属于 Debug：一次对话可能跑好几轮，每轮一条 Info 会刷满日志。
 		log.Debug("AI 工具轮次完成",
 			"round", rounds, "tools", toolNames, "errors", toolErrs,
 			"drafts", len(createdIDs))
@@ -674,8 +638,7 @@ func (s *AIService) ChatStream(ctx context.Context, in ChatInput, sink ChatEvent
 		return nil, err
 	}
 	success = true
-	// 每次对话一条汇总：问了什么、跑了几轮、重试几次、生成了几个草稿。
-	// 排查「AI 没按要求干活」时，这条比逐轮打点有用得多。
+	// 每次对话一条汇总，排查「AI 没按要求干活」时先看这条。
 	log.Info("AI 对话完成",
 		"rounds", rounds, "retries", retries, "drafts", len(createdIDs),
 		"truncated", truncated, "reply_len", len([]rune(replyText)),
@@ -696,17 +659,10 @@ func (s *AIService) ListActions(status string) ([]models.AIAction, error) {
 	return rows, nil
 }
 
-// ActionRetention 是 AI 草稿的保留期。
-//
-// 草稿是「确认后才生效」的机制载体，但执行完的记录没有长期价值：
-// 真正的结果在 reminders / channels 里，草稿只用于展示与追溯。
-// 90 天足够覆盖任何合理的"放着过几天再确认"，再久就是垃圾。
+// ActionRetention 是 AI 草稿的保留期，按创建时间计算。
 const ActionRetention = 90 * 24 * time.Hour
 
-// PurgeActions 删除创建时间早于保留期的草稿，返回删除行数。
-//
-// 待确认（pending）也一并清理：放了 90 天还没人点的草稿，
-// 要么是用户忘了，要么对应的提醒/通道早已变化，留着只会让角标永远挂着数字。
+// PurgeActions 删除创建时间早于保留期的草稿，返回删除行数；待确认的也一并清理。
 func (s *AIService) PurgeActions(olderThan time.Duration) (int64, error) {
 	if olderThan <= 0 {
 		return 0, nil
@@ -873,10 +829,7 @@ func (s *AIService) failAction(act *models.AIAction, err error) error {
 	return err
 }
 
-// markAction 更新操作状态。
-//
-// 写库失败只记日志：调用方已经在处理业务结果，不该因为状态回写失败
-// 再抛一个错误掩盖真正原因。
+// markAction 更新操作状态；写库失败只记日志，不覆盖调用方的业务错误。
 func (s *AIService) markAction(act *models.AIAction, status, errMsg, ref string) {
 	updates := map[string]any{"status": status}
 	if errMsg != "" {
@@ -899,8 +852,7 @@ func (s *AIService) markAction(act *models.AIAction, status, errMsg, ref string)
 
 // historyTurns 把客户端回传的历史消息裁剪并转成对话轮次。
 //
-// 只保留最近 maxHistoryTurns 条，并丢弃非法角色：前端数据不可信，
-// 但这里不报错——历史的格式问题不该让整轮对话失败。
+// 只保留最近 maxHistoryTurns 条，非法角色与空内容按前端数据不可信处理，直接丢弃。
 func historyTurns(history []ChatMessage) []llm.Turn {
 	if len(history) > maxHistoryTurns {
 		history = history[len(history)-maxHistoryTurns:]
@@ -920,16 +872,10 @@ func historyTurns(history []ChatMessage) []llm.Turn {
 	return out
 }
 
-// maxCustomPromptRunes 是自定义提示词的字数上限。
-//
-// 提示词会随每一轮工具调用重复发送，过长会显著抬高 token 成本；
-// 4000 字足够写下详细的回复风格与业务约定。
+// maxCustomPromptRunes 是自定义提示词的字数上限；提示词会随每轮工具调用重复发送。
 const maxCustomPromptRunes = 4000
 
 // SystemPrompt 返回当前生效的完整系统提示词（内置规则 + 用户追加内容）。
-//
-// 追加内容放在内置规则之后：内置规则包含工具使用与待确认机制等硬性约束，
-// 让它们优先出现在上下文中，减少被自定义内容的花式指令覆盖的可能。
 func (s *AIService) SystemPrompt() (string, error) {
 	kv, err := s.configMap()
 	if err != nil {
@@ -938,13 +884,7 @@ func (s *AIService) SystemPrompt() (string, error) {
 	return s.systemPrompt(kv[KeyAIPrompt]), nil
 }
 
-// systemPrompt 构造系统提示。
-//
-// 当前时间与时区必须写进去：模型不知道"明天九点"对应哪一天，
-// 也不知道站点时区，写错时间是最常见的失败。
-//
-// custom 是用户在设置页填写的追加提示词，可为空：
-// 它只追加风格与偏好，不能绕过上面列出的硬性规则。
+// systemPrompt 构造系统提示；自定义内容排在硬性规则之后，避免覆盖内置约束。
 func (s *AIService) systemPrompt(custom string) string {
 	now := time.Now().In(s.TZ.Get())
 	base := fmt.Sprintf(`你是 Reminder 自托管提醒系统的助手，帮助用户用自然语言管理提醒与通知通道。
@@ -998,9 +938,7 @@ func parseMaxRetries(raw string) int {
 	return n
 }
 
-// normalizeMaxRetries 校验并归一化入参里的重试次数。
-//
-// nil（未传）用默认值；显式传 0 表示「不重试」，是合法设置。
+// normalizeMaxRetries 校验并归一化重试次数；nil 表示未传，用默认值。
 func normalizeMaxRetries(n *int) (int, error) {
 	if n == nil {
 		return defaultMaxRetries, nil
@@ -1014,8 +952,7 @@ func normalizeMaxRetries(n *int) (int, error) {
 
 // resolveConfig 合并入参与库中设置，得到可用的配置。
 //
-// 入参里的 api_key 为空或占位符时回落到库中已保存的密钥；
-// 这样"测试连接"可以在不重新输入密钥的情况下复用现有配置。
+// 入参的 api_key 为空或占位符时回落到库中已保存的密钥，便于「测试连接」复用现有配置。
 func (s *AIService) resolveConfig(in AISettingsInput) (*aiConfig, error) {
 	kv, err := s.configMap()
 	if err != nil {
@@ -1050,8 +987,7 @@ func (s *AIService) resolveConfig(in AISettingsInput) (*aiConfig, error) {
 	if in.Enabled {
 		cfg.Enabled = true
 	}
-	// 入参的 max_retries 只有显式传入（非 nil）才覆盖：
-	// TestConnection / FetchModels 这些内部调用不带该字段，不能因此把重试改成默认之外的语义。
+	// 只有显式传入才覆盖，TestConnection / FetchModels 不带该字段
 	if in.MaxRetries != nil {
 		cfg.MaxRetries = *in.MaxRetries
 	}
@@ -1087,9 +1023,6 @@ func newProvider(cfg *aiConfig) (llm.Provider, error) {
 }
 
 // configMap 读取 ai_ 前缀的设置。
-//
-// 不用 LIKE 'ai\_%'：SQLite 的 LIKE 默认没有 ESCAPE 子句，反斜杠不转义，
-// substr 写法在两种 SQL 方言下行为一致。
 func (s *AIService) configMap() (map[string]string, error) {
 	var rows []models.Config
 	if err := s.DB.Where("substr(key, 1, 3) = ?", "ai_").Find(&rows).Error; err != nil {

@@ -12,14 +12,11 @@ import (
 	"time"
 )
 
-// textHandler 输出 new-api 风格的单行日志：
+// textHandler 输出单行日志：
 //
 //	[INFO] 2026/11/07 - 20:31:39 | 7bc69bc7850af4d0 | 开始投递 reminder=12 log=34 title=喝水
 //
-// 相比 slog 默认的 TextHandler，做了三处取舍：
-//   - request_id 单独占一列：一次请求的多条日志能直接对上，不用在 kv 里找；
-//   - 字段值不加引号（除非含空白或特殊字符）：默认格式会给每个字符串都套引号；
-//   - 源码位置只在 Warn 及以上输出：INFO 是业务节点，位置信息纯属噪音。
+// request_id 单独成列；值含空白时才加引号；源码位置只在 Warn 及以上输出。
 type textHandler struct {
 	mu        *sync.Mutex
 	w         io.Writer
@@ -29,9 +26,7 @@ type textHandler struct {
 	group     string
 }
 
-// newTextHandler 构造文本 handler。
-//
-// opts.Level 为空时按 Info 处理，与 slog 默认值保持一致。
+// newTextHandler 构造文本 handler；opts.Level 为空时按 Info 处理。
 func newTextHandler(w io.Writer, opts *slog.HandlerOptions) *textHandler {
 	h := &textHandler{mu: &sync.Mutex{}, w: w, level: slog.LevelInfo}
 	if opts != nil {
@@ -48,9 +43,7 @@ func (h *textHandler) Enabled(_ context.Context, level slog.Level) bool {
 	return level >= h.level.Level()
 }
 
-// WithAttrs 返回带预置字段的新 handler。
-//
-// 拷贝结构体但共享同一个互斥锁指针，保证并发写不交错。
+// WithAttrs 返回带预置字段的新 handler，共享同一个互斥锁保证并发写不交错。
 func (h *textHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
 	if len(attrs) == 0 {
 		return h
@@ -60,10 +53,7 @@ func (h *textHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
 	return &nh
 }
 
-// WithGroup 返回带分组前缀的新 handler。
-//
-// 本项目的日志不使用分组；这里实现成「key 加前缀」，
-// 以免某个依赖调用 WithGroup 后字段被静默丢弃。
+// WithGroup 把 group 作为字段前缀；本项目不用分组，但实现它以免依赖调用后字段被丢弃。
 func (h *textHandler) WithGroup(name string) slog.Handler {
 	if name == "" {
 		return h
@@ -160,9 +150,7 @@ func levelLabel(l slog.Level) string {
 	}
 }
 
-// writeValue 写字段值。
-//
-// 含空白、引号或等号的值加引号，避免和后面的 kv 混在一起读不出来。
+// writeValue 写字段值；含空白、引号或等号的值加引号，避免与后面的 kv 混在一起。
 func writeValue(b *strings.Builder, v slog.Value) {
 	switch v.Kind() {
 	case slog.KindString:
@@ -187,10 +175,7 @@ func writeValue(b *strings.Builder, v slog.Value) {
 	}
 }
 
-// sourceOf 返回缩短后的源码位置（internal/xxx.go:42）。
-//
-// 与 slog 默认的 FILE:LINE 相比，这里保留 internal/ 之后的相对路径：
-// 部署机器上绝对路径没有意义，而且会把一行日志撑得很长。
+// sourceOf 返回缩短后的源码位置（internal/xxx.go:42）：部署机器上的绝对路径没有意义。
 func sourceOf(r slog.Record) string {
 	if r.PC == 0 {
 		return ""

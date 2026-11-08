@@ -1,12 +1,7 @@
-// Package notifier 定义通知通道的统一接口与所有具体实现。
+// Package notifier 定义通知通道的统一接口与各通道实现。
 //
-// 每个 Notifier 接收一个 Channel 配置和一段渲染后的消息（Subject + Body），
-// 内部按各自协议把消息发出去。
-//
-// 错误约定：
-//   - 返回 nil 表示成功；
-//   - 返回 ErrPermanent 表示该错误不应该重试（鉴权失败、参数错误、对端业务码 != 0 等）；
-//   - 返回任意其他 error 表示可重试（网络、超时、5xx 等）。
+// 错误约定：nil 表示成功；包装 ErrPermanent 表示不应重试（鉴权失败、参数错误、对端业务码非 0）；
+// 其他 error 表示可重试（网络、超时、5xx）。
 package notifier
 
 import (
@@ -15,7 +10,7 @@ import (
 	"fmt"
 )
 
-// ErrPermanent 是哨兵错误，包装真实错误后表示"不要重试"。
+// ErrPermanent 包装真实错误后表示「不要重试」。
 var ErrPermanent = errors.New("permanent error")
 
 // Permanent 把任意 err 包装成永久错误，dispatch 看到 ErrPermanent 不再重试。
@@ -31,10 +26,7 @@ func IsPermanent(err error) bool {
 	return errors.Is(err, ErrPermanent)
 }
 
-// Message 是渲染后的消息体。
-//
-// Subject 在某些通道（如 webhook）可能不被使用；Vars 仅在 webhook GET/POST
-// 模板二次渲染时被用到，其他通道通常用不到。
+// Message 是渲染后的消息体；Vars 供 webhook 模板二次渲染使用。
 type Message struct {
 	Subject string
 	Body    string
@@ -42,19 +34,15 @@ type Message struct {
 	Vars    map[string]string
 }
 
-// Notifier 是所有通道的统一发送接口。
-//
-// configJSON 是 Channel.Config 已经解密后的明文 JSON 字节流，由 ChannelService 准备。
+// Notifier 是所有通道的统一发送接口；configJSON 是已解密的通道配置。
 type Notifier interface {
 	Type() string
 	Send(ctx context.Context, configJSON []byte, msg Message) error
 }
 
-// Registry 把通道类型字符串映射到具体的 Notifier 实例。
+// Registry 把通道类型映射到 Notifier 实例。
 //
-// 新增通道类型时在本文件注册即可，dispatch 与 channel_service 都从这里查询。
-// 注意：Registration 的 key 必须与 ChannelService.validType 允许的类型、
-// 以及前端 ChannelType 完全一致，否则通道会在发送时报"未知通道类型"。
+// key 必须与 ChannelService 的类型校验和前端 ChannelType 完全一致。
 var Registry = map[string]Notifier{
 	"smtp":     &smtpNotifier{},
 	"dingtalk": &dingtalkNotifier{},

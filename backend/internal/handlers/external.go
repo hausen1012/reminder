@@ -1,10 +1,7 @@
-// external 处理外部 API v1 调用。
+// external 处理外部 API v1 调用，与面板共用 ReminderService，鉴权用令牌而非 JWT。
 //
-// 与面板使用的 ReminderHandler 共享 ReminderService，但鉴权使用令牌而非 JWT。
-// 提醒创建时强制 source=api，未指定通道时回退到 Key 的默认通道。
-//
-// 本文件只放接口实现：外部 API 的文档唯一来源是 docs-site/api/，
-// 改接口时同步改文档，不在代码里再维护一份内嵌 HTML。
+// 提醒创建时强制 source=api，未指定通道时回退到令牌的默认通道。
+// 外部 API 文档唯一来源是 docs-site/api/。
 package handlers
 
 import (

@@ -1,7 +1,4 @@
-// confirm 处理确认链接 GET /c/:token 的无认证页面。
-//
-// 用户点开链接后验证 token 有效性、标记已确认，并返回一个状态页面。
-// 该页面简单内嵌 HTML 字符串，不依赖模板引擎或前端构建。
+// confirm 处理确认链接 GET /c/:token：验证令牌、标记已确认，返回内嵌的 HTML 状态页。
 package handlers
 
 import (
@@ -19,9 +16,7 @@ import (
 // ConfirmHandler 处理确认链接。
 type ConfirmHandler struct {
 	Svc *services.ConfirmService
-	// TZ 是站点时区：确认页上的时间必须按站点时区展示。
-	// models.Time 一律以 UTC 落库，直接 Format 会让用户看到早 8 小时的时间。
-	// 为空时退回 time.Local（启动时已对齐到站点时区，仅损失运行期改时区的热更新）。
+	// TZ 是站点时区：models.Time 以 UTC 落库，直接 Format 会让用户看到偏移时间
 	TZ *timezone.Provider
 }
 
@@ -33,11 +28,9 @@ func (h *ConfirmHandler) loc() *time.Location {
 	return time.Local
 }
 
-// Confirm 处理 GET /c/:token
+// Confirm 处理 GET /c/:token。
 //
-// 幂等语义：重复点击（连点、浏览器预取、多设备同时打开）本质上是「已经处理过了」，
-// 不该给用户看一页红色「确认失败」。因此已使用的令牌渲染成功页并注明确认时间，
-// 只有真正无效 / 过期 / 日志已清理的情况才显示错误页。
+// 幂等：已使用的令牌渲染成功页并注明确认时间，只有无效 / 过期 / 日志已清理才显示错误页。
 func (h *ConfirmHandler) Confirm(c *gin.Context) {
 	token := c.Param("token")
 	if token == "" {
@@ -104,8 +97,7 @@ p{font-size:14px;color:#666;line-height:1.6}
 </html>`, escapeHTML(title), confirmedAt)
 }
 
-// confirmAlreadyPage 重复点击页：把「已被使用」渲染成中性的成功态，
-// 显示首次确认时间，让用户清楚「这件事已经处理过了」。
+// confirmAlreadyPage 重复点击页：把「已被使用」渲染成中性成功态并显示首次确认时间。
 func confirmAlreadyPage(dl *models.DeliveryLog, loc *time.Location) string {
 	title := "该提醒"
 	if dl.Title != "" {

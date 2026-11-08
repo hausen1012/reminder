@@ -37,21 +37,17 @@ type SetupResult struct {
 
 // applyMiddleware 装配全局中间件。
 //
-// 顺序是契约，不是随意排列：
+// 顺序是契约：
 //
-//	Recovery      → 兜住任何下游 panic，必须是第一个
-//	RequestID     → SlogLogger / ErrorHandler 都要读它，必须在其前
-//	CORS          → 必须在所有可能提前 Abort 的中间件之前。
-//	                 gin 的 c.AbortWithStatusJSON 会停止后续中间件执行，
-//	                 排在 CORS 之前的 BodyLimit 一旦拒绝请求，响应里就没有
-//	                 Access-Control-* 头，浏览器会把 413 当成不可读的跨域失败，
-//	                 前端只能显示「网络错误」而不是「请求过大」
-//	SlogLogger    → 记录访问日志，包括被 CORS 预检、BodyLimit 拦下的请求
-//	BodyLimit     → 读 body 前就拦住超大请求
-//	ErrorHandler  → 渲染 c.Error 里注册的 AppError，放在业务路由之前即可
+//	Recovery      → 兜住下游 panic，必须第一个
+//	RequestID     → SlogLogger / ErrorHandler 都要读它
+//	CORS          → 必须在 BodyLimit 之前：CORS 之后提前 Abort 的响应会缺
+//	                 Access-Control-* 头，浏览器把 413 当成不可读的跨域失败
+//	SlogLogger    → 记录访问日志，包括被拦截的请求
+//	BodyLimit     → 读 body 前拦住超大请求
+//	ErrorHandler  → 渲染 c.Error 里注册的 AppError
 //
-// 这里拆成独立函数，是为了让顺序能被单测直接断言（见 router/middleware_order_test.go）：
-// 之前 413 缺 CORS 头就是顺序写错导致的，光靠读代码不容易发现。
+// 拆成独立函数是为了让顺序能被单测断言（见 router/middleware_order_test.go）。
 func applyMiddleware(r *gin.Engine, cfg *config.Config) {
 	r.Use(gin.Recovery())
 	r.Use(middleware.RequestID())
@@ -70,9 +66,7 @@ func Setup(staticFS embed.FS, cfg *config.Config) (*SetupResult, error) {
 	// 中间件顺序集中在这里维护，顺序本身就是契约，改动前先读 applyMiddleware 的注释。
 	applyMiddleware(r, cfg)
 
-	// 默认 gin 信任所有代理头（X-Forwarded-For 可被任意客户端伪造）。
-	// 本项目的访问日志会记录 IP，若不作限制，日志里的来源 IP 毫无参考价值。
-	// 只有显式配置了 TRUSTED_PROXIES 才信任代理头，否则一律用 TCP 对端地址。
+	// gin 默认信任所有代理头。只有显式配置 TRUSTED_PROXIES 才信任，否则用 TCP 对端地址。
 	if err := r.SetTrustedProxies(cfg.TrustedProxies); err != nil {
 		slog.Warn("TRUSTED_PROXIES 配置非法，已忽略全部代理头", "value", cfg.TrustedProxies, "error", err)
 		_ = r.SetTrustedProxies(nil)
@@ -85,15 +79,12 @@ func Setup(staticFS embed.FS, cfg *config.Config) (*SetupResult, error) {
 	if err != nil {
 		return nil, fmt.Errorf("初始化 secretbox 失败: %w", err)
 	}
-	// 未配置 ENCRYPTION_KEY 时用的是编译进二进制的固定密钥，
-	// 数据库文件一旦泄漏，通道密码与令牌明文等同于明文暴露。
-	// 这不是启动错误（保持开箱即用），但必须让运维在日志里看到。
+	// 未配置 ENCRYPTION_KEY 时使用内置固定密钥，等同于明文；不是启动错误，但必须让运维看到。
 	if cfg.EncryptionKey == "" {
 		slog.Warn("ENCRYPTION_KEY 未配置，敏感字段使用内置固定密钥加密，等同于明文；生产环境请显式配置")
 	}
 
-	// 站点时区：先用环境变量 TIMEZONE 给出的默认值，随后由库里的设置覆盖。
-	// 这一层是可变引用，设置页改时区后所有服务立刻读到新值。
+	// 站点时区：先用环境变量默认值，随后由库里的设置覆盖；可变引用，改设置后立即生效
 	tz := timezone.New(cfg.Timezone)
 
 	channelSvc := services.NewChannelService(database.DB, box, tz)
@@ -123,9 +114,7 @@ func Setup(staticFS embed.FS, cfg *config.Config) (*SetupResult, error) {
 		slog.Error("调度器加载已有提醒失败", "error", err)
 	}
 
-	// 恢复重启前未完成的确认重发链。
-	// 内存里的定时器随进程消失，但链的轮次与时间都在库里；
-	// 不恢复的话，一个「需要确认」的提醒在重启后就只发一次，永远不再催。
+	// 恢复重启前未完成的确认重发链
 	if _, err := confirmMgr.RecoverChains(); err != nil {
 		slog.Error("恢复确认重发链失败，重启前的催办将不会继续", "error", err)
 	}
@@ -148,9 +137,7 @@ func Setup(staticFS embed.FS, cfg *config.Config) (*SetupResult, error) {
 		}
 	}
 
-	// 自动清理 AI 草稿：固定保留 90 天，不提供开关——
-	// 草稿没有长期价值（结果在 reminders / channels 里），
-	// 留着的唯一效果是让浮窗角标永远挂着数字。
+	// 自动清理 AI 草稿：固定保留 90 天，不提供开关
 	aiSvc := services.NewAIService(database.DB, box, tz, reminderSvc, channelSvc)
 	if _, err := engine.AddDailyJob("AI草稿清理", scheduler.DailyPurgeExpr, func() {
 		n, err := aiSvc.PurgeActions(services.ActionRetention)
@@ -230,7 +217,7 @@ func Setup(staticFS embed.FS, cfg *config.Config) (*SetupResult, error) {
 			channels.POST("", channelHandler.Create)
 			channels.GET("/:id", channelHandler.Get)
 			channels.PUT("/:id", channelHandler.Update)
-			channels.DELETE("/batch", channelHandler.BatchDelete) // 新增（放在 /:id 之前）
+			channels.DELETE("/batch", channelHandler.BatchDelete) // 必须放在 /:id 之前
 			channels.DELETE("/:id", channelHandler.Delete)
 			channels.PATCH("/:id/toggle", channelHandler.Toggle)
 			channels.POST("/test-dry", channelHandler.TestDryRun)
@@ -306,17 +293,11 @@ func Setup(staticFS embed.FS, cfg *config.Config) (*SetupResult, error) {
 	}, nil
 }
 
-// registerNotFound 给未命中的路由补上统一错误体。
-//
-// gin 默认返回纯文本 "404 page not found"，与后端「所有错误都是
-// {"error":{code,message,field?}}」的约定不一致，前端 extractApiError 读不到
-// message，只能退化成 "Request failed with status code 404"。
-// 这里只覆盖 /api 前缀：其余路径由静态文件中间件处理并已经 Abort，
-// 万一走到这里也保持 gin 原本的纯文本输出，避免改变既有行为。
+// registerNotFound 给 /api 下未命中的路由补上统一错误体（其余路径返回纯文本 404）。
 func registerNotFound(r *gin.Engine) {
 	r.NoRoute(func(c *gin.Context) {
 		if !strings.HasPrefix(c.Request.URL.Path, "/api") {
-			// 必须自己写 body：只设状态码时 gin 仍会补上默认的 404 文本
+			// 必须自己写 body：只设状态码时 gin 仍会补上默认文本
 			c.Data(http.StatusNotFound, "text/plain", []byte("404 page not found"))
 			return
 		}

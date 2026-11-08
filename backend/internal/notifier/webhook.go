@@ -15,8 +15,7 @@ import (
 
 // WebhookConfig 是通用 Webhook 通道的配置。
 //
-// Method=GET：subject/body/vars 一律按 query_template 拼到 query string；
-// Method=POST：直接把 body_template 渲染后作为请求体发送，Content-Type 默认 application/json。
+// GET 按 query_template 拼 query string；POST 把 body_template 渲染后作为请求体。
 type WebhookConfig struct {
 	Method           string            `json:"method"` // GET | POST
 	URL              string            `json:"url"`
@@ -107,13 +106,12 @@ func (n *webhookNotifier) Send(ctx context.Context, configJSON []byte, msg Messa
 		req.Header.Set("Authorization", cfg.AuthorizationEnc)
 	}
 
-	// 只记录 header 名，不记录取值：Authorization 等字段是解密后的凭据，
-	// 一旦写进日志就等于把 token 落到磁盘上。
+	// 只记 header 名不记取值，Authorization 是解密后的凭据
 	slog.Debug("Webhook 发送请求", "method", req.Method, "url", redactURL(req.URL), "header_keys", headerKeys(req.Header))
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		// 这里只抛错，dispatch 会带重试轮次与通道信息再记一次；重复记同一错误会淹没真正有用的那条
+		// 这里只返回错误，dispatch 会带重试轮次与通道信息统一记录
 		return fmt.Errorf("请求 Webhook 失败: %w", err)
 	}
 	defer resp.Body.Close()
@@ -131,12 +129,8 @@ func (n *webhookNotifier) Send(ctx context.Context, configJSON []byte, msg Messa
 
 // buildPostBody 构造 POST 请求体。
 //
-// 如果 BodyTemplate 是合法 JSON，先解析 JSON 树，再逐字符串值替换占位符，
-// 最后 json.Marshal 确保特殊字符正确转义。
-// 如果 BodyTemplate 不是 JSON 或为空，退回到整串渲染或默认 {subject, body} 结构。
-//
-// 注意：请求体里可能带 {{confirm_url}} 这类一次性凭据，函数内只记录长度，
-// 不把内容写进日志。
+// BodyTemplate 是合法 JSON 时按 JSON 树逐字符串渲染（保证转义正确），
+// 否则整串渲染或回退到默认的 {subject, body}。请求体可能含一次性凭据，只记录长度。
 func buildPostBody(bodyTemplate string, msg Message) ([]byte, error) {
 	if bodyTemplate == "" {
 		bodyBytes, _ := json.Marshal(map[string]string{"subject": msg.Subject, "body": msg.Body})

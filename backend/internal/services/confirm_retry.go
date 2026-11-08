@@ -1,7 +1,5 @@
-// confirm_retry 管理"需要确认"提醒的重发链。
-//
-// 当提醒触发后未被确认，按配置的间隔与最大次数持续重发；
-// 每次重发复用同一个 confirm_url token，任一时刻点击即终止整条链。
+// confirm_retry 管理「需要确认」提醒的重发链：未确认时按配置的间隔与次数持续重发，
+// 每次复用同一个令牌，任一时刻点击即终止整条链。
 package services
 
 import (
@@ -17,10 +15,8 @@ import (
 
 // ConfirmRetryManager 持有内存中的 chain_id → *time.Timer 映射。
 //
-// 定时器本身无法持久化，但确认链的状态在库里（delivery_logs.confirm_chain_id
-// + confirm_tokens）：进程重启后由 RecoverChains 按库里的轮次与上次发送时间
-// 重新排下一轮，因此「重启导致催办丢失」不再是取舍——除非进程在重启后
-// 再也没起来，那种情况下整个系统都已经停了。
+// 定时器不能持久化，但链的状态都在库里（delivery_logs.confirm_chain_id + confirm_tokens），
+// 进程重启后由 RecoverChains 重新排下一轮。
 type ConfirmRetryManager struct {
 	DB         *gorm.DB
 	Dispatch   *DispatchService
@@ -47,10 +43,8 @@ func NewConfirmRetryManager(db *gorm.DB, dispatch *DispatchService, confirmSvc *
 
 // Schedule 注册一轮重发。
 //
-// round 是已完成的轮次数（0 = 首次触发已发出，下次是第 1 次重发），
-// 因此这里判断的是「已经发满 maxRetries 轮就不再排下一轮」，条件是 round >= max。
-// 对应的 retry 入口用的是 round > max：它校验的是「当前这一轮是否超界」，
-// 两者相差 1 是语义不同（排下一轮 vs 执行本轮），不是笔误。
+// round 是已完成的轮次数（0 表示首次触发已发出），因此这里用 round >= max 判断是否已发满；
+// 对应的 retry 入口用 round > max（校验当前这一轮），差 1 是语义不同，不是笔误。
 func (m *ConfirmRetryManager) Schedule(r *models.Reminder, chainID string, round int) {
 	if round >= r.ConfirmMaxRetries {
 		slog.Info("跳过调度", "chain", chainID, "round", round, "max_retries", r.ConfirmMaxRetries)
@@ -61,9 +55,7 @@ func (m *ConfirmRetryManager) Schedule(r *models.Reminder, chainID string, round
 	m.scheduleAfter(r, chainID, round+1, delay)
 }
 
-// scheduleAfter 在 delay 之后执行第 round 轮重发（round 是即将执行的轮次）。
-//
-// 启动恢复用它安排「剩下的那部分间隔」，正常路径则由 Schedule 传入完整间隔。
+// scheduleAfter 在 delay 之后执行第 round 轮重发；启动恢复用它安排剩余的间隔。
 func (m *ConfirmRetryManager) scheduleAfter(r *models.Reminder, chainID string, round int, delay time.Duration) {
 	if delay < 0 {
 		delay = 0
@@ -111,29 +103,11 @@ func (m *ConfirmRetryManager) StopAll() {
 	}
 }
 
-// RecoverChains 在进程启动时重建未完成的重发链。
+// RecoverChains 在进程启动时重建未完成的重发链，返回恢复的链数量。
 //
-// 内存里的 *time.Timer 无法存活到重启之后，但链的状态都在库里：
-// 每条链的最新一条日志给出已发到第几轮（retry_round）与上次发送时间（fired_at）。
-// 恢复逻辑据此排出下一轮，并扣掉停机期间已经流逝的时间：
-//
-//   - 停机时间 < 重发间隔：再等「剩余间隔」；
-//   - 停机时间 >= 重发间隔：立即补一轮（与 sweeper 补漏的语义一致）。
-//
-// 三条筛选规则，都是「按链整体判断」而不是「按单条日志判断」：
-//
-//  1. 每个提醒只恢复最新那条链。确认链的语义是「只追踪最新的一轮」——
-//     每轮新触发都会取消旧链，用户点的也只会是最新消息里的链接。
-//     若把历史链一并恢复，重启后同一提醒会有多条催办链并发往手机上发。
-//  2. 链里只要有一条日志是 confirmed，整条链就作废。不能只看「最新一条的
-//     confirmed」：确认与重发之间存在竞态窗口，确认之后可能又插进一条
-//     confirmed=false 的重发日志，那不代表用户没处理过。
-//  3. 令牌已过期（或根本没有令牌）的链不恢复：链接点不开，催也没用。
-//
-// 就绪判断（是否已用尽、提醒是否还生效）仍然交给 retry：那里已有完整且被
-// 测试覆盖的终止条件，这里再判一遍只会多出一份可能漂移的规则。
-//
-// 返回恢复的链数量。
+// 依据每条链最新一轮的 retry_round 与 fired_at 排下一轮，扣掉停机期间流逝的时间。
+// 三条规则均按链整体判断：每个提醒只恢复最新那条链；链里任一日志已确认即整条作废
+// （确认与重发存在竞态窗口，不能只看最新一条）；令牌已过期的不恢复。
 func (m *ConfirmRetryManager) RecoverChains() (int, error) {
 	type chainRow struct {
 		ChainID    string `gorm:"column:chain_id"`
@@ -142,15 +116,10 @@ func (m *ConfirmRetryManager) RecoverChains() (int, error) {
 		LastFired  int64  `gorm:"column:last_fired"`
 	}
 
-	// 一条 SQL 取回所有候选。每个提醒只在 fired_at/id 最新的一行上留 rn=1，
-	// 由此拿到「该提醒最新那条链的最新一轮」。
-	//
-	// 令牌挂在链的首条日志上（CreateToken 传的是首次触发的 deliveryLogID），
-	// 而重发轮的日志没有对应的 token 行，因此令牌要按 chain_id 聚合，
-	// 不能直接 LEFT JOIN 到 dl.id 上——否则第 2 轮以后的链会被误判成「没有令牌」。
-	//
-	// NOT EXISTS 让「已确认」成为链级判断；时间条件放在 SQL 里，
-	// 停机很久的旧链不会被带回 Go 再筛。
+	// 一条 SQL 取回所有候选：每个提醒只保留最新一轮（rn=1）。
+	// 令牌挂在链的首条日志上，其余轮的日志没有对应 token 行，因此按 chain_id 聚合，
+	// 不能直接 JOIN 到 dl.id。NOT EXISTS 让「已确认」成为链级判断；
+	// 时间条件放在 SQL 里，停机很久的旧链不会被带回 Go 再筛。
 	var rows []chainRow
 	err := m.DB.Raw(`
 		SELECT t.chain_id, t.reminder_id, t.round, t.last_fired
@@ -188,8 +157,7 @@ func (m *ConfirmRetryManager) RecoverChains() (int, error) {
 		return 0, nil
 	}
 
-	// 一次取回涉及的提醒，避免每个链一次查询（N+1）。
-	// 启动阶段链可能不少，而这个查询本身与链数量无关。
+	// 一次取回涉及的提醒，避免 N+1 查询
 	ids := make([]uint, 0, len(rows))
 	for _, row := range rows {
 		ids = append(ids, row.ReminderID)
@@ -277,7 +245,7 @@ func (m *ConfirmRetryManager) retry(reminderID uint, chainID string, round int) 
 	if err := m.DB.Model(&models.DeliveryLog{}).
 		Where("confirm_chain_id = ? AND confirmed = ?", chainID, true).
 		Count(&confirmed).Error; err != nil {
-		// 查不到确认状态就不能冒险继续重发：宁可这一轮跳过，也不要给已确认的用户再发一遍
+		// 查不到确认状态就不能冒险继续重发
 		slog.Error("查询确认状态失败，本轮重发跳过", "chain", chainID, "round", round, "error", err)
 		m.stopChain(chainID)
 		return

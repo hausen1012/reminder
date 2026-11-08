@@ -1,11 +1,5 @@
-// Package secretbox 提供通道敏感字段（SMTP 密码、钉钉签名密钥、Webhook Authorization 等）的对称加解密。
-//
-// 密钥来源优先级：
-//  1. 环境变量 ENCRYPTION_KEY（base64 编码的 32 字节）；
-//  2. 否则使用本文件内置的硬编码 fallback 常量。
-//
-// 生产部署建议覆盖 ENCRYPTION_KEY 环境变量，否则 DB 文件泄漏即等于明文。
-// 启动时不会因为缺少 ENCRYPTION_KEY 而退出。
+// Package secretbox 提供通道敏感字段的对称加解密，密钥取环境变量 ENCRYPTION_KEY
+// （base64 编码的 32 字节），未配置时使用内置常量；生产环境务必显式配置。
 package secretbox
 
 import (

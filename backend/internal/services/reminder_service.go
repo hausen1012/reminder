@@ -1,8 +1,6 @@
-// reminder_service 负责提醒的 CRUD/Toggle/Preview/Test，
-// 并在写库后同步通知调度器（Engine.Add/Update/Remove）。
+// reminder_service 负责提醒的 CRUD/Toggle/Preview/Test，并在写库后同步调度器。
 //
-// 与 scheduler 的解耦：本服务依赖 SchedulerHook 接口而不是直接 import scheduler，
-// 这样 scheduler 在调度回调里依赖 services 时不会产生循环。
+// 依赖 SchedulerHook 接口而非直接 import scheduler，避免循环依赖。
 package services
 
 import (
@@ -21,19 +19,14 @@ import (
 	"gorm.io/gorm"
 )
 
-// SchedulerHook 是 ReminderService 同步给调度器的接口。
-//
-// 实现：scheduler.Engine。允许测试时注入 noop。
+// SchedulerHook 是 ReminderService 同步给调度器的接口（实现：scheduler.Engine，测试可注入 noop）。
 type SchedulerHook interface {
 	Add(r *models.Reminder) error
 	Update(r *models.Reminder) error
 	Remove(id uint)
 }
 
-// ReminderService 提供提醒的 CRUD 与调度器同步。
-//
-// 时区不再按提醒保存：站点时区由 timezone.Provider 统一提供（设置页可改），
-// 调度计算与展示都读当时的站点时区。落库时间一律 UTC。
+// ReminderService 提供提醒的 CRUD 与调度器同步；时区取自站点级 timezone.Provider，落库时间为 UTC。
 type ReminderService struct {
 	DB         *gorm.DB
 	Engine     SchedulerHook
@@ -50,9 +43,7 @@ func NewReminderService(db *gorm.DB, engine SchedulerHook, tz *timezone.Provider
 	return &ReminderService{DB: db, Engine: engine, TZ: tz, Dispatch: disp, ConfirmMgr: confirmMgr}
 }
 
-// ReminderInput 是 Create / Update 的入参。
-//
-// 没有 timezone 字段：站点时区是全局设置（设置页可改），不按提醒保存。
+// ReminderInput 是 Create / Update 的入参；时区是站点级全局设置，不在此。
 type ReminderInput struct {
 	Title                   string         `json:"title"`
 	Content                 string         `json:"content"`
@@ -144,8 +135,7 @@ func (s *ReminderService) Create(in ReminderInput) (*ReminderView, error) {
 	}
 	if s.Engine != nil {
 		if err := s.Engine.Add(r); err != nil {
-			// 调度器失败不应导致 CRUD 失败：用户保存的数据已落库。
-			// 但这意味着该提醒不会自动触发（只能靠兜底扫描），必须靠日志暴露出来。
+			// 数据已落库，调度失败只记日志：该提醒将只能依赖兜底扫描
 			slog.Error("注册提醒到调度器失败，数据已保存但不会自动触发", "id", r.ID, "title", r.Title, "error", err)
 		}
 	}
@@ -179,8 +169,7 @@ func (s *ReminderService) Update(id uint, in ReminderInput) (*ReminderView, erro
 	if contentFormat == "" {
 		contentFormat = "text"
 	}
-	// 与 Create 保持一致：正文留空时回退为标题，
-	// 否则「只改标题」的更新会把正文清空。
+	// 与 Create 一致：正文留空时回退为标题，避免「只改标题」把正文清空
 	content := in.Content
 	if strings.TrimSpace(content) == "" {
 		content = strings.TrimSpace(in.Title)
@@ -358,11 +347,7 @@ func (s *ReminderService) Delete(id uint) error {
 	return nil
 }
 
-// BatchDelete 批量硬删除提醒并从调度器移除。
-//
-// 两步删除放在同一个事务里：与单条 Delete 保持一致。
-// 分开执行时，若第二步失败，会留下「关联表已清、提醒还在」的脏数据——
-// 该提醒仍会出现在列表里，但绑定关系已经没了，用户只能手动删除。
+// BatchDelete 批量硬删除提醒并从调度器移除；关联与主体的删除在同一事务内。
 func (s *ReminderService) BatchDelete(ids []uint) error {
 	if len(ids) == 0 {
 		return nil
@@ -375,7 +360,7 @@ func (s *ReminderService) BatchDelete(ids []uint) error {
 	}); err != nil {
 		return err
 	}
-	// 事务提交后再清理调度器和确认重试（避免事务内调用 s.DB 造成 SQLite 单连接死锁）
+	// 事务提交后再清理调度器与确认重试，避免事务内访问 DB 造成 SQLite 死锁
 	for _, id := range ids {
 		if s.Engine != nil {
 			s.Engine.Remove(id)
@@ -437,9 +422,7 @@ func (s *ReminderService) Toggle(id uint) (*ReminderView, error) {
 	return s.toView(r, chIDs), nil
 }
 
-// Preview 计算给定 spec 的下 n 次触发时间。
-//
-// 时区固定取当前站点时区（不再接受按提醒覆盖），与创建/更新时的计算保持一致。
+// Preview 计算给定 spec 的下 n 次触发时间（时区取当前站点时区）。
 func (s *ReminderService) Preview(calendar, scheduleType string, specMap map[string]any, n int) ([]time.Time, error) {
 	if n <= 0 {
 		n = 5
@@ -456,7 +439,7 @@ func (s *ReminderService) Preview(calendar, scheduleType string, specMap map[str
 	return scheduler.PreviewSolar(calendar, scheduleType, spec, from, s.TZ.Get(), n)
 }
 
-// Now 返回当前站点时区下的时间，供 handler 计算"今天"的边界。
+// Now 返回当前站点时区下的时间，供 handler 计算「今天」的边界。
 func (s *ReminderService) Now() time.Time {
 	return time.Now().In(s.TZ.Get())
 }
@@ -579,9 +562,7 @@ func (s *ReminderService) channelIDs(reminderID uint) ([]uint, error) {
 	return ids, nil
 }
 
-// channelIDsBatch 一次查出多条提醒绑定的通道，返回 reminder_id → channel_id 列表。
-//
-// 列表类接口不能用逐条 channelIDs：50 条提醒就是 50 次额外查询（N+1）。
+// channelIDsBatch 一次查出多条提醒绑定的通道，避免列表接口 N+1 查询。
 func (s *ReminderService) channelIDsBatch(reminderIDs []uint) (map[uint][]uint, error) {
 	out := make(map[uint][]uint, len(reminderIDs))
 	if len(reminderIDs) == 0 {

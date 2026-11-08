@@ -13,11 +13,8 @@ import (
 	"github.com/reminder/backend/internal/logger"
 )
 
-// OpenAIProvider 用 OpenAI Chat Completions 协议对接任意兼容厂商。
-//
-// DeepSeek、Moonshot、通义、Ollama、vLLM、各类中转站都实现了这套协议，
-// 因此这里直接手写 HTTP（而不是引入各家 SDK）：只要 base_url + 模型名可配，
-// 就能覆盖绝大多数厂商，也避免为每家增加依赖。
+// OpenAIProvider 用 OpenAI Chat Completions 协议对接任意兼容厂商（DeepSeek、Moonshot、
+// 通义、Ollama、vLLM、中转站等），因此直接手写 HTTP 而不引入各家 SDK。
 type OpenAIProvider struct {
 	baseURL string
 	apiKey  string

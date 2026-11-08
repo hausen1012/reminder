@@ -1,7 +1,6 @@
-// dispatch_service 是一次触发的"渲染 + 通道并发发送 + 重试 + 落 attempts 与汇总状态"链条。
+// dispatch_service 完成一次触发的渲染、通道并发发送、重试与状态汇总。
 //
-// 与 Engine 的契约：Engine 在事务内插入一条 status=pending 的 delivery_log，
-// 随后异步调 Run(reminder, deliveryLogID)；本服务负责把这条 log 推进到终态。
+// 契约：Engine 插入 pending 日志后异步调用 Run，本服务负责把它推进到终态。
 package services
 
 import (
@@ -47,13 +46,8 @@ func NewDispatchService(db *gorm.DB, channelSvc *ChannelService, tz *timezone.Pr
 	}
 }
 
-// Run 是 Engine.fire 异步调用的入口。
-//
-// 流程：
-//  1. 加载该提醒绑定的所有 enabled 通道（无绑定 → 标 failed）
-//  2. 构造 vars（不含 confirm_url；Phase 5 接入确认机制后注入）
-//  3. 渲染 title / content（一次性）；为每个通道执行 send-with-retry
-//  4. 汇总 attempts 状态 → 写回 delivery_log.status 与渲染后的 title/content
+// Run 是 Engine.fire 异步调用的入口：加载通道 → 构建变量并渲染 → 各通道并发发送并重试
+// → 汇总结果写回日志状态。
 func (d *DispatchService) Run(ctx context.Context, r *models.Reminder, deliveryLogID uint) {
 	if r == nil || deliveryLogID == 0 {
 		return
@@ -75,8 +69,7 @@ func (d *DispatchService) Run(ctx context.Context, r *models.Reminder, deliveryL
 	for i, ch := range channels {
 		chNames[i] = ch.Name + "(" + ch.Type + ")"
 	}
-	// 中间步骤一律 Debug：一次投递有七八个阶段，全部打成 Info 会让日志只剩噪音，
-	// 真正需要看的是最后那条汇总（成功/失败、耗时、通道数）与出错分支。
+	// 中间步骤都用 Debug，真正需要看的是最后那条汇总与出错分支
 	slog.Debug("已加载通道", "reminder", r.ID, "channels", chNames)
 
 	planned := r.NextFireAt
@@ -85,8 +78,7 @@ func (d *DispatchService) Run(ctx context.Context, r *models.Reminder, deliveryL
 		planned = &fresh
 	}
 	vars := buildVars(r, time.Now(), planned.Std(), d.TZ.Get())
-	// 不打印 vars 内容：其中的 confirm_url 带确认令牌，拿到即可替用户确认提醒。
-	// 排查时关心的是"渲染了多少变量、正文多长"，长度信息已经足够。
+	// 不打印 vars 内容：confirm_url 带确认令牌，记长度即可
 	slog.Debug("变量构建完成", "reminder", r.ID, "vars_count", len(vars))
 
 	// 需要确认时，首发生成 chain_id + token；重发复用已有 chain_id + token
@@ -140,8 +132,7 @@ func (d *DispatchService) Run(ctx context.Context, r *models.Reminder, deliveryL
 			body += "\n点击确认提醒：" + cu
 		}
 	}
-	// 将渲染后的 body 写回 vars，确保下游（如 webhook BodyTemplate 中的 {{content}}）
-	// 也能拿到展开后的内容（含确认链接）。
+	// 渲染后的 body 写回 vars，保证下游（如 webhook 的 {{content}}）拿到展开后的内容
 	vars["content"] = body
 	rendered := notifier.Message{
 		Subject: notifier.Render(r.Title, vars),
@@ -196,8 +187,7 @@ func (d *DispatchService) Run(ctx context.Context, r *models.Reminder, deliveryL
 	case failCnt > 0:
 		status = "partial"
 	}
-	// 一次投递只留这一条汇总：谁、发到几个通道、成败各几个、用了多久。
-	// 通道级明细在 Debug（sendWithRetry）与投递日志页里都有，不必在 Info 里重复。
+	// 一次投递只留这一条汇总，通道级明细在 Debug 与投递日志页里
 	slog.Info("投递完成", "reminder", r.ID, "log", deliveryLogID, "title", r.Title, "status", status,
 		"success", successCnt, "failed", failCnt, "total", len(channels),
 		"elapsed_ms", time.Since(started).Milliseconds())
@@ -222,10 +212,8 @@ func (d *DispatchService) Run(ctx context.Context, r *models.Reminder, deliveryL
 	}
 }
 
-// sendWithRetry 在单个通道上按 RetryDelays 串行重试，写入 DeliveryAttempt。
-//
-// 永久错误（ErrPermanent）立即停止；其他错误等下一个 delay 再试。
-// 返回值：是否最终成功。
+// sendWithRetry 在单个通道上按 RetryDelays 串行重试并写入 DeliveryAttempt；
+// 永久错误立即停止，返回是否最终成功。
 func (d *DispatchService) sendWithRetry(ctx context.Context, ch *models.Channel, deliveryLogID uint, msg notifier.Message) bool {
 	n, err := notifier.Get(ch.Type)
 	if err != nil {
@@ -254,7 +242,7 @@ func (d *DispatchService) sendWithRetry(ctx context.Context, ch *models.Channel,
 		err := n.Send(ctx, plainConfig, msg)
 		latency := int(time.Since(started).Milliseconds())
 		if err == nil {
-			// 单次成功属于高频细节，只在 LOG_LEVEL=debug 时输出；最终结果由 Run 汇总记录
+			// 单次成功属于高频细节，只在 debug 级别输出
 			slog.Debug("通道发送成功", "log", deliveryLogID, "channel", ch.ID, "name", ch.Name, "type", ch.Type, "attempt", i+1, "latency_ms", latency)
 			d.writeAttempt(deliveryLogID, ch, i+1, "success", "", latency)
 			return true
@@ -303,10 +291,7 @@ func (d *DispatchService) finalize(deliveryLogID uint, status, renderedTitle, re
 	}
 }
 
-// loadChannels 取 reminder 绑定的全部 enabled 通道。
-//
-// 关联表是 ReminderChannel，且只选择 enabled=true 的通道；
-// 没有绑定或全部禁用时返回空切片。
+// loadChannels 取提醒绑定的全部 enabled 通道；没有绑定或全部禁用时返回空切片。
 func (d *DispatchService) loadChannels(reminderID uint) ([]*models.Channel, error) {
 	var ids []uint
 	if err := d.DB.Model(&models.ReminderChannel{}).
@@ -328,11 +313,7 @@ func (d *DispatchService) loadChannels(reminderID uint) ([]*models.Channel, erro
 	return out, nil
 }
 
-// DryRun 发送测试消息，不落任何 delivery_log / delivery_attempt。
-//
-// 失败时返回 AppError（validation_failed）而不是裸 error：试发失败的原因
-// （密码错、地址不通、配置解不开）都是用户能自己处理的，应该拿到 400 + 可读文案，
-// 而不是 500「服务器内部错误」。
+// DryRun 发送测试消息，不落任何日志；失败时返回 400 + 可读文案而不是 500。
 func (d *DispatchService) DryRun(ctx context.Context, channels []*models.Channel, msg notifier.Message) error {
 	var wg sync.WaitGroup
 	errCh := make(chan error, len(channels))
@@ -394,10 +375,7 @@ func (d *DispatchService) sendDryRun(ctx context.Context, ch *models.Channel, ms
 
 // --- helpers ---
 
-// friendlyErr 取错误里适合直接展示给用户的那部分文案。
-//
-// AppError 的 Error() 是 "code: message (field=x)" 形式，落进 delivery_attempt.error
-// 后会在日志页显示出一堆技术细节；用户真正需要的是 message 本身。
+// friendlyErr 取 AppError 里的 message，去掉 code/field 等技术细节。
 func friendlyErr(err error) string {
 	var ae *middleware.AppError
 	if errors.As(err, &ae) {

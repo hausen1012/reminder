@@ -13,16 +13,12 @@ import (
 	"time"
 )
 
-// 日志目录的默认值。
-//
-// 导出成常量，让其它包（测试、文档生成）引用同一份默认值，不必各自硬编码。
+// 日志目录的默认值，供测试等引用同一份默认值。
 const DefaultLogFile = "/var/log/reminder"
 
 // Config 汇总所有运行时配置。
 //
-// 时区不在这里：站点时区存在数据库的 config 表（key=timezone），
-// 可在面板「设置」页热更新，由 internal/timezone.Provider 持有。
-// 这里的 Timezone 仅是首次启动、库里还没有该配置时的环境变量默认值。
+// 站点时区由 internal/timezone.Provider 持有；这里的 Timezone 只是首次启动的默认值。
 type Config struct {
 	// 基础配置
 	Port      string
@@ -69,7 +65,7 @@ func Load() *Config {
 		LoginLockoutMin:  getEnvInt("LOGIN_LOCKOUT_MINUTES", 15),
 	}
 	if cfg.MaxBodyMB <= 0 {
-		// 0 或负数会让所有请求被拒；按「未配置」处理而不是照字面生效
+		// 0 或负数会让所有请求被拒，按未配置处理
 		slog.Warn("MAX_BODY_MB 非法，回退为 1 MB", "value", cfg.MaxBodyMB)
 		cfg.MaxBodyMB = 1
 	}
@@ -86,9 +82,7 @@ func Load() *Config {
 		slog.Warn("JWT_SECRET 未配置，已自动生成")
 	}
 
-	// 先把进程时区对齐到环境变量给出的值：日志按天切分等启动期逻辑
-	// 在读到库里的站点时区之前就会用到 time.Local。
-	// 运行期真正的时区来源是 internal/timezone.Provider（设置页可改）。
+	// 启动期逻辑（日志按天切分等）在读到库里的时区之前就会用到 time.Local
 	if loc, err := time.LoadLocation(cfg.Timezone); err != nil {
 		slog.Warn("TIMEZONE 解析失败，保持进程默认时区", "timezone", cfg.Timezone, "error", err)
 	} else {
@@ -120,10 +114,7 @@ func getEnvInt(key string, fallback int) int {
 	return n
 }
 
-// splitCSV 把逗号分隔的列表拆成切片，忽略空白项。
-//
-// 用于 TRUSTED_PROXIES 这类可配置多项的环境变量：
-// 写 "nginx 的 IP、容器网段" 比要求用户手写 JSON 更符合 YAML/Compose 的习惯。
+// splitCSV 把逗号分隔的列表拆成切片，忽略空白项（用于 TRUSTED_PROXIES 等多项配置）。
 func splitCSV(v string) []string {
 	if strings.TrimSpace(v) == "" {
 		return nil

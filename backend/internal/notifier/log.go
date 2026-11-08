@@ -1,5 +1,4 @@
-// log 通道：将通知输出到服务器控制台，用于开发和测试。
-// 无需任何配置，不调用外部服务。
+// log 通道：把消息输出到服务端日志，供开发调试，无需配置。
 package notifier
 
 import (
@@ -8,13 +7,10 @@ import (
 	"time"
 )
 
-// logNotifier 把消息写到服务端日志，便于本地调试通道配置。
+// logNotifier 把消息写到服务端日志。
 //
-// Type 必须返回 "log"：ChannelService 只允许 "log" 这种类型，
-// 前端「日志输出」选项提交的也是 "log"，三者需保持一致。
-//
-// 正文可能包含 {{confirm_url}} 等一次性凭据，但本通道的用途就是"把消息打到日志"，
-// 用户明确选择了它，因此这里保留完整正文——这是唯一允许输出正文的通道。
+// Type 与 ChannelService 的类型校验、前端「日志输出」选项保持一致（都是 "log"）。
+// 这是唯一允许输出完整正文的通道——它的用途就是打日志，正文里的 confirm_url 也一样。
 type logNotifier struct{}
 
 func (n *logNotifier) Type() string { return "log" }
@@ -27,7 +23,7 @@ func (n *logNotifier) Send(_ context.Context, _ []byte, msg Message) error {
 	case "markdown":
 		body = StripMarkdown(msg.Body)
 	}
-	// 统一走 slog，避免 fmt.Printf 绕过日志级别与文件写入
+	// 走 slog，保证受日志级别与文件输出控制
 	slog.Info("通知(日志通道)", "at", time.Now().Format(time.RFC3339),
 		"subject", msg.Subject, "format", msg.Format, "body", body)
 	return nil

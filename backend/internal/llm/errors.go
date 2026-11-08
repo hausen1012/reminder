@@ -6,11 +6,7 @@ import (
 	"github.com/anthropics/anthropic-sdk-go/v2"
 )
 
-// ErrorAttrs 把厂商错误拆成结构化字段，供日志使用。
-//
-// 只返回 key/value 对，不修改错误本身：用户看到的仍是原本的文案，
-// 而日志里能直接看到 status / request_id / 上游原文，不用再猜。
-// 服务层在「对话最终失败」时也会调用它，保证上游状态码与响应体不会丢。
+// ErrorAttrs 把厂商错误拆成结构化日志字段，不修改错误本身。
 func ErrorAttrs(err error) []any {
 	if err == nil {
 		return nil

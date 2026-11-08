@@ -1,6 +1,4 @@
-// log_service 提供日志查询与清理功能。
-//
-// 日志是调度触发与 Dispatch 运行的结果沉淀，不可修改仅可查询和按时间范围删除。
+// log_service 提供日志查询与清理：日志不可修改，只能按时间范围删除。
 package services
 
 import (
@@ -17,8 +15,7 @@ import (
 // LogService 负责 DeliveryLog 的查询与清理。
 type LogService struct {
 	DB *gorm.DB
-	// SiteURL 是环境变量 SITE_URL 给出的回退地址：
-	// 库里设置了站点地址（config 表 key=site_url）时以库为准。
+	// SiteURL 是环境变量 SITE_URL 给出的回退地址，库里有站点地址时以库为准
 	SiteURL string
 }
 
@@ -224,18 +221,10 @@ func (s *LogService) BatchDelete(ids []uint) error {
 	})
 }
 
-// purgeBatchSize 是单次清理的日志条数。
-//
-// 清理不能用「先 Pluck 出全部 id 再分批删」：日志量大时那一份 id 切片
-// 本身就是几百 MB 的内存尖峰。这里改成每轮现取一批 id（至多 500 个）
-// 立刻删除，内存占用与日志总量无关。
+// purgeBatchSize 是单次清理的日志条数；循环取批，内存占用与日志总量无关。
 const purgeBatchSize = 500
 
-// Purge 清理日志。
-//
-// 循环取批：每轮只把一批 id 读进内存，先删它们的 attempts 再删日志本身，
-// 保证同一批的 id 在两条 DELETE 之间不会漂移；取不到一批的量即结束。
-// 整个清理在一个事务里完成，中途失败整体回滚，不会留下「日志删了、attempts 还在」。
+// Purge 清理日志：循环取批，先删 attempts 再删日志，整个清理在一个事务内完成。
 func (s *LogService) Purge(olderThan time.Duration, all bool) (int64, error) {
 	if !all && olderThan <= 0 {
 		return 0, nil

@@ -10,10 +10,7 @@ import (
 	"github.com/reminder/backend/internal/logger"
 )
 
-// HeaderRequestID 是请求 ID 的响应头名。
-//
-// 客户端可以自带该头（例如网关生成的追踪 ID），服务端原样沿用；
-// 没带或带了非法值时自动生成一个，保证每条请求日志与错误日志都能对上号。
+// HeaderRequestID 是请求 ID 的响应头名；客户端自带的（如网关追踪 ID）原样沿用，否则自动生成。
 const HeaderRequestID = "X-Request-ID"
 
 // ctxRequestID 是请求 ID 在 gin.Context 中的键。
@@ -22,15 +19,11 @@ const ctxRequestID = "request_id"
 // requestIDSeq 在 crypto/rand 不可用时提供兜底序号。
 var requestIDSeq atomic.Uint64
 
-// RequestID 为每个请求分配请求 ID，并写入响应头。
-//
-// 请求 ID 还会写进请求的 context：业务层用 logger.FromContext(ctx) 就能拿到
-// 带 request_id 的 logger，不必在每个调用点手写字段。写进 context 而不是只放
-// gin.Context，是因为 service 层拿不到 gin.Context，只能拿到 ctx。
+// RequestID 为每个请求分配请求 ID 并写入响应头与 ctx（service 层拿不到 gin.Context）。
 func RequestID() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		id := strings.TrimSpace(c.GetHeader(HeaderRequestID))
-		// 限制长度并剔除换行：请求 ID 会进日志和响应头，过长或带换行都可能是注入。
+		// 限制长度并剔除换行，防止注入日志或响应头
 		if id == "" || len(id) > 64 || strings.ContainsAny(id, "\r\n") {
 			id = newRequestID()
 		}

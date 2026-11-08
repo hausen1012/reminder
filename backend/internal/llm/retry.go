@@ -10,17 +10,11 @@ import (
 	"github.com/anthropics/anthropic-sdk-go/v2"
 )
 
-// HTTPStatusError 是 OpenAI 兼容厂商返回的非 2xx 响应。
-//
-// 单独定义类型（而不是只拼错误字符串）是为了让重试策略能按状态码判断：
-// 限流（429）与 5xx 值得重试，密钥错（401）、参数错（400）重试多少次都没用。
+// HTTPStatusError 是厂商返回的非 2xx 响应；带状态码是为了让重试策略区分临时与永久失败。
 type HTTPStatusError struct {
 	Status  int
 	Message string
 	// Body 是上游响应体的截断副本，只进日志不进用户可见错误。
-	//
-	// 中转站经常把真实原因（例如「inference exceeds tpm/rpm limit」）
-	// 放在响应体里而不是 message 字段，排错时这一段最关键。
 	Body string
 }
 
@@ -28,10 +22,6 @@ type HTTPStatusError struct {
 func (e *HTTPStatusError) Error() string { return e.Message }
 
 // 重试退避参数：第 n 次重试等待 base * 2^(n-1)，上限 max。
-//
-// 故意取得比较短：默认 10 次重试的最坏等待约 15 秒，
-// 面板请求的超时是 120 秒，留足单次请求本身的耗时。
-//
 // 用变量而不是常量，便于测试里调小以避免真实等待。
 var (
 	retryBaseDelay = 200 * time.Millisecond
@@ -53,25 +43,17 @@ func retryBackoff(attempt int) time.Duration {
 	return delay
 }
 
-// RetryObserver 在一次重试真正开始等待之前被调用。
-//
-// attempt 是本次重试的序号（从 1 开始），max 是配置的最大重试次数，
-// delay 是接下来要等待的退避时长，err 是触发重试的原始错误。
-// 上层用它把「正在重试」的进度透传给前端，避免用户对着一个转圈图标干等。
+// RetryObserver 在一次重试真正开始等待之前被调用，用于把重试进度透传给前端。
 type RetryObserver func(attempt, max int, delay time.Duration, err error)
 
 // ChatWithRetry 调用 Provider，并在可重试错误上按指数退避重试。
 //
 // maxRetries 是「首次失败之后」的重试次数：0 表示只请求一次。
-// ctx 被取消或已超时时立即停止，不再发起下一次尝试。
 func ChatWithRetry(ctx context.Context, p Provider, req Request, maxRetries int) (*Reply, error) {
 	return ChatWithRetryNotify(ctx, p, req, maxRetries, nil)
 }
 
-// ChatWithRetryNotify 与 ChatWithRetry 相同，但在每次重试前回调 obs。
-//
-// obs 在调用方的 goroutine 里同步执行，实现必须立即返回：
-// 它阻塞多久，重试就被推迟多久。
+// ChatWithRetryNotify 与 ChatWithRetry 相同，但在每次重试前回调 obs（同步执行，必须立即返回）。
 func ChatWithRetryNotify(ctx context.Context, p Provider, req Request, maxRetries int, obs RetryObserver) (*Reply, error) {
 	if maxRetries < 0 {
 		maxRetries = 0

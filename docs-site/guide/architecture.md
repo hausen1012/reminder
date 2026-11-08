@@ -47,11 +47,8 @@
 | `crypto/secretbox` | 通道敏感字段与 AI 草稿的对称加解密 |
 | `llm` | 厂商无关的对话接口，Anthropic 与 OpenAI 兼容协议两个实现 |
 
-设计上有两条约束值得注意：
-
-- **服务层不依赖 scheduler 的具体实现**，而是依赖一个 `SchedulerHook` 接口，避免循环依赖
-- **调度器不直接发送消息**，而是写一条 `pending` 日志后异步交给 `DispatchService`，
-  把「什么时候触发」和「怎么发出去」解耦
+两条约束：服务层依赖 `SchedulerHook` 接口而非 scheduler 具体实现，避免循环依赖；
+调度器只写 `pending` 日志，发送异步交给 `DispatchService`，把「何时触发」和「怎么发」解耦。
 
 ## AI 助手的执行链路
 
@@ -61,28 +58,18 @@ POST /api/ai/chat（无状态：history 由前端上传）
   ├─ 读取 ai_* 设置，按 provider 构造 llm.Provider
   ├─ 拼接客户端上传的历史（最多 30 条）
   └─ 工具循环（最多 8 轮）
-        │
-        ├─ llm.Provider.Chat(system + 历史 + 工具定义)
-        ├─ 只读工具（list_channels / list_reminders）立即执行，结果回填
-        └─ 写工具（create_* / update_* / delete_reminder）
-              └─ 只生成 ai_actions 草稿（payload_enc 加密），不落业务表
+        ├─ 只读工具立即执行，结果回填
+        └─ 写工具只生成 ai_actions 草稿（payload_enc 加密），不落业务表
   │
-  └─ 返回 reply + 本轮新生成的草稿（对话不落库）
+  └─ 返回 reply + 本轮新生成的草稿
 
 POST /api/ai/actions/:id/apply
-  └─ 解密 payload → 反序列化 → 调用既有 ReminderService / ChannelService
+  └─ 解密 payload → 调用既有 ReminderService / ChannelService
 ```
 
-对话本身不落库：助手是面板右下角的浮动工具，聊天记录只存在浏览器 `sessionStorage`，
-刷新页面能续上、关掉标签页就散。唯一的持久化是待确认草稿——那是「确认后才生效」的机制本身。
-
-关键约束：**写操作不经过任何绕过校验的捷径**。草稿执行时走的是和面板表单
-完全相同的服务层方法，所以校验规则、调度器同步、通道绑定的处理方式都一致。
-
-厂商差异被收敛在 `internal/llm`：上层只看到 `Turn` / `ToolCall` / `Reply`，
-Anthropic 的 `tool_result` 与 OpenAI 的 `role=tool` 消息由各自的 Provider 翻译。
-Anthropic 一侧开启思考，因此 assistant 轮要把上一轮的原始响应（含 thinking 块签名）
-原样回放，这一步通过 `Turn.Raw` 透传，编排层不需要理解其中的结构。
+草稿执行走的是和面板表单相同的服务层方法，校验规则、调度器同步、通道绑定处理完全一致。
+厂商差异收敛在 `internal/llm`：上层只看到 `Turn` / `ToolCall` / `Reply`；
+Anthropic 开启思考时需原样回放上一轮的原始响应，通过 `Turn.Raw` 透传。
 
 ## 一次触发的完整链路
 
@@ -119,7 +106,7 @@ Engine 定时器到期
 | `tokens` | 外部 API 令牌 |
 | `token_default_channels` | 令牌的默认通道路由 |
 | `configs` | 站点配置（键值对），AI 设置也以 `ai_` 前缀存在这里 |
-| `ai_actions` | AI 生成的待确认写操作（入参加密存储），保留 90 天后自动清理。对话本身不入库 |
+| `ai_actions` | AI 生成的待确认写操作（入参加密存储），保留 90 天后自动清理 |
 
 数据库结构在启动时自动建齐（`AutoMigrate`）。
 
@@ -137,23 +124,18 @@ Engine 定时器到期
 
 ## 时区处理
 
-- 所有时间列在数据库里存 **Unix 毫秒整数**。
-  模型层用 `models.Time`（内嵌 `time.Time`，实现 `driver.Valuer` / `sql.Scanner`）
-  统一转换，写入时自动归一化为 UTC
-- 时区是**站点级全局设置**（面板「设置」页，按 `config` 表 `key=timezone` 保存），不按提醒保存
-- 调度计算时按站点时区解释 `schedule_spec` 里的本地时间（如 `09:00` 表示当地 9 点）
+- 所有时间列在数据库里存 **Unix 毫秒整数**，模型层用 `models.Time` 统一转换，写入时归一化为 UTC
+- 时区是**站点级全局设置**（`config` 表 `key=timezone`），不按提醒保存
+- 调度计算按站点时区解释 `schedule_spec` 里的本地时间（如 `09:00` 表示当地 9 点）
 - 展示时前端按站点时区渲染（`lib/datetime.ts` 的 `formatInZone`），不依赖浏览器本地时区。
   接口返回的时间统一是 RFC3339 字符串
-- 在设置页改时区会立刻重建 cron 实例、按新时区重算并回写所有启用提醒的 `next_fire_at`，无需重启
-  （`Engine.ReloadTimezone` → `Engine.RecomputeNextFire`）。只重建不重算是不够的：
-  sweeper 依据库里的 `next_fire_at` 判断补漏，旧值在新时区下会变成过去时间，
-  导致错误补发或被误标 `expired`
+- 改时区会立刻重建 cron 实例、按新时区重算并回写所有启用提醒的 `next_fire_at`，无需重启。
+  sweeper 依据库里的 `next_fire_at` 判断补漏，所以只重建不重算会让旧值变成过去时间
 - 重建 cron 实例时，每日日志清理等维护型任务会一并恢复（`Engine.purgeJobs`）
 
 ::: tip 为什么时间存整数而不是文本
-SQLite 对文本列按字典序比较，带时区偏移的时间文本如果直接存，同一时刻会被排到不同位置，范围查询与排序都会失真。若在 SQL 里套 `julianday()`，函数包裹列会让**索引完全失效**（退化为全表扫描），而且浮点天数等值比较精度不足。
-
-统一存整数毫秒后：比较与排序都是整数语义，`(enabled, next_fire_at)` 复合索引可直接走范围扫描，等值精确，在模型层 `models.Time` 中统一归一化为 UTC。
+SQLite 对文本列按字典序比较，带偏移的时间文本会让范围查询与排序失真；在 SQL 里套 `julianday()`
+又会让索引失效。存整数毫秒后比较与排序都是整数语义，`(enabled, next_fire_at)` 复合索引可直接走范围扫描。
 :::
 
 ## 并发与一致性

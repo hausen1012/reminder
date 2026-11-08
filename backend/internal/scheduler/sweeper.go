@@ -1,12 +1,5 @@
-// Sweeper 是调度器的兜底扫描器：
-//   - 进程崩溃 / 重启窗口期内可能错过的触发，由 sweeper 在容忍窗口内补发；
-//   - 超出 MISS_TOLERANCE_MINUTES 的过期触发，直接标记 expired 并向前推进 next_fire_at；
-//   - 卡在 pending 的投递日志（进程在投递中途退出）被收敛为 failed。
-//
-// 与 Engine.fire 共享同一套乐观锁，所以二者并发不会重复触发。
-//
-// 注意：next_fire_at 是 models.Time（Unix 毫秒整数），比较与排序都是整数语义，
-// 写入时的时区偏移不会影响结果。
+// Sweeper 是调度器的兜底扫描器：在容忍窗口内补发错过的触发，超窗口的标记 expired，
+// 并把卡在 pending 的投递日志收敛为 failed。与 Engine.fire 共用乐观锁，不会重复触发。
 package scheduler
 
 import (
@@ -29,30 +22,20 @@ type Sweeper struct {
 	interval    time.Duration
 	missTol     time.Duration
 	skewSeconds time.Duration
-	// pendingTTL 是 pending 日志的存活上限：超过它仍是 pending，
-	// 说明投递 goroutine 已经消失（进程退出 / 被强制杀死），不会再有人推进终态。
+	// pendingTTL 是 pending 日志的存活上限，超过即认为投递 goroutine 已消失。
 	pendingTTL time.Duration
 
-	// mu 保护下面两个字段：IsRunning 会被 HTTP 请求 goroutine 调用，
-	// 而 Start/Stop 来自 main 的启动与停机流程，不加锁读是数据竞争。
+	// mu 保护下面两个字段：IsRunning 由 HTTP 请求调用，Start/Stop 由启动流程调用。
 	mu     sync.Mutex
 	cancel context.CancelFunc
-	done   chan struct{} // 与 cancel 一同在 Start 里重建，Stop 靠它等待 goroutine 退出
+	done   chan struct{}
 }
 
-// pendingTTL 是 pending 日志的收敛阈值。
-//
-// 单个通道最长重试链是「立即 + 10s + 30s」，加上三次请求各自的超时
-// （Webhook 15s、SMTP 15s），单通道最坏约 1 分钟；多个通道并发。
-// 取 10 分钟是相对宽松的上限：正常投递不可能跑这么久，
-// 而太短会把仍在重试的投递误判为失败。
+// pendingTTL 是 pending 日志的收敛阈值；单通道最坏重试链约 1 分钟，取 10 分钟留足余量。
 const pendingTTL = 10 * time.Minute
 
-// NewSweeper 构造一个 Sweeper。
-//
-// interval 决定扫描间隔；missTol 决定漏触发的容忍上限，超过即标记 expired。
-// skewSeconds 用来避免与正常触发器抢同一秒，建议给 30s 以上。
-// tz 为空时回退到默认站点时区。
+// NewSweeper 构造 Sweeper；interval 为扫描间隔，missTol 为漏触发容忍上限，
+// skew 用于避开正常触发器，tz 为空时回退到默认站点时区。
 func NewSweeper(db *gorm.DB, engine *Engine, tz *timezone.Provider, interval, missTol, skew time.Duration) *Sweeper {
 	if tz == nil {
 		tz = timezone.New("")
@@ -199,11 +182,8 @@ func (s *Sweeper) tick() {
 	wg.Wait()
 }
 
-// markExpired 把一条已严重过期的提醒推进到下一次：
-//   - 写一条 status=expired 的 delivery_log（便于用户排查）
-//   - next_fire_at 推进到 Compute(now)（cron/interval）；once 直接置 nil 并 disable
-//
-// 使用与 engine.fire 一致的乐观锁，避免与正常触发器抢更新。
+// markExpired 把一条严重过期的提醒推进到下一次：写一条 expired 日志，并推进 next_fire_at
+// （once 直接置空并禁用）。用与 engine.fire 一致的乐观锁。
 func (s *Sweeper) markExpired(r *models.Reminder, now time.Time) error {
 	spec, err := ParseSpec(r.ScheduleSpec)
 	if err != nil {
@@ -259,16 +239,9 @@ var errSweepSkipped = errors.New("sweep skipped by optimistic lock")
 
 // recoverStalePendingLogs 把卡在 pending 的投递日志收敛为 failed。
 //
-// 为什么必须有这一步：Engine.fire 在事务里插入 pending 日志后，投递是异步 goroutine。
-// 如果进程恰好在投递中途退出（重启、OOM、被 kill -9），这条日志就永远停在 pending——
-// 没有任何代码会再碰它：sweeper 只扫 reminders 表，调度器只处理 next_fire_at。
-// 结果是日志页长期挂着「发送中」，成功率统计被永久污染。
-//
-// 判据是 fired_at 早于 now - pendingTTL，而不是「启动时」：
-// 进程正常运行期间也可能出现 goroutine 意外消失（panic 未被 recover 到），
-// 用时间窗口判定可以覆盖这两种情况，且不需要额外的启动钩子。
-//
-// 同时写一条日志：这不是正常业务结果，运维需要知道发生过。
+// 进程在投递中途退出时，这条日志不会有任何代码再推进终态，会永久污染成功率统计。
+// 判据是 fired_at 早于 now - pendingTTL，而不是「启动时」——正常运行期间也可能有
+// goroutine 意外消失。
 func (s *Sweeper) recoverStalePendingLogs(now time.Time) {
 	cutoff := models.TimeOf(now.Add(-s.pendingTTL))
 	res := s.db.Model(&models.DeliveryLog{}).

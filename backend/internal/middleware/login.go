@@ -9,20 +9,12 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// LoginLimiter 是登录接口的失败计数限流器。
+// LoginLimiter 是登录接口的失败计数限流器，防止无限撞库。
 //
-// 为什么需要：登录接口不需要任何凭据就能调用，暴露到公网后
-// 不设上限就等于允许无限撞库。外部令牌有 per-令牌限流，登录没有。
+// 计数键是「用户名 + 客户端 IP」：只按 IP 会牵连同一 NAT 下的用户，只按用户名又能换 IP 绕过。
+// 成功登录清零该键；锁定期间直接拒绝、不进入密码校验，避免被用来消耗 bcrypt 算力。
 //
-// 计数键是「用户名 + 客户端 IP」而不是单独 IP 或单独用户名：
-//   - 只按 IP：同一 NAT 后面的正常用户会被别人的失败计数牵连；
-//   - 只按用户名：换 IP 就能绕过，且会被人故意用别人的用户名锁死账号。
-//
-// 成功登录会清零该键；锁定期间直接拒绝，不进入密码校验，
-// 这样 bcrypt 也不会被用来做 CPU 消耗攻击。
-//
-// 检查与记录由 AuthHandler 显式调用，而不是做成中间件：
-// 中间件要拿到用户名就得先读请求体，读掉之后 handler 就解析不到了。
+// 由 AuthHandler 显式调用而非常规中间件：中间件读掉请求体后 handler 就解析不到了。
 type LoginLimiter struct {
 	maxAttempts int
 	lockout     time.Duration
@@ -35,16 +27,12 @@ type LoginLimiter struct {
 type loginSlot struct {
 	failures  int
 	lockedTil time.Time
-	// lastSeen 是该键最近一次被尝试的时间，用于惰性清理。
-	// 只靠 failures==0 清理不够：攻击者可以用大量不同用户名各失败一次，
-	// 这些槽位永远不归零，map 会无界增长。
+	// lastSeen 用于惰性清理：攻击者可用大量用户名单次失败让 map 无界增长
 	lastSeen time.Time
 }
 
-// idleTTL 是槽位的空闲过期时间：超过它没有任何尝试就丢弃。
-//
-// 取 max(lockout, 1h)：锁定窗口内的计数必须留着，否则锁定会被绕过；
-// 而比锁定期更长的闲置槽位已经没有意义，丢掉后用户下次失败从 0 开始数。
+// idleTTL 是槽位的空闲过期时间，取 max(lockout, 1h)：
+// 锁定期内的计数必须保留，更久没动静的槽位已无意义。
 func (l *LoginLimiter) idleTTL() time.Duration {
 	if l.lockout > time.Hour {
 		return l.lockout
@@ -52,9 +40,7 @@ func (l *LoginLimiter) idleTTL() time.Duration {
 	return time.Hour
 }
 
-// NewLoginLimiter 构造登录限流器。
-//
-// maxAttempts <= 0 表示关闭限流。
+// NewLoginLimiter 构造登录限流器；maxAttempts <= 0 表示关闭限流。
 func NewLoginLimiter(maxAttempts int, lockout time.Duration) *LoginLimiter {
 	if lockout <= 0 {
 		lockout = 15 * time.Minute

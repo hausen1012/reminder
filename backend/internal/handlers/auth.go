@@ -93,11 +93,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	})
 }
 
-// RetryAfterSeconds 把锁定剩余时长换算成 Retry-After 的秒数。
-//
-// HTTP 规范允许 Retry-After 用秒数或 HTTP-date；这里用秒数，更简单也更通用。
-// 向上取整并至少返回 1：剩余 0.4 秒时返回 "0" 会让客户端立刻重试，
-// 而实际上这一刻仍被判定为锁定。
+// RetryAfterSeconds 把锁定剩余时长换算成 Retry-After 秒数（向上取整，至少 1）。
 func RetryAfterSeconds(d time.Duration) int {
 	if d <= 0 {
 		return 1

@@ -1,11 +1,6 @@
-// Engine 是调度器的核心：把 Reminder 按其 (Calendar, ScheduleType) 注册到
-// 合适的触发器上（cron.AddFunc 或 time.AfterFunc），到点触发 fire 闭包。
-//
-// fire 闭包负责：
-//  1. 重读最新 Reminder（防止过时缓存）
-//  2. 在短事务内乐观锁更新 next_fire_at + 插入 pending delivery_log
-//  3. 异步把 dispatch 任务交给 DispatchService
-//  4. 若非 cron 触发器，重新算下一次并注册新的 AfterFunc
+// Engine 把 Reminder 按 (Calendar, ScheduleType) 注册到 cron 或 time.AfterFunc，
+// 到点触发 fire：重读提醒 → 事务内乐观锁推进 next_fire_at 并插入 pending 日志
+// → 异步交给 DispatchService → 非 cron 触发器重算并注册下一次。
 package scheduler
 
 import (
@@ -23,9 +18,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// Dispatcher 是 Engine 调用 dispatch 阶段的接口，避免循环依赖。
-//
-// 实现：services.DispatchService。
+// Dispatcher 是 Engine 触发后交给下游的接口，避免循环依赖（实现：services.DispatchService）。
 type Dispatcher interface {
 	Run(ctx context.Context, reminder *models.Reminder, deliveryLogID uint)
 }
@@ -40,14 +33,10 @@ type Engine struct {
 	mu  sync.Mutex
 	reg map[uint]*registered
 
-	// reloadMu 串行化 ReloadTimezone。
-	// 两次并发改时区（多标签页同时保存）若交错执行，会出现一个把另一个刚重建的
-	// cron 实例整替换掉、而 RecomputeNextFire 又用着中间态时区的乱象。
+	// reloadMu 串行化 ReloadTimezone，避免并发改时区时交错重建 cron 实例。
 	reloadMu sync.Mutex
 
-	// purgeJobs 记录通过 AddPurgeCron 注册的维护型定时任务。
-	// 它们不属于任何提醒，ReloadTimezone 整体替换 cron 实例时必须一并恢复，
-	// 否则改一次时区，每日清理任务就永久消失，直到进程重启。
+	// purgeJobs 是维护型定时任务，ReloadTimezone 替换 cron 实例时需一并恢复。
 	purgeJobs []purgeJob
 
 	stopped    bool
@@ -76,10 +65,7 @@ type registered struct {
 	timer   *time.Timer  // kind=afterfunc 时有效
 }
 
-// NewEngine 构造 Engine；时区用于 cron 解析与 AfterFunc 计算。
-//
-// 传入 Provider 而不是固定的 *time.Location：站点时区可以在设置页热更新，
-// 每次计算都会读取当时的时区。
+// NewEngine 构造 Engine；传入 Provider 而非固定时区，以支持设置页热更新。
 func NewEngine(db *gorm.DB, disp Dispatcher, tz *timezone.Provider) *Engine {
 	if tz == nil {
 		tz = timezone.New("")
@@ -96,13 +82,8 @@ func NewEngine(db *gorm.DB, disp Dispatcher, tz *timezone.Provider) *Engine {
 
 // ReloadTimezone 在站点时区变更后重建 cron 实例、回写下次触发时间并重新注册全部提醒。
 //
-// robfig/cron 的时区在构造时固定，改时区只能重建实例；
-// 已注册的 AfterFunc 也要按新时区重算下次触发时间。
-//
-// 除了内存里的注册项，库里持久化的 next_fire_at 也必须按新时区重算：
-// sweeper 是拿库里的值判断补漏的（next_fire_at <= now），时区往前移之后
-// 旧值会变成过去时间，落在容忍窗口内会被立刻补发一次、超出窗口则被标记 expired，
-// 都不该发生在"用户只是改了个时区"的时候。
+// cron 的时区在构造时固定，只能重建；库里的 next_fire_at 也必须重算，
+// 否则 sweeper 会按旧值把改时区误判成漏触发（补发或标记 expired）。
 func (e *Engine) ReloadTimezone() {
 	e.reloadMu.Lock()
 	defer e.reloadMu.Unlock()
@@ -126,8 +107,7 @@ func (e *Engine) ReloadTimezone() {
 	}
 	e.mu.Unlock()
 
-	// cron.Stop 会等待正在执行的 job 结束，其中可能回调 fire 去拿 e.mu，
-	// 因此必须在释放锁之后调用。
+	// cron.Stop 会等待正在执行的 job 结束，其中可能回调 fire 去拿 e.mu，须在释放锁后调用
 	if wasStarted && old != nil {
 		if ctx := old.Stop(); ctx != nil {
 			<-ctx.Done()
@@ -137,8 +117,7 @@ func (e *Engine) ReloadTimezone() {
 	if wasStarted {
 		e.cron.Start()
 	}
-	// 先回写库里的下次触发时间，再注册：addAfterFunc 会重算并覆盖内存中的定时器，
-	// 但 cron 条目的触发时间由 cron 实例按新时区解析，不依赖库里的值。
+	// 先回写库里的下次触发时间，再注册（addAfterFunc 会重算并覆盖内存定时器）
 	if n, err := e.RecomputeNextFire(); err != nil {
 		slog.Warn("时区变更后重算下次触发时间失败", "error", err)
 	} else {
@@ -151,12 +130,8 @@ func (e *Engine) ReloadTimezone() {
 
 // RecomputeNextFire 按当前站点时区重算所有 enabled 提醒的 next_fire_at 并回写。
 //
-// after 基准取 now 而不是 last_fired_at：时区变更只应改变"当地几点触发"，
-// 不应把时区前移后已成过去的旧计划当作漏触发补上一串。
-// 单次提醒若在新时区下已过期，next_fire_at 写空——与"已触发过的 once"同一形态，
-// 但不动 enabled：开关是用户的意图，不该因为改时区被悄悄改掉。
-//
-// 返回实际更新的行数。
+// 基准取 now 而非 last_fired_at：改时区不应把已成过去的旧计划当成漏触发补发。
+// 单次提醒若在新时区下已过期则写空 next_fire_at，但不改动 enabled。
 func (e *Engine) RecomputeNextFire() (int, error) {
 	var items []models.Reminder
 	if err := e.db.Where("enabled = ?", true).Find(&items).Error; err != nil {
@@ -193,9 +168,7 @@ func (e *Engine) RecomputeNextFire() (int, error) {
 	return updated, nil
 }
 
-// ExtraEntryCount 返回 cron 实例里除提醒之外的任务数量（如每日日志清理）。
-//
-// 用于断言时区变更重建后维护型任务没有丢失。
+// ExtraEntryCount 返回 cron 实例里除提醒之外的任务数量，用于断言时区重建后维护任务未丢失。
 func (e *Engine) ExtraEntryCount() int {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -295,10 +268,7 @@ func (e *Engine) Remove(id uint) {
 	delete(e.reg, id)
 }
 
-// addCron 把 solar/cron 注册到 cron.Cron 实例。
-//
-// robfig/cron 在 WithSeconds() 下需要 6 字段；配置里给的是标准 5 字段，
-// 这里统一补上秒位 "0 "（用户配置含义不变）。
+// addCron 把 solar/cron 注册到 cron 实例；配置给的是 5 字段，这里补上秒位。
 func (e *Engine) addCron(r *models.Reminder, spec *ScheduleSpec) error {
 	if spec.Expr == "" {
 		return errors.New("cron 表达式为空")
@@ -317,9 +287,7 @@ func (e *Engine) addCron(r *models.Reminder, spec *ScheduleSpec) error {
 	return nil
 }
 
-// addAfterFunc 为 solar/once 与 solar/interval 注册一次性 AfterFunc。
-//
-// 若计算出的下次触发为 nil（spec 已过期）或在过去太久，直接不注册。
+// addAfterFunc 为 once / interval 注册一次性 AfterFunc；下次触发为 nil（已过期）时不注册。
 func (e *Engine) addAfterFunc(r *models.Reminder, spec *ScheduleSpec) error {
 	if r == nil {
 		return errors.New("reminder 不能为空")
@@ -495,13 +463,8 @@ func (e *Engine) LastFireTime() time.Time {
 	return e.lastFireAt
 }
 
-// fire 是所有触发器的统一入口。
-//
-// 步骤：
-//  1. 重读最新 reminder；不存在/已禁用直接 return
-//  2. 短事务：乐观锁更新 next_fire_at + 插入 delivery_log(pending)
-//  3. 异步交给 dispatcher
-//  4. 若非 cron 触发器，注册下一次 AfterFunc
+// fire 是所有触发器的统一入口：重读提醒 → 事务内乐观锁推进 next_fire_at 并插入
+// pending 日志 → 异步投递 → 非 cron 触发器注册下一次。
 func (e *Engine) fire(id uint) {
 	e.lastFireMu.Lock()
 	e.lastFireAt = time.Now()
@@ -521,7 +484,7 @@ func (e *Engine) fire(id uint) {
 	}
 
 	now := time.Now()
-	// 若下次触发时间还在未来（允许 2 秒时钟抖动容差），说明已被其它并发路径（如 cron/sweeper）触发并推进，跳过本次触发
+	// next_fire_at 仍在未来（留 2 秒时钟抖动的容差）说明已被其它路径触发并推进
 	if r.NextFireAt != nil && r.NextFireAt.After(now.Add(2*time.Second)) {
 		return
 	}
@@ -535,7 +498,7 @@ func (e *Engine) fire(id uint) {
 	// 算出新的 next_fire_at（cron 也要算，用于持久化展示）
 	newNext, err := Compute(r.Calendar, r.ScheduleType, spec, now, e.tz.Get())
 	if err != nil {
-		// 继续触发本次提醒（用户等的是这一条），但下次时间会写空，必须留痕
+		// 本次照常投递，但 next_fire_at 会写空，必须留痕
 		slog.Error("触发时计算下次触发时间失败，本次仍投递，next_fire_at 将写空",
 			"reminder", id, "title", r.Title, "schedule_type", r.ScheduleType, "calendar", r.Calendar, "error", err)
 	}
@@ -545,8 +508,7 @@ func (e *Engine) fire(id uint) {
 
 	var logID uint
 	err = e.db.Transaction(func(tx *gorm.DB) error {
-		// 乐观锁：用旧 next_fire_at 防止重复触发。
-		// next_fire_at 是整数毫秒列，等值比较精确。
+		// 乐观锁：用旧 next_fire_at 做等值条件，防止重复触发
 		oldNext := r.NextFireAt
 		q := tx.Model(&models.Reminder{}).Where("id = ? AND enabled = ?", id, true)
 		if oldNext != nil {
@@ -635,10 +597,7 @@ func (e *Engine) LoadAndRegisterAll() error {
 	return nil
 }
 
-// AddPurgeCron 注册一个每天凌晨 3 点的日志清理任务。
-//
-// 任务会记进 purgeJobs，这样 ReloadTimezone 重建 cron 实例后能自动恢复；
-// 调用方无需（也不应该）在时区变更后手动重注册。
+// AddPurgeCron 注册一个每天凌晨 3 点的日志清理任务（ReloadTimezone 后自动恢复）。
 func (e *Engine) AddPurgeCron(logSrv interface {
 	Purge(olderThan time.Duration, all bool) (int64, error)
 }, purgeAfter time.Duration) (cron.EntryID, error) {
@@ -656,23 +615,18 @@ func (e *Engine) AddPurgeCron(logSrv interface {
 // DailyPurgeExpr 是维护型任务的运行时刻：每天凌晨 3 点（含秒字段）。
 const DailyPurgeExpr = "0 0 3 * * *"
 
-// AddDailyJob 注册一个每天凌晨 3 点运行的维护型任务。
-//
-// 任务会记进 purgeJobs，ReloadTimezone 重建 cron 实例后自动恢复；
-// name 只用于日志，便于区分是哪一个维护任务出了错。
+// AddDailyJob 注册一个每天凌晨 3 点运行的维护型任务；name 只用于日志。
 func (e *Engine) AddDailyJob(name string, expr string, job func()) (cron.EntryID, error) {
 	wrapped := func() {
 		defer func() {
-			// 维护任务跑在 cron goroutine 里，panic 会带崩整个进程，
-			// 这里兜住并记录，下一个周期照常执行。
+			// 维护任务跑在 cron goroutine 里，panic 会带崩进程，这里兜住并记录
 			if r := recover(); r != nil {
 				slog.Error("维护任务 panic", "job", name, "recover", r, "stack", debug.Stack())
 			}
 		}()
 		job()
 	}
-	// 持锁登记与注册：ReloadTimezone 会整体替换 e.cron，
-	// 若这里不加锁，可能把任务登记到已被替换的旧实例上，导致清理任务丢失。
+	// 持锁登记与注册：ReloadTimezone 会整体替换 e.cron，不加锁可能把任务登记到旧实例上
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	id, err := e.cron.AddFunc(expr, wrapped)

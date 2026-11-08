@@ -1,7 +1,6 @@
 // Package services 业务服务层：handler 与 DB/外部资源之间的胶水。
 //
-// channel_service 负责通道的 CRUD、敏感字段透明加解密、试发。
-// 敏感字段约定：Config JSON 内任意以 "_enc" 结尾的字段值在落库前加密、读出后解密。
+// 敏感字段约定：通道 Config 内任意以 "_enc" 结尾的字段值在落库前加密、读出后解密。
 package services
 
 import (
@@ -37,9 +36,7 @@ func NewChannelService(db *gorm.DB, box *secretbox.Box, tz *timezone.Provider) *
 	return &ChannelService{DB: db, Box: box, TZ: tz}
 }
 
-// ChannelInput 是 Create/Update 的入参。
-//
-// Config 是前端传入的明文 map，内含 _enc 后缀字段时由本服务加密后再落库。
+// ChannelInput 是 Create/Update 的入参；Config 是前端传入的明文，_enc 后缀字段由本服务加密。
 type ChannelInput struct {
 	Name    string         `json:"name"`
 	Type    string         `json:"type"`
@@ -47,8 +44,7 @@ type ChannelInput struct {
 	Config  map[string]any `json:"config"`
 }
 
-// ChannelView 是返回给前端的视图：Config 内 _enc 后缀字段统一脱敏成 "***"，
-// 这样前端看不到明文，编辑时若留空表示不修改。
+// ChannelView 是返回给前端的视图：_enc 后缀字段统一脱敏成 "***"。
 type ChannelView struct {
 	ID        uint           `json:"id"`
 	Name      string         `json:"name"`
@@ -110,9 +106,7 @@ func (s *ChannelService) Create(in ChannelInput) (*ChannelView, error) {
 	return s.toView(ch), nil
 }
 
-// Update 修改通道，禁止修改 Type。
-//
-// Config 中带 _enc 后缀的字段：值为占位符 "***" 时保留原密文不变，其他值视为新明文。
+// Update 修改通道，禁止修改 Type；_enc 字段传 "***" 表示保留原密文。
 func (s *ChannelService) Update(id uint, in ChannelInput) (*ChannelView, error) {
 	ch, err := s.getOrNotFound(id)
 	if err != nil {
@@ -132,11 +126,8 @@ func (s *ChannelService) Update(id uint, in ChannelInput) (*ChannelView, error) 
 		_ = json.Unmarshal(ch.Config, &oldEnc)
 	}
 
-	// 只对 patch 里的字段做加密，再叠加到旧配置上，实现部分更新。
-	//
-	// 不能先 mergeConfig 再整体 encryptConfig：旧配置里 _enc 字段已是密文，
-	// 整体加密会把密文再加密一次（二次加密）；也不能只写 in.Config，
-	// 那样未提交的字段会被静默丢弃（而 validateInput 校验的是合并后的结果）。
+	// 只加密 patch 里的字段再叠加到旧配置：不能整体加密（旧 _enc 已是密文，会被二次加密），
+	// 也不能只写 in.Config（未提交字段会被丢弃）
 	patchEnc, err := s.encryptConfig(in.Config, oldEnc)
 	if err != nil {
 		return nil, middleware.NewAppError(middleware.CodeValidationFailed, err.Error())
@@ -304,16 +295,13 @@ func (s *ChannelService) DryRun(ctx context.Context, chType string, config map[s
 	}
 	if err := n.Send(ctx, plainConfig, rendered); err != nil {
 		slog.Warn("通道试发失败", "type", chType, "error", err)
-		// 试发失败通常是配置问题（密码错、地址不通），属于用户可处理的范围，
-		// 应返回 400 + 原文案，而不是 500「服务器内部错误」
+		// 试发失败通常是配置问题，返回 400 + 原文案而不是 500
 		return middleware.NewAppError(middleware.CodeValidationFailed, "试发失败: "+err.Error())
 	}
 	return nil
 }
 
-// DecryptedConfig 返回明文 config JSON，供 dispatch 阶段直接喂给 Notifier。
-//
-// dispatch 不应再回经 ChannelView（视图把敏感字段脱敏掉了）。
+// DecryptedConfig 返回明文 config JSON，供 dispatch 阶段直接喂给 Notifier（视图已脱敏）。
 func (s *ChannelService) DecryptedConfig(ch *models.Channel) ([]byte, error) {
 	dec, err := s.decryptConfig(ch.Config)
 	if err != nil {
@@ -335,9 +323,7 @@ type ChannelStats struct {
 	SuccessRate float64 `json:"success_rate"`
 }
 
-// Stats 返回指定时间窗口内各通道的发送统计。
-//
-// 没有发送记录的通道也包含在结果中（total=0）。
+// Stats 返回指定时间窗口内各通道的发送统计；没有记录的通道也包含在结果中。
 func (s *ChannelService) Stats(window time.Duration) ([]*ChannelStats, error) {
 	cutoff := time.Now().Add(-window)
 
@@ -520,10 +506,7 @@ func mergeConfig(ch *models.Channel, patch map[string]any) map[string]any {
 	return merged
 }
 
-// encryptConfig 把 cfg 内 _enc 后缀字段的明文值加密。
-// 当字段值是 sensitivePlaceholder（"***"）时：
-//   - oldEnc 中存在该字段：复制原密文；
-//   - 否则视为留空。
+// encryptConfig 加密 cfg 内 _enc 后缀字段；值为 "***" 时沿用 oldEnc 里的原密文，否则视为留空。
 func (s *ChannelService) encryptConfig(cfg map[string]any, oldEnc map[string]any) (map[string]any, error) {
 	out := make(map[string]any, len(cfg))
 	for k, v := range cfg {
@@ -558,12 +541,10 @@ func (s *ChannelService) encryptConfig(cfg map[string]any, oldEnc map[string]any
 	return out, nil
 }
 
-// decryptConfig 把 cfg 内 _enc 后缀字段的密文解密为明文。
+// decryptConfig 解密 cfg 内 _enc 后缀字段。
 //
-// 解密失败最常见的原因是换过 ENCRYPTION_KEY，此时密文已经无法还原。
-// 这里返回 AppError（而不是裸 error）：试发接口会把该错误直接透给用户，
-// 裸 error 经 ErrorHandler 会变成 500，用户只看到「服务器内部错误」，
-// 完全无法判断该怎么办。返回 400 + 明确提示，用户就知道要重新填写。
+// 解密失败最常见于更换过 ENCRYPTION_KEY；返回 AppError 而非裸 error，
+// 让用户看到「请重新填写」而不是 500。
 func (s *ChannelService) decryptConfig(raw datatypes.JSON) (map[string]any, error) {
 	cfg := map[string]any{}
 	if len(raw) > 0 {

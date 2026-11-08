@@ -9,20 +9,15 @@ import (
 	"github.com/reminder/backend/internal/logger"
 )
 
-// jwtClaims 是 JWT 中我们关心的字段。
-//
-// 用结构化 claims 而不是 MapClaims：解析即校验类型，避免手写
-// float64 断言后出现"类型不符静默变 0"的情况。
+// jwtClaims 是 JWT 中我们关心的字段；用结构化 claims 而非 MapClaims 以避免类型断言静默变 0。
 type jwtClaims struct {
 	UserID   uint   `json:"user_id"`
 	Username string `json:"username"`
 	jwt.RegisteredClaims
 }
 
-// JWTAuth 返回基于 HS256 的认证中间件。
-//
-// 校验失败一律返回 401；验签算法通过 jwt.WithValidMethods 限定为 HS256，
-// 从而阻断 alg=none 与算法混淆攻击。
+// JWTAuth 返回基于 HS256 的认证中间件，校验失败一律 401；
+// 限定 HS256 可阻断 alg=none 与算法混淆攻击。
 func JWTAuth(secret string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		auth := c.GetHeader("Authorization")
@@ -37,9 +32,7 @@ func JWTAuth(secret string) gin.HandlerFunc {
 			return []byte(secret), nil
 		}, jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}))
 		if err != nil || !token.Valid {
-			// 对外仍是同一句「无效或已过期」，但日志里要能区分到底是验签失败、
-			// 过期还是格式错误：不记下来，线上只能猜。
-			// request_id 由 logger.FromContext 从 ctx 里自动带上。
+			// 对外文案相同，日志里要区分验签失败、过期还是格式错误
 			if err != nil {
 				logger.FromContext(c.Request.Context()).Warn("JWT 校验失败",
 					"path", c.Request.URL.Path, "error", err)

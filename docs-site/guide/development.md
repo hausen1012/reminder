@@ -70,8 +70,7 @@ docs-site/             文档站点（VitePress）
 ```
 
 前端展示时间统一走 `src/lib/datetime.ts`（`formatInZone` / `formatNextFireInZone`），
-时区取自 `useSiteTimezone()`（站点全局设置）。不要直接用 `new Date(x).toLocaleString()`：
-那会跟随浏览器本地时区，用户换设备后看到的时间会整体偏移。
+时区取自 `useSiteTimezone()`。不要用 `new Date(x).toLocaleString()`：那会跟随浏览器本地时区。
 
 ## 后端测试
 
@@ -85,21 +84,17 @@ CI 里会用 `-race` 跑一遍，因此涉及并发的改动建议本地也加�
 cd backend && go test ./... -race -count=1
 ```
 
-测试覆盖的重点路径包括：调度乐观锁、兜底补发与过期、通道投递状态机、确认重发链、
+测试覆盖的重点路径：调度乐观锁、兜底补发与过期、通道投递状态机、确认重发链、
 外部 API 令牌隔离、确认链接转义、AI 工具编排与待确认操作。
 
 AI 相关测试用 fake `llm.Provider` 注入脚本化响应（`services/ai_service_test.go`），
-不访问真实网络；OpenAI 兼容协议本身用 `httptest` 起本地服务验证请求形状
-（`llm/provider_test.go`）。浮窗的本地存储恢复、草稿角标等行为在
-`components/ai/AIChatWidget.test.tsx` 里用 `sessionStorage` 覆盖。
+不访问真实网络；OpenAI 兼容协议用 `httptest` 验证请求形状（`llm/provider_test.go`）。
 
-写测试时的三个惯例：
+写测试的三个惯例：
 
-- 内存 SQLite 建库与固定时区统一走 `internal/testutil`（`testutil.NewDB(t)`、
-  `testutil.CST()`、`testutil.TZ(loc)`），各包不再各自抄一份建库代码
-- 每个包共享的脚手架（fake 替身、造数辅助、等待函数）集中放在该包的
-  `testutil_test.go`，不散落在具体用例文件里
-- handler 的测试通过 `httptest` 打真实路由，而不是直接调用方法
+- 内存 SQLite 与固定时区统一走 `internal/testutil`（`testutil.NewDB(t)`、`testutil.CST()`、`testutil.TZ(loc)`）
+- 每个包共享的脚手架（fake、造数辅助、等待函数）集中放在该包的 `testutil_test.go`
+- handler 测试通过 `httptest` 打真实路由，而不是直接调用方法
 
 ## 前端测试
 
@@ -130,11 +125,9 @@ cd frontend && npm run test:coverage
 { "error": { "code": "validation_failed", "message": "标题必填", "field": "title" } }
 ```
 
-handler 里只需 `abortErr(c, err)`，不要自己拼错误响应体。这样前端只需要实现一套错误解析逻辑。
-
-`/api` 下未注册的路径由 `router.registerNotFound` 统一补成同样的结构，
-因此新增路由时不需要额外处理 404。前端取值统一用 `lib/api.ts` 的
-`extractApiError` / `extractApiErrorCode` / `extractApiErrorField`。
+handler 里只需 `abortErr(c, err)`，不要自己拼错误响应体。
+`/api` 下未注册的路径由 `router.registerNotFound` 补成同样的结构，新增路由无需额外处理 404。
+前端取值统一用 `lib/api.ts` 的 `extractApiError` / `extractApiErrorCode` / `extractApiErrorField`。
 
 ## 日志与凭据
 
@@ -147,25 +140,18 @@ handler 里只需 `abortErr(c, err)`，不要自己拼错误响应体。这样�
 | 要记渲染后的正文 / 变量 | 只记长度（`body_len`、`vars_count`），不记内容 |
 | 要记 AI 上游错误 | `llm.ErrorAttrs(err)` / `ErrorAttrsWith(err, ...)`，展开出 `status` / `body` / `upstream_request_id` |
 
-正文里可能带 `{{confirm_url}}`（一次性确认令牌），变量里还可能带用户内容，
-记全文等于把令牌与隐私一起写进日志。`log` 通道是唯一例外——它的用途就是把正文打出来。
-AI 对话的 `user_message` 是另一个例外：只截断 500 字后记录，用于复现出问题的提问。
+正文里可能带 `{{confirm_url}}`（一次性确认令牌），变量里还可能带用户内容，记全文等于把令牌与隐私写进日志。
+`log` 通道与 AI 的 `user_message`（截断 500 字）是仅有的例外。
 
 ### 写日志的约定
 
-- **请求内用 `logger.FromContext(ctx)`**：它返回带 `request_id` 的 logger，
-  不用再手工拼 `request_id` 字段。中间件在 `RequestID` 里把 id 写进请求 ctx，
-  service 层拿到的 ctx 会一路带下去。
-- **级别要选对**：失败路径用 `Warn` / `Error`，不要用 `Info`——否则设置
-  `LOG_LEVEL=warn` 时真正的故障会被一起藏掉。`Info` 只留给生命周期与业务节点，
-  `Debug` 留给中间步骤与高频成功明细（访问日志的 2xx、投递阶段日志、AI 工具轮次）。
-- **错误必须带 `error` 字段**：`log.Warn("...", "error", err)`，不要只写一句
-  「失败了」。
-- **HTTP 错误只记一次**：handler 用 `abortErr`，由 `ErrorHandler` 统一记录并分级；
-  请求体解析失败用 `abortBindErr(c, err, "请求体格式错误")`，底层原因会挂到
-  `AppError.Cause` 上，在同一条日志的 `error` 字段里输出。不要在 handler 里再补一条。
-- **带上下文**：投递链路带 `reminder` / `log` / `channel` / `attempt`，便于 `grep` 串起来。
-- **单条日志别太长**：用户输入、上游响应体要截断（500 / 1000 字），并只记必要的字段。
+- **请求内用 `logger.FromContext(ctx)`**：自动带 `request_id`，不必手工拼字段。
+- **级别要选对**：失败路径用 `Warn` / `Error`，`Info` 只留给生命周期与业务节点，
+  `Debug` 留给中间步骤与高频成功明细。
+- **错误必须带 `error` 字段**：`log.Warn("...", "error", err)`。
+- **HTTP 错误只记一次**：handler 用 `abortErr` / `abortBindErr`，由 `ErrorHandler` 统一记录，不要再补一条。
+- **带上下文**：投递链路带 `reminder` / `log` / `channel` / `attempt`，便于 grep 串起来。
+- **单条日志别太长**：用户输入、上游响应体要截断（500 / 1000 字）。
 
 ## 文档站点
 

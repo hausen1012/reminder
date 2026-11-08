@@ -1,11 +1,6 @@
-// token_service 管理令牌的全生命周期。
+// token_service 管理令牌的全生命周期：外部程序用 X-AUTH 调用 /api/external/v1/*。
 //
-// 外部程序通过 X-AUTH 鉴权调用 /api/external/v1/*，面板也可以创建/管理令牌。
-// 明文令牌仅创建时一次性返回，后续默认只展示前缀；如需重复查看则由
-// GetPlaintext 解密后返回。
-//
-// 明文用 secretbox 加密后入库（与通道敏感字段同一把密钥）：数据库文件泄漏时
-// 不应连带泄漏可直接调用的令牌。解密失败时不回退、不猜测，直接提示重新创建。
+// 明文用 secretbox 加密后入库（与通道敏感字段同一把密钥）；创建时一次性返回，之后需经 GetPlaintext 解密查看。
 package services
 
 import (
@@ -34,9 +29,7 @@ type TokenService struct {
 	lastUsedAt map[uint]time.Time // 节流 TouchLastUsed
 }
 
-// NewTokenService 构造服务。
-//
-// box 用于加密入库的明文；为 nil 时退化为不加密（仅测试用）。
+// NewTokenService 构造服务；box 为 nil 时不加密（仅测试用）。
 func NewTokenService(db *gorm.DB, box *secretbox.Box) *TokenService {
 	return &TokenService{
 		DB:         db,
@@ -186,9 +179,7 @@ func (s *TokenService) DefaultChannelIDs(keyID uint) []uint {
 	return ids
 }
 
-// DefaultChannelIDsBatch 一次查出多个令牌的默认通道，返回 token_id → channel_id 列表。
-//
-// 列表接口不能用逐条 DefaultChannelIDs：每页 N 个令牌就是 N 次额外查询（N+1）。
+// DefaultChannelIDsBatch 一次查出多个令牌的默认通道，避免列表接口 N+1 查询。
 func (s *TokenService) DefaultChannelIDsBatch(keyIDs []uint) (map[uint][]uint, error) {
 	out := make(map[uint][]uint, len(keyIDs))
 	if len(keyIDs) == 0 {
@@ -252,12 +243,8 @@ func (s *TokenService) UpdateDefaultChannels(id uint, channelIDs []uint) error {
 	})
 }
 
-// GetPlaintext 返回令牌的明文（从库里解密）。
-//
-// 读取路径保证不返回 500：
-//   - 解密成功，返回明文；
-//   - 解密失败（通常是换过 ENCRYPTION_KEY），返回 404 + 可操作提示，
-//     而不是把库里的密文当明文返回（用户会误以为那是令牌）。
+// GetPlaintext 返回令牌明文。解密失败（通常是更换 ENCRYPTION_KEY）时返回 404 + 提示，
+// 不会把密文当明文返回。
 func (s *TokenService) GetPlaintext(id uint) (string, error) {
 	var key models.Token
 	if err := s.DB.First(&key, id).Error; err != nil {
@@ -274,11 +261,8 @@ func (s *TokenService) GetPlaintext(id uint) (string, error) {
 
 // --- 明文加解密 ---
 
-// sealPlaintext 加密明文供落库；没有配置 Box 时原样返回（测试场景）。
-//
-// 加密失败时宁可让创建失败，也不静默降级为明文入库：
-// 那会在用户不知情的情况下掏空这层保护。这条路径实际不可达
-// （只有 crypto/rand 失败才会触发），因此允许它返回 500。
+// sealPlaintext 加密明文供落库；Box 为 nil 时原样返回（测试场景）。
+// 加密失败宁可让创建失败，也不静默降级为明文入库。
 func (s *TokenService) sealPlaintext(plain string) (string, error) {
 	if s.Box == nil {
 		return plain, nil
@@ -291,10 +275,7 @@ func (s *TokenService) sealPlaintext(plain string) (string, error) {
 	return enc, nil
 }
 
-// openPlaintext 解密库里的明文，保证不返回 500。
-//
-//  1. 解密成功 → 返回明文；
-//  2. 解密失败 → 返回 404 + 提示重新创建（如 ENCRYPTION_KEY 被更换，密文无法还原）。
+// openPlaintext 解密库里的明文；失败时返回 404 + 提示重新创建，不返回 500。
 func (s *TokenService) openPlaintext(stored string) (string, error) {
 	// 未配置加密层（仅测试场景）：库里存的就是明文
 	if s.Box == nil {
@@ -372,9 +353,7 @@ type TokenView struct {
 	Usage24h          int64  `json:"usage_24h"`
 }
 
-// ListViews 返回令牌富列表，支持分页和搜索。
-//
-// 默认通道与 24h 用量都按整页一次性批量查询：逐条查会变成 2N+1 次往返。
+// ListViews 返回令牌富列表，支持分页和搜索；默认通道与 24h 用量按整页批量查询。
 func (s *TokenService) ListViews(limit, offset int, search string) ([]*TokenView, int64, error) {
 	keys, total, err := s.List(limit, offset, search)
 	if err != nil {

@@ -1,11 +1,7 @@
-// Package scheduler 提供调度器相关组件：
-//   - nextfire：从 ScheduleSpec 算下一次触发的纯函数
-//   - engine：trigger 注册/反注册（cron + AfterFunc）
-//   - sweeper：补漏扫描
-//   - confirm_retry：未确认重发链
+// Package scheduler 提供调度相关组件：nextfire（计算下次触发）、engine（触发器注册）、
+// sweeper（补漏扫描）、confirm_retry（未确认重发链）。
 //
-// 时区统一由 timezone.Provider 提供，可用 loc 参数传入固定时区做单元测试。
-// 时间落库统一走 models.Time（Unix 毫秒整数），偏移不再影响比较与排序。
+// 时区统一由 timezone.Provider 提供；时间落库统一走 models.Time（Unix 毫秒整数）。
 package scheduler
 
 import (
@@ -19,8 +15,7 @@ import (
 
 // ScheduleSpec 是 Reminder.ScheduleSpec 反序列化后的结构。
 //
-// 一个 spec 同时只会用到对应 (Calendar, ScheduleType) 子集字段，其他字段为零值。
-// JSON tag 与设计文档 §3.2 一致。
+// 一个 spec 只会用到对应 (Calendar, ScheduleType) 的子集字段，其他字段为零值。
 type ScheduleSpec struct {
 	// solar/once
 	At string `json:"at,omitempty"` // 配置时区下的本地时间 "2006-01-02T15:04:05"
@@ -62,9 +57,7 @@ func ParseSpec(raw []byte) (*ScheduleSpec, error) {
 
 // Compute 根据 (calendar, scheduleType, spec, after, loc) 算出下一次触发时间。
 //
-// 返回值的时区与 loc 一致（便于按"当地几点"阅读与断言）；落库时由
-// models.Time 统一归一化为 Unix 毫秒，调用方无需再做时区转换。
-// 返回 nil（不报错）表示该 spec 已不会再触发（如单次已过期）。
+// 返回值的时区与 loc 一致；返回 nil 表示该 spec 已不会再触发（如单次已过期）。
 func Compute(calendar, scheduleType string, spec *ScheduleSpec, after time.Time, loc *time.Location) (*time.Time, error) {
 	if spec == nil {
 		return nil, fmt.Errorf("spec 不能为空")
@@ -115,11 +108,9 @@ func computeSolarInterval(s *ScheduleSpec, after time.Time, loc *time.Location) 
 	if err != nil {
 		return nil, fmt.Errorf("解析 start_at 失败: %w", err)
 	}
-	// 第一次触发就是 start_at；之后按 every*unit 累加。
-	// 在大粒度（month/year）下使用 AddDate，按设计文档保留日历语义。
+	// 第一次触发就是 start_at；之后按 every*unit 累加，month/year 用 AddDate 保留日历语义
 	t := start
-	// 估算跳几步（粗略），避免极小 every 时一次一次累加太多
-	// 但 month/year 不能用纯秒数估算，保险起见仍用循环但加上保护上限。
+	// 保险上限，避免异常参数导致死循环
 	const maxIters = 1 << 20
 	for i := 0; i < maxIters; i++ {
 		if t.After(after) {
@@ -153,10 +144,7 @@ func computeSolarCron(s *ScheduleSpec, after time.Time, loc *time.Location) (*ti
 	return &t, nil
 }
 
-// addInterval 按 unit 累加 every 个单位。
-//
-// minute/hour 用 Duration；day/month/year 用 AddDate 保留日历语义
-// （例如 1/31 + 1 month = 2/28 由 time 包按规范处理）。
+// addInterval 按 unit 累加 every 个单位；day/month/year 用 AddDate 保留日历语义。
 func addInterval(t time.Time, every int, unit string) (time.Time, error) {
 	switch unit {
 	case "minute":
@@ -216,11 +204,8 @@ func computeLunarInterval(s *ScheduleSpec, after time.Time, loc *time.Location) 
 	return nil, fmt.Errorf("lunar interval 循环超过上限")
 }
 
-// addLunarInterval 按 unit 在农历上累加。
-//
-// day：用 lunar-go 的 Next(days) 保留农历日历语义；
-// month/year：直接对农历月份/年份做加法，size_policy=shift 自动处理月末。
-// leap_policy=skip：始终只产生非闰月的日期，自然满足。
+// addLunarInterval 按 unit 在农历上累加：day 用 Next(days)，month/year 对农历月/年做加法
+// （size_policy=shift 处理月末，leap_policy=skip 只产生非闰月日期）。
 func addLunarInterval(t time.Time, every int, unit string, loc *time.Location) (time.Time, error) {
 	switch unit {
 	case "day":
@@ -237,10 +222,7 @@ func addLunarInterval(t time.Time, every int, unit string, loc *time.Location) (
 	return time.Time{}, fmt.Errorf("lunar 不支持的 unit: %s", unit)
 }
 
-// addLunarMonths 在农历月份上累加，使用 calendar 语义：
-//   - month 1-12 永远对应非闰月（闰月编号为负值，不在计算中出现）
-//   - 月份超出 12 时进位到年份
-//   - size_policy=shift：目标日的天数超过当月天数时顺延到月末
+// addLunarMonths 在农历月份上累加：只对应非闰月，超 12 进位到年，月末顺延。
 func addLunarMonths(t time.Time, months int, loc *time.Location) (time.Time, error) {
 	lun := calendar.NewLunarFromSolar(calendar.NewSolarFromYmd(t.Year(), int(t.Month()), t.Day()))
 	ly := lun.GetYear()
@@ -292,8 +274,7 @@ func addLunarYears(t time.Time, years int, loc *time.Location) (time.Time, error
 		t.Hour(), t.Minute(), 0, 0, loc), nil
 }
 
-// parseLocalTime 解析 "YYYY-MM-DDTHH:MM[:SS]" 字符串为指定时区时间。
-// 允许末尾不带秒。
+// parseLocalTime 解析 "YYYY-MM-DDTHH:MM[:SS]" 为指定时区时间，允许末尾不带秒。
 func parseLocalTime(s string, loc *time.Location) (time.Time, error) {
 	layouts := []string{
 		"2006-01-02T15:04:05",
@@ -309,9 +290,7 @@ func parseLocalTime(s string, loc *time.Location) (time.Time, error) {
 	return time.Time{}, fmt.Errorf("时间格式不识别: %s", s)
 }
 
-// PreviewSolar 返回未来 n 次触发时间（公历/农历均支持）。
-//
-// 用于编辑页的"下次触发预览"。
+// PreviewSolar 返回未来 n 次触发时间，用于编辑页的「下次触发预览」。
 func PreviewSolar(calendar, scheduleType string, spec *ScheduleSpec, from time.Time, loc *time.Location, n int) ([]time.Time, error) {
 	out := make([]time.Time, 0, n)
 	cur := from

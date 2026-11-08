@@ -1,7 +1,5 @@
-// confirm_service 管理一次性的确认令牌，用于"需要确认"的提醒场景。
-//
-// 一条提醒触发时创建 token，用户访问 /c/:token 时标记为已确认；
-// ConfirmRetryManager 在重发前检查是否已确认，已确认则终止重发链。
+// confirm_service 管理一次性的确认令牌：触发时创建，访问 /c/:token 时标记已确认，
+// ConfirmRetryManager 据此终止重发链。
 package services
 
 import (
@@ -15,16 +13,11 @@ import (
 	"gorm.io/gorm"
 )
 
-// ConfirmTokenTTL 是确认链接的有效期。
-//
-// 导出成常量：Dispatch 创建令牌、RecoverChains 判断「这条链还有没有意义」
-// 用的是同一个值，两边各写一个字面量迟早会漂移。
+// ConfirmTokenTTL 是确认链接的有效期。创建令牌与恢复链时共用，避免两处字面量漂移。
 const ConfirmTokenTTL = 72 * time.Hour
 
-// ConsumeToken 可能返回的哨兵错误。
-//
-// 导出成哨兵值而不是字符串：HTTP 层需要区分「已确认」与真正的失败，
-// 前者应当渲染成幂等的成功页，而不是吓人的错误页。
+// ConsumeToken 可能返回的哨兵错误：HTTP 层需要区分「已确认」与真正的失败，
+// 前者应渲染成幂等的成功页。
 var (
 	// ErrConfirmTokenInvalid 令牌不存在。
 	ErrConfirmTokenInvalid = errors.New("确认链接无效")
@@ -47,10 +40,7 @@ func NewConfirmService(db *gorm.DB, cfg *config.Config) *ConfirmService {
 	return &ConfirmService{DB: db, Cfg: cfg}
 }
 
-// CreateToken 生成一个 32 字节 hex 令牌并落库。
-//
-// deliveryLogID 是第一次触发的日志 ID；ttl 是令牌有效期，
-// 超过有效期后 ConsumeToken 返回"已过期"。
+// CreateToken 生成一个 32 字节 hex 令牌并落库，ttl 为有效期。
 func (s *ConfirmService) CreateToken(deliveryLogID uint, ttl time.Duration) (string, error) {
 	b := make([]byte, 32)
 	if _, err := rand.Read(b); err != nil {
@@ -69,16 +59,10 @@ func (s *ConfirmService) CreateToken(deliveryLogID uint, ttl time.Duration) (str
 	return token, nil
 }
 
-// ConsumeToken 消费一个令牌。
+// ConsumeToken 消费一个令牌，成功时标记 used_at 并把该链的日志标为已确认。
 //
-// 成功时：标记 used_at、更新 delivery_log 的 confirmed 字段，返回该 delivery_log。
-// 错误情况：令牌不存在（ErrConfirmTokenInvalid）、已使用（ErrConfirmTokenUsed）、
-// 已过期（ErrConfirmTokenExpired）、日志已被清理（ErrConfirmLogMissing）。
-//
-// 并发语义：多次点击（浏览器预取、用户连点、多设备同时打开）只会有一次真正生效。
-// used_at 的写入是带 `used_at IS NULL` 条件的原子 UPDATE，RowsAffected=0 即说明
-// 被别的请求抢先消费，此时按「已使用」处理并尽量返回日志，让上层渲染幂等成功页。
-// 已使用时不修改任何数据，也不会重复更新 confirmed_at。
+// 并发点击只有一次真正生效：used_at 用带 `used_at IS NULL` 条件的原子 UPDATE 写入，
+// RowsAffected=0 即说明被抢先，按「已使用」处理并尽量返回日志，以便渲染幂等成功页。
 func (s *ConfirmService) ConsumeToken(token string) (*models.DeliveryLog, error) {
 	var ct models.ConfirmToken
 	if err := s.DB.First(&ct, "token = ?", token).Error; err != nil {
@@ -151,11 +135,7 @@ func (s *ConfirmService) ConsumeToken(token string) (*models.DeliveryLog, error)
 	return &dl, nil
 }
 
-// BuildURL 拼接完整的确认 URL。
-//
-// 域名优先取设置页的「站点地址」（config 表 key=site_url），没有时回退到环境变量
-// SITE_URL。用户点开链接的往往是手机，地址必须手机可达；部署后才发现填错的情况很常见，
-// 所以这里现读库，改完无需重启。
+// BuildURL 拼接完整的确认 URL，域名取设置页的站点地址（现读库，改完即时生效）。
 func (s *ConfirmService) BuildURL(token string) string {
 	fallback := ""
 	if s.Cfg != nil {

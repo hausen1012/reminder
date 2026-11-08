@@ -1,18 +1,12 @@
 // Package logger 提供全局 slog 配置。
 //
-// 开发环境输出 TextHandler（带颜色/源码行号），生产环境输出 JSONHandler。
-// 可通过环境变量 LOG_FORMAT=json 强制 JSON 格式，LOG_LEVEL 调整最低级别。
-// 日志同时写入控制台和文件（如果 logDir 非空），文件按进程时区按日滚动
-// （启动时先按 TIMEZONE 对齐，router 初始化后再对齐库里的站点时区）。
-//
-// 使用方式：
-//
-//	import "github.com/reminder/backend/internal/logger"
+// LOG_FORMAT=json 输出 JSON，否则用自定义的文本格式（见 format.go）；LOG_LEVEL 调整级别。
+// logDir 非空时同时写文件，按日滚动（启动时先按 TIMEZONE，router 初始化后再对齐库里的站点时区）。
 //
 //	logger.Init(cfg.LogFile)
 //	slog.Info("server starting", "port", cfg.Port)
 //
-// 所有模块统一使用 slog 标准库，不再使用 log.Printf / fmt.Printf 输出日志。
+// 所有模块统一使用 slog，不要用 log.Printf / fmt.Printf。
 package logger
 
 import (
@@ -30,37 +24,25 @@ import (
 // 文件级别的日志目录写失败时，重复告警会淹没有用信息；只提示一次。
 var writerWarnOnce sync.Once
 
-// activeCloser 是上一次 Init 打开的文件 writer。
-//
-// 重复 Init（测试里常见）会换掉全局 logger，若不关闭旧文件句柄，
-// Windows 上临时目录无法删除；长期运行也会累积句柄。
+// activeCloser 是上一次 Init 打开的文件 writer；重复 Init 时要关闭旧句柄。
 var activeCloser struct {
 	mu sync.Mutex
 	c  io.Closer
 }
 
-// activeLevel 保存 Init 时确定的级别，供 Level() 读取。
-//
-// 用 atomic 而不是普通变量：GORM 日志适配可能在并发请求里读它。
+// activeLevel 保存 Init 时确定的级别，供 Level() 读取（atomic：GORM 适配会并发读）。
 var activeLevel atomic.Int32
 
 func init() {
 	activeLevel.Store(int32(slog.LevelInfo))
 }
 
-// Level 返回 Init 时确定的日志级别（由 LOG_LEVEL 决定）。
-//
-// 供其他包（如 GORM 的 SQL 日志适配）对齐级别：日志级别只解析一次，
-// 避免两套解析逻辑对同一个值给出不同结论。
+// Level 返回 Init 时确定的日志级别，供其他包（如 GORM 日志适配）对齐。
 func Level() slog.Level {
 	return slog.Level(activeLevel.Load())
 }
 
-// Init 配置全局 slog logger。
-//
-// 如果 logDir 非空，日志会同时写入该目录下按日滚动的文件。
-// 级别取自环境变量 LOG_LEVEL（debug / info / warn / error），默认 info。
-// 可重复调用：每次调用都会重新设置默认 logger。
+// Init 配置全局 slog logger；logDir 非空时同时写入按日滚动的文件，可重复调用。
 func Init(logDir string) {
 	// 关闭上一次 Init 打开的文件：全局 logger 只保留最新一份
 	activeCloser.mu.Lock()
@@ -87,9 +69,7 @@ func Init(logDir string) {
 
 	multi := io.MultiWriter(writers...)
 
-	// 统一时间格式与源码位置：
-	//   - JSON 输出下由 ReplaceAttr 改写 time / source；
-	//   - text 输出由 textHandler 自己排版（见 format.go），这里只需对齐 JSON。
+	// 统一时间格式与源码位置：JSON 走 ReplaceAttr，text 由 textHandler 自行排版
 	replace := func(_ []string, a slog.Attr) slog.Attr {
 		switch a.Key {
 		case slog.TimeKey:
@@ -106,12 +86,11 @@ func Init(logDir string) {
 	opts := &slog.HandlerOptions{
 		Level:     level,
 		AddSource: true,
-		// ReplaceAttr 只对 JSONHandler 生效：textHandler 自己排版，
-		// 不需要也不应该再经一次属性改写。
+		// ReplaceAttr 只对 JSONHandler 生效，textHandler 自行排版
 		ReplaceAttr: replace,
 	}
 
-	// 默认 TextHandler（开发友好），LOG_FORMAT=json 时切换 JSONHandler
+	// 默认文本格式，LOG_FORMAT=json 时切换 JSONHandler
 	var h slog.Handler
 	switch strings.ToLower(strings.TrimSpace(os.Getenv("LOG_FORMAT"))) {
 	case "json":
@@ -123,9 +102,7 @@ func Init(logDir string) {
 	slog.SetDefault(slog.New(h))
 }
 
-// parseLevel 把 LOG_LEVEL 转成 slog.Level。
-//
-// 空值或无法识别的值一律回退到 info；logger 尚未就绪，因此直接写标准错误。
+// parseLevel 把 LOG_LEVEL 转成 slog.Level；空值或无法识别时回退 info 并提示到标准错误。
 func parseLevel(v string) slog.Level {
 	switch strings.ToLower(strings.TrimSpace(v)) {
 	case "", "info":
@@ -142,10 +119,7 @@ func parseLevel(v string) slog.Level {
 	}
 }
 
-// dailyWriter 是按自然日滚动的文件 writer。
-//
-// 每次写入前检查日期，跨天时关闭旧文件并打开新文件。打开失败时不阻塞日志：
-// 调用方已经拿到标准错误输出，这里只补充一次提示，避免把写日志本身变成故障源。
+// dailyWriter 是按自然日滚动的文件 writer；打开或写入失败时静默降级到标准错误（只提示一次）。
 type dailyWriter struct {
 	mu   sync.Mutex
 	dir  string

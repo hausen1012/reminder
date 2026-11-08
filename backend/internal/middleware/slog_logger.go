@@ -8,24 +8,12 @@ import (
 )
 
 // slowRequestThreshold 是「成功但慢」的请求被提升为 Warn 的阈值。
-//
-// 2xx 默认降到 Debug（见 SlogLogger），但一个成功的请求也可能值得注意：
-// 秒级以上的响应通常意味着慢查询、外部通道超时或锁竞争。
-// 这类请求保持可见，否则调高级别排查时会把它们一起藏掉。
 const slowRequestThreshold = time.Second
 
 // SlogLogger 返回基于 slog 的 Gin 请求日志中间件。
 //
-// 替换 gin.Default() 自带的日志记录器，统一使用结构化日志。
-//
-// 级别按状态码与耗时决定，而不是一律 Info：
-//   - 5xx → Error：请求失败到服务端问题，必须能一眼筛出来；
-//   - 4xx → Warn：客户端问题（参数错、鉴权失败、限流），排查时同样有用；
-//   - 2xx/3xx → Debug：绝大多数是面板轮询与页面加载，Info 级别下会淹没有用信息；
-//     耗时超过 1 秒的仍然提到 Warn。
-//
-// 本中间件只负责「访问日志」这一件事（谁、什么方法、打到哪、多久、多大、什么状态）；
-// 失败原因由 ErrorHandler 单独记录，两处共用 request_id，可以按 id 串起来看。
+// 级别按状态码与耗时决定：5xx → Error，4xx 或慢请求 → Warn，2xx/3xx → Debug
+// （面板块轮询会把 Info 级别淹掉）。失败原因由 ErrorHandler 另行记录，两处共用 request_id。
 func SlogLogger() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
@@ -37,8 +25,7 @@ func SlogLogger() gin.HandlerFunc {
 		latency := time.Since(start)
 		status := c.Writer.Status()
 
-		// 没有错误的成功请求在 Info 级别下不输出；先判级别，
-		// 避免为一条最终会被丢弃的日志拼装字段。
+		// 成功请求在 Info 级别不输出；先判级别，避免白拼字段
 		level := slog.LevelDebug
 		switch {
 		case status >= 500:

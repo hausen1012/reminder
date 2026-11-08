@@ -33,9 +33,7 @@ type AppError struct {
 	// Status 可选地指定 HTTP 状态码；为 0 时按 Code 推断
 	Status int `json:"-"`
 	// Cause 是底层原因（如 JSON 解析错误），只进日志不进响应体。
-	//
-	// 有了它，handler 就不必为了留下排查线索而自己再打一条日志：
-	// ErrorHandler 统一输出一条，既带对外文案也带底层原因。
+	// 有了它，handler 不必自行补一条日志，ErrorHandler 会统一输出。
 	Cause error `json:"-"`
 }
 
@@ -97,15 +95,11 @@ func (e *AppError) httpStatus() int {
 	}
 }
 
-// ErrorBody 构造统一的错误响应体：
+// ErrorBody 构造统一的错误响应体，是整个后端唯一的错误格式：
 //
 //	{"error": {"code": "not_found", "message": "...", "field": "..."}}
 //
-// 这是整个后端唯一的错误响应格式。所有错误出口（业务 handler、鉴权中间件、
-// panic 恢复）都必须经由本函数构造响应体，避免出现「有的接口返回 error 包裹、
-// 有的直接返回 code」的两套格式，前端也就只需要实现一套解析逻辑。
-//
-// field 为空时省略该字段。
+// field 为空时省略。
 func ErrorBody(code ErrorCode, message, field string) gin.H {
 	body := gin.H{"code": code, "message": message}
 	if field != "" {
@@ -114,13 +108,10 @@ func ErrorBody(code ErrorCode, message, field string) gin.H {
 	return gin.H{"error": body}
 }
 
-// ErrorHandler 是顶层中间件：
-//  1. recover panic 并以 internal_error 响应；
-//  2. 把 handler 通过 c.Error 注册的 AppError 统一渲染为 JSON 错误体。
+// ErrorHandler 是顶层中间件：recover panic，并把 handler 通过 c.Error 注册的 AppError
+// 统一渲染为 JSON 错误体。
 //
-// 同时负责把错误写进服务端日志：AppError 按状态码分级（4xx → Warn，5xx → Error），
-// 未知错误一律 Error。日志里带 method / path / request_id / code / message / field，
-// 让「请求日志」与「错误日志」能通过 request_id 对上同一次请求。
+// 同时按状态码分级记录日志（4xx → Warn，5xx → Error），带 request_id 与访问日志对应。
 func ErrorHandler() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		defer func() {
@@ -152,11 +143,11 @@ func ErrorHandler() gin.HandlerFunc {
 				"error_code", string(ae.Code),
 				"error_message", ae.Message,
 			}
-			// field 为空是常态（大多数业务错误不针对具体字段），不必输出一个空 kv。
+			// field 为空是常态，不必输出空 kv
 			if ae.Field != "" {
 				logArgs = append(logArgs, "field", ae.Field)
 			}
-			// 底层原因只进日志：对外仍是同一句可读文案，排查时才看得到真因。
+			// 底层原因只进日志，对外仍是同一句可读文案
 			if ae.Cause != nil {
 				logArgs = append(logArgs, "error", ae.Cause)
 			}

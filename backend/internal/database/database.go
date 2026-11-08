@@ -35,9 +35,7 @@ var allModels = []any{
 	&models.AIAction{},
 }
 
-// AllModels 返回建表所需的全部模型清单。
-//
-// 除 Init 外，测试用的内存库也用它建表，避免测试各自维护一份模型列表后与生产脱节。
+// AllModels 返回建表所需的全部模型；测试的内存库也用它建表，避免与生产脱节。
 func AllModels() []any {
 	return append([]any(nil), allModels...)
 }
@@ -70,23 +68,12 @@ func Init(cfg *config.Config) error {
 	return ensureAdmin(cfg)
 }
 
-// gormConfig 返回生产环境统一使用的 GORM 配置。
+// gormConfig 返回统一使用的 GORM 配置：
+//   - NowFunc 固定 UTC，与 models.Time 的归一化保持一致
+//   - Logger 接到 slog：失败 SQL → Error，慢查询（> 500ms）→ Warn，其余仅 debug
+//   - RecordNotFound 不计错误：「查不到」是正常业务分支
 //
-// NowFunc 仍然强制 UTC：models.Time 的 Value 会自己归一化，这里保持 UTC
-// 是为了让 GORM 自动填充的 created_at / updated_at 与手写字段走同一条路径，
-// 也避免任何直接读 NowFunc 的代码拿到本地偏移。
-//
-// Logger 接到 slog 上：之前 GORM 默认把 SQL 打到标准输出，
-// 既绕过了 LOG_FORMAT / LOG_LEVEL，也没有结构化字段。现在的规则是：
-//   - 失败 SQL → Error 级别，带 sql / rows / error；
-//   - 慢查询（> 500ms）→ Warn 级别；
-//   - 其余 SQL 只在 LOG_LEVEL=debug 时记录。
-//
-// RecordNotFound 不计入错误：业务上「查不到」是正常分支（例如 404），
-// 记成 Error 会把真正该看的失败淹掉。
-//
-// 传入的 slog.Default() 是此刻的默认 logger，因此 logger.Init 必须先于
-// database.Init 调用（main 里的顺序就是这样）。
+// logger.Init 必须先于 database.Init 调用。
 func gormConfig() *gorm.Config {
 	return &gorm.Config{
 		NowFunc: func() time.Time { return time.Now().UTC() },
@@ -111,8 +98,7 @@ func gormLogLevel(level slog.Level) gormlogger.LogLevel {
 	}
 }
 
-// buildDSN 在原始 DB 路径上追加 SQLite 推荐的并发参数。
-// 如果用户已经在 DBPath 里写了 ? 查询串，则保留不动。
+// buildDSN 在 DB 路径上追加 SQLite 推荐的并发参数；路径里已带查询串时保留不动。
 func buildDSN(path string) string {
 	if strings.Contains(path, "?") {
 		return path
