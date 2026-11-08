@@ -62,8 +62,14 @@
   html,
   body {
     @apply overflow-x-hidden;
+    -webkit-text-size-adjust: 100%;
   }
   body {
     @apply bg-background text-foreground;
+    -webkit-tap-highlight-color: transparent;
+  }
+  /* 移动端滚动容器：阻断滚动链，避免带动整页回弹 */
+  .scroll-area {
+    overscroll-behavior: contain;
   }
 }

@@ -264,8 +264,10 @@ export function AIChatWidget() {
         onClick={() => setOpen(true)}
         aria-label="打开 AI 助手"
         className={cn(
-          'fixed bottom-5 right-5 z-40 flex h-12 w-12 items-center justify-center rounded-full',
-          'bg-primary text-primary-foreground shadow-lg transition-transform hover:scale-105',
+          'fixed right-4 z-40 flex h-12 w-12 items-center justify-center rounded-full md:right-5',
+          // 移动端抬高到标签栏之上，避免遮挡导航
+          'bottom-[calc(4.5rem+env(safe-area-inset-bottom))] md:bottom-5',
+          'bg-primary text-primary-foreground shadow-lg transition-transform hover:scale-105 active:scale-95',
         )}
       >
         <Sparkles className="h-5 w-5" />
@@ -286,7 +288,7 @@ export function AIChatWidget() {
             'sm:bottom-5 sm:right-5 sm:h-[620px] sm:max-h-[calc(100dvh-2.5rem)] sm:w-[400px] sm:rounded-xl',
           )}
         >
-          <div className="flex items-center justify-between border-b px-4 py-3">
+          <div className="flex items-center justify-between border-b px-4 py-3 pt-[calc(0.75rem+env(safe-area-inset-top))] sm:pt-3">
             <div className="flex items-center gap-2">
               <Bot className="h-4 w-4 text-muted-foreground" />
               <span className="text-sm font-medium">AI 助手</span>
@@ -308,7 +310,7 @@ export function AIChatWidget() {
             </div>
           </div>
 
-          <div className="flex-1 space-y-3 overflow-y-auto p-4">
+          <div className="flex-1 space-y-3 overflow-y-auto scroll-area p-4">
             {history.length === 0 && actions.length === 0 && (
               <div className="py-8 text-center text-sm text-muted-foreground">
                 <MessageSquare className="mx-auto mb-3 h-8 w-8 opacity-40" />
@@ -373,7 +375,7 @@ export function AIChatWidget() {
             <div ref={bottomRef} />
           </div>
 
-          <div className="space-y-2 border-t p-3">
+          <div className="space-y-2 border-t p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:pb-3">
             <Textarea
               rows={2}
               value={input}

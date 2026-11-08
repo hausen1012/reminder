@@ -161,16 +161,16 @@ export default function ChannelsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6">
       <PageHeader title="通知渠道">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {selectedIds.size > 0 && (
-            <Button size="sm" variant="destructive" onClick={() => setBatchConfirmOpen(true)}>
+            <Button size="sm" variant="destructive" className="flex-1 md:flex-none" onClick={() => setBatchConfirmOpen(true)}>
               <Trash2 className="h-4 w-4 mr-1" />
               删除选中 ({selectedIds.size})
             </Button>
           )}
-          <Button size="sm" onClick={() => setCreating(true)}>
+          <Button size="sm" className="flex-1 md:flex-none" onClick={() => setCreating(true)}>
             <Plus className="h-4 w-4 mr-1" />
             新建渠道
           </Button>
@@ -206,7 +206,7 @@ export default function ChannelsPage() {
       ) : items.length === 0 ? (
         <Card>
           <CardContent className="py-10 text-center text-sm text-muted-foreground">
-            还没有通知渠道，点击右上角新建一个吧。
+            还没有通知渠道，点击上方「新建渠道」创建。
           </CardContent>
         </Card>
       ) : (
@@ -269,37 +269,41 @@ export default function ChannelsPage() {
             </div>
           </div>
 
-          {/* 移动端卡片列表 */}
+          {/* 移动端卡片列表：名称 + 类型/创建时间两行，操作按钮收进底部一行 */}
           <div className="divide-y md:hidden">
             {items.map((ch) => (
-              <div key={ch.id} className="px-4 py-3 space-y-2">
-                <div className="flex items-start justify-between gap-2">
+              <div key={ch.id} className="px-3 py-2.5">
+                <div className="flex items-center gap-2.5">
                   <Checkbox
                     checked={selectedIds.has(ch.id)}
                     onCheckedChange={() => toggleSelect(ch.id)}
-                    className="mt-1"
+                    className="shrink-0"
+                    aria-label={`选择渠道 ${ch.name}`}
                   />
                   <div className="min-w-0 flex-1">
-                    <p className="font-medium truncate" title={ch.name}>{ch.name}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">{TYPE_LABEL[ch.type]}</p>
+                    <p className="truncate text-sm font-medium" title={ch.name}>{ch.name}</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      {TYPE_LABEL[ch.type]} · 创建于 {formatInZone(ch.created_at, tz)}
+                    </p>
                   </div>
-                  <div className="flex gap-0.5 shrink-0">
-                    <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => handleDuplicate(ch)} title="复制">
-                      <Copy className="h-4 w-4" />
-                    </Button>
-                    <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setEditing(ch)} title="编辑">
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setToDelete(ch)} title="删除">
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-                <div className="flex items-center justify-between text-xs text-muted-foreground">
-                  <span>创建于 {formatInZone(ch.created_at, tz)}</span>
-                  <span className={ch.enabled ? 'text-green-600' : 'text-muted-foreground'}>
+                  <span className={ch.enabled ? 'shrink-0 text-xs text-green-600' : 'shrink-0 text-xs text-muted-foreground'}>
                     {ch.enabled ? '已启用' : '已禁用'}
                   </span>
+                </div>
+
+                <div className="mt-1 flex justify-end gap-1 pl-6">
+                  <Button size="sm" variant="ghost" className="h-8 px-2 text-xs" onClick={() => handleDuplicate(ch)}>
+                    <Copy className="h-3.5 w-3.5 mr-1" />
+                    复制
+                  </Button>
+                  <Button size="sm" variant="ghost" className="h-8 px-2 text-xs" onClick={() => setEditing(ch)}>
+                    <Pencil className="h-3.5 w-3.5 mr-1" />
+                    编辑
+                  </Button>
+                  <Button size="sm" variant="ghost" className="h-8 px-2 text-xs text-destructive hover:text-destructive" onClick={() => setToDelete(ch)}>
+                    <Trash2 className="h-3.5 w-3.5 mr-1" />
+                    删除
+                  </Button>
                 </div>
               </div>
             ))}

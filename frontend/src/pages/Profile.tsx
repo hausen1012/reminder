@@ -171,10 +171,10 @@ export default function Profile() {
     <div className="space-y-6">
       <PageHeader title="设置" />
       <div className="flex flex-col gap-6 md:flex-row md:gap-8">
-        {/* 分区导航：移动端横向可滚动，桌面端纵向列表 */}
+        {/* 分区导航：移动端横向可滚动并吸顶，桌面端纵向列表 */}
         <nav
           aria-label="设置分区"
-          className="flex gap-1 overflow-x-auto pb-1 md:-ml-3 md:w-52 md:shrink-0 md:flex-col md:overflow-visible md:pb-0"
+          className="sticky top-0 z-10 -mx-4 flex gap-1 overflow-x-auto bg-background px-4 pb-1.5 pt-1.5 md:static md:-ml-3 md:mx-0 md:w-52 md:shrink-0 md:flex-col md:overflow-visible md:bg-transparent md:px-0 md:pb-0 md:pt-0"
         >
           {SECTIONS.map((section) => {
             const isActive = active === section.id

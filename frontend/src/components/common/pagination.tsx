@@ -48,12 +48,12 @@ export function Pagination({
 
   return (
     <div className="flex flex-col gap-1.5 border-t px-4 py-2 text-sm md:flex-row md:items-center md:justify-between">
-      <div className="text-muted-foreground">
+      <div className="text-xs text-muted-foreground md:text-sm">
         共 {total} 条&nbsp;&nbsp;第 {start}-{end} 条
       </div>
-      <div className="flex flex-wrap items-center gap-1.5 md:justify-end">
+      <div className="flex flex-wrap items-center justify-between gap-1.5 md:justify-end">
         {canChangeLimit && (
-          <div className="flex items-center gap-1 text-muted-foreground">
+          <div className="flex items-center gap-1 text-xs text-muted-foreground md:text-sm">
             <span>每页</span>
             <Select value={String(limit)} onValueChange={handleLimitChange}>
               <SelectTrigger className="h-8 w-[72px] px-2 text-xs">
@@ -69,11 +69,11 @@ export function Pagination({
             </Select>
           </div>
         )}
-        <div className="flex items-center gap-0.5">
+        <div className="ml-auto flex items-center gap-0.5 md:ml-0">
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8"
+            className="h-9 w-9 md:h-8 md:w-8"
             disabled={currentPage <= 1}
             onClick={() => goTo(currentPage - 1)}
             aria-label="上一页"
@@ -86,7 +86,7 @@ export function Pagination({
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8"
+            className="h-9 w-9 md:h-8 md:w-8"
             disabled={currentPage >= totalPages}
             onClick={() => goTo(currentPage + 1)}
             aria-label="下一页"

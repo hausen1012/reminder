@@ -258,9 +258,9 @@ export default function TokensPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6">
       <PageHeader title="令牌">
-        <Button size="sm" onClick={() => setCreateOpen(true)}>
+        <Button size="sm" className="w-full md:w-auto" onClick={() => setCreateOpen(true)}>
           <Plus className="mr-1 h-4 w-4" />
           新建令牌
         </Button>
@@ -376,57 +376,47 @@ export default function TokensPage() {
             </div>
           </div>
 
-          {/* 移动端卡片列表 */}
+          {/* 移动端卡片列表：名称 + 令牌前缀/最近使用一行，渠道与操作收进次要行 */}
           <div className="divide-y md:hidden">
             {filteredItems.map((key) => (
-              <div key={key.id} className="px-4 py-3 space-y-2">
-                <div className="flex items-start justify-between gap-2">
+              <div key={key.id} className="px-3 py-2.5">
+                <div className="flex items-center gap-2.5">
                   <div className="min-w-0 flex-1">
-                    <p className="font-medium truncate" title={key.name}>{key.name}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
+                    <p className="truncate text-sm font-medium" title={key.name}>{key.name}</p>
+                    <div className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
                       <code className="truncate">{key.prefix}...</code>
-                    </p>
-                  </div>
-                  <Switch checked={key.enabled} onCheckedChange={() => handleToggle(key)} />
-                </div>
-
-                <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
-                  <div>
-                    <span className="text-muted-foreground">令牌</span>
-                    <div className="flex items-center gap-1 mt-0.5">
-                      <code className="truncate text-muted-foreground">{key.prefix}...</code>
                       <button
                         type="button"
                         onClick={() => handleCopyFromList(key.id)}
                         disabled={copyingId === key.id}
-                        className="shrink-0 rounded p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-50"
+                        className="shrink-0 rounded p-0.5 text-muted-foreground active:text-foreground disabled:opacity-50"
+                        aria-label="复制完整令牌"
                         title="复制完整令牌"
                       >
                         <Copy className="h-3 w-3" />
                       </button>
+                      <span>·</span>
+                      <span className="truncate">最近使用 {formatRecentTime(key.last_used_at)}</span>
                     </div>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">最近使用</span>
-                    <p className="mt-0.5">{formatRecentTime(key.last_used_at)}</p>
-                  </div>
-                  <div className="col-span-2">
-                    <span className="text-muted-foreground">通知渠道</span>
-                    <p className="truncate mt-0.5" title={formatChannelNames(channels, key.default_channel_ids)}>
-                      {formatChannelNames(channels, key.default_channel_ids)}
+                    <p className="mt-0.5 truncate text-xs text-muted-foreground" title={formatChannelNames(channels, key.default_channel_ids)}>
+                      渠道：{formatChannelNames(channels, key.default_channel_ids)}
                     </p>
                   </div>
+                  <Switch checked={key.enabled} onCheckedChange={() => handleToggle(key)} className="shrink-0" />
                 </div>
 
-                <div className="flex justify-end gap-0.5 pt-1 border-t">
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openDetail(key)} title="查看与编辑">
-                    <Pencil className="h-4 w-4" />
+                <div className="mt-1 flex justify-end gap-1">
+                  <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={() => openDetail(key)}>
+                    <Pencil className="h-3.5 w-3.5 mr-1" />
+                    编辑
                   </Button>
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openCurl(key)} title="curl 使用示例">
-                    <Terminal className="h-4 w-4" />
+                  <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={() => openCurl(key)}>
+                    <Terminal className="h-3.5 w-3.5 mr-1" />
+                    curl
                   </Button>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setToDelete(key)} title="删除">
-                    <Trash2 className="h-4 w-4" />
+                  <Button variant="ghost" size="sm" className="h-8 px-2 text-xs text-destructive hover:text-destructive" onClick={() => setToDelete(key)}>
+                    <Trash2 className="h-3.5 w-3.5 mr-1" />
+                    删除
                   </Button>
                 </div>
               </div>
@@ -513,7 +503,7 @@ export default function TokensPage() {
       </Dialog>
 
       <Dialog open={detailOpen} onOpenChange={(open) => !open && closeDetail()}>
-        <DialogContent className="overflow-visible">
+        <DialogContent className="md:max-h-[90dvh] md:overflow-y-auto">
           <DialogHeader>
             <DialogTitle>令牌详情</DialogTitle>
           </DialogHeader>

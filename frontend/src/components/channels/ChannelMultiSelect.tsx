@@ -1,3 +1,4 @@
+import { useLayoutEffect, useRef, useState } from 'react'
 import { ChevronDown } from 'lucide-react'
 import type { Channel } from '@/types'
 
@@ -10,6 +11,9 @@ interface Props {
   onOpenChange: (open: boolean) => void
   onChange: (value: number[]) => void
 }
+
+// 列表最大高度，同时也是判断向上弹出是否有足够空间的门槛
+const LIST_MAX_HEIGHT = 256
 
 function formatChannelNames(channels: Channel[], ids: number[], placeholder: string): string {
   if (ids.length === 0) return placeholder
@@ -26,6 +30,16 @@ export function ChannelMultiSelect({
   onOpenChange,
   onChange,
 }: Props) {
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  // 触发按钮上方空间不足时改为向下展开，避免列表被对话框裁切
+  const [dropUp, setDropUp] = useState(true)
+
+  useLayoutEffect(() => {
+    if (!open || !triggerRef.current) return
+    const rect = triggerRef.current.getBoundingClientRect()
+    setDropUp(rect.top > LIST_MAX_HEIGHT)
+  }, [open])
+
   function toggleChannel(id: number) {
     const has = value.includes(id)
     onChange(has ? value.filter((x) => x !== id) : [...value, id])
@@ -38,9 +52,10 @@ export function ChannelMultiSelect({
   return (
     <div className="relative">
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => onOpenChange(!open)}
-        className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm outline-none"
+        className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-base outline-none md:text-sm"
       >
         <span className={`truncate ${value.length > 0 ? '' : 'text-muted-foreground'}`}>
           {formatChannelNames(channels, value, placeholder)}
@@ -50,13 +65,18 @@ export function ChannelMultiSelect({
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => onOpenChange(false)} />
-          <div className="absolute bottom-full z-50 mb-1 max-h-64 w-full overflow-y-auto rounded-md border bg-card shadow-lg md:bottom-full">
+          <div
+            className={
+              'absolute z-50 max-h-64 w-full overflow-y-auto scroll-area rounded-md border bg-card shadow-lg ' +
+              (dropUp ? 'bottom-full mb-1' : 'top-full mt-1')
+            }
+          >
             {channels.map((ch) => {
               const checked = value.includes(ch.id)
               return (
                 <label
                   key={ch.id}
-                  className="flex cursor-pointer items-center gap-2 px-3 py-2 text-sm hover:bg-muted first:rounded-t-md last:rounded-b-md"
+                  className="flex cursor-pointer items-center gap-2.5 px-3 py-2.5 text-sm hover:bg-muted active:bg-muted md:py-2"
                 >
                   <input
                     type="checkbox"
@@ -64,8 +84,8 @@ export function ChannelMultiSelect({
                     onChange={() => toggleChannel(ch.id)}
                     className="h-4 w-4"
                   />
-                  <span>{ch.name}</span>
-                  <span className="ml-auto text-xs text-muted-foreground">{ch.type}</span>
+                  <span className="truncate">{ch.name}</span>
+                  <span className="ml-auto shrink-0 text-xs text-muted-foreground">{ch.type}</span>
                 </label>
               )
             })}

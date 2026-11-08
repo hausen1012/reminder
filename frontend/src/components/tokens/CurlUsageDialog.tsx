@@ -110,7 +110,7 @@ export function CurlUsageDialog({ token, open, onClose }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-2xl sm:max-w-2xl max-sm:max-w-[calc(100%-1rem)] max-sm:p-4">
+      <DialogContent className="max-w-2xl md:max-h-[90dvh] md:overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Terminal className="h-5 w-5" />

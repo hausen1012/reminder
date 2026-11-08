@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import { AppLayout, Sidebar } from '@/components/layout/Layout'
@@ -145,8 +145,29 @@ describe('AppLayout', () => {
   it('渲染主内容与侧边栏', () => {
     renderLayout()
     expect(screen.getByText('主内容')).toBeInTheDocument()
-    // 桌面端与移动端各渲染一个 Sidebar，因此导航项出现 2 次
-    expect(screen.getAllByText('首页')).toHaveLength(2)
+    // 桌面侧边栏 + 移动端抽屉 + 底部标签栏各有一份导航
+    expect(screen.getAllByText('首页').length).toBeGreaterThanOrEqual(2)
+  })
+
+  it('移动端底部标签栏只展示高频页面，其余入口走「更多」', () => {
+    renderLayout()
+    const tabbar = screen.getByRole('navigation', { name: '主导航' })
+
+    for (const label of ['首页', '提醒', '通知', '日志', '更多']) {
+      expect(within(tabbar).getByText(label)).toBeInTheDocument()
+    }
+    for (const label of ['令牌', '监控', '设置']) {
+      expect(within(tabbar).queryByText(label)).not.toBeInTheDocument()
+    }
+  })
+
+  it('点击底部「更多」打开抽屉', async () => {
+    const user = userEvent.setup()
+    const { container } = renderLayout()
+
+    await user.click(screen.getByLabelText('打开更多菜单'))
+    const drawer = container.querySelector('div.fixed.inset-0')
+    expect(drawer?.className).toContain('visible')
   })
 
   it('初始时移动端抽屉为隐藏状态（用 CSS 控制，DOM 仍在）', () => {

@@ -74,7 +74,7 @@ export default function SchedulerPage() {
   const entries = engine?.entries ?? []
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6">
       <PageHeader title="监控">
         <Button
           variant="outline"
@@ -88,11 +88,11 @@ export default function SchedulerPage() {
         </Button>
       </PageHeader>
 
-      {/* 概览卡片 */}
-      <div className="grid gap-4 md:grid-cols-4">
+      {/* 概览卡片：移动端两列紧凑排布 */}
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">引擎状态</CardTitle>
+            <CardTitle className="text-xs font-medium md:text-sm">引擎状态</CardTitle>
           </CardHeader>
           <CardContent>
             <Badge variant={engine?.running ? 'success' : 'secondary'}>
@@ -103,16 +103,16 @@ export default function SchedulerPage() {
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">注册任务</CardTitle>
+            <CardTitle className="text-xs font-medium md:text-sm">注册任务</CardTitle>
           </CardHeader>
           <CardContent>
-            <span className="text-2xl font-bold">{engine?.registered_count ?? 0}</span>
+            <span className="text-xl font-bold md:text-2xl">{engine?.registered_count ?? 0}</span>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">扫描器状态</CardTitle>
+            <CardTitle className="text-xs font-medium md:text-sm">扫描器状态</CardTitle>
           </CardHeader>
           <CardContent>
             <Badge variant={sweeper?.running ? 'success' : 'secondary'}>
@@ -123,10 +123,10 @@ export default function SchedulerPage() {
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">扫描间隔</CardTitle>
+            <CardTitle className="text-xs font-medium md:text-sm">扫描间隔</CardTitle>
           </CardHeader>
           <CardContent>
-            <span className="text-2xl font-bold">{sweeper?.interval_seconds ?? '—'}s</span>
+            <span className="text-xl font-bold md:text-2xl">{sweeper?.interval_seconds ?? '—'}s</span>
           </CardContent>
         </Card>
       </div>
@@ -199,40 +199,31 @@ export default function SchedulerPage() {
               </div>
             </div>
 
-            {/* 移动端卡片列表 */}
+            {/* 移动端卡片列表：标题 + 类型角标，触发时间并列一行 */}
             <div className="divide-y md:hidden">
               {entries.map((e) => {
                 const channelNames = (e.channels ?? []).map((c) => c.name).join('、')
                 return (
                   <div
                     key={e.id}
-                    className="px-4 py-3 space-y-1.5 cursor-pointer active:bg-muted/30 transition-colors"
+                    className="px-3 py-2.5 active:bg-muted/30 transition-colors"
                     onClick={() => navigate(`/reminders`)}
                   >
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-xs font-medium text-muted-foreground">{TYPE_LABEL[e.schedule_type] ?? e.schedule_type}</span>
-                    </div>
-                    <p className="font-medium truncate" title={e.title}>{e.title || '—'}</p>
-                    <div className="text-xs text-muted-foreground">
-                      <span className="block">通知渠道</span>
-                      <span className="text-foreground truncate block" title={channelNames}>
-                        {channelNames || '—'}
+                    <div className="flex items-baseline gap-2">
+                      <p className="min-w-0 flex-1 truncate text-sm font-medium" title={e.title}>{e.title || '—'}</p>
+                      <span className="shrink-0 text-[10px] font-medium text-muted-foreground">
+                        {TYPE_LABEL[e.schedule_type] ?? e.schedule_type}
                       </span>
                     </div>
-                    <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
-                      <div>
-                        <span className="block">下次触发</span>
-                        <span className="text-foreground">
-                          {formatInZone(e.next_fire_at, tz)}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="block">上次触发</span>
-                        <span className="text-foreground">
-                          {formatInZone(e.last_fired_at, tz)}
-                        </span>
-                      </div>
+                    <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
+                      <span>下次 {formatInZone(e.next_fire_at, tz)}</span>
+                      <span>上次 {formatInZone(e.last_fired_at, tz)}</span>
                     </div>
+                    {channelNames && (
+                      <p className="mt-0.5 truncate text-xs text-muted-foreground" title={channelNames}>
+                        {channelNames}
+                      </p>
+                    )}
                   </div>
                 )
               })}

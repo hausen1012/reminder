@@ -203,16 +203,16 @@ export default function RemindersPage() {
   }, [channels])
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6">
       <PageHeader title="提醒">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {selectedIds.size > 0 && (
-              <Button size="sm" variant="destructive" onClick={() => setBatchConfirmOpen(true)}>
+              <Button size="sm" variant="destructive" className="flex-1 md:flex-none" onClick={() => setBatchConfirmOpen(true)}>
                 <Trash2 className="h-4 w-4 mr-1" />
                 删除选中 ({selectedIds.size})
               </Button>
             )}
-            <Button size="sm" onClick={() => setCreating(true)}>
+            <Button size="sm" className="flex-1 md:flex-none" onClick={() => setCreating(true)}>
               <Plus className="h-4 w-4 mr-1" />
               新建提醒
             </Button>
@@ -270,7 +270,7 @@ export default function RemindersPage() {
       ) : items.length === 0 ? (
         <Card>
           <CardContent className="py-10 text-center text-sm text-muted-foreground">
-            还没有提醒，点击右上角新建一个。
+            还没有提醒，点击上方「新建提醒」创建。
           </CardContent>
         </Card>
       ) : (
@@ -384,82 +384,61 @@ export default function RemindersPage() {
             </div>
           </div>
 
-          {/* 移动端卡片列表 */}
+          {/* 移动端卡片列表：只保留标题、触发时间与操作，明细放次要行 */}
           <div className="divide-y md:hidden">
             {items.map((r) => {
               const chNames = r.channel_ids.map((cid) => channelMap.get(cid) || `#${cid}`)
               return (
-                <div key={r.id} className="px-4 py-3 space-y-2">
-                  <div className="flex items-start justify-between gap-2">
+                <div key={r.id} className="px-3 py-2.5">
+                  <div className="flex items-start gap-2.5">
                     <Checkbox
                       checked={selectedIds.has(r.id)}
                       onCheckedChange={() => toggleSelect(r.id)}
-                      className="mt-1"
+                      className="mt-1.5 shrink-0"
+                      aria-label={`选择提醒 ${r.title}`}
                     />
                     <div className="min-w-0 flex-1">
-                      <p className="font-medium truncate" title={r.title}>{r.title}</p>
-                      {r.content && (
-                        <p className="text-xs text-muted-foreground truncate mt-0.5" title={r.content}>
-                          {r.content}
-                        </p>
-                      )}
-                    </div>
-                    <Switch checked={r.enabled} onCheckedChange={() => handleToggle(r)} />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
-                    <div>
-                      <span className="text-muted-foreground">类型</span>
-                      <p className="mt-0.5">{TYPE_LABEL[r.schedule_type] ?? r.schedule_type}</p>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">来源</span>
-                      <p className="mt-0.5">
+                      <p className="truncate text-sm font-medium" title={r.title}>{r.title}</p>
+                      <div className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <span className={r.enabled ? 'text-foreground font-medium' : ''}>
+                          {r.enabled ? formatNextFireInZone(r.next_fire_at, tz) : '已停用'}
+                        </span>
+                        <span>·</span>
+                        <span>{TYPE_LABEL[r.schedule_type] ?? r.schedule_type}</span>
                         <span
                           className={
-                            'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ' +
+                            'inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium ' +
                             (SOURCE_BADGE_CLASS[r.source] ?? 'bg-muted text-muted-foreground')
                           }
                         >
                           {sourceLabel(r.source)}
                         </span>
+                      </div>
+                      <p className="mt-0.5 truncate text-xs text-muted-foreground" title={formatReminderDetail(r)}>
+                        {formatReminderDetail(r)}
+                        {chNames.length > 0 && ` · ${chNames.join('、')}`}
                       </p>
                     </div>
-                    <div className="col-span-2">
-                      <span className="text-muted-foreground">时间</span>
-                      <p className="truncate mt-0.5" title={formatReminderDetail(r)}>{formatReminderDetail(r)}</p>
-                    </div>
-                    <div className="col-span-2">
-                      <span className="text-muted-foreground">下次触发</span>
-                      <p className="mt-0.5">{r.enabled ? formatNextFireInZone(r.next_fire_at, tz) : '—'}</p>
-                    </div>
-                    <div className="col-span-2">
-                      <span className="text-muted-foreground">通知渠道</span>
-                      <p className="truncate mt-0.5" title={chNames.join(', ')}>
-                        {chNames.length === 0 ? '—' : chNames.join(', ')}
-                      </p>
-                    </div>
-                    <div className="col-span-2">
-                      <span className="text-muted-foreground">创建时间</span>
-                      <p className="mt-0.5">{formatInZone(r.created_at, tz)}</p>
-                    </div>
+                    <Switch checked={r.enabled} onCheckedChange={() => handleToggle(r)} className="mt-0.5 shrink-0" />
                   </div>
 
-                  <div className="flex justify-end gap-0.5 pt-1 border-t">
-                    <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => handleDuplicate(r)} title="复制">
-                      <Copy className="h-4 w-4" />
+                  <div className="mt-1 flex justify-end gap-1 pl-6">
+                    <Button size="sm" variant="ghost" className="h-8 px-2 text-xs" onClick={() => handleDuplicate(r)}>
+                      <Copy className="h-3.5 w-3.5 mr-1" />
+                      复制
                     </Button>
-                    <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setEditing(r)} title="编辑">
-                      <Pencil className="h-4 w-4" />
+                    <Button size="sm" variant="ghost" className="h-8 px-2 text-xs" onClick={() => setEditing(r)}>
+                      <Pencil className="h-3.5 w-3.5 mr-1" />
+                      编辑
                     </Button>
                     <Button
-                      size="icon"
+                      size="sm"
                       variant="ghost"
-                      className="h-8 w-8 text-destructive hover:text-destructive"
+                      className="h-8 px-2 text-xs text-destructive hover:text-destructive"
                       onClick={() => setToDelete(r)}
-                      title="删除"
                     >
-                      <Trash2 className="h-4 w-4" />
+                      <Trash2 className="h-3.5 w-3.5 mr-1" />
+                      删除
                     </Button>
                   </div>
                 </div>

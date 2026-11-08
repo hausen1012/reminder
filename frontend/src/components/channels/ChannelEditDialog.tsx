@@ -153,7 +153,7 @@ export function ChannelEditDialog({ channel, open, onClose, onSaved }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl md:max-h-[90dvh] md:overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{isEdit ? '编辑通知渠道' : '新建通知渠道'}</DialogTitle>
         </DialogHeader>

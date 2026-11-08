@@ -22,6 +22,7 @@ import { ScheduleForm, type ScheduleValue } from './ScheduleForm'
 import { createReminder, extractApiError, listChannels, testReminderDryRun, updateReminder } from '@/lib/api'
 import type { Channel, Reminder, ReminderInput } from '@/types'
 import { toContentFormat } from '@/types'
+import { cn } from '@/lib/utils'
 
 interface Props {
   reminder: Reminder | null
@@ -57,6 +58,8 @@ export function ReminderEditDialog({ reminder, open, onClose, onSaved }: Props) 
   const [saving, setSaving] = useState(false)
   const [testing, setTesting] = useState(false)
   const [channelOpen, setChannelOpen] = useState(false)
+  // 占位符帮助面板：点击图标开关，移动端没有 hover 只能靠点击
+  const [helpOpen, setHelpOpen] = useState(false)
   const [channels, setChannels] = useState<Channel[]>([])
   const { toast } = useToast()
   const siteTimezone = tz
@@ -150,7 +153,7 @@ export function ReminderEditDialog({ reminder, open, onClose, onSaved }: Props) 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent
-        className="max-w-2xl max-h-[90vh] overflow-y-auto"
+        className="max-w-2xl md:max-h-[90dvh] md:overflow-y-auto"
         onPointerDownOutside={(e) => {
           // CalendarPopover 通过 createPortal(document.body) 渲染，不在 Dialog DOM 子树内，
           // Radix Dialog 的 DismissableLayer 会拦截其 pointerdown 并阻止 click 产生。
@@ -181,18 +184,29 @@ export function ReminderEditDialog({ reminder, open, onClose, onSaved }: Props) 
             />
           </div>
           <div className="space-y-2">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-1.5">
                 <Label htmlFor="r-content">内容</Label>
                 <div className="group relative inline-flex">
                   <button
                     type="button"
+                    onClick={() => setHelpOpen((v) => !v)}
                     className="rounded-sm p-0.5 text-muted-foreground transition-colors hover:text-foreground"
                     aria-label="查看可用占位符"
+                    aria-expanded={helpOpen}
                   >
                     <Info className="h-3.5 w-3.5" />
                   </button>
-                  <div className="pointer-events-none absolute left-full top-1/2 z-50 ml-2 hidden w-72 -translate-y-1/2 rounded-md border bg-popover p-3 text-xs text-popover-foreground shadow-md group-hover:block">
+                  {helpOpen && (
+                    <div className="fixed inset-0 z-40" onClick={() => setHelpOpen(false)} />
+                  )}
+                  <div
+                    className={cn(
+                      'absolute left-0 top-full z-50 mt-1 w-72 max-w-[calc(100vw-3rem)] rounded-md border bg-popover p-3 text-xs text-popover-foreground shadow-md',
+                      'md:left-full md:top-1/2 md:-translate-y-1/2 md:ml-2 md:mt-0',
+                      helpOpen ? 'block' : 'hidden md:group-hover:block',
+                    )}
+                  >
                     <div className="space-y-1.5">
                       <p className="font-medium mb-1">可用占位符</p>
                       <div>

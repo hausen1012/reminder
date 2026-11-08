@@ -1,4 +1,6 @@
 // 通用筛选栏：Select 筛选器 + 搜索框 + 刷新按钮
+//
+// 桌面端筛选器在前、搜索与刷新同排；移动端搜索与刷新占第一行，筛选器换到第二行。
 import type { ReactNode, FormEvent } from 'react'
 import { Search, RefreshCw } from 'lucide-react'
 import { Input } from '@/components/ui/input'
@@ -23,9 +25,13 @@ export function FilterToolbar({
 }: Props) {
   return (
     <div className="flex flex-wrap items-center gap-2">
-      {children}
+      {children && (
+        <div className="order-last flex w-full flex-wrap items-center gap-2 md:order-none md:w-auto">
+          {children}
+        </div>
+      )}
       <form
-        className="flex-1 min-w-0 flex gap-2 md:max-w-sm"
+        className="flex min-w-0 flex-1 gap-2 md:max-w-sm"
         onSubmit={(e: FormEvent) => {
           e.preventDefault()
           onSearch()
@@ -35,13 +41,21 @@ export function FilterToolbar({
           placeholder={placeholder}
           value={searchValue}
           onChange={(e) => onSearchChange(e.target.value)}
-          className="flex-1 min-w-0"
+          className="min-w-0 flex-1"
+          enterKeyHint="search"
         />
-        <Button type="submit" variant="outline" size="icon" title="搜索">
+        <Button type="submit" variant="outline" size="icon" title="搜索" aria-label="搜索" className="shrink-0">
           <Search className="h-4 w-4" />
         </Button>
       </form>
-      <Button variant="outline" size="icon" onClick={onRefresh} title="刷新" className="ml-auto shrink-0">
+      <Button
+        variant="outline"
+        size="icon"
+        onClick={onRefresh}
+        title="刷新"
+        aria-label="刷新"
+        className="ml-auto shrink-0"
+      >
         <RefreshCw className="h-4 w-4" />
       </Button>
     </div>

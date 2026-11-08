@@ -32,8 +32,13 @@ const DialogContent = React.forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        'fixed left-[50%] top-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 sm:max-w-lg sm:rounded-lg max-sm:inset-0 max-sm:max-w-full max-sm:rounded-none max-sm:h-dvh max-sm:translate-x-0 max-sm:translate-y-0',
+        // 桌面端居中弹窗；宽度默认 max-w-lg，调用方传 max-w-* 时由 tailwind-merge 覆盖
+        'fixed z-50 grid w-full max-w-lg gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 sm:left-[50%] sm:top-[50%] sm:translate-x-[-50%] sm:translate-y-[-50%] sm:rounded-lg',
+        // 移动端：底部弹层；高度受限时可滚动，长表单不会冲出屏幕
+        'max-sm:inset-x-0 max-sm:bottom-0 max-sm:top-auto max-sm:h-auto max-sm:max-h-[92dvh] max-sm:translate-x-0 max-sm:translate-y-0 max-sm:overflow-y-auto max-sm:scroll-area max-sm:rounded-b-none max-sm:rounded-t-2xl max-sm:pb-[calc(1.5rem+env(safe-area-inset-bottom))]',
         className,
+        // 放在最后：移动端全宽，覆盖调用方传入的 max-w-*
+        'max-sm:max-w-none',
       )}
       {...props}
     >
@@ -48,12 +53,15 @@ const DialogContent = React.forwardRef<
 DialogContent.displayName = DialogPrimitive.Content.displayName
 
 const DialogHeader = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
-  <div className={cn('flex flex-col space-y-1.5 text-center sm:text-left', className)} {...props} />
+  <div className={cn('flex flex-col space-y-1.5 pr-8 text-center sm:pr-0 sm:text-left', className)} {...props} />
 )
 DialogHeader.displayName = 'DialogHeader'
 
 const DialogFooter = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
-  <div className={cn('flex flex-row justify-end gap-2', className)} {...props} />
+  <div
+    className={cn('flex flex-row flex-wrap justify-end gap-2 max-sm:[&>*]:flex-1', className)}
+    {...props}
+  />
 )
 DialogFooter.displayName = 'DialogFooter'
 
