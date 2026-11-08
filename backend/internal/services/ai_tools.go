@@ -32,12 +32,10 @@ const (
 func channelTypeSchema() map[string]any {
 	specs := notifier.Specs()
 	enum := make([]string, 0, len(specs))
-	parts := make([]string, 0, len(specs))
 	lines := make([]string, 0, len(specs))
 	for _, s := range specs {
 		enum = append(enum, s.Type)
-		parts = append(parts, s.Type+"="+s.Label)
-		if keys := nonSensitiveFieldKeys(s); len(keys) > 0 {
+		if keys := fieldKeys(s); len(keys) > 0 {
 			lines = append(lines, "- "+s.Type+": "+keys)
 		} else {
 			lines = append(lines, "- "+s.Type+": 无需字段")
@@ -46,12 +44,12 @@ func channelTypeSchema() map[string]any {
 	return map[string]any{
 		"type":        "string",
 		"enum":        enum,
-		"description": "通道类型。填写 config 时按类型提供字段：\n" + strings.Join(lines, "\n"),
+		"description": "通道类型。填写 config 时按类型提供字段（敏感字段按 _enc 键名直接填原文）：\n" + strings.Join(lines, "\n"),
 	}
 }
 
-// nonSensitiveFieldKeys 返回非敏感字段键名，敏感字段在配置里按 _enc 键名填写原文。
-func nonSensitiveFieldKeys(s notifier.Spec) string {
+// fieldKeys 返回字段键名清单。
+func fieldKeys(s notifier.Spec) string {
 	keys := make([]string, 0, len(s.Fields))
 	for _, f := range s.Fields {
 		keys = append(keys, f.Key)
