@@ -30,7 +30,7 @@ export default function Login() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background">
+    <div className="fixed inset-0 flex items-center justify-center bg-background p-4 overflow-hidden overscroll-none">
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
           <CardTitle className="flex items-center justify-center gap-2">
