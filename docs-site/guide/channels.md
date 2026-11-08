@@ -11,6 +11,7 @@
 | `dingtalk` | 钉钉群机器人 Webhook | 是 |
 | `wecom` | 企业微信群机器人 Webhook | 是 |
 | `feishu` | 飞书群自定义机器人 Webhook | 是 |
+| `telegram` | Telegram Bot，发送到指定会话 | 是 |
 | `webhook` | 通用 HTTP 回调，可自定义方法、头、Body 模板 | 是 |
 | `log` | 输出到服务端日志，用于本地调试 | 否 |
 
@@ -81,6 +82,24 @@
 
 飞书自定义机器人只发送纯文本消息：`markdown` 与 `html` 正文都会先转换为纯文本。
 正文超过 4000 字时会被截断并追加省略号（对端请求体上限为 20 KB）。
+
+## Telegram
+
+| 字段 | 说明 |
+|---|---|
+| `bot_token_enc` | Bot Token，向 `@BotFather` 申请，加密存储 |
+| `chat_id` | 目标用户或群组的 chat_id |
+| `disable_notification` | 静默发送，客户端不播放提示音 |
+
+发送前需要把机器人加入目标会话。个人会话的 chat_id 可从 `getUpdates` 接口读取，
+群组 chat_id 为负数。
+
+正文超过 4096 字时会被截断并追加省略号。
+
+::: tip 需要代理的网络环境
+程序通过 Go 标准库的默认 HTTP 客户端访问 `api.telegram.org`，该客户端会读取
+`HTTPS_PROXY` 环境变量。在无法直连的网络里给服务进程设置该变量即可，无需改动通道配置。
+:::
 
 ## 通用 Webhook
 

@@ -108,6 +108,17 @@ var specs = map[string]Spec{
 		// 飞书文本消息请求体上限 20 KB，这里留足余量
 		MaxBodyLen: 4000,
 	},
+	"telegram": {
+		Type:        "telegram",
+		Label:       "Telegram",
+		Description: "通过 Bot API 发送到指定会话；需要网络能访问 api.telegram.org，可用 HTTPS_PROXY 配置代理",
+		Fields: []FieldSpec{
+			{Key: "bot_token_enc", Label: "Bot Token", Kind: FieldPassword, Placeholder: "123456:ABC-DEF...", Required: true, Help: "向 @BotFather 申请"},
+			{Key: "chat_id", Label: "Chat ID", Kind: FieldText, Placeholder: "用户或群组的 chat_id", Required: true, Help: "把机器人拉进目标会话后从 getUpdates 获取"},
+			{Key: "disable_notification", Label: "静默发送", Kind: FieldSwitch, Help: "客户端不播放提示音"},
+		},
+		MaxBodyLen: 4096,
+	},
 	"webhook": {
 		Type:             "webhook",
 		Label:            "通用 Webhook",
@@ -135,7 +146,7 @@ var specs = map[string]Spec{
 }
 
 // specOrder 决定类型枚举与前端下拉框的顺序。
-var specOrder = []string{"smtp", "dingtalk", "wecom", "feishu", "webhook", "log"}
+var specOrder = []string{"smtp", "dingtalk", "wecom", "feishu", "telegram", "webhook", "log"}
 
 // SpecOf 按类型取元数据。
 func SpecOf(typ string) (Spec, bool) {

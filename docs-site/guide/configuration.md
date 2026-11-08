@@ -90,6 +90,7 @@ $b = New-Object byte[] 32
 | `TRUSTED_PROXIES` | 空 | 可信反向代理的 IP / CIDR，逗号分隔，如 `127.0.0.1,172.18.0.0/16` |
 | `LOGIN_MAX_ATTEMPTS` | `5` | 同一「用户名 + IP」连续登录失败多少次后临时锁定；`0` 表示关闭登录限流 |
 | `LOGIN_LOCKOUT_MINUTES` | `15` | 登录锁定时长（分钟） |
+| `HTTPS_PROXY` | 空 | 访问外部服务时的 HTTP 代理，作用于 Telegram 等需要代理的网络环境 |
 
 ::: tip 放在反向代理后面时务必配置 TRUSTED_PROXIES
 访问日志里的 `ip` 字段、登录限流的计数键都依赖客户端 IP。
