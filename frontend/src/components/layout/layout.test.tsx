@@ -1,4 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest'
+import { useEffect } from 'react'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
@@ -12,8 +13,16 @@ vi.mock('@/contexts/ThemeContext', () => ({ useTheme: () => mockTheme() }))
 vi.mock('@/contexts/AuthContext', () => ({ useAuth: () => mockAuth() }))
 vi.mock('@/contexts/ConfigContext', () => ({ useConfig: () => mockConfig() }))
 // 外壳测试只关心布局，浮窗有自己的测试文件，这里替换成空组件避免引入
-// toast 上下文依赖
-vi.mock('@/components/ai/AIChatWidget', () => ({ AIChatWidget: () => null }))
+// toast 上下文依赖；保留 onEnabledChange 上报，便于验证主内容底部留白
+const aiState = vi.hoisted(() => ({ enabled: false }))
+vi.mock('@/components/ai/AIChatWidget', () => ({
+  AIChatWidget: ({ onEnabledChange }: { onEnabledChange?: (enabled: boolean) => void }) => {
+    useEffect(() => {
+      onEnabledChange?.(aiState.enabled)
+    }, [onEnabledChange])
+    return null
+  },
+}))
 
 function renderSidebar(onNavClick?: () => void) {
   return render(
@@ -137,6 +146,7 @@ describe('AppLayout', () => {
   }
 
   beforeEach(() => {
+    aiState.enabled = false
     mockTheme.mockReturnValue({ theme: 'light', toggle: vi.fn() })
     mockAuth.mockReturnValue({ user: { id: 1, username: 'admin' }, logout: vi.fn() })
     mockConfig.mockReturnValue({ config: {} })
@@ -198,5 +208,20 @@ describe('AppLayout', () => {
 
     const drawer = container.querySelector('div.fixed.inset-0')
     expect(drawer?.className).toContain('invisible')
+  })
+
+  it('AI 助手未启用时主内容不额外留白', () => {
+    const { container } = renderLayout()
+    const main = container.querySelector('main')
+    expect(main).not.toBeNull()
+    expect(main?.className).not.toContain('pb-24')
+  })
+
+  it('AI 助手启用后主内容底部预留滚动余量，分页可滚出悬浮按钮', () => {
+    aiState.enabled = true
+    const { container } = renderLayout()
+    const main = container.querySelector('main')
+    // 移动端与桌面端按钮均为 3rem 高，留白 6rem 足以让分页滚到按钮上方
+    expect(main?.className).toContain('pb-24')
   })
 })

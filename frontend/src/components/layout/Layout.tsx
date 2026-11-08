@@ -35,6 +35,8 @@ import { cn } from '@/lib/utils'
 
 export function AppLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  // AI 入口启用时，主内容区底部预留滚动余量，避免右下角悬浮按钮压住分页等底部控件
+  const [aiEnabled, setAiEnabled] = useState(false)
   const { theme, toggle } = useTheme()
   const { config } = useConfig()
 
@@ -102,7 +104,14 @@ export function AppLayout() {
       </header>
 
       {/* 主内容区 */}
-      <main className="relative min-h-0 min-w-0 flex-1 overflow-y-auto scroll-area bg-background p-4 md:p-8">
+      <main
+        className={cn(
+          'relative min-h-0 min-w-0 flex-1 overflow-y-auto scroll-area bg-background p-4 md:p-8',
+          // AI 悬浮按钮固定在右下角，会盖住列表底部的分页；启用时在主内容底部留出滚动余量，
+          // 滚到底部后分页会停在按钮上方。
+          aiEnabled && 'pb-24',
+        )}
+      >
         <Outlet />
       </main>
 
@@ -142,7 +151,7 @@ export function AppLayout() {
       </nav>
 
       {/* AI 助手：右下角悬浮窗，不占导航、不进数据库 */}
-      <AIChatWidget />
+      <AIChatWidget onEnabledChange={setAiEnabled} />
     </div>
   )
 }

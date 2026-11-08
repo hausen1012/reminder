@@ -81,7 +81,15 @@ function saveHistory(history: AIChatMessage[]) {
   }
 }
 
-export function AIChatWidget() {
+interface AIChatWidgetProps {
+  /**
+   * 启用状态变化时回调。布局据此为主内容预留底部滚动余量，
+   * 使分页等底部控件能滚出右下角悬浮按钮的覆盖范围。
+   */
+  onEnabledChange?: (enabled: boolean) => void
+}
+
+export function AIChatWidget({ onEnabledChange }: AIChatWidgetProps = {}) {
   const { toast } = useToast()
   const [enabled, setEnabled] = useState(false)
   const [loaded, setLoaded] = useState(false)
@@ -123,6 +131,11 @@ export function AIChatWidget() {
   useEffect(() => {
     loadSettings()
   }, [loadSettings])
+
+  // 设置加载完成后再上报，避免首屏误加留白
+  useEffect(() => {
+    onEnabledChange?.(loaded && enabled)
+  }, [loaded, enabled, onEnabledChange])
 
   const refreshActions = useCallback(async () => {
     try {
