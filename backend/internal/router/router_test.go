@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 
@@ -70,4 +71,44 @@ func TestNoRoute_NonAPI_NotJSON(t *testing.T) {
 	if ct := w.Header().Get("Content-Type"); strings.HasPrefix(ct, "application/json") {
 		t.Fatalf("非 /api 路径不应返回 JSON 错误体，Content-Type = %q", ct)
 	}
+}
+
+func TestInitGinMode(t *testing.T) {
+	origMode := gin.Mode()
+	origEnv, hadEnv := os.LookupEnv("GIN_MODE")
+	t.Cleanup(func() {
+		gin.SetMode(origMode)
+		if hadEnv {
+			_ = os.Setenv("GIN_MODE", origEnv)
+		} else {
+			_ = os.Unsetenv("GIN_MODE")
+		}
+	})
+
+	t.Run("未设置GIN_MODE且非TestMode时默认切换为ReleaseMode", func(t *testing.T) {
+		_ = os.Unsetenv("GIN_MODE")
+		gin.SetMode(gin.DebugMode)
+		initGinMode()
+		if gin.Mode() != gin.ReleaseMode {
+			t.Fatalf("gin.Mode() = %s, 期望 %s", gin.Mode(), gin.ReleaseMode)
+		}
+	})
+
+	t.Run("已显式配置GIN_MODE环境变量时保持外部设置", func(t *testing.T) {
+		_ = os.Setenv("GIN_MODE", "debug")
+		gin.SetMode(gin.DebugMode)
+		initGinMode()
+		if gin.Mode() != gin.DebugMode {
+			t.Fatalf("gin.Mode() = %s, 期望 %s", gin.Mode(), gin.DebugMode)
+		}
+	})
+
+	t.Run("单测环境下已设置为TestMode时予以保留", func(t *testing.T) {
+		_ = os.Unsetenv("GIN_MODE")
+		gin.SetMode(gin.TestMode)
+		initGinMode()
+		if gin.Mode() != gin.TestMode {
+			t.Fatalf("gin.Mode() = %s, 期望 %s", gin.Mode(), gin.TestMode)
+		}
+	})
 }

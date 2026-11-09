@@ -6,7 +6,7 @@ Reminder 是一套自托管的个人提醒 / 通知系统。你把要做的事�
 - 开源仓库：[github.com/hausen1012/reminder](https://github.com/hausen1012/reminder)
 - 文档地址：[hausen1012.github.io/reminder](https://hausen1012.github.io/reminder/)
 
-它面向的场景是「一个人或一个小组自己的提醒需求」，因此刻意做成**单进程 + 单文件 + 单数据库**：
+Reminder 采用**单进程 + 单文件 + 单数据库**架构：
 
 - 前端构建产物直接嵌入 Go 二进制，部署只需要拷贝一个可执行文件
 - 数据存在本地 SQLite 文件里，不需要额外安装数据库

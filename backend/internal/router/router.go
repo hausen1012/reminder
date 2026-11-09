@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"log/slog"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -59,11 +60,20 @@ func applyMiddleware(r *gin.Engine, cfg *config.Config) {
 	r.Use(middleware.ErrorHandler())
 }
 
+// initGinMode 确保未显式配置 GIN_MODE 时默认以 ReleaseMode 运行，
+// 避免生产环境打印 debug 警告与全部路由表；单测下若已设置为 TestMode 则保留。
+func initGinMode() {
+	if os.Getenv(gin.EnvGinMode) == "" && gin.Mode() != gin.TestMode {
+		gin.SetMode(gin.ReleaseMode)
+	}
+}
+
 // Setup 构建路由 + 启动调度器 + Sweeper。
 //
 // 返回值包含 gin.Engine 与 SchedulerHandles（供 main 在优雅停机时 Stop 各后台组件）。
 // 初始化失败时返回 error，由调用方决定如何退出，避免在库内 panic。
 func Setup(staticFS embed.FS, cfg *config.Config) (*SetupResult, error) {
+	initGinMode()
 	r := gin.New()
 	// 中间件顺序集中在这里维护，顺序本身就是契约，改动前先读 applyMiddleware 的注释。
 	applyMiddleware(r, cfg)

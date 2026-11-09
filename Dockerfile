@@ -27,6 +27,7 @@ RUN BUILD_TIME="${BUILD_TIME:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}" && \
 FROM alpine:3.24
 # tzdata 必须安装：站点时区（设置页可改）与 TIMEZONE 都依赖时区数据库
 RUN apk --no-cache add tzdata
+ENV GIN_MODE=release
 WORKDIR /app
 COPY --from=backend /app/server .
 EXPOSE 8765
