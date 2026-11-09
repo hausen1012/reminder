@@ -4,8 +4,8 @@
 
 | 形态 | 适用场景 | 需要什么 |
 |---|---|---|
-| 单文件二进制 | 一台自己的服务器 / 树莓派 / NAS | 目标平台的可执行文件 |
-| Docker | 已有 Docker 环境 | `docker-compose` |
+| 单文件二进制 | 一台自己的 x86 服务器（或在目标机器本地编译） | 目标平台的可执行文件 |
+| Docker | 已有 Docker 环境（支持 x86 服务器、树莓派及各类 NAS） | `docker-compose` |
 
 两种形态的运行逻辑一致：一个进程、一个 SQLite 文件、一个端口。**不支持多副本部署**，
 因为调度器与限流器都是进程内状态。
@@ -32,21 +32,69 @@ LOG_FILE=/var/log/reminder \
 ```
 
 跨平台构建需要交叉编译。由于 SQLite 驱动使用 CGO，交叉编译时**构建机器**上需要有目标平台的 C 交叉工具链；
-配置麻烦时直接用 Docker 部署更省事。
+对于树莓派或 ARM NAS 等非 x86 设备，推荐直接使用官方多架构 Docker 镜像。
 
 ## Docker
 
+支持使用官方 Docker 镜像，或在本地从源码构建镜像。官方镜像支持 `linux/amd64` 与 `linux/arm64`。
+
+### 方式一：Docker Run
+
 ```bash
-docker compose up -d --build
+docker pull hausen1012/reminder:latest
+
+docker run -d \
+  --name reminder \
+  --restart unless-stopped \
+  -p 8765:8765 \
+  -v ./reminder/db:/data/db \
+  -v ./reminder/log:/var/log/reminder \
+  -e SITE_URL=http://localhost:8765 \
+  hausen1012/reminder:latest
+```
+
+### 方式二：Docker Compose
+
+克隆仓库或新建 `docker-compose.yml`：
+
+```yaml
+version: '3.8'
+
+services:
+  reminder:
+    image: hausen1012/reminder:latest
+    container_name: reminder
+    restart: unless-stopped
+    ports:
+      - "8765:8765"
+    volumes:
+      - ./reminder/db:/data/db
+      - ./reminder/log:/var/log/reminder
+    environment:
+      - SITE_URL=http://localhost:8765
+```
+
+启动容器：
+
+```bash
+docker compose up -d
 ```
 
 `docker-compose.yml` 已经把数据库与日志挂到宿主机目录（`./reminder/db`、`./reminder/log`），
 容器重建不会丢数据。所有环境变量都可以通过宿主机环境或 `.env` 文件覆盖。
 
+### 本地源码构建
+
+若需修改代码并从本地源码构建镜像：
+
+```bash
+docker compose up -d --build
+```
+
 镜像构建分三段：Node 构建前端 → Go 编译（前端产物拷进 `cmd/server/web` 供 `go:embed`）→
 Alpine 运行。最终镜像只包含二进制与时区数据。
 
-打 tag 时 GitHub Actions 会自动构建并推送到 Docker Hub 并创建 GitHub Release（见 `.github/workflows/release.yml`）。
+打 tag 时 GitHub Actions 会自动构建多架构镜像（`linux/amd64`、`linux/arm64`）并推送到 Docker Hub 并创建 GitHub Release（见 `.github/workflows/release.yml`）。
 
 ## 反向代理
 

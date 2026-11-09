@@ -45,9 +45,34 @@ CI 会在每次 push / PR 时执行这些检查。
 
 ### 构建与部署
 
+#### Docker 部署（推荐）
+
+使用官方多架构镜像（支持 amd64 / arm64）：
+
+```bash
+docker pull hausen1012/reminder:latest
+
+docker run -d \
+  --name reminder \
+  --restart unless-stopped \
+  -p 8765:8765 \
+  -v ./reminder/db:/data/db \
+  -v ./reminder/log:/var/log/reminder \
+  -e SITE_URL=http://localhost:8765 \
+  hausen1012/reminder:latest
+```
+
+或使用 Docker Compose 启动：
+
+```bash
+docker compose up -d
+```
+
+#### 本地构建
+
 ```bash
 make build         # 构建单文件二进制到 build/
-make docker        # 或使用 Docker 部署
+make docker        # 本地构建镜像并运行 Docker
 ```
 
 ### 配置

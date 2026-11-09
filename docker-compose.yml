@@ -2,6 +2,7 @@ version: '3.8'
 
 services:
   reminder:
+    image: hausen1012/reminder:latest
     build: .
     ports:
       - "${PORT:-8765}:8765"

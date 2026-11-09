@@ -5,7 +5,7 @@
 最快的方式，免安装 Go 与 Node.js：
 
 ```bash
-docker compose up -d --build
+docker compose up -d
 ```
 
 容器会监听 `8765` 端口，数据与日志挂载在仓库目录下的 `reminder/db` 与 `reminder/log`。

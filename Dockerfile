@@ -1,11 +1,11 @@
 # Stage 1: Frontend build
-FROM node:20-alpine AS frontend
+FROM --platform=$BUILDPLATFORM node:22-alpine AS frontend
 WORKDIR /app
 COPY frontend/ .
 RUN npm ci && npm run build
 
 # Stage 2: Go build
-FROM golang:1.25-alpine AS backend
+FROM golang:1.25-alpine3.24 AS backend
 WORKDIR /app
 RUN apk add --no-cache gcc musl-dev
 ENV CGO_ENABLED=1
@@ -24,7 +24,7 @@ RUN BUILD_TIME="${BUILD_TIME:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}" && \
       -o server ./cmd/server
 
 # Stage 3: Runtime
-FROM alpine:3.19
+FROM alpine:3.24
 # tzdata 必须安装：站点时区（设置页可改）与 TIMEZONE 都依赖时区数据库
 RUN apk --no-cache add tzdata
 WORKDIR /app
