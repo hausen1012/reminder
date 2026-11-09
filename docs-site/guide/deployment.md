@@ -46,7 +46,7 @@ docker compose up -d --build
 镜像构建分三段：Node 构建前端 → Go 编译（前端产物拷进 `cmd/server/web` 供 `go:embed`）→
 Alpine 运行。最终镜像只包含二进制与时区数据。
 
-打 tag 时 GitHub Actions 会自动构建并推送到 Docker Hub（见 `.github/workflows/docker-release.yml`）。
+打 tag 时 GitHub Actions 会自动构建并推送到 Docker Hub 并创建 GitHub Release（见 `.github/workflows/docker-release.yml`）。
 
 ## 反向代理
 
