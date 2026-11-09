@@ -168,7 +168,7 @@ var specs = map[string]Spec{
 	},
 	"webhook": {
 		Type:        "webhook",
-		Label:       "通用 Webhook",
+		Label:       "Webhook",
 		Description: "可自定义方法、请求头与 Body 模板的 HTTP 回调",
 		Fields: []FieldSpec{
 			{Key: "method", Label: "方法", Kind: FieldSelect, Default: "POST", Options: []Option{

@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-// WebhookConfig 是通用 Webhook 通道的配置。
+// WebhookConfig 是 Webhook 通道的配置。
 //
 // GET 按 query_template 拼 query string；POST 把 body_template 渲染后作为请求体。
 type WebhookConfig struct {

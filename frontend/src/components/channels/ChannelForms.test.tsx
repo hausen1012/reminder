@@ -246,7 +246,7 @@ describe('WeComForm', () => {
   })
 })
 
-// --- 通用 Webhook ---
+// --- Webhook ---
 
 describe('WebhookForm', () => {
   it('默认 POST 时显示 Content-Type 与 Body 模板', () => {

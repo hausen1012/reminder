@@ -255,7 +255,7 @@ export function WeComForm({ config, onChange }: SubFormProps) {
   )
 }
 
-// --- 通用 Webhook ---
+// --- Webhook ---
 
 // 把 Record<string, string> 转成 "key: value" 多行文本，便于编辑
 function kvToText(obj: Record<string, string> | undefined): string {
