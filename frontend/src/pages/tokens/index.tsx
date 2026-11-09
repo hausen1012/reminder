@@ -1,8 +1,9 @@
 // 令牌管理页
 import { useEffect, useMemo, useState } from 'react'
-import { Plus, Trash2, Copy, CheckCircle2, Pencil, Terminal, AlertCircle } from 'lucide-react'
+import { Plus, Trash2, Copy, CheckCircle2, Pencil, Terminal, AlertCircle, KeyRound, SearchX } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { EmptyState } from '@/components/common/EmptyState'
 import { PageHeader } from '@/components/common/PageHeader'
 import { FilterToolbar } from '@/components/common/FilterToolbar'
 import { Input } from '@/components/ui/input'
@@ -302,11 +303,34 @@ export default function TokensPage() {
           </CardContent>
         </Card>
       ) : filteredItems.length === 0 ? (
-        <Card>
-          <CardContent className="py-10 text-center text-sm text-muted-foreground">
-            {search.trim() ? '没有匹配的令牌。' : '还没有令牌。'}
-          </CardContent>
-        </Card>
+        Boolean(search.trim()) ? (
+          <EmptyState
+            icon={SearchX}
+            title="没有匹配的令牌"
+            description="未找到符合搜索条件的令牌，尝试更换关键词。"
+            action={{
+              label: '清空搜索',
+              variant: 'outline',
+              onClick: () => setSearch(''),
+            }}
+            secondaryAction={{
+              label: '新建令牌',
+              icon: Plus,
+              onClick: () => setCreateOpen(true),
+            }}
+          />
+        ) : (
+          <EmptyState
+            icon={KeyRound}
+            title="还没有令牌"
+            description="创建 API 访问令牌，可通过 HTTP 请求直接触发提醒或投递消息。"
+            action={{
+              label: '新建令牌',
+              icon: Plus,
+              onClick: () => setCreateOpen(true),
+            }}
+          />
+        )
       ) : (
         <Card>
           {/* 桌面端表格 */}

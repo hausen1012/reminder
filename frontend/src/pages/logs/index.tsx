@@ -19,9 +19,12 @@ import {
   Send,
   Bell,
   Share2,
+  Inbox,
+  SearchX,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { EmptyState } from '@/components/common/EmptyState'
 import { PageHeader } from '@/components/common/PageHeader'
 import { FilterToolbar } from '@/components/common/FilterToolbar'
 import { Badge } from '@/components/ui/badge'
@@ -334,11 +337,28 @@ export default function LogsPage() {
           </CardContent>
         </Card>
       ) : items.length === 0 ? (
-        <Card>
-          <CardContent className="py-10 text-center text-sm text-muted-foreground">
-            还没有发送日志。创建提醒并触发后这里会显示记录。
-          </CardContent>
-        </Card>
+        Boolean(filter.status || filter.source || filter.search) ? (
+          <EmptyState
+            icon={SearchX}
+            title="未找到匹配的日志"
+            description="当前筛选条件下没有日志记录，尝试清除筛选或调整搜索关键词。"
+            action={{
+              label: '清除筛选',
+              variant: 'outline',
+              onClick: () => {
+                setFilter({})
+                setSearch('')
+                setOffset(0)
+              },
+            }}
+          />
+        ) : (
+          <EmptyState
+            icon={Inbox}
+            title="还没有发送日志"
+            description="创建提醒并在触发或测试发送后，投递结果、延迟与重试记录将展示在这里。"
+          />
+        )
       ) : (
         <Card>
           {/* 桌面端表格 */}
@@ -751,7 +771,14 @@ export default function LogsPage() {
                   </div>
                 </>
               ) : (
-                <p className="text-sm text-muted-foreground py-4">暂无投递记录。</p>
+                <EmptyState
+                  variant="dashed"
+                  size="compact"
+                  icon={Send}
+                  title="暂无投递记录"
+                  description="本次触发尚未产生各渠道的投递尝试详情。"
+                  className="my-2"
+                />
               )}
             </TabsContent>
           </Tabs>

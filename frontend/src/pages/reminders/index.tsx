@@ -1,9 +1,10 @@
 // 提醒列表页：toolbar（来源筛选/状态/搜索/新建）+ 表格 + 编辑/试发/删除。
 import { useEffect, useState, useMemo, useCallback } from 'react'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Plus, Pencil, Trash2, Copy, AlertCircle } from 'lucide-react'
+import { Plus, Pencil, Trash2, Copy, AlertCircle, Bell, SearchX } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { EmptyState } from '@/components/common/EmptyState'
 import { Switch } from '@/components/ui/switch'
 import {
   Select,
@@ -268,11 +269,39 @@ export default function RemindersPage() {
           </CardContent>
         </Card>
       ) : items.length === 0 ? (
-        <Card>
-          <CardContent className="py-10 text-center text-sm text-muted-foreground">
-            还没有提醒，点击上方「新建提醒」创建。
-          </CardContent>
-        </Card>
+        source !== 'all' || enabled !== 'all' || Boolean(search.trim()) ? (
+          <EmptyState
+            icon={SearchX}
+            title="未找到匹配的提醒"
+            description="没有找到符合当前筛选条件的提醒，尝试调整关键词或清除筛选。"
+            action={{
+              label: '清除筛选',
+              variant: 'outline',
+              onClick: () => {
+                setSource('all')
+                setEnabled('all')
+                setSearch('')
+                setOffset(0)
+              },
+            }}
+            secondaryAction={{
+              label: '新建提醒',
+              icon: Plus,
+              onClick: () => setCreating(true),
+            }}
+          />
+        ) : (
+          <EmptyState
+            icon={Bell}
+            title="还没有提醒"
+            description="创建你的第一条提醒，到达设定时间或触发周期后将准时推送通知。"
+            action={{
+              label: '新建提醒',
+              icon: Plus,
+              onClick: () => setCreating(true),
+            }}
+          />
+        )
       ) : (
         <Card>
           {/* 桌面端表格 */}

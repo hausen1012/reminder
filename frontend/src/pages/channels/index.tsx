@@ -1,8 +1,9 @@
 // 通知页：列表 + 新建/编辑对话框 + 发送测试 + 删除
 import { useCallback, useEffect, useState } from 'react'
-import { Plus, Pencil, Trash2, Copy, AlertCircle } from 'lucide-react'
+import { Plus, Pencil, Trash2, Copy, AlertCircle, Radio, SearchX } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { EmptyState } from '@/components/common/EmptyState'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Pagination } from '@/components/common/pagination'
 import { useToast } from '@/components/ui/use-toast'
@@ -198,11 +199,38 @@ export default function ChannelsPage() {
           </CardContent>
         </Card>
       ) : items.length === 0 ? (
-        <Card>
-          <CardContent className="py-10 text-center text-sm text-muted-foreground">
-            还没有通知渠道，点击上方「新建渠道」创建。
-          </CardContent>
-        </Card>
+        Boolean(search.trim()) ? (
+          <EmptyState
+            icon={SearchX}
+            title="未找到匹配的通知渠道"
+            description="没有找到符合搜索条件的通知渠道，尝试调整关键词。"
+            action={{
+              label: '清空搜索',
+              variant: 'outline',
+              onClick: () => {
+                setSearch('')
+                setSearchInput('')
+                setOffset(0)
+              },
+            }}
+            secondaryAction={{
+              label: '新建渠道',
+              icon: Plus,
+              onClick: () => setCreating(true),
+            }}
+          />
+        ) : (
+          <EmptyState
+            icon={Radio}
+            title="还没有通知渠道"
+            description="添加邮件、企业微信、飞书、钉钉、Bark 等渠道，用于接收提醒消息。"
+            action={{
+              label: '新建渠道',
+              icon: Plus,
+              onClick: () => setCreating(true),
+            }}
+          />
+        )
       ) : (
         <Card>
           {/* 桌面端表格 */}

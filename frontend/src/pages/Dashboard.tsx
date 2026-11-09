@@ -16,6 +16,7 @@ import {
   AlertTriangle,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { EmptyState } from '@/components/common/EmptyState'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/contexts/AuthContext'
@@ -310,20 +311,19 @@ export default function Dashboard() {
                 <MiniLoader />
               </div>
             ) : todayReminders.length === 0 ? (
-              <div className="py-8 text-center flex flex-col items-center justify-center space-y-2 border border-dashed rounded-lg bg-muted/20">
-                <CalendarCheck className="h-8 w-8 text-muted-foreground/60" />
-                <p className="text-sm font-medium text-muted-foreground">今天没有待触发的提醒</p>
-                <p className="text-xs text-muted-foreground">日程很轻松，或者现在安排一个新提醒</p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCreateDialogOpen(true)}
-                  className="mt-2 text-xs"
-                >
-                  <Plus className="h-3.5 w-3.5 mr-1" />
-                  新建提醒
-                </Button>
-              </div>
+              <EmptyState
+                variant="dashed"
+                size="compact"
+                icon={CalendarCheck}
+                title="今天没有待触发的提醒"
+                description="日程很轻松，或者现在安排一个新提醒。"
+                action={{
+                  label: '新建提醒',
+                  icon: Plus,
+                  onClick: () => setCreateDialogOpen(true),
+                  variant: 'outline',
+                }}
+              />
             ) : (
               <div className="space-y-2 max-h-[420px] overflow-y-auto overflow-x-hidden scroll-area pr-1 md:space-y-2.5">
                 {todayReminders.map((r, idx) => (
@@ -372,11 +372,13 @@ export default function Dashboard() {
                 <MiniLoader />
               </div>
             ) : logs.length === 0 ? (
-              <div className="py-8 text-center flex flex-col items-center justify-center space-y-2 border border-dashed rounded-lg bg-muted/20">
-                <Inbox className="h-8 w-8 text-muted-foreground/60" />
-                <p className="text-sm font-medium text-muted-foreground">过去 24 小时暂无发送记录</p>
-                <p className="text-xs text-muted-foreground">有提醒触发后将在此处显示投递日志</p>
-              </div>
+              <EmptyState
+                variant="dashed"
+                size="compact"
+                icon={Inbox}
+                title="过去 24 小时暂无发送记录"
+                description="有提醒触发后将在此处显示投递日志。"
+              />
             ) : (
               <div className="space-y-2 max-h-[420px] overflow-y-auto overflow-x-hidden scroll-area pr-1 md:space-y-2.5">
                 {logs.map((log) => {

@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { AlertCircle, RefreshCw } from 'lucide-react'
+import { AlertCircle, RefreshCw, CalendarClock } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { EmptyState } from '@/components/common/EmptyState'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Pagination } from '@/components/common/pagination'
@@ -145,9 +146,17 @@ export default function SchedulerPage() {
             <p className="text-sm text-muted-foreground">加载中…</p>
           </CardContent>
         ) : entries.length === 0 ? (
-          <CardContent className="py-6">
-            <p className="text-sm text-muted-foreground">暂无注册任务。</p>
-          </CardContent>
+          <EmptyState
+            variant="plain"
+            icon={CalendarClock}
+            title="暂无注册任务"
+            description="当前调度引擎中没有待触发的任务。当创建有效提醒或存在重发任务时将在此排队。"
+            action={{
+              label: '前往提醒管理',
+              variant: 'outline',
+              onClick: () => navigate('/reminders'),
+            }}
+          />
         ) : (
           <>
             {/* 桌面端表格 */}
