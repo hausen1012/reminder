@@ -28,7 +28,7 @@ features:
     details: 单次、周期（分/时/天/月/年）、Cron 表达式，公历与农历都支持，农历还能按农历月重复。
   - icon: 📮
     title: 多渠道通知
-    details: SMTP 邮件、钉钉机器人、企业微信机器人、通用 Webhook，以及用于调试的日志通道。
+    details: SMTP 邮件、钉钉 / 企业微信 / 飞书机器人、Telegram、Bark、ntfy、Apprise、通用 Webhook，以及用于调试的日志通道。
   - icon: ✅
     title: 确认闭环
     details: 需要确认的提醒附带一次性链接，未点击则按配置自动重发，直到你确认或用完重试次数。
