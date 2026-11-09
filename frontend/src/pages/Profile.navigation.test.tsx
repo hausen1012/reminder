@@ -1,7 +1,9 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { AuthProvider } from '@/contexts/AuthContext'
 import { ConfigProvider } from '@/contexts/ConfigContext'
+import { AboutProvider } from '@/contexts/AboutContext'
 import { ToastProviderRoot } from '@/components/ui/use-toast'
 import Profile from '@/pages/Profile'
 
@@ -11,20 +13,26 @@ vi.mock('@/lib/api', async () => {
     ...actual,
     getAISettings: vi.fn(),
     getConfig: vi.fn(),
+    getMe: vi.fn(),
     updateConfig: vi.fn(),
     updatePassword: vi.fn(),
+    getAboutInfo: vi.fn(),
   }
 })
 
-import { getAISettings, getConfig, updateConfig } from '@/lib/api'
+import { getAboutInfo, getAISettings, getConfig, getMe, updateConfig } from '@/lib/api'
 
-// Profile 依赖站点配置与 toast 上下文，这里用真实 Provider 包一层
+// Profile 依赖站点配置、关于信息与 toast 上下文，这里用真实 Provider 包一层
 function renderProfile() {
   return render(
     <ToastProviderRoot>
-      <ConfigProvider>
-        <Profile />
-      </ConfigProvider>
+      <AuthProvider>
+        <ConfigProvider>
+          <AboutProvider>
+            <Profile />
+          </AboutProvider>
+        </ConfigProvider>
+      </AuthProvider>
     </ToastProviderRoot>,
   )
 }
@@ -35,10 +43,15 @@ function navButton(name: string) {
   return within(nav).getByRole('button', { name })
 }
 
-// 设置页三大分区：账户信息、基础设置、AI 助手
+// 设置页四个分区：账户信息、基础设置、AI 助手、关于
 describe('Profile 分区导航', () => {
   beforeEach(() => {
     localStorage.setItem('token', 'test-token')
+    vi.mocked(getMe).mockResolvedValue({
+      code: 200,
+      message: 'ok',
+      data: { id: 1, username: 'admin', created_at: '' },
+    })
     vi.mocked(getConfig).mockResolvedValue({
       timezone: 'Europe/Berlin',
       app_name: '提醒',
@@ -53,6 +66,19 @@ describe('Profile 分区导航', () => {
       api_key: '',
       custom_prompt: '',
       max_retries: 10,
+    })
+    vi.mocked(getAboutInfo).mockResolvedValue({
+      version: 'dev',
+      build_time: '',
+      update: {
+        enabled: true,
+        comparable: true,
+        latest_version: '',
+        release_url: '',
+        checked_at: '',
+        error: '',
+        update_available: false,
+      },
     })
   })
 
@@ -74,12 +100,16 @@ describe('Profile 分区导航', () => {
     expect(screen.getByRole('heading', { name: '站点信息' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: '站点地址' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: '时区设置' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: '关于项目' })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: '账户信息' })).not.toBeInTheDocument()
 
     await userEvent.click(navButton('AI 助手'))
     expect(screen.getByRole('heading', { name: 'AI 助手' })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: '基础设置' })).not.toBeInTheDocument()
+
+    await userEvent.click(navButton('关于'))
+    expect(screen.getByRole('heading', { name: '关于' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '版本信息' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'AI 助手' })).not.toBeInTheDocument()
   })
 
   it('回显当前站点时区', async () => {

@@ -17,13 +17,16 @@ Linux 装 `gcc`）。
 | `make dev` | 一键启动前后端（前端热更新） |
 | `make dev-backend` | 只启动后端 |
 | `make dev-frontend` | 只启动前端 |
-| `make build` | 构建当前平台的单文件二进制 |
+| `make build` | 构建当前平台的单文件二进制（版本号取最近的 git tag 注入） |
 | `make build-linux` / `build-macos` / `build-windows` | 交叉编译 |
 | `make fmt` | 格式化 Go 代码 |
 | `make lint` | `go vet` + 格式校验 |
 | `make test` | 后端 Go 测试 + 前端 Vitest |
 | `make docker` | 用 compose 构建并启动 |
 | `make clean` | 清理构建产物 |
+
+`go run`（`make dev`）不注入版本信息，关于页会显示 `dev`；需要看到真实版本号时用 `make build`。
+注入的变量是 `internal/version` 包的 `Version` 与 `BuildTime`，Docker 构建通过 `VERSION` 构建参数传入。
 
 ::: tip 开发脚本默认 `LOG_LEVEL=debug`
 `make dev` / `make dev-backend` / `dev.sh` / `dev.ps1` 都会把后端日志级别设为 `debug`，
@@ -57,6 +60,7 @@ backend/
     llm/               厂商无关的对话接口（Anthropic / OpenAI 兼容实现）
     router/            路由装配
     crypto/secretbox/  对称加密
+    version/           构建时注入的版本号与构建时间
     testutil/          仅测试用的脚手架（内存库、固定时区）
 frontend/
   src/

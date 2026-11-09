@@ -25,19 +25,26 @@ build-frontend:
 	find backend/cmd/server/web -mindepth 1 ! -name '.gitkeep' -exec rm -rf {} +
 	cp -r frontend/dist/* backend/cmd/server/web/
 
+# 版本号注入：取自最近的 git tag，仓库外或无 tag 时为 dev。
+# 构建时间用 UTC，前端按站点时区展示。
+VERSION ?= $(shell git describe --tags --abbrev=0 2>/dev/null || echo dev)
+BUILD_TIME ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
+LDFLAGS = -X github.com/reminder/backend/internal/version.Version=$(VERSION) \
+          -X github.com/reminder/backend/internal/version.BuildTime=$(BUILD_TIME)
+
 # Build backend binary (local OS)
 build: build-frontend
-	cd backend && go build -o ../build/server ./cmd/server/
+	cd backend && go build -ldflags "$(LDFLAGS)" -o ../build/server ./cmd/server/
 
 # Cross-platform builds
 build-linux: build-frontend
-	cd backend && GOOS=linux GOARCH=amd64 go build -o ../build/server-linux ./cmd/server/
+	cd backend && GOOS=linux GOARCH=amd64 go build -ldflags "$(LDFLAGS)" -o ../build/server-linux ./cmd/server/
 
 build-macos: build-frontend
-	cd backend && GOOS=darwin GOARCH=amd64 go build -o ../build/server-macos ./cmd/server/
+	cd backend && GOOS=darwin GOARCH=amd64 go build -ldflags "$(LDFLAGS)" -o ../build/server-macos ./cmd/server/
 
 build-windows: build-frontend
-	cd backend && GOOS=windows GOARCH=amd64 go build -o ../build/server.exe ./cmd/server/
+	cd backend && GOOS=windows GOARCH=amd64 go build -ldflags "$(LDFLAGS)" -o ../build/server.exe ./cmd/server/
 
 # Docker
 docker:

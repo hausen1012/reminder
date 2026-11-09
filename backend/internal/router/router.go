@@ -1,6 +1,7 @@
 package router
 
 import (
+	"context"
 	"embed"
 	"fmt"
 	"io/fs"
@@ -18,6 +19,7 @@ import (
 	"github.com/reminder/backend/internal/scheduler"
 	"github.com/reminder/backend/internal/services"
 	"github.com/reminder/backend/internal/timezone"
+	"github.com/reminder/backend/internal/version"
 )
 
 // SchedulerHandles 把 scheduler 相关启动后实例返回给 main，
@@ -155,6 +157,16 @@ func Setup(staticFS embed.FS, cfg *config.Config) (*SetupResult, error) {
 	tokenSvc := services.NewTokenService(database.DB, box)
 	userSvc := services.NewUserService(database.DB)
 
+	// 关于页：版本信息与每日一次的更新检查
+	aboutSvc := services.NewAboutService(database.DB, version.Version, version.BuildTime)
+	if _, err := engine.AddDailyJob("检查更新", scheduler.DailyPurgeExpr, func() {
+		aboutSvc.AutoCheck(context.Background())
+	}); err != nil {
+		slog.Warn("注册更新检查任务失败", "error", err)
+	}
+	// 启动后异步检查一次，避免首次打开关于页时还没有任何结论
+	go aboutSvc.AutoCheck(context.Background())
+
 	loginLimiter := middleware.NewLoginLimiter(
 		cfg.LoginMaxAttempts,
 		time.Duration(cfg.LoginLockoutMin)*time.Minute,
@@ -170,6 +182,7 @@ func Setup(staticFS embed.FS, cfg *config.Config) (*SetupResult, error) {
 	schedulerHandler := &handlers.SchedulerHandler{Engine: engine, Sweeper: sweeper}
 	configHandler := &handlers.ConfigHandler{Svc: configSvc}
 	aiHandler := &handlers.AIHandler{Svc: aiSvc}
+	aboutHandler := &handlers.AboutHandler{Svc: aboutSvc}
 
 	// 确认链接（无需认证）
 	r.GET("/c/:token", confirmHandler.Confirm)
@@ -280,6 +293,13 @@ func Setup(staticFS embed.FS, cfg *config.Config) (*SetupResult, error) {
 		cfgRoute := protected.Group("/config")
 		cfgRoute.GET("", configHandler.GetAll)
 		cfgRoute.PUT("", configHandler.Update)
+
+		about := protected.Group("/about")
+		{
+			about.GET("", aboutHandler.Get)
+			about.POST("/check", aboutHandler.Check)
+			about.PUT("/update-check", aboutHandler.UpdateCheck)
+		}
 	}
 
 	serveStaticFiles(r, staticFS)

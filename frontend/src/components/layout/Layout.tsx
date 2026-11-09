@@ -28,6 +28,7 @@ import { Separator } from '@/components/ui/separator'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useAuth } from '@/contexts/AuthContext'
 import { useConfig } from '@/contexts/ConfigContext'
+import { useAbout } from '@/contexts/AboutContext'
 import { AppLogo } from '@/components/common/AppLogo'
 import { AIChatWidget } from '@/components/ai/AIChatWidget'
 import { DOCS_URL, GITHUB_URL } from '@/lib/constants'
@@ -185,6 +186,7 @@ export function Sidebar({ onNavClick }: SidebarProps) {
   const { theme, toggle } = useTheme()
   const { user, logout } = useAuth()
   const { config } = useConfig()
+  const { hasUnreadUpdate } = useAbout()
 
   return (
     <aside className="flex h-full w-full flex-col border-r bg-card md:w-48">
@@ -215,6 +217,12 @@ export function Sidebar({ onNavClick }: SidebarProps) {
           >
             <item.icon className="h-[18px] w-[18px] md:h-4 md:w-4" />
             {item.label}
+            {item.to === '/profile' && hasUnreadUpdate && (
+              <span
+                className="ml-auto h-1.5 w-1.5 rounded-full bg-destructive"
+                aria-label="有新版本"
+              />
+            )}
           </NavLink>
         ))}
       </nav>

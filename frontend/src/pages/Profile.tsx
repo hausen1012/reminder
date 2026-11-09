@@ -1,9 +1,10 @@
 import { useState, useEffect, useContext, type FormEvent } from 'react'
-import { Loader2, Github, BookOpen, ExternalLink, User as UserIcon } from 'lucide-react'
+import { Loader2, User as UserIcon } from 'lucide-react'
 import { extractApiError, updatePassword } from '@/lib/api'
 import { useConfig } from '@/contexts/ConfigContext'
+import { useAbout } from '@/contexts/AboutContext'
 import { AuthContext } from '@/contexts/AuthContext'
-import { COMMON_TIMEZONES, DOCS_URL, GITHUB_URL } from '@/lib/constants'
+import { COMMON_TIMEZONES } from '@/lib/constants'
 import { formatInZone } from '@/lib/datetime'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -25,10 +26,11 @@ import {
 import { useToast } from '@/components/ui/use-toast'
 import { AppLogo } from '@/components/common/AppLogo'
 import { AISettingsSection } from '@/components/ai/AISettingsSection'
+import { AboutSection } from '@/components/about/AboutSection'
 import { PageHeader } from '@/components/common/PageHeader'
 import { cn } from '@/lib/utils'
 
-// 设置页三大分区：账户信息、基础设置、AI 助手
+// 设置页分区：账户信息、基础设置、AI 助手、关于
 const SECTIONS = [
   {
     id: 'account',
@@ -38,12 +40,17 @@ const SECTIONS = [
   {
     id: 'general',
     label: '基础设置',
-    description: '配置站点外观、运行环境与系统信息',
+    description: '配置站点外观、站点地址与时区',
   },
   {
     id: 'ai',
     label: 'AI 助手',
     description: '开启后可用自然语言对话来创建通知渠道与提醒；助手生成的写操作需要你确认后才生效',
+  },
+  {
+    id: 'about',
+    label: '关于',
+    description: '当前版本、更新检查与项目地址',
   },
 ] as const
 
@@ -53,6 +60,12 @@ export default function Profile() {
   const [active, setActive] = useState<SectionId>('account')
   const auth = useContext(AuthContext)
   const user = auth?.user
+  const { hasUnreadUpdate, markSeen } = useAbout()
+
+  // 切到关于分区即视为已读，导航红点收起
+  useEffect(() => {
+    if (active === 'about') markSeen()
+  }, [active, markSeen])
 
   // --- 修改密码 ---
   const [oldPassword, setOldPassword] = useState('')
@@ -191,7 +204,15 @@ export default function Profile() {
                     : 'text-muted-foreground hover:bg-secondary/50 hover:text-foreground',
                 )}
               >
-                {section.label}
+                <span className="inline-flex items-center gap-1.5">
+                  {section.label}
+                  {section.id === 'about' && hasUnreadUpdate && (
+                    <span
+                      className="h-1.5 w-1.5 rounded-full bg-destructive"
+                      aria-label="有新版本"
+                    />
+                  )}
+                </span>
               </button>
             )
           })}
@@ -413,44 +434,14 @@ export default function Profile() {
                       </form>
                     </CardContent>
                   </Card>
-
-                  {/* 关于项目 */}
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-base font-medium">关于项目</CardTitle>
-                      <CardDescription>Reminder 开源仓库与完整文档</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                      <a
-                        href={GITHUB_URL}
-                        target="_blank"
-                        rel="noreferrer noopener"
-                        className="flex items-center gap-2 text-sm text-primary hover:underline"
-                      >
-                        <Github className="h-4 w-4" />
-                        github.com/hausen1012/reminder
-                        <ExternalLink className="h-3 w-3" />
-                      </a>
-                      <a
-                        href={DOCS_URL}
-                        target="_blank"
-                        rel="noreferrer noopener"
-                        className="flex items-center gap-2 text-sm text-primary hover:underline"
-                      >
-                        <BookOpen className="h-4 w-4" />
-                        hausen1012.github.io/reminder
-                        <ExternalLink className="h-3 w-3" />
-                      </a>
-                      <p className="text-xs text-muted-foreground">
-                        遇到问题或有建议，欢迎到 GitHub 提 Issue；具体用法见文档站点。
-                      </p>
-                    </CardContent>
-                  </Card>
                 </div>
               )}
 
               {/* AI 助手 */}
               {section.id === 'ai' && <AISettingsSection />}
+
+              {/* 关于 */}
+              {section.id === 'about' && <AboutSection />}
             </div>
           ))}
         </div>

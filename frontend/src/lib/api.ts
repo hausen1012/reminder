@@ -1,6 +1,7 @@
 import axios from 'axios'
 import type {
   Token,
+  AboutInfo,
   ApiResponse,
   AIAction,
   AIChatMessage,
@@ -334,6 +335,24 @@ export async function getConfig() {
 export async function updateConfig(cfg: Record<string, string>) {
   const res = await api.put<ApiResponse<Record<string, string>>>('/config', cfg)
   return res.data.data ?? {}
+}
+
+// --- 关于 ---
+
+export async function getAboutInfo() {
+  const res = await api.get<ApiResponse<AboutInfo>>('/about')
+  return res.data.data
+}
+
+/** 立即检查一次更新，等待服务端请求 GitHub 后返回最新状态。 */
+export async function checkUpdate() {
+  const res = await api.post<ApiResponse<AboutInfo>>('/about/check')
+  return res.data.data
+}
+
+export async function setUpdateCheckEnabled(enabled: boolean) {
+  const res = await api.put<ApiResponse<AboutInfo>>('/about/update-check', { enabled })
+  return res.data.data
 }
 
 // --- 批量删除 ---

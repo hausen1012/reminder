@@ -334,3 +334,31 @@ export const AI_ACTION_LABEL: Record<AIActionKind, string> = {
   update_reminder: '修改提醒',
   delete_reminder: '删除提醒',
 }
+
+// --- 关于页 ---
+
+/** 更新检查状态。检查结果只存在服务端内存，重启后由自动检查重新获取。 */
+export interface AboutUpdateStatus {
+  /** 是否开启每日自动检查；关闭后只有手动检查会出网 */
+  enabled: boolean
+  /** 当前构建版本能否参与版本比较；本地开发构建（dev）为 false */
+  comparable: boolean
+  /** 最近一次检查发现的最新版本；从未成功检查时为空串 */
+  latest_version: string
+  /** 最新版本对应的发布页面地址 */
+  release_url: string
+  /** 最近一次检查时间（RFC3339）；从未检查时为空串 */
+  checked_at: string
+  /** 最近一次检查失败的原因；成功时为空串 */
+  error: string
+  /** 最新版本是否高于当前构建版本 */
+  update_available: boolean
+}
+
+export interface AboutInfo {
+  /** 当前构建版本；本地开发构建为 dev */
+  version: string
+  /** 构建时间（RFC3339）；未注入时为空串 */
+  build_time: string
+  update: AboutUpdateStatus
+}

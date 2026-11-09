@@ -152,6 +152,19 @@ AI 助手的全部配置都在面板里改，每次对话都按最新设置构�
 对话内容不写入数据库，`config` 表里的 `ai_*` 只保存厂商、模型与加密后的密钥。
 :::
 
+## 版本与更新检查
+
+关于页（**设置 → 关于**）展示当前构建版本与构建时间，并每天自动查询一次新版本。
+自动检查的开关以 `update_check_enabled` 存在 `config` 表里，通过
+`PUT /api/about/update-check` 读写，键不存在时视为开启。
+
+- 版本号在构建时通过 `-ldflags -X github.com/reminder/backend/internal/version.Version=...`
+  注入，`make build` 取最近的 git tag，Docker 构建由 `VERSION` 构建参数传入；
+  未注入时为 `dev`，开发构建不比较版本、也不自动检查。
+- 自动检查每天凌晨 3 点执行一次，启动时也会检查一次；结论缓存在内存里，重启后重新获取。
+- 关闭自动检查后不再请求 GitHub，手动「立即检查」仍然可用。
+- 检查结果按仓库 tag 与当前版本比较，只提示有更新，不会自动升级。
+
 ## Docker 部署示例
 
 ```yaml

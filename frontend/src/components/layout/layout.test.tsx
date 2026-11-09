@@ -9,9 +9,11 @@ import { AppLayout, Sidebar } from '@/components/layout/Layout'
 const mockTheme = vi.fn()
 const mockAuth = vi.fn()
 const mockConfig = vi.fn()
+const mockAbout = vi.fn()
 vi.mock('@/contexts/ThemeContext', () => ({ useTheme: () => mockTheme() }))
 vi.mock('@/contexts/AuthContext', () => ({ useAuth: () => mockAuth() }))
 vi.mock('@/contexts/ConfigContext', () => ({ useConfig: () => mockConfig() }))
+vi.mock('@/contexts/AboutContext', () => ({ useAbout: () => mockAbout() }))
 // 外壳测试只关心布局，浮窗有自己的测试文件，这里替换成空组件避免引入
 // toast 上下文依赖；保留 onEnabledChange 上报，便于验证主内容底部留白
 const aiState = vi.hoisted(() => ({ enabled: false }))
@@ -37,6 +39,18 @@ describe('Sidebar', () => {
     mockTheme.mockReturnValue({ theme: 'light', toggle: vi.fn() })
     mockAuth.mockReturnValue({ user: { id: 1, username: 'admin' }, logout: vi.fn() })
     mockConfig.mockReturnValue({ config: {} })
+    mockAbout.mockReturnValue({ hasUnreadUpdate: false })
+  })
+
+  it('有新版本时在「设置」上显示红点', () => {
+    mockAbout.mockReturnValue({ hasUnreadUpdate: true })
+    renderSidebar()
+    expect(screen.getByLabelText('有新版本')).toBeInTheDocument()
+  })
+
+  it('没有新版本时不显示红点', () => {
+    renderSidebar()
+    expect(screen.queryByLabelText('有新版本')).not.toBeInTheDocument()
   })
 
   it('渲染全部导航项', () => {
@@ -150,6 +164,7 @@ describe('AppLayout', () => {
     mockTheme.mockReturnValue({ theme: 'light', toggle: vi.fn() })
     mockAuth.mockReturnValue({ user: { id: 1, username: 'admin' }, logout: vi.fn() })
     mockConfig.mockReturnValue({ config: {} })
+    mockAbout.mockReturnValue({ hasUnreadUpdate: false })
   })
 
   it('渲染主内容与侧边栏', () => {

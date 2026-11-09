@@ -46,6 +46,7 @@
 | `middleware` | 鉴权、日志、错误渲染、CORS、限流 |
 | `crypto/secretbox` | 通道敏感字段与 AI 草稿的对称加解密 |
 | `llm` | 厂商无关的对话接口，Anthropic 与 OpenAI 兼容协议两个实现 |
+| `version` | 构建时注入的版本号与构建时间 |
 
 两条约束：服务层依赖 `SchedulerHook` 接口而非 scheduler 具体实现，避免循环依赖；
 调度器只写 `pending` 日志，发送异步交给 `DispatchService`，把「何时触发」和「怎么发」解耦。
@@ -105,7 +106,7 @@ Engine 定时器到期
 | `confirm_tokens` | 确认令牌 |
 | `tokens` | 外部 API 令牌 |
 | `token_default_channels` | 令牌的默认通道路由 |
-| `configs` | 站点配置（键值对），AI 设置也以 `ai_` 前缀存在这里 |
+| `configs` | 站点配置（键值对），AI 设置也以 `ai_` 前缀存在这里，更新检查开关为 `update_check_enabled` |
 | `ai_actions` | AI 生成的待确认写操作（入参加密存储），保留 90 天后自动清理 |
 
 数据库结构在启动时自动建齐（`AutoMigrate`）。
@@ -116,7 +117,7 @@ Engine 定时器到期
 |---|---|
 | `pages` | 页面级组件：首页、提醒、通知、日志、令牌、监控、设置 |
 | `components` | 可复用组件，按功能分目录 |
-| `contexts` | 认证、主题、站点配置的全局状态 |
+| `contexts` | 认证、主题、站点配置、关于信息的全局状态 |
 | `lib` | API 封装与工具函数 |
 | `ui` | 基础 UI 组件 |
 

@@ -30,6 +30,9 @@ jobs:
         with:
           context: .
           push: true
+          # 版本号传给 Dockerfile，镜像内二进制与关于页展示同一版本
+          build-args: |
+            VERSION=${{ github.ref_name }}
           tags: |
             ${{ secrets.DOCKER_USERNAME }}/reminder:${{ steps.meta.outputs.version }}
             ${{ secrets.DOCKER_USERNAME }}/reminder:latest

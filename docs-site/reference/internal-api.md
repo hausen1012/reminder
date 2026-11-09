@@ -122,6 +122,9 @@ JWT 有效期为 72 小时。改密码后旧 JWT 仍然有效直到过期——�
 | `GET` | `/api/scheduler/status` | 调度器状态与注册明细，支持分页 |
 | `GET` | `/api/config` | 站点配置键值对（仅白名单内的键） |
 | `PUT` | `/api/config` | 批量更新配置，值为空串表示删除该键 |
+| `GET` | `/api/about` | 当前版本、构建时间与更新检查状态 |
+| `POST` | `/api/about/check` | 立即检查一次更新，等待结果后返回最新状态 |
+| `PUT` | `/api/about/update-check` | 开关每日自动检查，请求体 `{ "enabled": true }` |
 
 ### 健康检查的状态码
 
