@@ -526,6 +526,34 @@ func (s *ReminderService) validate(in *ReminderInput) error {
 			return middleware.NewAppError(middleware.CodeValidationFailed, "最大重试次数至少 1").WithField("confirm_max_retries")
 		}
 	}
+	if err := s.validateChannels(in.ChannelIDs); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *ReminderService) validateChannels(ids []uint) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	dedup := make([]uint, 0, len(ids))
+	seen := make(map[uint]bool, len(ids))
+	for _, id := range ids {
+		if id == 0 {
+			return middleware.NewAppError(middleware.CodeValidationFailed, "指定的通知渠道不存在").WithField("channel_ids")
+		}
+		if !seen[id] {
+			seen[id] = true
+			dedup = append(dedup, id)
+		}
+	}
+	var count int64
+	if err := s.DB.Model(&models.Channel{}).Where("id IN ?", dedup).Count(&count).Error; err != nil {
+		return err
+	}
+	if count != int64(len(dedup)) {
+		return middleware.NewAppError(middleware.CodeValidationFailed, "指定的通知渠道不存在").WithField("channel_ids")
+	}
 	return nil
 }
 

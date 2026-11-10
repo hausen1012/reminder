@@ -53,7 +53,7 @@ X-AUTH: bdrk_xxxxxxxx
 | `calendar` | string | 否 | `solar` / `lunar`，默认 `solar` |
 | `schedule_type` | string | 否 | `once` / `interval` / `cron`，默认 `once` |
 | `schedule_spec` | object | 是 | 调度规则，结构随类型变化 |
-| `channel_ids` | number[] | 否 | 留空时使用令牌的默认通道 |
+| `channel_ids` | number[] | 否 | 通知渠道 ID 列表；留空时使用令牌的默认通道。指定的渠道必须存在，否则返回 400 校验失败 |
 | `enabled` | boolean | 否 | 默认 `true` |
 | `require_confirm` | boolean | 否 | 是否需要确认，默认 `false` |
 | `confirm_retry_interval_sec` | number | 否 | 重发间隔，最小 60 |

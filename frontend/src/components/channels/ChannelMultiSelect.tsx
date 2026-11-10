@@ -45,7 +45,9 @@ export function ChannelMultiSelect({
     onChange(has ? value.filter((x) => x !== id) : [...value, id])
   }
 
-  if (channels.length === 0) {
+  const unknownIds = value.filter((id) => !channels.some((c) => c.id === id))
+
+  if (channels.length === 0 && unknownIds.length === 0) {
     return <p className="text-xs text-muted-foreground">{emptyText}</p>
   }
 
@@ -71,6 +73,21 @@ export function ChannelMultiSelect({
               (dropUp ? 'bottom-full mb-1' : 'top-full mt-1')
             }
           >
+            {unknownIds.map((id) => (
+              <label
+                key={`unknown-${id}`}
+                className="flex cursor-pointer items-center gap-2.5 px-3 py-2.5 text-sm hover:bg-muted active:bg-muted md:py-2"
+              >
+                <input
+                  type="checkbox"
+                  checked={value.includes(id)}
+                  onChange={() => toggleChannel(id)}
+                  className="h-4 w-4"
+                />
+                <span className="truncate">#{id}</span>
+                <span className="ml-auto shrink-0 text-xs text-muted-foreground">未知</span>
+              </label>
+            ))}
             {channels.map((ch) => {
               const checked = value.includes(ch.id)
               return (

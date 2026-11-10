@@ -1,9 +1,11 @@
 package services
 
 import (
+	"errors"
 	"testing"
 	"time"
 
+	"github.com/reminder/backend/internal/middleware"
 	"github.com/reminder/backend/internal/models"
 	"gorm.io/gorm"
 )
@@ -196,6 +198,98 @@ func TestReminderUpdate_NotFound(t *testing.T) {
 
 	if _, err := svc.Update(9999, validOnceInput()); err == nil {
 		t.Fatal("更新不存在的提醒应报错")
+	}
+}
+
+// 通道 ID 不存在时必须拒绝写库，不能留下指向不存在通道的绑定。
+func TestReminderCreate_RejectsUnknownChannel(t *testing.T) {
+	db := openTestDB(t)
+	svc := newReminderStack(t, db)
+	ch := createChannel(t, db, "log")
+
+	cases := []struct {
+		name string
+		ids  []uint
+	}{
+		{"全部不存在", []uint{9999}},
+		{"部分不存在", []uint{ch.ID, 9999}},
+		{"存在重复的不存在 ID", []uint{9999, 9999}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			in := validOnceInput()
+			in.ChannelIDs = tc.ids
+			_, err := svc.Create(in)
+			if err == nil {
+				t.Fatal("期望校验失败")
+			}
+			var ae *middleware.AppError
+			if !errors.As(err, &ae) || ae.Field != "channel_ids" {
+				t.Fatalf("期望 field=channel_ids 的校验错误，实际 %v", err)
+			}
+		})
+	}
+
+	var count int64
+	db.Model(&models.Reminder{}).Count(&count)
+	if count != 0 {
+		t.Fatalf("渠道校验失败不应写库，实际残留 %d 条", count)
+	}
+}
+
+// 更新时同样校验通道，且失败时原绑定保持不变。
+func TestReminderUpdate_RejectsUnknownChannel(t *testing.T) {
+	db := openTestDB(t)
+	svc := newReminderStack(t, db)
+	ch := createChannel(t, db, "log")
+
+	in := validOnceInput()
+	in.ChannelIDs = []uint{ch.ID}
+	created, err := svc.Create(in)
+	if err != nil {
+		t.Fatalf("创建失败: %v", err)
+	}
+
+	upd := validOnceInput()
+	upd.Title = "改后的标题"
+	upd.ChannelIDs = []uint{9999}
+	if _, err := svc.Update(created.ID, upd); err == nil {
+		t.Fatal("更新到不存在的通道应报错")
+	}
+
+	got, err := svc.Get(created.ID)
+	if err != nil {
+		t.Fatalf("读取失败: %v", err)
+	}
+	if got.Title != in.Title {
+		t.Fatalf("校验失败时标题不应被修改，实际 %q", got.Title)
+	}
+	if len(got.ChannelIDs) != 1 || got.ChannelIDs[0] != ch.ID {
+		t.Fatalf("校验失败时通道绑定应保持原值，实际 %v", got.ChannelIDs)
+	}
+}
+
+// 更新时传空列表应清空全部通道绑定。
+func TestReminderUpdate_ClearsChannelsWithEmptyList(t *testing.T) {
+	db := openTestDB(t)
+	svc := newReminderStack(t, db)
+	ch := createChannel(t, db, "log")
+
+	in := validOnceInput()
+	in.ChannelIDs = []uint{ch.ID}
+	created, err := svc.Create(in)
+	if err != nil {
+		t.Fatalf("创建失败: %v", err)
+	}
+
+	upd := validOnceInput()
+	upd.ChannelIDs = nil
+	v, err := svc.Update(created.ID, upd)
+	if err != nil {
+		t.Fatalf("更新失败: %v", err)
+	}
+	if len(v.ChannelIDs) != 0 {
+		t.Fatalf("通道绑定应被清空，实际 %v", v.ChannelIDs)
 	}
 }
 

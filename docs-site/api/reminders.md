@@ -177,7 +177,7 @@ curl -X PUT http://localhost:8765/api/external/v1/reminders/1 \
 
 ::: warning 更新是全量覆盖
 只想改标题，也要把 `calendar`、`schedule_type`、`schedule_spec` 一起带上。
-另外 `channel_ids` 会被整体替换：传 `[]` 或不传都会清空该提醒的通道绑定。
+另外 `channel_ids` 会被整体替换：传 `[]` 或不传都会清空该提醒的通道绑定；传非空列表时其中的通道 ID 必须存在，否则返回 `validation_failed`。
 
 未传 `enabled` 时保留当前启用状态，其余字段则按传入值覆盖。
 :::
