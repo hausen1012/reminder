@@ -42,7 +42,7 @@ describe('Sidebar', () => {
     mockAbout.mockReturnValue({ hasUnreadUpdate: false })
   })
 
-  it('有新版本时在「设置」上显示红点', () => {
+  it('有新版本时在「关于」上显示红点', () => {
     mockAbout.mockReturnValue({ hasUnreadUpdate: true })
     renderSidebar()
     expect(screen.getByLabelText('有新版本')).toBeInTheDocument()
@@ -55,7 +55,7 @@ describe('Sidebar', () => {
 
   it('渲染全部导航项', () => {
     renderSidebar()
-    for (const label of ['首页', '提醒', '通知', '日志', '令牌', '监控', '设置']) {
+    for (const label of ['首页', '提醒', '通知', '日志', '令牌', '监控', '设置', '关于']) {
       expect(screen.getByText(label)).toBeInTheDocument()
     }
   })
@@ -122,27 +122,10 @@ describe('Sidebar', () => {
     expect(onNavClick).toHaveBeenCalled()
   })
 
-  it('渲染文档与 GitHub 站外链接，均在新窗口打开', () => {
+  it('侧边栏不再单独放置文档与 GitHub 外链', () => {
     renderSidebar()
-
-    const docs = screen.getByRole('link', { name: /文档/ })
-    expect(docs).toHaveAttribute('href', 'https://hausen1012.github.io/reminder/')
-    expect(docs).toHaveAttribute('target', '_blank')
-    expect(docs).toHaveAttribute('rel', 'noreferrer noopener')
-
-    const github = screen.getByRole('link', { name: /GitHub/ })
-    expect(github).toHaveAttribute('href', 'https://github.com/hausen1012/reminder')
-    expect(github).toHaveAttribute('target', '_blank')
-    expect(github).toHaveAttribute('rel', 'noreferrer noopener')
-  })
-
-  it('点击站外链接触发 onNavClick（用于关闭移动端抽屉）', async () => {
-    const onNavClick = vi.fn()
-    const user = userEvent.setup()
-    renderSidebar(onNavClick)
-
-    await user.click(screen.getByRole('link', { name: /文档/ }))
-    expect(onNavClick).toHaveBeenCalled()
+    expect(screen.queryByRole('link', { name: /文档/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /GitHub/ })).not.toBeInTheDocument()
   })
 })
 

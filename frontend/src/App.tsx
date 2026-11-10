@@ -9,6 +9,7 @@ import { ToastProviderRoot } from '@/components/ui/use-toast'
 import Login from '@/pages/Login'
 import Dashboard from '@/pages/Dashboard'
 import Profile from '@/pages/Profile'
+import About from '@/pages/About'
 import ChannelsPage from '@/pages/channels'
 import RemindersPage from '@/pages/reminders'
 import LogsPage from '@/pages/logs'
@@ -46,6 +47,7 @@ export default function App() {
                     <Route path="tokens" element={<TokensPage />} />
                     <Route path="scheduler" element={<SchedulerPage />} />
                     <Route path="profile" element={<Profile />} />
+                    <Route path="about" element={<About />} />
                   </Route>
                 </Routes>
               </AboutProvider>

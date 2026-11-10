@@ -6,11 +6,9 @@ import { useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import {
   Activity,
-  ArrowUpRight,
   Bell,
   BellRing,
-  BookOpen,
-  Github,
+  Info,
   Key,
   LayoutDashboard,
   LogOut,
@@ -31,7 +29,6 @@ import { useConfig } from '@/contexts/ConfigContext'
 import { useAbout } from '@/contexts/AboutContext'
 import { AppLogo } from '@/components/common/AppLogo'
 import { AIChatWidget } from '@/components/ai/AIChatWidget'
-import { DOCS_URL, GITHUB_URL } from '@/lib/constants'
 import { cn } from '@/lib/utils'
 
 export function AppLayout() {
@@ -169,18 +166,13 @@ const navItems = [
   { to: '/tokens', label: '令牌', icon: Key },
   { to: '/scheduler', label: '监控', icon: Activity },
   { to: '/profile', label: '设置', icon: User },
+  { to: '/about', label: '关于', icon: Info },
 ]
 
 // 移动端底部标签栏：高频页面直达，其余入口走「更多」抽屉
 const mobileTabs = navItems.filter((item) =>
   ['/', '/reminders', '/channels', '/logs'].includes(item.to),
 )
-
-// 站外链接：放在导航区末尾，用分隔线与功能页区分，右侧箭头提示会打开新窗口
-const externalLinks = [
-  { href: DOCS_URL, label: '文档', icon: BookOpen },
-  { href: GITHUB_URL, label: 'GitHub', icon: Github },
-]
 
 export function Sidebar({ onNavClick }: SidebarProps) {
   const { theme, toggle } = useTheme()
@@ -217,7 +209,7 @@ export function Sidebar({ onNavClick }: SidebarProps) {
           >
             <item.icon className="h-[18px] w-[18px] md:h-4 md:w-4" />
             {item.label}
-            {item.to === '/profile' && hasUnreadUpdate && (
+            {item.to === '/about' && hasUnreadUpdate && (
               <span
                 className="ml-auto h-1.5 w-1.5 rounded-full bg-destructive"
                 aria-label="有新版本"
@@ -226,24 +218,6 @@ export function Sidebar({ onNavClick }: SidebarProps) {
           </NavLink>
         ))}
       </nav>
-      <Separator />
-      {/* 站外链接：文档与开源仓库，样式与导航项一致但右侧带外链箭头 */}
-      <div className="space-y-1 p-3">
-        {externalLinks.map((item) => (
-          <a
-            key={item.href}
-            href={item.href}
-            target="_blank"
-            rel="noreferrer noopener"
-            onClick={onNavClick}
-            className="group flex items-center gap-3 rounded-md px-3 py-2.5 text-sm text-muted-foreground transition-colors hover:bg-secondary/50 hover:text-foreground md:py-2"
-          >
-            <item.icon className="h-[18px] w-[18px] md:h-4 md:w-4" />
-            {item.label}
-            <ArrowUpRight className="ml-auto h-3 w-3 opacity-40 transition-opacity group-hover:opacity-100" />
-          </a>
-        ))}
-      </div>
       <Separator />
       <div className="flex items-center justify-between p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] md:pb-3">
         <span className="truncate text-sm text-muted-foreground">{user?.username}</span>

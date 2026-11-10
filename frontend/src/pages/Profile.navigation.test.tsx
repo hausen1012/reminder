@@ -3,7 +3,6 @@ import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { AuthProvider } from '@/contexts/AuthContext'
 import { ConfigProvider } from '@/contexts/ConfigContext'
-import { AboutProvider } from '@/contexts/AboutContext'
 import { ToastProviderRoot } from '@/components/ui/use-toast'
 import Profile from '@/pages/Profile'
 
@@ -16,21 +15,18 @@ vi.mock('@/lib/api', async () => {
     getMe: vi.fn(),
     updateConfig: vi.fn(),
     updatePassword: vi.fn(),
-    getAboutInfo: vi.fn(),
   }
 })
 
-import { getAboutInfo, getAISettings, getConfig, getMe, updateConfig } from '@/lib/api'
+import { getAISettings, getConfig, getMe, updateConfig } from '@/lib/api'
 
-// Profile 依赖站点配置、关于信息与 toast 上下文，这里用真实 Provider 包一层
+// Profile 依赖站点配置与 toast 上下文，这里用真实 Provider 包一层
 function renderProfile() {
   return render(
     <ToastProviderRoot>
       <AuthProvider>
         <ConfigProvider>
-          <AboutProvider>
-            <Profile />
-          </AboutProvider>
+          <Profile />
         </ConfigProvider>
       </AuthProvider>
     </ToastProviderRoot>,
@@ -43,7 +39,7 @@ function navButton(name: string) {
   return within(nav).getByRole('button', { name })
 }
 
-// 设置页四个分区：账户信息、基础设置、AI 助手、关于
+// 设置页三个分区：账户信息、基础设置、AI 助手
 describe('Profile 分区导航', () => {
   beforeEach(() => {
     localStorage.setItem('token', 'test-token')
@@ -66,19 +62,6 @@ describe('Profile 分区导航', () => {
       api_key: '',
       custom_prompt: '',
       max_retries: 10,
-    })
-    vi.mocked(getAboutInfo).mockResolvedValue({
-      version: 'dev',
-      build_time: '',
-      update: {
-        enabled: true,
-        comparable: true,
-        latest_version: '',
-        release_url: '',
-        checked_at: '',
-        error: '',
-        update_available: false,
-      },
     })
   })
 
@@ -105,11 +88,11 @@ describe('Profile 分区导航', () => {
     await userEvent.click(navButton('AI 助手'))
     expect(screen.getByRole('heading', { name: 'AI 助手' })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: '基础设置' })).not.toBeInTheDocument()
+  })
 
-    await userEvent.click(navButton('关于'))
-    expect(screen.getByRole('heading', { name: '关于' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: '版本信息' })).toBeInTheDocument()
-    expect(screen.queryByRole('heading', { name: 'AI 助手' })).not.toBeInTheDocument()
+  it('不再包含关于分区', async () => {
+    renderProfile()
+    expect(screen.queryByRole('button', { name: '关于' })).not.toBeInTheDocument()
   })
 
   it('回显当前站点时区', async () => {

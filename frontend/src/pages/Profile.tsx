@@ -2,7 +2,6 @@ import { useState, useEffect, useContext, type FormEvent } from 'react'
 import { Loader2, User as UserIcon } from 'lucide-react'
 import { extractApiError, updatePassword } from '@/lib/api'
 import { useConfig } from '@/contexts/ConfigContext'
-import { useAbout } from '@/contexts/AboutContext'
 import { AuthContext } from '@/contexts/AuthContext'
 import { COMMON_TIMEZONES } from '@/lib/constants'
 import { formatInZone } from '@/lib/datetime'
@@ -26,11 +25,10 @@ import {
 import { useToast } from '@/components/ui/use-toast'
 import { AppLogo } from '@/components/common/AppLogo'
 import { AISettingsSection } from '@/components/ai/AISettingsSection'
-import { AboutSection } from '@/components/about/AboutSection'
 import { PageHeader } from '@/components/common/PageHeader'
 import { cn } from '@/lib/utils'
 
-// 设置页分区：账户信息、基础设置、AI 助手、关于
+// 设置页分区：账户信息、基础设置、AI 助手
 const SECTIONS = [
   {
     id: 'account',
@@ -47,11 +45,6 @@ const SECTIONS = [
     label: 'AI 助手',
     description: '开启后可用自然语言对话来创建通知渠道与提醒；助手生成的写操作需要你确认后才生效',
   },
-  {
-    id: 'about',
-    label: '关于',
-    description: '当前版本、更新检查与项目地址',
-  },
 ] as const
 
 type SectionId = (typeof SECTIONS)[number]['id']
@@ -60,12 +53,6 @@ export default function Profile() {
   const [active, setActive] = useState<SectionId>('account')
   const auth = useContext(AuthContext)
   const user = auth?.user
-  const { hasUnreadUpdate, markSeen } = useAbout()
-
-  // 切到关于分区即视为已读，导航红点收起
-  useEffect(() => {
-    if (active === 'about') markSeen()
-  }, [active, markSeen])
 
   // --- 修改密码 ---
   const [oldPassword, setOldPassword] = useState('')
@@ -206,12 +193,6 @@ export default function Profile() {
               >
                 <span className="inline-flex items-center gap-1.5">
                   {section.label}
-                  {section.id === 'about' && hasUnreadUpdate && (
-                    <span
-                      className="h-1.5 w-1.5 rounded-full bg-destructive"
-                      aria-label="有新版本"
-                    />
-                  )}
                 </span>
               </button>
             )
@@ -439,9 +420,6 @@ export default function Profile() {
 
               {/* AI 助手 */}
               {section.id === 'ai' && <AISettingsSection />}
-
-              {/* 关于 */}
-              {section.id === 'about' && <AboutSection />}
             </div>
           ))}
         </div>

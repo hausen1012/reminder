@@ -1,35 +1,25 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { AuthProvider } from '@/contexts/AuthContext'
 import { ConfigProvider } from '@/contexts/ConfigContext'
 import { AboutProvider } from '@/contexts/AboutContext'
 import { ToastProviderRoot } from '@/components/ui/use-toast'
-import Profile from '@/pages/Profile'
+import About from '@/pages/About'
 
 vi.mock('@/lib/api', async () => {
   const actual = await vi.importActual<typeof import('@/lib/api')>('@/lib/api')
   return {
     ...actual,
-    getAISettings: vi.fn(),
     getConfig: vi.fn(),
     getMe: vi.fn(),
-    updateConfig: vi.fn(),
-    updatePassword: vi.fn(),
     getAboutInfo: vi.fn(),
     checkUpdate: vi.fn(),
     setUpdateCheckEnabled: vi.fn(),
   }
 })
 
-import {
-  checkUpdate,
-  getAboutInfo,
-  getAISettings,
-  getConfig,
-  getMe,
-  setUpdateCheckEnabled,
-} from '@/lib/api'
+import { checkUpdate, getAboutInfo, getConfig, getMe, setUpdateCheckEnabled } from '@/lib/api'
 import type { AboutInfo } from '@/types'
 
 // 默认状态：已检查过、没有新版本
@@ -50,8 +40,22 @@ function aboutInfo(overrides: Partial<AboutInfo['update']> = {}): AboutInfo {
   }
 }
 
-// 设置页「关于」分区：版本信息、更新检查与项目地址。
-describe('Profile 关于分区', () => {
+function renderAbout() {
+  return render(
+    <ToastProviderRoot>
+      <AuthProvider>
+        <ConfigProvider>
+          <AboutProvider>
+            <About />
+          </AboutProvider>
+        </ConfigProvider>
+      </AuthProvider>
+    </ToastProviderRoot>,
+  )
+}
+
+// 关于页：版本信息、更新检查与项目地址。
+describe('关于页', () => {
   beforeEach(() => {
     localStorage.setItem('token', 'test-token')
     // 已读标记跨用例共享同一个 localStorage，先清掉避免相互影响
@@ -62,45 +66,13 @@ describe('Profile 关于分区', () => {
       data: { id: 1, username: 'admin', created_at: '' },
     })
     vi.mocked(getConfig).mockResolvedValue({ timezone: 'Asia/Shanghai' })
-    vi.mocked(getAISettings).mockResolvedValue({
-      enabled: false,
-      provider: 'anthropic',
-      base_url: '',
-      model: 'claude-opus-5-5',
-      api_key: '',
-      custom_prompt: '',
-      max_retries: 10,
-    })
     vi.mocked(getAboutInfo).mockResolvedValue(aboutInfo())
     vi.mocked(checkUpdate).mockResolvedValue(aboutInfo())
     vi.mocked(setUpdateCheckEnabled).mockResolvedValue(aboutInfo({ enabled: false }))
   })
 
-  function renderProfile() {
-    return render(
-      <ToastProviderRoot>
-        <AuthProvider>
-          <ConfigProvider>
-            <AboutProvider>
-              <Profile />
-            </AboutProvider>
-          </ConfigProvider>
-        </AuthProvider>
-      </ToastProviderRoot>,
-    )
-  }
-
-  it('关于是独立分区，不再出现在基础设置里', async () => {
-    renderProfile()
-    await userEvent.click(screen.getByRole('button', { name: '基础设置' }))
-
-    expect(screen.getByRole('heading', { name: '基础设置' })).toBeInTheDocument()
-    expect(screen.queryByRole('heading', { name: '关于项目' })).not.toBeInTheDocument()
-  })
-
-  it('切换到关于后展示当前版本与项目地址', async () => {
-    renderProfile()
-    await userEvent.click(screen.getByRole('button', { name: '关于' }))
+  it('展示当前版本与项目地址', async () => {
+    renderAbout()
 
     // 当前版本与最新版本都是 v1.4.1，两处都应显示
     await waitFor(() => expect(screen.getAllByText('v1.4.1')).toHaveLength(2))
@@ -125,8 +97,7 @@ describe('Profile 关于分区', () => {
         update_available: true,
       }),
     )
-    renderProfile()
-    await userEvent.click(screen.getByRole('button', { name: '关于' }))
+    renderAbout()
 
     await waitFor(() => expect(screen.getByText('有新版本')).toBeInTheDocument())
     expect(screen.getByText('v1.5.0')).toBeInTheDocument()
@@ -136,28 +107,20 @@ describe('Profile 关于分区', () => {
     )
   })
 
-  it('进入关于分区后收起「关于」导航的红点', async () => {
+  it('打开页面后把最新版本标记为已读', async () => {
     vi.mocked(getAboutInfo).mockResolvedValue(
       aboutInfo({ latest_version: 'v1.5.0', update_available: true }),
     )
-    renderProfile()
+    renderAbout()
 
-    const navButton = await screen.findByRole('button', { name: /关于/ })
-    await waitFor(() => expect(within(navButton).getByLabelText('有新版本')).toBeInTheDocument())
-
-    await userEvent.click(navButton)
-    await waitFor(() =>
-      expect(within(navButton).queryByLabelText('有新版本')).not.toBeInTheDocument(),
-    )
-    expect(localStorage.getItem('update_seen_version')).toBe('v1.5.0')
+    await waitFor(() => expect(localStorage.getItem('update_seen_version')).toBe('v1.5.0'))
   })
 
   it('点击立即检查会请求检查接口并刷新状态', async () => {
     vi.mocked(checkUpdate).mockResolvedValue(
       aboutInfo({ latest_version: 'v1.5.0', update_available: true }),
     )
-    renderProfile()
-    await userEvent.click(screen.getByRole('button', { name: '关于' }))
+    renderAbout()
 
     await userEvent.click(await screen.findByRole('button', { name: /立即检查/ }))
 
@@ -166,8 +129,7 @@ describe('Profile 关于分区', () => {
   })
 
   it('关闭自动检查会提交开关状态', async () => {
-    renderProfile()
-    await userEvent.click(screen.getByRole('button', { name: '关于' }))
+    renderAbout()
 
     const toggle = await screen.findByRole('switch', { name: '每天自动检查更新' })
     await waitFor(() => expect(toggle).toBeChecked())
@@ -178,8 +140,7 @@ describe('Profile 关于分区', () => {
 
   it('检查失败时展示错误文案', async () => {
     vi.mocked(getAboutInfo).mockResolvedValue(aboutInfo({ error: '版本列表接口返回 HTTP 502' }))
-    renderProfile()
-    await userEvent.click(screen.getByRole('button', { name: '关于' }))
+    renderAbout()
 
     await waitFor(() =>
       expect(screen.getByText(/检查失败：版本列表接口返回 HTTP 502/)).toBeInTheDocument(),
@@ -200,8 +161,7 @@ describe('Profile 关于分区', () => {
         update_available: false,
       },
     })
-    renderProfile()
-    await userEvent.click(screen.getByRole('button', { name: '关于' }))
+    renderAbout()
 
     await waitFor(() =>
       expect(screen.getByText('当前为开发构建，不参与版本比较')).toBeInTheDocument(),
