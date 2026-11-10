@@ -64,6 +64,10 @@ func Init(cfg *config.Config) error {
 		return fmt.Errorf("migrate: %w", err)
 	}
 
+	if db.Migrator().HasColumn("channels", "enabled") {
+		_ = db.Exec("ALTER TABLE `channels` DROP COLUMN `enabled`").Error
+	}
+
 	DB = db
 	return ensureAdmin(cfg)
 }

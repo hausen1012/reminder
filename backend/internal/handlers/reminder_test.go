@@ -281,7 +281,7 @@ func TestReminderTestDryRun(t *testing.T) {
 	}
 
 	// 正常：真实 log 通道应发送成功
-	ch := &models.Channel{Name: "dry-log", Type: "log", Enabled: true, Config: []byte("{}")}
+	ch := &models.Channel{Name: "dry-log", Type: "log", Config: []byte("{}")}
 	if err := db.Create(ch).Error; err != nil {
 		t.Fatalf("创建通道失败: %v", err)
 	}

@@ -476,13 +476,13 @@ func (s *ReminderService) TestDryRun(ctx context.Context, title, content, conten
 	return s.Dispatch.DryRun(ctx, channels, rendered)
 }
 
-// loadChannelsByIDs 根据 ID 列表加载 enabled 通道。
+// loadChannelsByIDs 根据 ID 列表加载通道。
 func (s *ReminderService) loadChannelsByIDs(ids []uint) ([]*models.Channel, error) {
 	if len(ids) == 0 {
 		return nil, nil
 	}
 	var rows []models.Channel
-	if err := s.DB.Where("id IN ? AND enabled = ?", ids, true).Find(&rows).Error; err != nil {
+	if err := s.DB.Where("id IN ?", ids).Find(&rows).Error; err != nil {
 		return nil, err
 	}
 	out := make([]*models.Channel, 0, len(rows))

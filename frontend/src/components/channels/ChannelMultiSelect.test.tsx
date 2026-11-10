@@ -5,8 +5,8 @@ import { ChannelMultiSelect } from '@/components/channels/ChannelMultiSelect'
 import type { Channel } from '@/types'
 
 const channels: Channel[] = [
-  { id: 1, name: '邮件通知', type: 'smtp', enabled: true, config: {}, created_at: '', updated_at: '' },
-  { id: 2, name: '钉钉群', type: 'dingtalk', enabled: true, config: {}, created_at: '', updated_at: '' },
+  { id: 1, name: '邮件通知', type: 'smtp', config: {}, created_at: '', updated_at: '' },
+  { id: 2, name: '钉钉群', type: 'dingtalk', config: {}, created_at: '', updated_at: '' },
 ]
 
 describe('ChannelMultiSelect', () => {

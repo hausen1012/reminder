@@ -19,7 +19,7 @@ func TestDispatchRun_LogsFailureChain(t *testing.T) {
 	// 三次重试，测试里不真的等待
 	dispatch.RetryDelays = []time.Duration{0, 0, 0}
 
-	badCh := createChannel(t, db, "unknown-type", true)
+	badCh := createChannel(t, db, "unknown-type")
 	r := &models.Reminder{
 		Title: "全失败", Calendar: "solar", ScheduleType: "once", Enabled: true, Source: "web",
 	}
@@ -76,7 +76,7 @@ func TestDispatchRun_SuccessLoggedOnceAtInfo(t *testing.T) {
 	dispatch := newDispatchStack(t, db)
 	dispatch.RetryDelays = []time.Duration{0}
 
-	okCh := createChannel(t, db, "log", true)
+	okCh := createChannel(t, db, "log")
 	r := &models.Reminder{
 		Title: "成功", Content: "正文", Calendar: "solar", ScheduleType: "once", Enabled: true, Source: "web",
 	}

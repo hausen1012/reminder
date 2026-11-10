@@ -34,7 +34,6 @@ func newChannelTestEngine(t *testing.T) *gin.Engine {
 	r.PUT("/channels/:id", h.Update)
 	r.DELETE("/channels/:id", h.Delete)
 	r.DELETE("/channels/batch", h.BatchDelete)
-	r.PATCH("/channels/:id/toggle", h.Toggle)
 	r.POST("/channels/test-dry", h.TestDryRun)
 	r.GET("/channels/stats", h.Stats)
 	return r
@@ -163,35 +162,6 @@ func TestChannelBatchDelete_EmptyIDs(t *testing.T) {
 	}
 }
 
-// Toggle 应切换 enabled。
-func TestChannelToggle(t *testing.T) {
-	r := newChannelTestEngine(t)
-
-	w := doJSON(r, http.MethodPost, "/channels", map[string]any{
-		"name":   "切换",
-		"type":   "log",
-		"config": map[string]any{},
-	})
-	if w.Code != http.StatusOK {
-		t.Fatalf("创建失败: %d", w.Code)
-	}
-	id := dataID(t, w)
-
-	w = doJSON(r, http.MethodPatch, "/channels/"+itoa(id)+"/toggle", nil)
-	if w.Code != http.StatusOK {
-		t.Fatalf("切换状态码 = %d", w.Code)
-	}
-	var resp struct {
-		Data struct {
-			Enabled bool `json:"enabled"`
-		} `json:"data"`
-	}
-	decodeJSON(t, w, &resp)
-	if resp.Data.Enabled {
-		t.Fatal("切换后 enabled 应为 false")
-	}
-}
-
 // 通道列表：无参数走全量、有参数走分页，两者结构不同（前端据此区分）。
 func TestChannelList_AllVsPaged(t *testing.T) {
 	r := newChannelTestEngine(t)
@@ -237,12 +207,6 @@ func TestChannelList_AllVsPaged(t *testing.T) {
 		t.Fatalf("分页应为 total=3 len=2，实际 total=%d len=%d", paged.Data.Total, len(paged.Data.Items))
 	}
 
-	// enabled=false 过滤（新建默认启用，应为 0 条）
-	w = doJSON(r, http.MethodGet, "/channels?enabled=false", nil)
-	decodeJSON(t, w, &paged)
-	if paged.Data.Total != 0 {
-		t.Fatalf("enabled=false 应返回 0 条，实际 %d", paged.Data.Total)
-	}
 }
 
 // 通道更新：成功路径与类型不可变更。

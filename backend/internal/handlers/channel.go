@@ -18,9 +18,8 @@ type ChannelHandler struct {
 func (h *ChannelHandler) List(c *gin.Context) {
 	limitStr := c.Query("limit")
 	offsetStr := c.Query("offset")
-	enabledStr := c.Query("enabled")
 	search := c.Query("search")
-	if limitStr == "" && offsetStr == "" && enabledStr == "" && search == "" {
+	if limitStr == "" && offsetStr == "" && search == "" {
 		views, err := h.Svc.List()
 		if err != nil {
 			abortErr(c, err)
@@ -45,11 +44,7 @@ func (h *ChannelHandler) List(c *gin.Context) {
 			f.Offset = n
 		}
 	}
-	if enabledStr != "" {
-		if b, err := strconv.ParseBool(enabledStr); err == nil {
-			f.Enabled = &b
-		}
-	}
+
 	views, total, err := h.Svc.ListPaged(f)
 	if err != nil {
 		abortErr(c, err)
@@ -120,21 +115,6 @@ func (h *ChannelHandler) Delete(c *gin.Context) {
 		return
 	}
 	successJSON(c, nil)
-}
-
-// Toggle PATCH /api/channels/:id/toggle
-func (h *ChannelHandler) Toggle(c *gin.Context) {
-	id, err := parseID(c, "id")
-	if err != nil {
-		abortErr(c, err)
-		return
-	}
-	v, err := h.Svc.Toggle(id)
-	if err != nil {
-		abortErr(c, err)
-		return
-	}
-	successJSON(c, v)
 }
 
 // Types GET /api/channels/types

@@ -90,7 +90,7 @@ describe('api 通知渠道', () => {
     expect(mockRequest).toHaveBeenCalledWith('get', '/channels/7')
   })
 
-  it('createChannel / updateChannel / deleteChannel / toggleChannel', async () => {
+  it('createChannel / updateChannel / deleteChannel', async () => {
     mockRequest.mockReturnValue(respond({ data: { id: 1 } }))
     const input = { name: 'n', type: 'log' as const, config: {} }
 
@@ -102,9 +102,6 @@ describe('api 通知渠道', () => {
 
     await api.deleteChannel(1)
     expect(mockRequest).toHaveBeenCalledWith('delete', '/channels/1')
-
-    await api.toggleChannel(1)
-    expect(mockRequest).toHaveBeenCalledWith('patch', '/channels/1/toggle')
   })
 
   it('testChannelDryRun 提交配置', async () => {

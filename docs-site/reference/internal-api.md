@@ -71,7 +71,6 @@ JWT 有效期为 72 小时。改密码后旧 JWT 仍然有效直到过期——�
 | `PUT` | `/api/channels/:id` | 更新（与旧配置合并，未传的字段保持原值） |
 | `DELETE` | `/api/channels/:id` | 删除 |
 | `DELETE` | `/api/channels/batch` | 批量删除 |
-| `PATCH` | `/api/channels/:id/toggle` | 启用 / 禁用 |
 | `POST` | `/api/channels/test-dry` | 用表单配置测试发送 |
 | `GET` | `/api/channels/stats` | 各通道使用统计 |
 

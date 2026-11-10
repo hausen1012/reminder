@@ -110,7 +110,6 @@ export default function ChannelsPage() {
         name: ch.name + '-copy',
         type: ch.type,
         config: ch.config,
-        enabled: ch.enabled,
       })
       toast({ title: '通知渠道已复制', variant: 'success' })
       refresh()
@@ -308,9 +307,6 @@ export default function ChannelsPage() {
                       {labelOf(specs, ch.type)} · 创建于 {formatInZone(ch.created_at, tz)}
                     </p>
                   </div>
-                  <span className={ch.enabled ? 'shrink-0 text-xs text-green-600' : 'shrink-0 text-xs text-muted-foreground'}>
-                    {ch.enabled ? '已启用' : '已禁用'}
-                  </span>
                 </div>
 
                 <div className="mt-1 flex justify-end gap-1 pl-6">

@@ -193,8 +193,8 @@ func TestChannelCreate_LogTypeNoConfig(t *testing.T) {
 	if err != nil {
 		t.Fatalf("创建失败: %v", err)
 	}
-	if !v.Enabled {
-		t.Fatal("默认应启用")
+	if v.Name != "日志" {
+		t.Fatalf("名称 = %q，期望 日志", v.Name)
 	}
 }
 
@@ -318,37 +318,9 @@ func TestChannelListAndPaged(t *testing.T) {
 		t.Fatalf("搜索应命中 1 条，实际 %d", total)
 	}
 
-	// enabled 过滤
-	enabled := false
-	_, total, err = svc.ListPaged(ChannelListFilter{Limit: 10, Enabled: &enabled})
-	if err != nil {
-		t.Fatalf("过滤失败: %v", err)
-	}
-	if total != 0 {
-		t.Fatalf("enabled=false 应为 0，实际 %d", total)
-	}
-
 	// 排序白名单
 	if _, _, err := svc.ListPaged(ChannelListFilter{Limit: 10, SortBy: "name; DROP TABLE", SortOrder: "asc"}); err != nil {
 		t.Fatalf("非法排序应回退而非报错: %v", err)
-	}
-}
-
-// Toggle：切换启用状态。
-func TestChannelToggle(t *testing.T) {
-	svc, _ := newChannelSvcForTest(t)
-
-	created, err := svc.Create(ChannelInput{Name: "toggle", Type: "log", Config: map[string]any{}})
-	if err != nil {
-		t.Fatalf("创建失败: %v", err)
-	}
-
-	v, err := svc.Toggle(created.ID)
-	if err != nil {
-		t.Fatalf("切换失败: %v", err)
-	}
-	if v.Enabled {
-		t.Fatal("应变为禁用")
 	}
 }
 
@@ -558,7 +530,7 @@ func TestChannelDecryptWrongKeyReturnsValidationError(t *testing.T) {
 		"host":         "smtp.example.com",
 		"password_enc": cipher,
 	})
-	ch := &models.Channel{Name: "换密钥", Type: "smtp", Enabled: true, Config: datatypes.JSON(cfg)}
+	ch := &models.Channel{Name: "换密钥", Type: "smtp", Config: datatypes.JSON(cfg)}
 	if err := db.Create(ch).Error; err != nil {
 		t.Fatalf("创建通道失败: %v", err)
 	}
@@ -613,7 +585,7 @@ func TestChannelDecryptOKWithSameKey(t *testing.T) {
 		t.Fatalf("加密失败: %v", err)
 	}
 	cfg, _ := json.Marshal(map[string]any{"password_enc": cipher})
-	ch := &models.Channel{Name: "同密钥", Type: "smtp", Enabled: true, Config: datatypes.JSON(cfg)}
+	ch := &models.Channel{Name: "同密钥", Type: "smtp", Config: datatypes.JSON(cfg)}
 	if err := db.Create(ch).Error; err != nil {
 		t.Fatalf("创建通道失败: %v", err)
 	}

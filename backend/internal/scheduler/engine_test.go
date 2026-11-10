@@ -391,9 +391,8 @@ func TestEngineListRegistered(t *testing.T) {
 	}
 
 	ch := &models.Channel{
-		Name:    "测试通道",
-		Type:    "webhook",
-		Enabled: true,
+		Name: "测试通道",
+		Type: "webhook",
 	}
 	if err := db.Create(ch).Error; err != nil {
 		t.Fatalf("创建通道失败: %v", err)

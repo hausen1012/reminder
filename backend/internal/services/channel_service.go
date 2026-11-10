@@ -38,10 +38,9 @@ func NewChannelService(db *gorm.DB, box *secretbox.Box, tz *timezone.Provider) *
 
 // ChannelInput 是 Create/Update 的入参；Config 是前端传入的明文，_enc 后缀字段由本服务加密。
 type ChannelInput struct {
-	Name    string         `json:"name"`
-	Type    string         `json:"type"`
-	Enabled *bool          `json:"enabled,omitempty"`
-	Config  map[string]any `json:"config"`
+	Name   string         `json:"name"`
+	Type   string         `json:"type"`
+	Config map[string]any `json:"config"`
 }
 
 // ChannelView 是返回给前端的视图：_enc 后缀字段统一脱敏成 "***"。
@@ -49,7 +48,6 @@ type ChannelView struct {
 	ID        uint           `json:"id"`
 	Name      string         `json:"name"`
 	Type      string         `json:"type"`
-	Enabled   bool           `json:"enabled"`
 	Config    map[string]any `json:"config"`
 	CreatedAt models.Time    `json:"created_at"`
 	UpdatedAt models.Time    `json:"updated_at"`
@@ -57,7 +55,6 @@ type ChannelView struct {
 
 // ChannelListFilter 是通道列表分页参数。
 type ChannelListFilter struct {
-	Enabled   *bool
 	Search    string
 	Limit     int
 	Offset    int
@@ -91,13 +88,9 @@ func (s *ChannelService) Create(in ChannelInput) (*ChannelView, error) {
 	}
 	raw, _ := json.Marshal(encConfig)
 	ch := &models.Channel{
-		Name:    strings.TrimSpace(in.Name),
-		Type:    in.Type,
-		Enabled: true,
-		Config:  datatypes.JSON(raw),
-	}
-	if in.Enabled != nil {
-		ch.Enabled = *in.Enabled
+		Name:   strings.TrimSpace(in.Name),
+		Type:   in.Type,
+		Config: datatypes.JSON(raw),
 	}
 	if err := s.DB.Create(ch).Error; err != nil {
 		if isUniqueErr(err) {
@@ -147,9 +140,6 @@ func (s *ChannelService) Update(id uint, in ChannelInput) (*ChannelView, error) 
 		"name":   strings.TrimSpace(in.Name),
 		"config": datatypes.JSON(raw),
 	}
-	if in.Enabled != nil {
-		updates["enabled"] = *in.Enabled
-	}
 	if err := s.DB.Model(ch).Updates(updates).Error; err != nil {
 		if isUniqueErr(err) {
 			return nil, middleware.NewAppError(middleware.CodeValidationFailed, "通道名称已存在").WithField("name")
@@ -194,9 +184,6 @@ func (s *ChannelService) ListPaged(f ChannelListFilter) ([]*ChannelView, int64, 
 	}
 
 	q := s.DB.Model(&models.Channel{})
-	if f.Enabled != nil {
-		q = q.Where("enabled = ?", *f.Enabled)
-	}
 	if search := strings.TrimSpace(f.Search); search != "" {
 		q = q.Where("name LIKE ?", "%"+search+"%")
 	}
@@ -258,19 +245,6 @@ func (s *ChannelService) BatchDelete(ids []uint) error {
 	return s.DB.Transaction(func(tx *gorm.DB) error {
 		return tx.Delete(&models.Channel{}, ids).Error
 	})
-}
-
-// Toggle 切换启用状态。
-func (s *ChannelService) Toggle(id uint) (*ChannelView, error) {
-	ch, err := s.getOrNotFound(id)
-	if err != nil {
-		return nil, err
-	}
-	ch.Enabled = !ch.Enabled
-	if err := s.DB.Model(ch).Update("enabled", ch.Enabled).Error; err != nil {
-		return nil, err
-	}
-	return s.toView(ch), nil
 }
 
 // DryRun 用表单配置试发通知，不写 delivery_log。
@@ -617,7 +591,6 @@ func (s *ChannelService) toView(ch *models.Channel) *ChannelView {
 		ID:        ch.ID,
 		Name:      ch.Name,
 		Type:      ch.Type,
-		Enabled:   ch.Enabled,
 		Config:    cfg,
 		CreatedAt: ch.CreatedAt,
 		UpdatedAt: ch.UpdatedAt,

@@ -244,7 +244,6 @@ func Setup(staticFS embed.FS, cfg *config.Config) (*SetupResult, error) {
 			channels.PUT("/:id", channelHandler.Update)
 			channels.DELETE("/batch", channelHandler.BatchDelete) // 必须放在 /:id 之前
 			channels.DELETE("/:id", channelHandler.Delete)
-			channels.PATCH("/:id/toggle", channelHandler.Toggle)
 			channels.POST("/test-dry", channelHandler.TestDryRun)
 			channels.GET("/stats", channelHandler.Stats)
 		}

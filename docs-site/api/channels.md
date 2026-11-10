@@ -20,7 +20,6 @@ curl http://localhost:8765/api/external/v1/channels \
       "id": 1,
       "name": "邮件通知",
       "type": "smtp",
-      "enabled": true,
       "config": {
         "host": "***",
         "port": "***",
@@ -45,8 +44,3 @@ curl http://localhost:8765/api/external/v1/channels \
 3. 在创建提醒时把它填进 `channel_ids`
 
 更省事的做法是在面板的**令牌**页给令牌配置默认通道，之后调用创建接口时完全不传 `channel_ids`。
-
-::: tip 禁用通道会被跳过
-`enabled` 为 `false` 的通道即使被绑定也不会参与发送。提醒触发时如果所有绑定通道都不可用，
-日志状态会是 `failed`。
-:::

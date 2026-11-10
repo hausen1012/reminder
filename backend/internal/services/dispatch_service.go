@@ -295,7 +295,7 @@ func (d *DispatchService) finalize(deliveryLogID uint, status, renderedTitle, re
 	}
 }
 
-// loadChannels 取提醒绑定的全部 enabled 通道；没有绑定或全部禁用时返回空切片。
+// loadChannels 取提醒绑定的全部通道；没有绑定时返回空切片。
 func (d *DispatchService) loadChannels(reminderID uint) ([]*models.Channel, error) {
 	var ids []uint
 	if err := d.DB.Model(&models.ReminderChannel{}).
@@ -307,7 +307,7 @@ func (d *DispatchService) loadChannels(reminderID uint) ([]*models.Channel, erro
 		return nil, nil
 	}
 	var rows []models.Channel
-	if err := d.DB.Where("id IN ? AND enabled = ?", ids, true).Find(&rows).Error; err != nil {
+	if err := d.DB.Where("id IN ?", ids).Find(&rows).Error; err != nil {
 		return nil, err
 	}
 	out := make([]*models.Channel, 0, len(rows))

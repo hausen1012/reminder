@@ -56,7 +56,6 @@ export interface Channel {
   id: number
   name: string
   type: ChannelType
-  enabled: boolean
   config: Record<string, unknown>
   created_at: string
   updated_at: string
@@ -65,7 +64,6 @@ export interface Channel {
 export interface ChannelInput {
   name: string
   type: ChannelType
-  enabled?: boolean
   config: Record<string, unknown>
 }
 

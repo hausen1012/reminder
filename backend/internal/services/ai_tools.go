@@ -196,14 +196,13 @@ func (s *AIService) toolListChannels(context.Context, json.RawMessage) (string, 
 		return "", err
 	}
 	type item struct {
-		ID      uint   `json:"id"`
-		Name    string `json:"name"`
-		Type    string `json:"type"`
-		Enabled bool   `json:"enabled"`
+		ID   uint   `json:"id"`
+		Name string `json:"name"`
+		Type string `json:"type"`
 	}
 	out := make([]item, 0, len(channels))
 	for _, ch := range channels {
-		out = append(out, item{ID: ch.ID, Name: ch.Name, Type: ch.Type, Enabled: ch.Enabled})
+		out = append(out, item{ID: ch.ID, Name: ch.Name, Type: ch.Type})
 	}
 	return toJSONString(map[string]any{"channels": out}), nil
 }

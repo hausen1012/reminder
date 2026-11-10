@@ -125,10 +125,9 @@ func triggerDispatch(ctx context.Context, d *DispatchService, r *models.Reminder
 func createConfirmReminder(t *testing.T, db *gorm.DB, intervalSec, maxRetries int) *models.Reminder {
 	t.Helper()
 	channel := &models.Channel{
-		Name:    testutil.UniqueName("log"),
-		Type:    "log",
-		Enabled: true,
-		Config:  []byte("{}"),
+		Name:   testutil.UniqueName("log"),
+		Type:   "log",
+		Config: []byte("{}"),
 	}
 	if err := db.Create(channel).Error; err != nil {
 		t.Fatalf("创建测试通道失败: %v", err)

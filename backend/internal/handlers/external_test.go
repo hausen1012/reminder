@@ -132,7 +132,7 @@ func TestExternalCreate_UsesTokenDefaultChannels(t *testing.T) {
 
 	// 先建一个真实通道
 	ch := &models.Channel{
-		Name: "log-ch", Type: "log", Enabled: true, Config: []byte("{}"),
+		Name: "log-ch", Type: "log", Config: []byte("{}"),
 	}
 	if err := stack.db.Create(ch).Error; err != nil {
 		t.Fatalf("创建通道失败: %v", err)
@@ -290,7 +290,7 @@ func TestExternalListChannels(t *testing.T) {
 	}
 
 	ch := &models.Channel{
-		Name: "smtp-外发", Type: "smtp", Enabled: true,
+		Name: "smtp-外发", Type: "smtp",
 		Config: []byte(`{"host":"smtp.test","port":587,"password_enc":"c2VjcmV0"}`),
 	}
 	if err := stack.db.Create(ch).Error; err != nil {

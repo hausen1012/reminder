@@ -19,13 +19,12 @@ import (
 )
 
 // createChannel 创建一个测试用通道。
-func createChannel(t *testing.T, db *gorm.DB, chType string, enabled bool) *models.Channel {
+func createChannel(t *testing.T, db *gorm.DB, chType string) *models.Channel {
 	t.Helper()
 	ch := &models.Channel{
-		Name:    testutil.UniqueName(chType),
-		Type:    chType,
-		Enabled: enabled,
-		Config:  []byte("{}"),
+		Name:   testutil.UniqueName(chType),
+		Type:   chType,
+		Config: []byte("{}"),
 	}
 	if err := db.Create(ch).Error; err != nil {
 		t.Fatalf("创建通道失败: %v", err)
@@ -107,8 +106,8 @@ func TestDispatchRun_AllChannelsSucceed(t *testing.T) {
 	db := openTestDB(t)
 	dispatch := newDispatchStack(t, db)
 
-	ch1 := createChannel(t, db, "log", true)
-	ch2 := createChannel(t, db, "log", true)
+	ch1 := createChannel(t, db, "log")
+	ch2 := createChannel(t, db, "log")
 
 	r := &models.Reminder{
 		Title:        "全成功",
@@ -157,9 +156,9 @@ func TestDispatchRun_PartialWhenSomeFailed(t *testing.T) {
 	db := openTestDB(t)
 	dispatch := newDispatchStack(t, db)
 
-	okCh := createChannel(t, db, "log", true)
+	okCh := createChannel(t, db, "log")
 	// 不支持的通道类型会在 Get(type) 阶段失败，模拟一个必定失败的通道
-	badCh := createChannel(t, db, "unknown-type", true)
+	badCh := createChannel(t, db, "unknown-type")
 
 	r := &models.Reminder{
 		Title:        "部分失败",
@@ -190,7 +189,7 @@ func TestDispatchRun_AllFailed(t *testing.T) {
 	db := openTestDB(t)
 	dispatch := newDispatchStack(t, db)
 
-	badCh := createChannel(t, db, "unknown-type", true)
+	badCh := createChannel(t, db, "unknown-type")
 
 	r := &models.Reminder{
 		Title:        "全失败",
@@ -225,37 +224,6 @@ func TestDispatchRun_AllFailed(t *testing.T) {
 	}
 }
 
-// 禁用的通道不应被加载（等同没有可用通道）。
-func TestDispatchRun_DisabledChannelSkipped(t *testing.T) {
-	db := openTestDB(t)
-	dispatch := newDispatchStack(t, db)
-
-	disabled := createChannel(t, db, "log", false)
-
-	r := &models.Reminder{
-		Title:        "禁用通道",
-		Calendar:     "solar",
-		ScheduleType: "once",
-		Enabled:      true,
-		Source:       "web",
-	}
-	if err := db.Create(r).Error; err != nil {
-		t.Fatalf("创建提醒失败: %v", err)
-	}
-	bindChannels(t, db, r.ID, disabled.ID)
-	logID := createPendingLog(t, db, r)
-
-	dispatch.Run(context.Background(), r, logID)
-
-	var got models.DeliveryLog
-	if err := db.First(&got, logID).Error; err != nil {
-		t.Fatalf("读取日志失败: %v", err)
-	}
-	if got.Status != "failed" {
-		t.Fatalf("禁用通道应视为无可用通道 → failed，实际 %q", got.Status)
-	}
-}
-
 // 空参数应直接返回，不 panic。
 func TestDispatchRun_NilOrZeroArgs(t *testing.T) {
 	db := openTestDB(t)
@@ -279,8 +247,8 @@ func TestDispatchDryRun_AllSucceedNoRecords(t *testing.T) {
 	db := openTestDB(t)
 	d := newDispatchForDryRun(t, db)
 
-	ch1 := createChannel(t, db, "log", true)
-	ch2 := createChannel(t, db, "log", true)
+	ch1 := createChannel(t, db, "log")
+	ch2 := createChannel(t, db, "log")
 
 	msg := buildRenderedMessage("标题", "正文", "text", map[string]string{"title": "标题", "content": "正文"})
 	if err := d.DryRun(t.Context(), []*models.Channel{ch1, ch2}, msg); err != nil {
@@ -301,7 +269,7 @@ func TestDispatchDryRun_UnknownTypeFails(t *testing.T) {
 	db := openTestDB(t)
 	d := newDispatchForDryRun(t, db)
 
-	bad := &models.Channel{Name: "bad", Type: "unknown", Enabled: true, Config: []byte("{}")}
+	bad := &models.Channel{Name: "bad", Type: "unknown", Config: []byte("{}")}
 	err := d.DryRun(t.Context(), []*models.Channel{bad}, buildRenderedMessage("t", "c", "text", map[string]string{}))
 	if err == nil {
 		t.Fatal("未知类型应报错")
@@ -328,7 +296,7 @@ func TestDispatchDryRun_ContextCancelled(t *testing.T) {
 	d.RetryDelays = []time.Duration{0, time.Hour} // 第二次重试要等很久
 
 	// 用一个必定失败的通道类型触发重试分支
-	bad := &models.Channel{Name: "x", Type: "unknown", Enabled: true, Config: []byte("{}")}
+	bad := &models.Channel{Name: "x", Type: "unknown", Config: []byte("{}")}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
@@ -396,7 +364,7 @@ func TestDispatchWebhookTemplateGetsRenderedTitle(t *testing.T) {
 		"url":           sink.URL,
 		"body_template": `{"title":"{{title}}","content":"{{content}}"}`,
 	})
-	ch := &models.Channel{Name: testutil.UniqueName("webhook"), Type: "webhook", Enabled: true, Config: cfg}
+	ch := &models.Channel{Name: testutil.UniqueName("webhook"), Type: "webhook", Config: cfg}
 	if err := db.Create(ch).Error; err != nil {
 		t.Fatalf("创建通道失败: %v", err)
 	}
@@ -441,7 +409,7 @@ func TestDispatchDoesNotAppendConfirmURLTwice(t *testing.T) {
 		"url":           sink.URL,
 		"body_template": `{"content":"{{content}}"}`,
 	})
-	ch := &models.Channel{Name: testutil.UniqueName("webhook"), Type: "webhook", Enabled: true, Config: cfg}
+	ch := &models.Channel{Name: testutil.UniqueName("webhook"), Type: "webhook", Config: cfg}
 	if err := db.Create(ch).Error; err != nil {
 		t.Fatalf("创建通道失败: %v", err)
 	}
@@ -627,10 +595,9 @@ func createConfirmReminderWithWebhookContent(t *testing.T, db *gorm.DB, interval
 	t.Helper()
 	cfg, _ := json.Marshal(map[string]any{"method": "POST", "url": url})
 	channel := &models.Channel{
-		Name:    testutil.UniqueName("webhook"),
-		Type:    "webhook",
-		Enabled: true,
-		Config:  cfg,
+		Name:   testutil.UniqueName("webhook"),
+		Type:   "webhook",
+		Config: cfg,
 	}
 	if err := db.Create(channel).Error; err != nil {
 		t.Fatalf("创建测试通道失败: %v", err)

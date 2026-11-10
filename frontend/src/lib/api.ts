@@ -121,7 +121,6 @@ export async function logout() {
 // --- 通知 ---
 
 export interface ListChannelsQuery {
-  enabled?: boolean
   search?: string
   limit?: number
   offset?: number
@@ -163,10 +162,6 @@ export async function deleteChannel(id: number) {
   await api.delete<ApiResponse<null>>(`/channels/${id}`)
 }
 
-export async function toggleChannel(id: number) {
-  const res = await api.patch<ApiResponse<Channel>>(`/channels/${id}/toggle`)
-  return res.data.data
-}
 
 export async function testChannelDryRun(input: {
   id?: number

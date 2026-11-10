@@ -136,7 +136,7 @@ func TestReminderCreate_Validation(t *testing.T) {
 func TestReminderCreate_BindsChannels(t *testing.T) {
 	db := openTestDB(t)
 	svc := newReminderStack(t, db)
-	ch := createChannel(t, db, "log", true)
+	ch := createChannel(t, db, "log")
 
 	in := validOnceInput()
 	in.ChannelIDs = []uint{ch.ID, ch.ID} // 重复 ID 应去重
@@ -158,8 +158,8 @@ func TestReminderCreate_BindsChannels(t *testing.T) {
 func TestReminderUpdate_ReplacesFieldsAndChannels(t *testing.T) {
 	db := openTestDB(t)
 	svc := newReminderStack(t, db)
-	ch1 := createChannel(t, db, "log", true)
-	ch2 := createChannel(t, db, "log", true)
+	ch1 := createChannel(t, db, "log")
+	ch2 := createChannel(t, db, "log")
 
 	in := validOnceInput()
 	in.ChannelIDs = []uint{ch1.ID}
@@ -236,7 +236,7 @@ func TestReminderToggle(t *testing.T) {
 func TestReminderDelete_CleansJoinTable(t *testing.T) {
 	db := openTestDB(t)
 	svc := newReminderStack(t, db)
-	ch := createChannel(t, db, "log", true)
+	ch := createChannel(t, db, "log")
 
 	in := validOnceInput()
 	in.ChannelIDs = []uint{ch.ID}
@@ -264,7 +264,7 @@ func TestReminderDelete_CleansJoinTable(t *testing.T) {
 func TestReminderBatchDelete(t *testing.T) {
 	db := openTestDB(t)
 	svc := newReminderStack(t, db)
-	ch := createChannel(t, db, "log", true)
+	ch := createChannel(t, db, "log")
 
 	var ids []uint
 	for i := 0; i < 3; i++ {
@@ -304,7 +304,7 @@ func TestReminderBatchDelete(t *testing.T) {
 func TestReminderBatchDelete_AtomicOnFailure(t *testing.T) {
 	db := openTestDB(t)
 	svc := newReminderStack(t, db)
-	ch := createChannel(t, db, "log", true)
+	ch := createChannel(t, db, "log")
 
 	in := validOnceInput()
 	in.Title = "原子性"
@@ -597,7 +597,7 @@ func TestReminderTestDryRun(t *testing.T) {
 		t.Fatal("通道不存在应报错")
 	}
 
-	ch := createChannel(t, db, "log", true)
+	ch := createChannel(t, db, "log")
 	if err := svc.TestDryRun(t.Context(), "试发", "正文 {{now_date}}", "text", []uint{ch.ID}); err != nil {
 		t.Fatalf("正常试发应成功: %v", err)
 	}
@@ -609,7 +609,7 @@ func TestReminderTestDryRun_Vars(t *testing.T) {
 
 	db := openTestDB(t)
 	svc := newReminderStack(t, db)
-	ch := createChannel(t, db, "log", true)
+	ch := createChannel(t, db, "log")
 
 	err := svc.TestDryRun(t.Context(), "试发",
 		"id={{reminder_id}} src={{reminder_source}}", "text", []uint{ch.ID})
@@ -622,20 +622,20 @@ func TestReminderTestDryRun_Vars(t *testing.T) {
 	}
 }
 
-// loadChannelsByIDs 只加载 enabled 的通道。
+// loadChannelsByIDs 加载指定 ID 的通道。
 func TestLoadChannelsByIDs(t *testing.T) {
 	db := openTestDB(t)
 	svc := newReminderStack(t, db)
 
-	enabled := createChannel(t, db, "log", true)
-	disabled := createChannel(t, db, "log", false)
+	ch1 := createChannel(t, db, "log")
+	ch2 := createChannel(t, db, "log")
 
-	got, err := svc.loadChannelsByIDs([]uint{enabled.ID, disabled.ID})
+	got, err := svc.loadChannelsByIDs([]uint{ch1.ID, ch2.ID})
 	if err != nil {
 		t.Fatalf("加载失败: %v", err)
 	}
-	if len(got) != 1 || got[0].ID != enabled.ID {
-		t.Fatalf("应只加载 enabled 的 1 个通道，实际 %d 个", len(got))
+	if len(got) != 2 {
+		t.Fatalf("应加载 2 个通道，实际 %d 个", len(got))
 	}
 
 	// 空输入返回 nil
@@ -653,7 +653,7 @@ func TestReminderList_QueryCountIndependentOfRowCount(t *testing.T) {
 	db := openTestDB(t)
 	svc := newReminderStack(t, db)
 
-	ch := createChannel(t, db, "log", true)
+	ch := createChannel(t, db, "log")
 	for i := 0; i < 5; i++ {
 		in := validOnceInput()
 		in.Title = "n-plus-one-" + itoaTest(i)
@@ -690,7 +690,7 @@ func TestReminderUpcoming_QueryCountIndependentOfRowCount(t *testing.T) {
 	db := openTestDB(t)
 	svc := newReminderStack(t, db)
 
-	ch := createChannel(t, db, "log", true)
+	ch := createChannel(t, db, "log")
 	for i := 0; i < 5; i++ {
 		r := seedReminderForUpcoming(t, db, "up-"+itoaTest(i), time.Now().Add(time.Minute), true)
 		if err := db.Create(&models.ReminderChannel{ReminderID: r.ID, ChannelID: ch.ID}).Error; err != nil {
