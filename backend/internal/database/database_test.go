@@ -1,14 +1,18 @@
 package database
 
 import (
+	"bytes"
+	"log/slog"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/reminder/backend/internal/config"
 	"github.com/reminder/backend/internal/models"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
+	gormlogger "gorm.io/gorm/logger"
 )
 
 // gormConfig 的 NowFunc 必须返回 UTC。
@@ -99,5 +103,150 @@ func TestBuildDSN(t *testing.T) {
 	const custom = "/tmp/a.db?cache=shared"
 	if got := buildDSN(custom); got != custom {
 		t.Fatalf("已带查询串时不应改写，得到 %q", got)
+	}
+}
+
+// captureSlog 把全局 slog 临时重定向到内存 buffer。
+func captureSlog(t *testing.T) *bytes.Buffer {
+	t.Helper()
+	buf := &bytes.Buffer{}
+	old := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(buf, &slog.HandlerOptions{Level: slog.LevelDebug})))
+	t.Cleanup(func() { slog.SetDefault(old) })
+	return buf
+}
+
+// LOG_LEVEL 到 GORM 级别的映射。
+func TestGormLogLevel(t *testing.T) {
+	cases := []struct {
+		in   slog.Level
+		want gormlogger.LogLevel
+	}{
+		{slog.LevelDebug, gormlogger.Info},
+		{slog.LevelInfo, gormlogger.Warn},
+		{slog.LevelWarn, gormlogger.Error},
+		{slog.LevelError, gormlogger.Error},
+	}
+	for _, tc := range cases {
+		if got := gormLogLevel(tc.in); got != tc.want {
+			t.Fatalf("gormLogLevel(%v) = %v，期望 %v", tc.in, got, tc.want)
+		}
+	}
+}
+
+// 失败 SQL 应以 Error 级别进结构化日志。
+func TestGormConfig_LogsFailedSQL(t *testing.T) {
+	logs := captureSlog(t)
+
+	cfg := gormConfig()
+	cfg.Logger = cfg.Logger.LogMode(gormlogger.Info)
+
+	path := filepath.Join(t.TempDir(), "log.db")
+	db, err := gorm.Open(sqlite.Open(path), cfg)
+	if err != nil {
+		t.Fatalf("打开数据库失败: %v", err)
+	}
+	sqlDB, _ := db.DB()
+	t.Cleanup(func() { _ = sqlDB.Close() })
+
+	if err := db.Raw("SELECT * FROM no_such_table").Scan(&[]models.Reminder{}).Error; err == nil {
+		t.Fatal("查询不存在的表应失败")
+	}
+
+	out := logs.String()
+	if !strings.Contains(out, "level=ERROR") || !strings.Contains(out, "no_such_table") {
+		t.Fatalf("失败 SQL 应写入 slog 的 ERROR 日志:\n%s", out)
+	}
+}
+
+// 「查不到记录」是正常业务分支，不应被记成 SQL 错误。
+func TestGormConfig_IgnoresRecordNotFound(t *testing.T) {
+	logs := captureSlog(t)
+
+	cfg := gormConfig()
+	cfg.Logger = cfg.Logger.LogMode(gormlogger.Info)
+
+	path := filepath.Join(t.TempDir(), "nf.db")
+	db, err := gorm.Open(sqlite.Open(path), cfg)
+	if err != nil {
+		t.Fatalf("打开数据库失败: %v", err)
+	}
+	sqlDB, _ := db.DB()
+	t.Cleanup(func() { _ = sqlDB.Close() })
+
+	if err := db.AutoMigrate(&models.Reminder{}); err != nil {
+		t.Fatalf("迁移失败: %v", err)
+	}
+
+	var r models.Reminder
+	if err := db.First(&r, 9999).Error; err == nil {
+		t.Fatal("不存在的记录应返回错误")
+	}
+
+	if out := logs.String(); strings.Contains(out, "level=ERROR") {
+		t.Fatalf("RecordNotFound 不应记为 ERROR:\n%s", out)
+	}
+}
+
+// Init 对全新库正常执行 AutoMigrate，并自动创建默认管理员。
+func TestInit_FreshDatabase(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "fresh.db")
+	cfg := &config.Config{DBPath: path, Username: "admin", Password: "admin123"}
+	if err := Init(cfg); err != nil {
+		t.Fatalf("Init 失败: %v", err)
+	}
+	sqlDB, err := DB.DB()
+	if err != nil {
+		t.Fatalf("获取连接失败: %v", err)
+	}
+	t.Cleanup(func() { _ = sqlDB.Close() })
+
+	timeCols := []string{"next_fire_at", "last_fired_at", "created_at", "updated_at"}
+	for _, col := range timeCols {
+		var typ string
+		if err := DB.Raw("SELECT type FROM pragma_table_info('reminders') WHERE name = ?", col).
+			Scan(&typ).Error; err != nil {
+			t.Fatalf("读取 reminders.%s 类型失败: %v", col, err)
+		}
+		if typ != "INTEGER" && typ != "integer" {
+			t.Fatalf("reminders.%s 类型 = %q，期望 INTEGER", col, typ)
+		}
+	}
+
+	var users int64
+	if err := DB.Model(&models.User{}).Count(&users).Error; err != nil {
+		t.Fatalf("统计用户失败: %v", err)
+	}
+	if users != 1 {
+		t.Fatalf("应创建 1 个默认管理员，实际 %d", users)
+	}
+}
+
+// Init 遇到旧库中含有 enabled 列的 channels 表时，应平滑删除该列且不 panic。
+func TestInit_DropsLegacyEnabledColumn(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "legacy.db")
+	cfg := &config.Config{DBPath: path, Username: "admin", Password: "admin123"}
+
+	preDB, err := gorm.Open(sqlite.Open(buildDSN(path)), gormConfig())
+	if err != nil {
+		t.Fatalf("预建库失败: %v", err)
+	}
+	if err := preDB.Exec("CREATE TABLE channels (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, type TEXT, enabled NUMERIC, config TEXT, created_at INTEGER, updated_at INTEGER);").Error; err != nil {
+		t.Fatalf("创建旧 channels 表失败: %v", err)
+	}
+	preSqlDB, _ := preDB.DB()
+	_ = preSqlDB.Close()
+
+	if err := Init(cfg); err != nil {
+		t.Fatalf("Init 失败: %v", err)
+	}
+	sqlDB, err := DB.DB()
+	if err != nil {
+		t.Fatalf("获取连接失败: %v", err)
+	}
+	t.Cleanup(func() { _ = sqlDB.Close() })
+
+	if DB.Migrator().HasColumn("channels", "enabled") {
+		t.Fatal("channels 表中仍残留 enabled 列")
 	}
 }

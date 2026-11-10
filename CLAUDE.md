@@ -65,6 +65,25 @@ cd frontend && npm run build && npm test
 测试要真跑通：新逻辑配新用例，不用 skip 或删用例掩盖失败，修 bug 先补复现用例。
 汇报时列出实际执行的命令和结果。
 
+### 4. 测试设计与文件收敛规范（严禁碎片化与无效测试）
+
+- **测试文件严禁过度分散，能够合并的必须坚决合并**：
+  - 同一个包内概念相近或同体系的测试用例，统一收敛在单个测试文件中，严禁按微小特性拆出碎片化文件。
+  - **中间件测试全部合并在单个 `middleware_test.go`**：所有中间件（JWT、Token、CORS、BodyLimit、RateLimiter、RequestID、日志记录与错误恢复）统一在一个文件中覆盖。
+  - **所有通知类型合并在单个 `channels_test.go`**：各类通知通道（Webhook、钉钉、企业微信、飞书、Bark、ntfy、Apprise、Telegram、SMTP 邮件等）统一在一个文件中覆盖，严禁每个通道类型单独开测试文件。
+  - **其他基础模块保持单文件高聚合**：如 `database_test.go`、`router_test.go`、`logger_test.go`、`llm_test.go`、`models_test.go`、`scheduler_test.go`，一个包原则上只维护 1~2 个高内聚测试文件。
+  - **严禁每次 PR 新建测试文件**：测试用例必须就近收敛在已有测试文件中；严禁为了单次 PR、阶段性联调、日志断言随手新建独立文件（如 `*_logging_test.go`、`*_flow_test.go`、`*.navigation.test.tsx` 等）。
+- **后端测试下沉至逻辑层，严禁测 Handler**：
+  - **禁止编写 Handler 层测试**：Handler 仅负责 Gin 上下文参数提取、状态码包装与 Service 串联，不承载独立业务规则；对 Handler 的冗余测试维护成本极高且易脱节。
+  - **测试统一集中在逻辑层与核心机制**：测试聚焦在 `services/`、`scheduler/`、`notifier/`、`middleware/` 等包，通过内存数据库（`testutil.NewDB(t)`）验证真实业务逻辑、重试机制、时区与数据状态。
+- **前端测试聚焦高价值状态与纯逻辑，拒绝无效 UI 冒烟**：
+  - **禁止编写纯 UI 渲染与样式断言测试**：严禁断言 DOM 结构、class 属性、svg 个数或简单无状态展示文本（如 Header、EmptyState、Pagination、ConfirmDialog 等）。
+  - **禁止编写 pages/ 页面级浅层集成测试**：严禁通过 mock 大量全局 API 来挂载整个页面仅为断言一两句静态文案或 Tab 切换，此类测试极易脆弱失效且产生 act 警告。
+  - **前端测试仅限以下三类高价值场景**：
+    1. `src/lib/` 纯函数工具库（时区时间格式化 `datetime`、接口错误解析 `apiError`、SSE 事件流解析 `aiStream`、通用工具 `utils`）。
+    2. `src/contexts/` 核心全局状态管理（`AuthContext`、`ConfigContext`、`ThemeContext`）。
+    3. 复杂状态机与数据转换组件（如 `AIChatWidget` 的流式中断/草稿暂存/会话缓存、`ChannelForms` 的渠道配置提取与反序列化）。
+
 ## 其他约定
 
 - **接口契约**：
@@ -85,6 +104,7 @@ cd frontend && npm run build && npm test
   - 前端：时间展示统一走 `src/lib/datetime.ts`（取 `useSiteTimezone()`），严禁使用原生 `new Date().toLocaleString()`。
 - **测试惯例**：
   - 内存 SQLite 与固定时区统一走 `internal/testutil`（`testutil.NewDB(t)`、`testutil.CST()`），各包不重复编写建库逻辑。
+  - 新增测试用例就近追加到所属模块的已有测试文件中，严禁单开零散文件；严格遵守「测 Service 与核心机制，不测 Handler；测前端状态与算法工具，不测纯展示 UI」原则。
 - **Git 提交**：
   - 提交信息用中文 + `feat/fix/refactor/docs/test/chore(scope):` 前缀。
 
