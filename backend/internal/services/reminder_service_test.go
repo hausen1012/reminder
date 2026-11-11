@@ -138,7 +138,7 @@ func TestReminderCreate_Validation(t *testing.T) {
 func TestReminderCreate_BindsChannels(t *testing.T) {
 	db := openTestDB(t)
 	svc := newReminderStack(t, db)
-	ch := createChannel(t, db, "log")
+	ch := createChannel(t, db, "mock")
 
 	in := validOnceInput()
 	in.ChannelIDs = []uint{ch.ID, ch.ID} // 重复 ID 应去重
@@ -160,8 +160,8 @@ func TestReminderCreate_BindsChannels(t *testing.T) {
 func TestReminderUpdate_ReplacesFieldsAndChannels(t *testing.T) {
 	db := openTestDB(t)
 	svc := newReminderStack(t, db)
-	ch1 := createChannel(t, db, "log")
-	ch2 := createChannel(t, db, "log")
+	ch1 := createChannel(t, db, "mock")
+	ch2 := createChannel(t, db, "mock")
 
 	in := validOnceInput()
 	in.ChannelIDs = []uint{ch1.ID}
@@ -205,7 +205,7 @@ func TestReminderUpdate_NotFound(t *testing.T) {
 func TestReminderCreate_RejectsUnknownChannel(t *testing.T) {
 	db := openTestDB(t)
 	svc := newReminderStack(t, db)
-	ch := createChannel(t, db, "log")
+	ch := createChannel(t, db, "mock")
 
 	cases := []struct {
 		name string
@@ -241,7 +241,7 @@ func TestReminderCreate_RejectsUnknownChannel(t *testing.T) {
 func TestReminderUpdate_RejectsUnknownChannel(t *testing.T) {
 	db := openTestDB(t)
 	svc := newReminderStack(t, db)
-	ch := createChannel(t, db, "log")
+	ch := createChannel(t, db, "mock")
 
 	in := validOnceInput()
 	in.ChannelIDs = []uint{ch.ID}
@@ -273,7 +273,7 @@ func TestReminderUpdate_RejectsUnknownChannel(t *testing.T) {
 func TestReminderUpdate_ClearsChannelsWithEmptyList(t *testing.T) {
 	db := openTestDB(t)
 	svc := newReminderStack(t, db)
-	ch := createChannel(t, db, "log")
+	ch := createChannel(t, db, "mock")
 
 	in := validOnceInput()
 	in.ChannelIDs = []uint{ch.ID}
@@ -330,7 +330,7 @@ func TestReminderToggle(t *testing.T) {
 func TestReminderDelete_CleansJoinTable(t *testing.T) {
 	db := openTestDB(t)
 	svc := newReminderStack(t, db)
-	ch := createChannel(t, db, "log")
+	ch := createChannel(t, db, "mock")
 
 	in := validOnceInput()
 	in.ChannelIDs = []uint{ch.ID}
@@ -358,7 +358,7 @@ func TestReminderDelete_CleansJoinTable(t *testing.T) {
 func TestReminderBatchDelete(t *testing.T) {
 	db := openTestDB(t)
 	svc := newReminderStack(t, db)
-	ch := createChannel(t, db, "log")
+	ch := createChannel(t, db, "mock")
 
 	var ids []uint
 	for i := 0; i < 3; i++ {
@@ -398,7 +398,7 @@ func TestReminderBatchDelete(t *testing.T) {
 func TestReminderBatchDelete_AtomicOnFailure(t *testing.T) {
 	db := openTestDB(t)
 	svc := newReminderStack(t, db)
-	ch := createChannel(t, db, "log")
+	ch := createChannel(t, db, "mock")
 
 	in := validOnceInput()
 	in.Title = "原子性"
@@ -691,7 +691,7 @@ func TestReminderTestDryRun(t *testing.T) {
 		t.Fatal("通道不存在应报错")
 	}
 
-	ch := createChannel(t, db, "log")
+	ch := createChannel(t, db, "mock")
 	if err := svc.TestDryRun(t.Context(), "试发", "正文 {{now_date}}", "text", []uint{ch.ID}); err != nil {
 		t.Fatalf("正常试发应成功: %v", err)
 	}
@@ -703,7 +703,7 @@ func TestReminderTestDryRun_Vars(t *testing.T) {
 
 	db := openTestDB(t)
 	svc := newReminderStack(t, db)
-	ch := createChannel(t, db, "log")
+	ch := createChannel(t, db, "mock")
 
 	err := svc.TestDryRun(t.Context(), "试发",
 		"id={{reminder_id}} src={{reminder_source}}", "text", []uint{ch.ID})
@@ -721,8 +721,8 @@ func TestLoadChannelsByIDs(t *testing.T) {
 	db := openTestDB(t)
 	svc := newReminderStack(t, db)
 
-	ch1 := createChannel(t, db, "log")
-	ch2 := createChannel(t, db, "log")
+	ch1 := createChannel(t, db, "mock")
+	ch2 := createChannel(t, db, "mock")
 
 	got, err := svc.loadChannelsByIDs([]uint{ch1.ID, ch2.ID})
 	if err != nil {
@@ -747,7 +747,7 @@ func TestReminderList_QueryCountIndependentOfRowCount(t *testing.T) {
 	db := openTestDB(t)
 	svc := newReminderStack(t, db)
 
-	ch := createChannel(t, db, "log")
+	ch := createChannel(t, db, "mock")
 	for i := 0; i < 5; i++ {
 		in := validOnceInput()
 		in.Title = "n-plus-one-" + itoaTest(i)
@@ -784,7 +784,7 @@ func TestReminderUpcoming_QueryCountIndependentOfRowCount(t *testing.T) {
 	db := openTestDB(t)
 	svc := newReminderStack(t, db)
 
-	ch := createChannel(t, db, "log")
+	ch := createChannel(t, db, "mock")
 	for i := 0; i < 5; i++ {
 		r := seedReminderForUpcoming(t, db, "up-"+itoaTest(i), time.Now().Add(time.Minute), true)
 		if err := db.Create(&models.ReminderChannel{ReminderID: r.ID, ChannelID: ch.ID}).Error; err != nil {

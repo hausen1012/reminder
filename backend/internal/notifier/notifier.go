@@ -53,7 +53,6 @@ var Registry = map[string]Notifier{
 	"ntfy":     &ntfyNotifier{},
 	"apprise":  &appriseNotifier{},
 	"webhook":  &webhookNotifier{},
-	"log":      &logNotifier{},
 }
 
 // Get 按类型查找 Notifier，未注册返回 nil + 错误。

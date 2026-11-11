@@ -106,8 +106,8 @@ func TestNormalizePage(t *testing.T) {
 // 关联表批量查询与整表替换：批量结果按主体分组，替换时去重并丢弃 0。
 func TestJoinHelpers(t *testing.T) {
 	db := openTestDB(t)
-	ch1 := createChannel(t, db, "log")
-	ch2 := createChannel(t, db, "log")
+	ch1 := createChannel(t, db, "mock")
+	ch2 := createChannel(t, db, "mock")
 
 	for _, rid := range []uint{1, 2} {
 		if err := replaceJoinRows(db, &models.ReminderChannel{}, "reminder_id", rid,

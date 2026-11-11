@@ -52,7 +52,7 @@ func newAITestService(t *testing.T, replies ...*llm.Reply) (*AIService, *fakePro
 	if err := svc.upsertConfig(KeyAIEnabled, "true"); err != nil {
 		t.Fatalf("写入 AI 开关失败: %v", err)
 	}
-	if _, err := chnSvc.Create(ChannelInput{Name: "测试通道", Type: "log", Config: map[string]any{}}); err != nil {
+	if _, err := chnSvc.Create(ChannelInput{Name: "测试通道", Type: "webhook", Config: map[string]any{"url": "https://example.com"}}); err != nil {
 		t.Fatalf("创建测试通道失败: %v", err)
 	}
 	return svc, fake, db

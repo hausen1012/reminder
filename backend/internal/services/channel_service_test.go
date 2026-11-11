@@ -185,19 +185,6 @@ func TestChannelCreate_RequiresTypeFields(t *testing.T) {
 	}
 }
 
-// log 类型无需任何配置即可创建。
-func TestChannelCreate_LogTypeNoConfig(t *testing.T) {
-	svc, _ := newChannelSvcForTest(t)
-
-	v, err := svc.Create(ChannelInput{Name: "日志", Type: "log", Config: map[string]any{}})
-	if err != nil {
-		t.Fatalf("创建失败: %v", err)
-	}
-	if v.Name != "日志" {
-		t.Fatalf("名称 = %q，期望 日志", v.Name)
-	}
-}
-
 // 敏感字段应以 *** 形式返回，且落库时被加密。
 func TestChannelSensitiveFieldsMaskedAndEncrypted(t *testing.T) {
 	svc, db := newChannelSvcForTest(t)
@@ -288,7 +275,7 @@ func TestChannelListAndPaged(t *testing.T) {
 	svc, _ := newChannelSvcForTest(t)
 
 	for i := 0; i < 3; i++ {
-		if _, err := svc.Create(ChannelInput{Name: "ch" + string(rune('A'+i)), Type: "log", Config: map[string]any{}}); err != nil {
+		if _, err := svc.Create(ChannelInput{Name: "ch" + string(rune('A'+i)), Type: "ntfy", Config: map[string]any{"topic": "t"}}); err != nil {
 			t.Fatalf("创建失败: %v", err)
 		}
 	}
@@ -328,11 +315,11 @@ func TestChannelListAndPaged(t *testing.T) {
 func TestChannelDelete(t *testing.T) {
 	svc, _ := newChannelSvcForTest(t)
 
-	c1, err := svc.Create(ChannelInput{Name: "d1", Type: "log", Config: map[string]any{}})
+	c1, err := svc.Create(ChannelInput{Name: "d1", Type: "ntfy", Config: map[string]any{"topic": "t"}})
 	if err != nil {
 		t.Fatalf("创建失败: %v", err)
 	}
-	c2, err := svc.Create(ChannelInput{Name: "d2", Type: "log", Config: map[string]any{}})
+	c2, err := svc.Create(ChannelInput{Name: "d2", Type: "ntfy", Config: map[string]any{"topic": "t"}})
 	if err != nil {
 		t.Fatalf("创建失败: %v", err)
 	}
@@ -361,7 +348,7 @@ func TestChannelDelete(t *testing.T) {
 func TestChannelStats(t *testing.T) {
 	svc, db := newChannelSvcForTest(t)
 
-	ch, err := svc.Create(ChannelInput{Name: "stat", Type: "log", Config: map[string]any{}})
+	ch, err := svc.Create(ChannelInput{Name: "stat", Type: "ntfy", Config: map[string]any{"topic": "t"}})
 	if err != nil {
 		t.Fatalf("创建失败: %v", err)
 	}
@@ -376,7 +363,7 @@ func TestChannelStats(t *testing.T) {
 		t.Fatalf("创建日志失败: %v", err)
 	}
 	db.Create(&models.DeliveryAttempt{
-		DeliveryLogID: dl.ID, ChannelID: ch.ID, ChannelType: "log",
+		DeliveryLogID: dl.ID, ChannelID: ch.ID, ChannelType: "ntfy",
 		ChannelName: "stat", Attempt: 1, Status: "success",
 	})
 
@@ -392,15 +379,15 @@ func TestChannelStats(t *testing.T) {
 	}
 }
 
-// DryRun 对未知类型应报错，对 log 类型应成功。
+// DryRun 对未知类型与已移除的 log 类型应报错。
 func TestChannelDryRun(t *testing.T) {
 	svc, _ := newChannelSvcForTest(t)
 
 	if err := svc.DryRun(t.Context(), "unknown", map[string]any{}); err == nil {
 		t.Fatal("未知类型应报错")
 	}
-	if err := svc.DryRun(t.Context(), "log", map[string]any{}); err != nil {
-		t.Fatalf("log 类型试发应成功: %v", err)
+	if err := svc.DryRun(t.Context(), "log", map[string]any{}); err == nil {
+		t.Fatal("已移除的 log 类型应报错")
 	}
 }
 
@@ -440,10 +427,10 @@ func TestChannelValidateBasics(t *testing.T) {
 	svc, _ := newChannelSvcForTest(t)
 
 	cases := []ChannelInput{
-		{Name: "", Type: "log", Config: map[string]any{}},                       // 名称空
-		{Name: string(make([]rune, 65)), Type: "log", Config: map[string]any{}}, // 名称超长
-		{Name: "x", Type: "nope", Config: map[string]any{}},                     // 未知类型
-		{Name: "x", Type: "log", Config: nil},                                   // config 空
+		{Name: "", Type: "ntfy", Config: map[string]any{"topic": "t"}},                       // 名称空
+		{Name: string(make([]rune, 65)), Type: "ntfy", Config: map[string]any{"topic": "t"}}, // 名称超长
+		{Name: "x", Type: "nope", Config: map[string]any{"topic": "t"}},                      // 未知类型
+		{Name: "x", Type: "ntfy", Config: nil},                                               // config 空
 	}
 	for i, in := range cases {
 		if _, err := svc.Create(in); err == nil {
@@ -635,11 +622,11 @@ func TestIsUniqueErr(t *testing.T) {
 
 	db := openTestDB(t)
 	svc := NewChannelService(db, nil, testTZ(cstZone()))
-	if _, err := svc.Create(ChannelInput{Name: "dup", Type: "log", Config: map[string]any{}}); err != nil {
+	if _, err := svc.Create(ChannelInput{Name: "dup", Type: "ntfy", Config: map[string]any{"topic": "t"}}); err != nil {
 		t.Fatalf("创建失败: %v", err)
 	}
 	// 重复名称触发唯一约束
-	_, err := svc.Create(ChannelInput{Name: "dup", Type: "log", Config: map[string]any{}})
+	_, err := svc.Create(ChannelInput{Name: "dup", Type: "ntfy", Config: map[string]any{"topic": "t"}})
 	if err == nil {
 		t.Fatal("重复名称应报错")
 	}

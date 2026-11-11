@@ -25,7 +25,6 @@
 | ntfy | text 消息 | 剥掉标记后按 text | 剥掉标签后按 text |
 | Apprise | text 消息 | 剥掉标记后按 text | 剥掉标签后按 text |
 | Webhook | 原样 | 原样 | 原样 |
-| 日志 | 原样 | 剥掉标记 | 剥掉标签 |
 
 Webhook 不做任何转换，`{{content}}` 拿到什么就发什么，转换责任交给你的模板。
 

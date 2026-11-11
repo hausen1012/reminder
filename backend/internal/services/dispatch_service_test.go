@@ -106,8 +106,8 @@ func TestDispatchRun_AllChannelsSucceed(t *testing.T) {
 	db := openTestDB(t)
 	dispatch := newDispatchStack(t, db)
 
-	ch1 := createChannel(t, db, "log")
-	ch2 := createChannel(t, db, "log")
+	ch1 := createChannel(t, db, "mock")
+	ch2 := createChannel(t, db, "mock")
 
 	r := &models.Reminder{
 		Title:        "全成功",
@@ -156,7 +156,7 @@ func TestDispatchRun_PartialWhenSomeFailed(t *testing.T) {
 	db := openTestDB(t)
 	dispatch := newDispatchStack(t, db)
 
-	okCh := createChannel(t, db, "log")
+	okCh := createChannel(t, db, "mock")
 	// 不支持的通道类型会在 Get(type) 阶段失败，模拟一个必定失败的通道
 	badCh := createChannel(t, db, "unknown-type")
 
@@ -247,8 +247,8 @@ func TestDispatchDryRun_AllSucceedNoRecords(t *testing.T) {
 	db := openTestDB(t)
 	d := newDispatchForDryRun(t, db)
 
-	ch1 := createChannel(t, db, "log")
-	ch2 := createChannel(t, db, "log")
+	ch1 := createChannel(t, db, "mock")
+	ch2 := createChannel(t, db, "mock")
 
 	msg := buildRenderedMessage("标题", "正文", "text", map[string]string{"title": "标题", "content": "正文"})
 	if err := d.DryRun(t.Context(), []*models.Channel{ch1, ch2}, msg); err != nil {
@@ -688,7 +688,7 @@ func TestDispatchRun_SuccessLoggedOnceAtInfo(t *testing.T) {
 	dispatch := newDispatchStack(t, db)
 	dispatch.RetryDelays = []time.Duration{0}
 
-	okCh := createChannel(t, db, "log")
+	okCh := createChannel(t, db, "mock")
 	r := &models.Reminder{
 		Title: "成功", Content: "正文", Calendar: "solar", ScheduleType: "once", Enabled: true, Source: "web",
 	}

@@ -17,7 +17,7 @@ Reminder 采用**单进程 + 单文件 + 单数据库**架构：
 | 能力 | 说明 |
 |---|---|
 | 调度 | 单次、周期（分 / 时 / 天 / 月 / 年）、Cron 表达式；公历与农历 |
-| 通道 | SMTP 邮件、钉钉 / 企业微信 / 飞书机器人、Telegram、Bark、ntfy、Apprise、Webhook、日志通道 |
+| 通道 | SMTP 邮件、钉钉 / 企业微信 / 飞书机器人、Telegram、Bark、ntfy、Apprise、Webhook |
 | 内容格式 | 纯文本、Markdown、HTML，各通道按自身能力适配或降级 |
 | 占位符 | 正文里可写 `{{now_date}}`、`{{lunar_date}}`、`{{confirm_url}}` 等，发送时渲染 |
 | 确认机制 | 发送后附带一次性链接，未确认按配置自动重发 |

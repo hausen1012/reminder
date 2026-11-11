@@ -52,7 +52,7 @@ func TestLogGetDetail(t *testing.T) {
 		t.Fatalf("创建日志失败: %v", err)
 	}
 	db.Create(&models.DeliveryAttempt{
-		DeliveryLogID: dl.ID, ChannelID: 1, ChannelType: "log", ChannelName: "c", Attempt: 1, Status: "success",
+		DeliveryLogID: dl.ID, ChannelID: 1, ChannelType: "webhook", ChannelName: "c", Attempt: 1, Status: "success",
 	})
 	if _, err := NewConfirmService(db, testCfg()).CreateToken(dl.ID, time.Hour); err != nil {
 		t.Fatalf("创建确认令牌失败: %v", err)
@@ -244,7 +244,7 @@ func TestLogBatchDelete(t *testing.T) {
 
 	dl := seedDeliveryLog(t, db, "待删", "success", 0, nil)
 	db.Create(&models.DeliveryAttempt{
-		DeliveryLogID: dl.ID, ChannelID: 1, ChannelType: "log", ChannelName: "c", Attempt: 1, Status: "success",
+		DeliveryLogID: dl.ID, ChannelID: 1, ChannelType: "webhook", ChannelName: "c", Attempt: 1, Status: "success",
 	})
 	if _, err := NewConfirmService(db, testCfg()).CreateToken(dl.ID, time.Hour); err != nil {
 		t.Fatalf("创建确认令牌失败: %v", err)
@@ -311,7 +311,7 @@ func TestLogPurge_MultipleBatches(t *testing.T) {
 	}
 	for i := range logs {
 		attempts = append(attempts, models.DeliveryAttempt{
-			DeliveryLogID: logs[i].ID, ChannelID: 1, ChannelType: "log",
+			DeliveryLogID: logs[i].ID, ChannelID: 1, ChannelType: "webhook",
 			ChannelName: "c", Attempt: 1, Status: "success",
 		})
 	}

@@ -183,16 +183,10 @@ var specs = map[string]Spec{
 			{Key: "content_type", Label: "Content-Type", Kind: FieldText, Default: "application/json"},
 		},
 	},
-	"log": {
-		Type:        "log",
-		Label:       "日志输出",
-		Description: "把消息写入服务端日志，零配置，适合本地调试",
-		Fields:      []FieldSpec{},
-	},
 }
 
 // specOrder 决定类型枚举与前端下拉框的顺序。
-var specOrder = []string{"smtp", "dingtalk", "wecom", "feishu", "telegram", "bark", "ntfy", "apprise", "webhook", "log"}
+var specOrder = []string{"smtp", "dingtalk", "wecom", "feishu", "telegram", "bark", "ntfy", "apprise", "webhook"}
 
 // SpecOf 按类型取元数据。
 func SpecOf(typ string) (Spec, bool) {

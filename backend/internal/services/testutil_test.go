@@ -6,6 +6,7 @@ package services
 
 import (
 	"context"
+	"log/slog"
 	"strconv"
 	"strings"
 	"sync"
@@ -15,11 +16,24 @@ import (
 	"github.com/reminder/backend/internal/config"
 	"github.com/reminder/backend/internal/crypto/secretbox"
 	"github.com/reminder/backend/internal/models"
+	"github.com/reminder/backend/internal/notifier"
 	"github.com/reminder/backend/internal/testutil"
 	"github.com/reminder/backend/internal/timezone"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 )
+
+type mockNotifier struct{}
+
+func (m *mockNotifier) Type() string { return "mock" }
+func (m *mockNotifier) Send(_ context.Context, _ []byte, msg notifier.Message) error {
+	slog.Info("mock发送", "subject", msg.Subject, "body", msg.Body)
+	return nil
+}
+
+func init() {
+	notifier.Registry["mock"] = &mockNotifier{}
+}
 
 // openTestDB 构造测试用的内存 SQLite 库（已迁移生产全量模型）。
 func openTestDB(t *testing.T) *gorm.DB {
@@ -121,12 +135,12 @@ func triggerDispatch(ctx context.Context, d *DispatchService, r *models.Reminder
 	return dlog.ID, nil
 }
 
-// createConfirmReminder 造一条需要确认、绑定了 log 通道的提醒。
+// createConfirmReminder 造一条需要确认、绑定了 mock 通道的提醒。
 func createConfirmReminder(t *testing.T, db *gorm.DB, intervalSec, maxRetries int) *models.Reminder {
 	t.Helper()
 	channel := &models.Channel{
-		Name:   testutil.UniqueName("log"),
-		Type:   "log",
+		Name:   testutil.UniqueName("mock"),
+		Type:   "mock",
 		Config: []byte("{}"),
 	}
 	if err := db.Create(channel).Error; err != nil {

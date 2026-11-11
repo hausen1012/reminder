@@ -390,7 +390,7 @@ func TestHeaderKeyList(t *testing.T) {
 
 func TestLimitBody_NoLimit(t *testing.T) {
 	msg := Message{Body: strings.Repeat("字", 10000)}
-	got := LimitBody("log", msg)
+	got := LimitBody("smtp", msg)
 	if got.Body != msg.Body {
 		t.Fatal("无上限的类型不应截断")
 	}
