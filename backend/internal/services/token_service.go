@@ -1,6 +1,4 @@
-// token_service 管理令牌的全生命周期：外部程序用 X-AUTH 调用 /api/external/v1/*。
-//
-// 明文用 secretbox 加密后入库（与通道敏感字段同一把密钥）；创建时一次性返回，之后需经 GetPlaintext 解密查看。
+// token_service 管理外部 API 令牌的创建、查看与删除（密钥经 secretbox 加密存储）。
 package services
 
 import (

@@ -15,11 +15,7 @@ import (
 	gormlogger "gorm.io/gorm/logger"
 )
 
-// gormConfig 的 NowFunc 必须返回 UTC。
-//
-// models.Time 的 Value 会自己归一化，但 GORM 自动填充 created_at / updated_at
-// 时直接拿 NowFunc 的返回值；保持 UTC 让自动字段与手写字段走同一条路径，
-// 也避免任何直接读 NowFunc 的代码拿到本地偏移。
+// gormConfig 的 NowFunc 必须返回 UTC，确保自动填充字段保持 UTC。
 func TestGormConfig_NowFuncUTC(t *testing.T) {
 	// 把进程时区设成非 UTC，模拟生产环境里 TZ=Asia/Shanghai 的部署
 	old := time.Local
@@ -222,7 +218,7 @@ func TestInit_FreshDatabase(t *testing.T) {
 	}
 }
 
-// Init 遇到旧库中含有 enabled 列的 channels 表时，应平滑删除该列且不 panic。
+// Init 遇到含有历史 enabled 列的 channels 表时应平滑删除该列。
 func TestInit_DropsLegacyEnabledColumn(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "legacy.db")
 	cfg := &config.Config{DBPath: path, Username: "admin", Password: "admin123"}

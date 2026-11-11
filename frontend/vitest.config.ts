@@ -2,7 +2,7 @@ import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import path from 'path'
 
-// 仅用于 vitest：不加载 PWA 插件，避免测试时生成 service worker
+// 测试环境不加载 PWA 插件
 export default defineConfig({
   plugins: [react()],
   resolve: {

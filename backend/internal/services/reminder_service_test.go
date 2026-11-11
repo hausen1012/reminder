@@ -391,10 +391,7 @@ func TestReminderBatchDelete(t *testing.T) {
 	}
 }
 
-// 批量删除是原子的：两步必须同生共死。
-//
-// 用触发器让「删除提醒」这一步必然失败，断言关联表未被单独删掉——
-// 否则会留下「提醒还在、绑定关系没了」的脏数据。
+// 验证批量删除提醒及其通道关联时的事务原子性。
 func TestReminderBatchDelete_AtomicOnFailure(t *testing.T) {
 	db := openTestDB(t)
 	svc := newReminderStack(t, db)
@@ -739,10 +736,7 @@ func TestLoadChannelsByIDs(t *testing.T) {
 	}
 }
 
-// 列表类接口的查询数不应随返回条数增长（防 N+1）。
-//
-// 3 条提醒绑定通道后，List 应固定为 3 次查询：count + 分页 + 通道批量。
-// 逐条查 channel_ids 会变成 3+N 次。
+// 验证 List 接口采用批量查询，避免 N+1。
 func TestReminderList_QueryCountIndependentOfRowCount(t *testing.T) {
 	db := openTestDB(t)
 	svc := newReminderStack(t, db)

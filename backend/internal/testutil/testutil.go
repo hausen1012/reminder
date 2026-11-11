@@ -1,6 +1,4 @@
-// Package testutil 汇集各包测试共用的脚手架（仅被 *_test.go 引用）。
-//
-// models 包因导入方向（testutil → database → models）无法引用本包，其用例自带建库辅助函数。
+// Package testutil 提供单元测试共用的内存数据库及测试脚手架。
 package testutil
 
 import (
@@ -18,10 +16,7 @@ import (
 // nameSeq 给测试造数提供进程内单调递增的序号。
 var nameSeq atomic.Uint64
 
-// UniqueName 返回一个测试内唯一的名字，用于通道等带唯一约束的字段。
-//
-// 不能只用 time.Now().UnixNano()：Windows 的时钟精度约 15ms，
-// 内存库写入又极快，连续两次调用很容易拿到同一个纳秒值而撞唯一约束。
+// UniqueName 返回测试内唯一的名称（基于递增计数与纳秒时间戳）。
 func UniqueName(prefix string) string {
 	return fmt.Sprintf("%s-%d-%d", prefix, nameSeq.Add(1), time.Now().UnixNano())
 }
@@ -36,10 +31,7 @@ func TZ(loc *time.Location) *timezone.Provider {
 	return timezone.NewFixed(loc)
 }
 
-// NewDB 构造测试专用的内存 SQLite 库，并按生产的模型清单建表。
-//
-// DSN 带上 t.Name()，同包内不同用例互不串库；连接数设为 1，
-// SQLite 写串行化，可避免 "database is locked"。
+// NewDB 构造测试用独立内存 SQLite 库，并按全量模型初始化建表。
 func NewDB(t *testing.T) *gorm.DB {
 	t.Helper()
 

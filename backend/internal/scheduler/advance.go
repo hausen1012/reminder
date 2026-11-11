@@ -6,10 +6,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// advanceReminder 在给定查询上追加乐观锁条件并推进 next_fire_at。
-//
-// q 是调用方准备好的基础查询（可带额外条件，如 enabled=?）；返回 false 表示这次推进
-// 被其它路径抢先。整数毫秒列的等值比较是精确的，因此直接比较旧值即可。
+// advanceReminder 使用乐观锁推进 next_fire_at，返回 false 表示已被其他操作推进。
 func advanceReminder(q *gorm.DB, r *models.Reminder, nextStored *models.Time, updates map[string]any) (bool, error) {
 	if r.NextFireAt != nil {
 		q = q.Where("next_fire_at = ?", *r.NextFireAt)

@@ -342,8 +342,7 @@ func TestAIUpdateReminderMergesExistingFields(t *testing.T) {
 	}
 }
 
-// 用户要求「需要确认」时：create_reminder 必须把确认策略真正写进草稿，
-// 确认执行后提醒上的 require_confirm / 重发参数要落库，而不是只写在正文里。
+// 验证 create_reminder 正确将确认策略写入草稿并在应用后落库。
 func TestAIChat_CreateReminderWithConfirm(t *testing.T) {
 	svc, _, db := newAITestService(t,
 		toolCall("create_reminder", `{
@@ -865,7 +864,7 @@ func TestAIParseSettingsFallsBackOnGarbage(t *testing.T) {
 	}
 }
 
-// 单次输出上限是固定值，不再从设置读取；旧库里残留的 ai_max_tokens 不应影响请求。
+// 验证单次输出上限使用固定值，忽略配置表中的历史键值。
 func TestAIChatUsesFixedMaxTokens(t *testing.T) {
 	svc, fake, _ := newAITestService(t, &llm.Reply{Text: "ok"})
 	if _, err := svc.SaveSettings(AISettingsInput{
@@ -886,7 +885,7 @@ func TestAIChatUsesFixedMaxTokens(t *testing.T) {
 	}
 }
 
-// 模型输出达到上限时停止本轮，不再执行被截断的工具调用。
+// 验证模型输出达到上限时终止执行截断的工具调用。
 func TestAIChat_StopsWhenReplyTruncated(t *testing.T) {
 	svc, fake, db := newAITestService(t,
 		&llm.Reply{
@@ -1059,7 +1058,7 @@ func (p *errorOnRoundProvider) Chat(_ context.Context, _ llm.Request) (*llm.Repl
 	}`), nil
 }
 
-// 验证：工具调用入库草稿后，后续轮次模型调用出错时，已入库的草稿会被自动回滚清理，避免残留孤儿待确认操作。
+// 验证模型后续轮次出错时自动回滚清理本轮草稿。
 func TestAIChat_CleansUpDraftsOnSubsequentRoundError(t *testing.T) {
 	svc, _, db := newAITestService(t)
 	svc.providerOverride = &errorOnRoundProvider{errOn: 2}
@@ -1079,7 +1078,7 @@ func TestAIChat_CleansUpDraftsOnSubsequentRoundError(t *testing.T) {
 	}
 }
 
-// 验证：并发执行 ApplyAction 时，原子 CAS 保证仅有一次成功，避免生成重复实体。
+// 验证并发执行 ApplyAction 时仅有一次成功。
 func TestAIApplyAction_ConcurrentExecution(t *testing.T) {
 	svc, _, db := newAITestService(t, &llm.Reply{Text: "ok"})
 

@@ -86,8 +86,6 @@ func (h *HealthHandler) Check(c *gin.Context) {
 }
 
 // SchedulerHandler 返回调度器（Engine + Sweeper）运行时状态。
-//
-// 与 HealthHandler 放在一起：两者都只读调度器运行态，且共用同一组依赖。
 type SchedulerHandler struct {
 	Engine  *scheduler.Engine
 	Sweeper *scheduler.Sweeper

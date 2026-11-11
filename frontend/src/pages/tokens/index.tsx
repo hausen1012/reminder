@@ -51,7 +51,7 @@ function formatChannelNames(channels: Channel[], ids: number[]): string {
 
 export default function TokensPage() {
   const tz = useSiteTimezone()
-  // 令牌的"最近使用"时间按站点时区展示，避免换设备后时间偏移
+  // 令牌最近使用时间按站点时区展示
   const formatRecentTime = (dateStr?: string) => formatInZone(dateStr, tz)
   const [items, setItems] = useState<Token[]>([])
   const [channels, setChannels] = useState<Channel[]>([])

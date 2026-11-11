@@ -109,10 +109,7 @@ func (n *webhookNotifier) Send(ctx context.Context, configJSON []byte, msg Messa
 	return classifyStatus("Webhook", res)
 }
 
-// buildPostBody 构造 POST 请求体。
-//
-// BodyTemplate 是合法 JSON 时按 JSON 树逐字符串渲染（保证转义正确），
-// 否则整串渲染或回退到默认的 {subject, body}。请求体可能含一次性凭据，只记录长度。
+// buildPostBody 构造 POST 请求体，支持 JSON 模板与纯文本模板渲染。
 func buildPostBody(bodyTemplate string, msg Message) ([]byte, error) {
 	if bodyTemplate == "" {
 		bodyBytes, _ := json.Marshal(map[string]string{"subject": msg.Subject, "body": msg.Body})

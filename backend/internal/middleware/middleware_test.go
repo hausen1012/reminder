@@ -824,9 +824,6 @@ func TestErrorHandler_LogsPanicWithStack(t *testing.T) {
 }
 
 // 请求日志按状态码分级：2xx=DEBUG、4xx=WARN、5xx=ERROR。
-//
-// 2xx 降到 Debug 是有意的：面板每 10 秒轮询一次监控接口，
-// Info 级别下这些日志会把真正的问题淹没。
 func TestSlogLogger_LevelByStatus(t *testing.T) {
 	cases := []struct {
 		name   string
@@ -868,9 +865,7 @@ func TestSlogLogger_LevelByStatus(t *testing.T) {
 	}
 }
 
-// Info 级别下成功的访问日志应当完全不输出。
-//
-// 这是「日志不要全是轮询请求」的核心保证：默认配置下只有异常与慢请求可见。
+// Info 级别下成功的访问日志不输出。
 func TestSlogLogger_SuccessSilentAtInfo(t *testing.T) {
 	logs := captureSlogAt(t, slog.LevelInfo)
 

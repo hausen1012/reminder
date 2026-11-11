@@ -1,7 +1,4 @@
-// about_service 提供关于页所需的版本信息与更新检查。
-//
-// 更新检查读取 GitHub 仓库的标签列表，取其中最大的版本号与当前构建版本比较。
-// 自动检查每天运行一次，可在面板「设置 → 关于」关闭；关闭后只有手动检查会出网。
+// about_service 提供版本信息查询与更新检查服务。
 package services
 
 import (
@@ -63,8 +60,6 @@ type AboutInfo struct {
 }
 
 // AboutService 管理版本信息与更新检查状态。
-//
-// 检查结果只保存在内存中，进程重启后由当天的自动检查或手动检查重新获取。
 type AboutService struct {
 	DB        *gorm.DB
 	Version   string

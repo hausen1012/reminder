@@ -1,9 +1,6 @@
 package models
 
-// Token 用于外部程序调用 /api/external/v1/* 时鉴权。
-//
-// KeyHash 是明文 sha256，Prefix 是明文前 8 位用于列表展示。
-// Plaintext 保存完整明文（经 secretbox 加密），用于面板按需查看。
+// Token 用于外部 API 鉴权，Plaintext 密文存储，KeyHash 为 sha256。
 type Token struct {
 	ID        uint   `gorm:"primaryKey" json:"id"`
 	Name      string `gorm:"size:64;not null" json:"name"`

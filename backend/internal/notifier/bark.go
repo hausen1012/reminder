@@ -1,7 +1,4 @@
-// Bark 通道：iOS 推送，支持官方与自建服务端。
-//
-// 请求形式为 POST {server}/push，JSON body 里带 device_key。
-// Device Key 属于凭据，日志里只记录主机名。
+// Bark 通道（iOS 推送）。
 package notifier
 
 import (

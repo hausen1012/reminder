@@ -53,7 +53,7 @@ func (h *textHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
 	return &nh
 }
 
-// WithGroup 把 group 作为字段前缀；本项目不用分组，但实现它以免依赖调用后字段被丢弃。
+// WithGroup 把 group 作为字段前缀。
 func (h *textHandler) WithGroup(name string) slog.Handler {
 	if name == "" {
 		return h
@@ -175,7 +175,7 @@ func writeValue(b *strings.Builder, v slog.Value) {
 	}
 }
 
-// sourceOf 返回缩短后的源码位置（internal/xxx.go:42）：部署机器上的绝对路径没有意义。
+// sourceOf 返回缩短后的源码位置（如 internal/xxx.go:42）。
 func sourceOf(r slog.Record) string {
 	if r.PC == 0 {
 		return ""

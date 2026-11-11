@@ -1,7 +1,4 @@
-// AI 助手浮窗：右下角悬浮按钮 + 对话面板。
-//
-// 做成浮窗而非独立页面，是为了在任意页面直接对话；聊天记录只存 sessionStorage（不入库），
-// 落库的只有待确认草稿。
+// AI 助手浮窗组件，会话记录暂存 sessionStorage。
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   Bot,
@@ -82,10 +79,7 @@ function saveHistory(history: AIChatMessage[]) {
 }
 
 interface AIChatWidgetProps {
-  /**
-   * 启用状态变化时回调。布局据此为主内容预留底部滚动余量，
-   * 使分页等底部控件能滚出右下角悬浮按钮的覆盖范围。
-   */
+  /** 启用状态变化时的回调。 */
   onEnabledChange?: (enabled: boolean) => void
 }
 

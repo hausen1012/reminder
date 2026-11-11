@@ -1,6 +1,4 @@
-// Package services 业务服务层：handler 与 DB/外部资源之间的胶水。
-//
-// 敏感字段约定：通道 Config 内任意以 "_enc" 结尾的字段值在落库前加密、读出后解密。
+// Package services 提供业务逻辑实现。
 package services
 
 import (
@@ -121,8 +119,7 @@ func (s *ChannelService) Update(id uint, in ChannelInput) (*ChannelView, error) 
 		_ = json.Unmarshal(ch.Config, &oldEnc)
 	}
 
-	// 只加密 patch 里的字段再叠加到旧配置：不能整体加密（旧 _enc 已是密文，会被二次加密），
-	// 也不能只写 in.Config（未提交字段会被丢弃）
+	// 仅加密 patch 中提交的敏感字段，并合并保留未提交字段
 	patchEnc, err := s.encryptConfig(in.Config, oldEnc)
 	if err != nil {
 		return nil, middleware.NewAppError(middleware.CodeValidationFailed, err.Error())
@@ -270,7 +267,7 @@ func (s *ChannelService) DryRun(ctx context.Context, chType string, config map[s
 	return nil
 }
 
-// DecryptedConfig 返回明文 config JSON，供 dispatch 阶段直接喂给 Notifier（视图已脱敏）。
+// DecryptedConfig 返回解密后的明文配置 JSON。
 func (s *ChannelService) DecryptedConfig(ch *models.Channel) ([]byte, error) {
 	dec, err := s.decryptConfig(ch.Config)
 	if err != nil {
@@ -469,10 +466,7 @@ func (s *ChannelService) encryptConfig(cfg map[string]any, oldEnc map[string]any
 	return out, nil
 }
 
-// decryptConfig 解密 cfg 内 _enc 后缀字段。
-//
-// 解密失败最常见于更换过 ENCRYPTION_KEY；返回 AppError 而非裸 error，
-// 让用户看到「请重新填写」而不是 500。
+// decryptConfig 解密配置中以 _enc 结尾的敏感字段。
 func (s *ChannelService) decryptConfig(raw datatypes.JSON) (map[string]any, error) {
 	cfg := map[string]any{}
 	if len(raw) > 0 {

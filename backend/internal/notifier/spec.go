@@ -1,8 +1,4 @@
-// spec.go 定义每种通道类型的元数据：显示名、配置字段、能力（格式支持与长度上限）。
-//
-// 这里是通道类型的唯一权威清单：services 的必填校验、AI 工具的类型枚举、
-// /api/channels/types 接口都由它派生。新增通道时在 specs 与 Registry 各登记一次，
-// 注册表测试会保证两处键一致。
+// spec.go 定义各通道类型的元数据（显示名、配置字段、格式与长度约束）。
 package notifier
 
 import "strings"
@@ -102,7 +98,7 @@ var specs = map[string]Spec{
 			{Key: "secret_enc", Label: "签名校验密钥", Kind: FieldPassword, Help: "机器人安全设置选择「签名校验」时必填"},
 			{Key: "at_all", Label: "@ 所有人", Kind: FieldSwitch, Help: "需要群开启 @ 所有人 功能"},
 		},
-		// 飞书文本消息请求体上限 20 KB，这里留足余量
+		// 飞书文本消息字符上限
 		MaxBodyLen: 4000,
 	},
 	"telegram": {

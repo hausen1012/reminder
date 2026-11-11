@@ -1,6 +1,4 @@
-// Engine 把 Reminder 按 (Calendar, ScheduleType) 注册到 cron 或 time.AfterFunc，
-// 到点触发 fire：重读提醒 → 事务内乐观锁推进 next_fire_at 并插入 pending 日志
-// → 异步交给 DispatchService → 非 cron 触发器重算并注册下一次。
+// Engine 负责提醒到期触发、乐观锁推进下次时间并调度投递。
 package scheduler
 
 import (
@@ -80,10 +78,7 @@ func NewEngine(db *gorm.DB, disp Dispatcher, tz *timezone.Provider) *Engine {
 	}
 }
 
-// ReloadTimezone 在站点时区变更后重建 cron 实例、回写下次触发时间并重新注册全部提醒。
-//
-// cron 的时区在构造时固定，只能重建；库里的 next_fire_at 也必须重算，
-// 否则 sweeper 会按旧值把改时区误判成漏触发（补发或标记 expired）。
+// ReloadTimezone 在站点时区变更后重建 cron 实例、重算下次触发时间并重新注册全部提醒。
 func (e *Engine) ReloadTimezone() {
 	e.reloadMu.Lock()
 	defer e.reloadMu.Unlock()
@@ -128,10 +123,7 @@ func (e *Engine) ReloadTimezone() {
 	}
 }
 
-// RecomputeNextFire 按当前站点时区重算所有 enabled 提醒的 next_fire_at 并回写。
-//
-// 基准取 now 而非 last_fired_at：改时区不应把已成过去的旧计划当成漏触发补发。
-// 单次提醒若在新时区下已过期则写空 next_fire_at，但不改动 enabled。
+// RecomputeNextFire 按当前站点时区以当前时间为基准重算所有启用提醒的 next_fire_at 并回写。
 func (e *Engine) RecomputeNextFire() (int, error) {
 	var items []models.Reminder
 	if err := e.db.Where("enabled = ?", true).Find(&items).Error; err != nil {
@@ -502,7 +494,7 @@ func (e *Engine) fire(id uint) {
 		slog.Error("触发时计算下次触发时间失败，本次仍投递，next_fire_at 将写空",
 			"reminder", id, "title", r.Title, "schedule_type", r.ScheduleType, "calendar", r.Calendar, "error", err)
 	}
-	// 统一以 UTC 落库：models.Time 的 Value 内部已归一化，这里显式转换更直观
+	// 统一以 UTC 时间落库
 	nowUTC := models.TimeOf(now)
 	nextStored := models.TimePtr(newNext)
 
@@ -602,14 +594,14 @@ const DailyPurgeExpr = "0 0 3 * * *"
 func (e *Engine) AddDailyJob(name string, expr string, job func()) (cron.EntryID, error) {
 	wrapped := func() {
 		defer func() {
-			// 维护任务跑在 cron goroutine 里，panic 会带崩进程，这里兜住并记录
+			// 捕获并记录维护任务 panic
 			if r := recover(); r != nil {
 				slog.Error("维护任务 panic", "job", name, "recover", r, "stack", debug.Stack())
 			}
 		}()
 		job()
 	}
-	// 持锁登记与注册：ReloadTimezone 会整体替换 e.cron，不加锁可能把任务登记到旧实例上
+	// 加锁登记与注册 cron 任务
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	id, err := e.cron.AddFunc(expr, wrapped)

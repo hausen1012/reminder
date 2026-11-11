@@ -28,7 +28,7 @@ func ErrorAttrs(err error) []any {
 		if id := apiErr.RequestID; id != "" {
 			attrs = append(attrs, "upstream_request_id", id)
 		}
-		// RawJSON 是上游原始响应体，截断后保留：中转站的真实原因常在这里
+		// 截断保留上游原始响应体
 		if raw := truncate([]byte(apiErr.RawJSON()), 1000); raw != "" {
 			attrs = append(attrs, "body", raw)
 		}
@@ -37,10 +37,7 @@ func ErrorAttrs(err error) []any {
 	return []any{"error", err}
 }
 
-// ErrorAttrsWith 返回「带调用方自定义字段」的错误日志参数。
-//
-// 用于把 provider / model 等本身就在日志上下文里的字段省掉：
-// 传进来的 attrs 在前，错误细节在后，后者优先覆盖同名键。
+// ErrorAttrsWith 返回合并调用方字段的错误日志参数，错误属性优先覆盖同名键。
 func ErrorAttrsWith(err error, attrs ...any) []any {
 	out := make([]any, 0, len(attrs)+8)
 	out = append(out, attrs...)

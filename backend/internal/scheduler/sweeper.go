@@ -76,9 +76,6 @@ func (s *Sweeper) Start() {
 }
 
 // IsRunning 返回 sweeper 是否在运行。
-//
-// 加锁读：/api/health 与 /api/scheduler/status 会在请求 goroutine 里调它，
-// 而 Start/Stop 可能来自 main 的启动与停机流程，无锁读 cancel 是数据竞争。
 func (s *Sweeper) IsRunning() bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -90,11 +87,7 @@ func (s *Sweeper) Interval() time.Duration {
 	return s.interval
 }
 
-// Stop 通知 sweeper 退出，并等待清理完成。
-//
-// 先把 cancel/done 摘下来再释放锁，然后才等待 goroutine 退出：
-// 若持锁等待，正在执行的 tick 可能卡住；若等完再清空 s.cancel，
-// 并发 Start 新建的 cancel 会被误清。
+// Stop 通知 sweeper 退出并等待清理完成。
 func (s *Sweeper) Stop() {
 	s.mu.Lock()
 	cancel, done := s.cancel, s.done
@@ -216,11 +209,7 @@ func (s *Sweeper) markExpired(r *models.Reminder, now time.Time) error {
 
 var errSweepSkipped = errors.New("sweep skipped by optimistic lock")
 
-// recoverStalePendingLogs 把卡在 pending 的投递日志收敛为 failed。
-//
-// 进程在投递中途退出时，这条日志不会有任何代码再推进终态，会永久污染成功率统计。
-// 判据是 fired_at 早于 now - pendingTTL，而不是「启动时」——正常运行期间也可能有
-// goroutine 意外消失。
+// recoverStalePendingLogs 将超时未推进终态的 pending 日志收敛为 failed。
 func (s *Sweeper) recoverStalePendingLogs(now time.Time) {
 	cutoff := models.TimeOf(now.Add(-s.pendingTTL))
 	res := s.db.Model(&models.DeliveryLog{}).

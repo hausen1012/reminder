@@ -1,7 +1,4 @@
-// Package notifier 定义通知通道的统一接口与各通道实现。
-//
-// 错误约定：nil 表示成功；包装 ErrPermanent 表示不应重试（鉴权失败、参数错误、对端业务码非 0）；
-// 其他 error 表示可重试（网络、超时、5xx）。
+// Package notifier 定义通知通道统一接口与实现（包装 ErrPermanent 为不可重试错误）。
 package notifier
 
 import (
@@ -41,8 +38,6 @@ type Notifier interface {
 }
 
 // Registry 把通道类型映射到 Notifier 实例。
-//
-// key 必须与 spec.go 里的 specs 完全一致，由 registry_test.go 保证。
 var Registry = map[string]Notifier{
 	"smtp":     &smtpNotifier{},
 	"dingtalk": &dingtalkNotifier{},

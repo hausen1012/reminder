@@ -7,10 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// BodyLimit 限制单个请求体的大小，超限返回 413 payload_too_large。
-//
-// 两层限制：声明了 Content-Length 超限的直接拒绝；未声明或撒谎的用 MaxBytesReader 兜住，
-// 由 abortBindErr 把 *http.MaxBytesError 转成 413。
+// BodyLimit 限制请求体大小，超限返回 413 payload_too_large。
 func BodyLimit(maxBytes int64) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if maxBytes <= 0 {

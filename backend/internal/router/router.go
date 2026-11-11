@@ -38,19 +38,8 @@ type SetupResult struct {
 	Handles *SchedulerHandles
 }
 
-// applyMiddleware 装配全局中间件。
-//
-// 顺序是契约：
-//
-//	Recovery      → 兜住下游 panic，必须第一个
-//	RequestID     → SlogLogger / ErrorHandler 都要读它
-//	CORS          → 必须在 BodyLimit 之前：CORS 之后提前 Abort 的响应会缺
-//	                 Access-Control-* 头，浏览器把 413 当成不可读的跨域失败
-//	SlogLogger    → 记录访问日志，包括被拦截的请求
-//	BodyLimit     → 读 body 前拦住超大请求
-//	ErrorHandler  → 渲染 c.Error 里注册的 AppError
-//
-// 拆成独立函数是为了让顺序能被单测断言（见 router/middleware_order_test.go）。
+// applyMiddleware 按序装配全局中间件：
+// Recovery -> RequestID -> CORS -> SlogLogger -> BodyLimit -> ErrorHandler。
 func applyMiddleware(r *gin.Engine, cfg *config.Config) {
 	r.Use(gin.Recovery())
 	r.Use(middleware.RequestID())
@@ -75,7 +64,6 @@ func initGinMode() {
 func Setup(staticFS embed.FS, cfg *config.Config) (*SetupResult, error) {
 	initGinMode()
 	r := gin.New()
-	// 中间件顺序集中在这里维护，顺序本身就是契约，改动前先读 applyMiddleware 的注释。
 	applyMiddleware(r, cfg)
 
 	// gin 默认信任所有代理头。只有显式配置 TRUSTED_PROXIES 才信任，否则用 TCP 对端地址。
@@ -116,8 +104,7 @@ func Setup(staticFS embed.FS, cfg *config.Config) (*SetupResult, error) {
 	// 读库里的站点时区（若存在）并应用，必须早于调度器注册
 	configSvc.LoadTimezone()
 
-	// 同步进程默认时区，供日志按天切分、确认页时间展示等零星用途。
-	// 只在启动阶段赋一次值：time.Local 是全局变量，运行期写入会是数据竞争。
+	// 启动时同步进程默认时区
 	time.Local = tz.Get()
 
 	// 启动调度器并把已 enabled 的提醒注册一遍
@@ -174,7 +161,7 @@ func Setup(staticFS embed.FS, cfg *config.Config) (*SetupResult, error) {
 	}); err != nil {
 		slog.Warn("注册更新检查任务失败", "error", err)
 	}
-	// 启动后异步检查一次，避免首次打开关于页时还没有任何结论
+	// 启动后异步检查更新
 	go aboutSvc.AutoCheck(context.Background())
 
 	loginLimiter := middleware.NewLoginLimiter(

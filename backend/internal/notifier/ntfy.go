@@ -1,7 +1,4 @@
-// ntfy 通道：发布消息到话题。
-//
-// 走 Header 形式（POST /{topic}），正文即消息体；标题、优先级、标签通过请求头传递。
-// 访问令牌以 Bearer 形式发送，日志里不打印。
+// ntfy 通道：通过 HTTP Header 传递标题、优先级与标签。
 package notifier
 
 import (

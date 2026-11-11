@@ -1,19 +1,12 @@
-// 前端使用的静态常量：项目对外地址、站点时区候选列表。
-//
-// 这些都是不随运行时变化的字面量；需要从后端读取的配置走 ConfigContext，
-// 不要混进这里。
+// 静态常量定义。
 
-// 项目对外地址：开源仓库与文档站点。
-// 界面上需要指回项目本身时统一引用这里，避免各处硬编码。
+// 项目仓库与文档地址。
 export const GITHUB_URL = 'https://github.com/hausen1012/reminder'
 export const DOCS_URL = 'https://hausen1012.github.io/reminder/'
 // 版本列表页面：关于页的「全部版本」入口。
 export const RELEASES_URL = 'https://github.com/hausen1012/reminder/releases'
 
-// 站点时区的常用候选列表。
-//
-// 时区是全局设置（设置页），提醒本身不再单独保存时区，
-// 因此这份列表只给设置页的下拉使用。
+// 站点时区常用候选列表（供设置页使用）。
 export const COMMON_TIMEZONES = [
   'Asia/Shanghai',
   'Asia/Tokyo',
@@ -37,10 +30,7 @@ export const COMMON_TIMEZONES = [
   'UTC',
 ]
 
-// 提醒来源的展示文案与徽章配色。
-//
-// 来源取值由后端写入：web（面板表单）、ai（AI 助手确认后创建）、api（外部令牌）。
-// 各处列表、详情、筛选统一引用这里，避免出现「api 显示成 Web」这类漏判。
+// 提醒来源展示文案与徽章配色（web / ai / api）。
 export const SOURCE_LABEL: Record<string, string> = {
   web: 'Web',
   ai: 'AI',

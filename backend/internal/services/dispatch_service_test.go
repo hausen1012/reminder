@@ -503,11 +503,7 @@ func captureLogs(t *testing.T) *bytes.Buffer {
 	return buf
 }
 
-// 投递日志不能泄露确认链接。
-//
-// vars 里带 confirm_url，拼出来就是完整可用的确认令牌；
-// 谁读到日志谁就能替用户把提醒确认掉，因此绝不能出现在日志里。
-// 这里刻意不用 log 通道——它的职责就是把正文打进日志，会掩盖要验证的点。
+// 验证投递日志不记录确认链接及令牌参数。
 func TestDispatchLogDoesNotLeakConfirmURL(t *testing.T) {
 	logs := captureLogs(t)
 

@@ -9,12 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// LoginLimiter 是登录接口的失败计数限流器，防止无限撞库。
-//
-// 计数键是「用户名 + 客户端 IP」：只按 IP 会牵连同一 NAT 下的用户，只按用户名又能换 IP 绕过。
-// 成功登录清零该键；锁定期间直接拒绝、不进入密码校验，避免被用来消耗 bcrypt 算力。
-//
-// 由 AuthHandler 显式调用而非常规中间件：中间件读掉请求体后 handler 就解析不到了。
+// LoginLimiter 针对「用户名 + 客户端 IP」提供登录失败限流，锁定期间直接拒绝。
 type LoginLimiter struct {
 	maxAttempts int
 	lockout     time.Duration
@@ -52,11 +47,7 @@ func NewLoginLimiter(maxAttempts int, lockout time.Duration) *LoginLimiter {
 	}
 }
 
-// LoginKey 构造计数键：小写用户名 + 客户端 IP。
-//
-// 用户名统一小写：数据库查询大小写敏感，但计数不该因为把 admin 写成 Admin
-// 就重置；IP 取的是 AuthHandler 收到请求时的 ClientIP（结果取决于
-// TRUSTED_PROXIES 配置），不是原始 X-Forwarded-For。
+// LoginKey 构造计数键：小写用户名 + ClientIP。
 func LoginKey(c *gin.Context, username string) string {
 	return strings.ToLower(strings.TrimSpace(username)) + "|" + c.ClientIP()
 }
@@ -67,10 +58,7 @@ func (l *LoginLimiter) Allow(key string) bool {
 	return ok
 }
 
-// AllowWithRetryAfter 同 Allow，并额外返回锁定剩余时长（未锁定时为 0）。
-//
-// 调用方用它填 Retry-After：写死 60 秒会与实际锁定时长脱节——
-// 配置成 15 分钟时，客户端按 60 秒重试只会再吃一次 429。
+// AllowWithRetryAfter 检查是否允许登录，并返回锁定剩余时长。
 func (l *LoginLimiter) AllowWithRetryAfter(key string) (bool, time.Duration) {
 	if l.maxAttempts <= 0 {
 		return true, 0

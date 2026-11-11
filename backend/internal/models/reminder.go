@@ -4,10 +4,7 @@ import (
 	"gorm.io/datatypes"
 )
 
-// Reminder 表示一条提醒。
-//
-// Calendar + ScheduleType 决定 ScheduleSpec 结构：solar 支持 once/interval/cron，lunar 支持 once/interval。
-// 时区是站点级全局设置，不按提醒保存；时间字段统一用 models.Time（Unix 毫秒）。
+// Reminder 表示一条提醒，时间字段统一为 Unix 毫秒（models.Time）。
 type Reminder struct {
 	ID            uint   `gorm:"primaryKey" json:"id"`
 	Title         string `gorm:"size:200;not null" json:"title"`
@@ -18,9 +15,7 @@ type Reminder struct {
 	ScheduleType string         `gorm:"size:16;index" json:"schedule_type"`
 	ScheduleSpec datatypes.JSON `gorm:"type:text" json:"schedule_spec"`
 
-	// 不能写 gorm:"default:true"：GORM 会跳过带默认值的零值字段，导致 Enabled=false 被覆盖成 true。
-	// 默认启用由 ReminderService.Create 显式赋值。Enabled 与 next_fire_at 组成 idx_reminders_due
-	// 复合索引，供 sweeper 与 Upcoming 的范围扫描使用。
+	// 默认值由创建逻辑显式赋值；与 next_fire_at 建立复合索引 idx_reminders_due。
 	Enabled bool   `gorm:"index;index:idx_reminders_due,priority:1" json:"enabled"`
 	Source  string `gorm:"size:16;index" json:"source"` // web | api
 	TokenID *uint  `gorm:"index" json:"token_id,omitempty"`

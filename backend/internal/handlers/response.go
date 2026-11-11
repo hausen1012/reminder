@@ -69,7 +69,7 @@ func abortBindErr(c *gin.Context, err error, message string) {
 	abortErr(c, appErr)
 }
 
-// abortErr 是处理 service 错误的统一入口；日志由 ErrorHandler 统一记录，这里不重复记。
+// abortErr 处理 service 错误并中断请求，由 ErrorHandler 统一记录日志。
 func abortErr(c *gin.Context, err error) {
 	_ = c.Error(err)
 	c.Abort()

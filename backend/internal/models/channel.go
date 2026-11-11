@@ -4,10 +4,7 @@ import (
 	"gorm.io/datatypes"
 )
 
-// Channel 表示一个通知通道。
-//
-// Type 在创建后不可变更，避免 Config schema 漂移。
-// Config 内带 _enc 后缀的字段由 ChannelService 在落库前/读出后透明加解密。
+// Channel 表示通知通道，Config 中 _enc 后缀字段透明加解密存储。
 type Channel struct {
 	ID        uint           `gorm:"primaryKey" json:"id"`
 	Name      string         `gorm:"size:64;not null;uniqueIndex" json:"name"`

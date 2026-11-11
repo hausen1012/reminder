@@ -20,9 +20,7 @@ import (
 var staticFS embed.FS
 
 func main() {
-	// 先解析配置再装配日志：config.Load 会按 TIMEZONE 同步 time.Local，
-	// 日志文件按自然日滚动时用的是站点时区，而不是宿主机时区。
-	// （config.Load 自身的告警发生在日志装配前，只会以标准库默认格式打到 stderr。）
+	// 先解析配置再装配日志，确保日志按配置的站点时区按日滚动。
 	cfg := config.Load()
 
 	logger.Init(cfg.LogFile)
@@ -88,9 +86,7 @@ func main() {
 	slog.Info("已退出。")
 }
 
-// getEnv 读环境变量，未设置或为空时返回 fallback。
-//
-// main 里只需要这一个，没必要为此导出 config 包的内部小工具。
+// getEnv 读取环境变量，未设置或为空时返回 fallback。
 func getEnv(key, fallback string) string {
 	if v := os.Getenv(key); v != "" {
 		return v

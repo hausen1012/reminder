@@ -285,10 +285,7 @@ func TestNewLogService_DefaultURL(t *testing.T) {
 	}
 }
 
-// 大量日志的清理应能跨多个批次完成，且 attempts 一并清掉。
-//
-// 用例刻意超过 purgeBatchSize，覆盖「按批取 id 循环删除」的路径；
-// 旧实现会先把全部 id Pluck 进内存，这里同时守住结果正确性。
+// 验证跨批次清理大量日志及对应 attempts 记录。
 func TestLogPurge_MultipleBatches(t *testing.T) {
 	svc, db := newLogSvc(t, "")
 

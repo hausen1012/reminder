@@ -1,5 +1,4 @@
-// 极简 toast 上下文：通过 useToast() 获取 toast() 调用即可弹出通知。
-// 比 shadcn 自带的 useToast 简化，避免额外的 hook 复杂度。
+// Toast 上下文，通过 useToast() 触发通知。
 import * as React from 'react'
 import {
   ToastProvider,

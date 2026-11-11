@@ -1,7 +1,4 @@
-// 消息正文的长度约束。
-//
-// 各渠道的对端长度上限不同，由 Spec.MaxBodyLen 声明；超长时在发送前截断并追加省略号，
-// 避免对端直接拒绝整条消息。
+// 消息正文长度约束：超长时按 Spec.MaxBodyLen 截断并追加省略号。
 package notifier
 
 import "strings"

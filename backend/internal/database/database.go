@@ -35,7 +35,7 @@ var allModels = []any{
 	&models.AIAction{},
 }
 
-// AllModels 返回建表所需的全部模型；测试的内存库也用它建表，避免与生产脱节。
+// AllModels 返回建表所需的全部模型。
 func AllModels() []any {
 	return append([]any(nil), allModels...)
 }

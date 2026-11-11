@@ -202,9 +202,7 @@ func TestPermanentWrapping(t *testing.T) {
 
 // ==================== registry_test.go ====================
 
-// 回归测试：Registry 的 key 必须覆盖 specs 里声明的所有通道类型。
-//
-// 漏注册的后果是：用户创建该类型通道后每次发送都失败（错误：未知通道类型）。
+// 验证 Registry 的注册项覆盖 specs 中声明的全部通道类型。
 func TestRegistry_CoversAllSpecs(t *testing.T) {
 	for _, typ := range Types() {
 		if _, err := Get(typ); err != nil {

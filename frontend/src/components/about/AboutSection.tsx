@@ -1,7 +1,4 @@
-// 关于页主体：当前版本、构建时间、更新检查与项目链接。
-//
-// 更新检查由后端每日自动执行并把结论缓存在内存里，这里只读取与触发手动检查；
-// 关闭自动检查后后端不再出网，手动检查仍然可用。
+// 关于页主体：版本信息、构建时间与更新检查。
 import { useState } from 'react'
 import { BookOpen, CheckCircle2, ExternalLink, Github, RefreshCw } from 'lucide-react'
 import { extractApiError } from '@/lib/api'

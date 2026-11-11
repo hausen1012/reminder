@@ -1,7 +1,4 @@
-// 飞书群自定义机器人。
-//
-// 请求体上限 20 KB；支持签名校验（timestamp + "\n" + secret 作为 HMAC-SHA256 密钥，
-// 对空字符串求签名后 base64）。
+// 飞书群自定义机器人通道。
 package notifier
 
 import (

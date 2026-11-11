@@ -1,7 +1,4 @@
-// 应用外壳：桌面侧边栏 + 移动端顶栏/底部标签栏，两者共用同一份导航数据。
-//
-// 桌面（md 及以上）使用固定侧边栏；移动端使用底部标签栏承载高频页面，
-// 其余入口（令牌、监控、设置、外链、账户）收进左滑抽屉。
+// 应用基础布局外壳（桌面侧边栏与移动端导航）。
 import { useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import {

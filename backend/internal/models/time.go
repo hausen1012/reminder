@@ -6,10 +6,7 @@ import (
 	"time"
 )
 
-// Time 是落库时间类型：在 SQLite 中以 Unix 毫秒（int64）存储。
-//
-// 比较与排序都是整数语义，索引正常生效，等值精确，
-// 零值表示"无此时间"，Value 会写成 NULL。
+// Time 在 SQLite 中以 Unix 毫秒（int64）存储，零值写为 NULL。
 type Time struct {
 	time.Time
 }

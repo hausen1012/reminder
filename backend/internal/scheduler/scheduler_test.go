@@ -99,9 +99,7 @@ func TestEngineFire_OptimisticLockSkipsDuplicate(t *testing.T) {
 	// 第一次 fire 正常处理
 	e.fire(r.ID)
 
-	// 把 next_fire_at 改成旧值，模拟"另一个 worker 抢先更新过"的场景：
-	// 此时数据库里的 next_fire_at 与被 fire 读到的值不一致时，
-	// 乐观锁条件 should fail。这里直接把 next_fire_at 回拨成 nil 制造不匹配。
+	// 修改 next_fire_at 模拟乐观锁条件不匹配场景
 	if err := db.Model(&models.Reminder{}).Where("id = ?", r.ID).
 		Update("next_fire_at", nil).Error; err != nil {
 		t.Fatalf("改写 next_fire_at 失败: %v", err)
@@ -1310,11 +1308,7 @@ func TestNewSweeper_PendingTTLDefault(t *testing.T) {
 
 // ==================== timezone_test.go ====================
 
-// 回归测试：同一时刻用不同时区偏移传入，落库后必须是同一个整数毫秒，
-// 因此 sweeper 能一致地扫到它们。
-//
-// 若时间按文本落库，+08:00 与 +00:00 两行会按字典序排在不同位置，
-// 边界查询只命中一半。
+// 验证不同时区传入的同一绝对时刻落库为相同毫秒值。
 func TestSweeperTick_HandlesMixedOffsetInput(t *testing.T) {
 	db := openSchedulerTestDB(t)
 	loc := time.FixedZone("CST", 8*3600)
@@ -1460,10 +1454,7 @@ func TestEngineReloadTimezone(t *testing.T) {
 	}
 }
 
-// 站点时区变更后，库里的 next_fire_at 必须按新时区重算并回写。
-//
-// 只重建 cron 是不够的：sweeper 拿库里的值判断补漏，旧值在新时区下
-// 可能已成过去，会被当作漏触发补发一次或被标记 expired。
+// 验证站点时区变更后，库中的 next_fire_at 按新时区重算回写。
 func TestEngineReloadTimezoneRecomputesNextFire(t *testing.T) {
 	db := openSchedulerTestDB(t)
 	cst := time.FixedZone("CST", 8*3600)

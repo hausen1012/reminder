@@ -78,10 +78,7 @@ func (s *ConfirmService) InspectToken(token string) (*models.DeliveryLog, error)
 	return dl, nil
 }
 
-// ConsumeToken 消费一个令牌，成功时标记 used_at 并把该链的日志标为已确认。
-//
-// 并发点击只有一次真正生效：used_at 用带 `used_at IS NULL` 条件的原子 UPDATE 写入，
-// RowsAffected=0 即说明被抢先，按「已使用」处理并尽量返回日志，以便渲染幂等成功页。
+// ConsumeToken 原子消费令牌并标记对应链的日志为已确认。
 func (s *ConfirmService) ConsumeToken(token string) (*models.DeliveryLog, error) {
 	ct, target, err := s.loadToken(token)
 	if err != nil {
@@ -148,10 +145,7 @@ func (s *ConfirmService) BuildURL(token string) string {
 	return siteURL(s.DB, fallback) + "/c/" + token
 }
 
-// loadToken 读取令牌及其对应的投递日志。
-//
-// 令牌不存在返回 ErrConfirmTokenInvalid；日志已被清理返回 ErrConfirmLogMissing
-// （此时令牌本身仍可用作「已使用」的判定依据，因此一并返回）。
+// loadToken 查询令牌及其关联的投递日志。
 func (s *ConfirmService) loadToken(token string) (*models.ConfirmToken, *models.DeliveryLog, error) {
 	var ct models.ConfirmToken
 	if err := s.DB.First(&ct, "token = ?", token).Error; err != nil {

@@ -460,11 +460,7 @@ func TestChunkIDs(t *testing.T) {
 	}
 }
 
-// 部分更新应保留未提交的字段，而不是把整份 config 覆盖成只剩提交的字段。
-//
-// 这是一个回归用例：Update 只把 patch 里的字段加密后整体写回，
-// 若调用方只提交 config 的一个子集（前端「只改某一项」的场景），
-// 其余字段会被静默丢弃。
+// 验证部分更新时保留未提交的配置字段。
 func TestChannelUpdate_PartialKeepsOtherFields(t *testing.T) {
 	db := openTestDB(t)
 	box, _ := secretbox.New("")
@@ -500,8 +496,7 @@ func TestChannelUpdate_PartialKeepsOtherFields(t *testing.T) {
 	}
 }
 
-// 换过 ENCRYPTION_KEY 后，通道敏感字段解不开必须返回 400 + 可操作提示，
-// 而不是 500。用户看到「服务器内部错误」完全无法判断要怎么办。
+// 验证密钥不匹配导致解密失败时返回 400 业务错误。
 func TestChannelDecryptWrongKeyReturnsValidationError(t *testing.T) {
 	db := openTestDB(t)
 

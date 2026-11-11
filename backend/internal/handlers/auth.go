@@ -34,9 +34,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-	// 解析出用户名之后才建计数键：限流依赖请求体，不能放在中间件里。
-	// 放在解析之后还附带一个好处——报文不合法不会被计入失败次数，
-	// 否则攻击者用空请求体就能把账号锁掉。
+	// 解析出用户名后建立限流计数键
 	var limiterKey string
 	if h.Limiter != nil {
 		limiterKey = middleware.LoginKey(c, req.Username)
@@ -44,8 +42,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 			logger.FromContext(c.Request.Context()).Warn("登录被限流",
 				"path", c.Request.URL.Path, "username", req.Username,
 				"ip", c.ClientIP(), "retry_after", retryAfter)
-			// 按锁定的剩余时长填 Retry-After，而不是写死一个值：
-			// 锁定时长可配置，写死会让客户端在锁定结束前反复重试。
+			// 按锁定的剩余时长设置 Retry-After
 			c.Header("Retry-After", strconv.Itoa(RetryAfterSeconds(retryAfter)))
 			abortErr(c, middleware.NewAppError(middleware.CodeRateLimited, "登录失败次数过多，请稍后再试"))
 			return
@@ -125,8 +122,6 @@ func (h *AuthHandler) Me(c *gin.Context) {
 }
 
 // Logout POST /api/auth/logout
-//
-// JWT 无状态，服务端不维护会话，登出由前端丢弃令牌完成。
 func (h *AuthHandler) Logout(c *gin.Context) {
 	successJSON(c, nil)
 }

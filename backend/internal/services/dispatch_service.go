@@ -1,6 +1,4 @@
-// dispatch_service 完成一次触发的渲染、通道并发发送、重试与状态汇总。
-//
-// 契约：Engine 插入 pending 日志后异步调用 Run，本服务负责把它推进到终态。
+// dispatch_service 负责提醒消息渲染、通道并发投递、重试及日志状态更新。
 package services
 
 import (
@@ -98,7 +96,7 @@ func (d *DispatchService) Run(ctx context.Context, r *models.Reminder, deliveryL
 				vars["confirm_url"] = d.ConfirmMgr.ConfirmSvc.BuildURL(tok.Token)
 			}
 		} else {
-			// 新触发：先取消该提醒旧的确认链，避免链堆积
+			// 新触发：取消该提醒此前的确认重发链
 			if d.ConfirmMgr != nil {
 				d.ConfirmMgr.CancelByReminderID(r.ID)
 			}

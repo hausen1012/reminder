@@ -1,6 +1,4 @@
-// 路由守卫：未登录跳登录页、已登录不进登录页。
-//
-// 两个组件只差 user 的有/无判断，放在一起便于对照；加载态文案与布局也共用。
+// 路由守卫：登录态与未登录态访问控制。
 import { Navigate } from 'react-router-dom'
 import type { ReactNode } from 'react'
 import { useAuth } from '@/contexts/AuthContext'

@@ -9,7 +9,7 @@ import (
 	"github.com/reminder/backend/internal/logger"
 )
 
-// jwtClaims 是 JWT 中我们关心的字段；用结构化 claims 而非 MapClaims 以避免类型断言静默变 0。
+// jwtClaims 是 JWT 自定义载荷结构。
 type jwtClaims struct {
 	UserID   uint   `json:"user_id"`
 	Username string `json:"username"`

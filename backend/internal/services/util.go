@@ -1,7 +1,4 @@
-// util 集中本包内部的小工具函数：分批查询、排序白名单。
-//
-// 两者都服务于「list / batch」类接口，且都是纯函数（不碰 DB），
-// 原先各自一个几行的文件（chunk.go、sort.go），合并到这里便于一起阅读与测试。
+// util 提供分批查询与排序白名单等辅助工具函数。
 package services
 
 import "strings"
@@ -22,10 +19,7 @@ func chunkIDs(ids []uint, size int) [][]uint {
 	return chunks
 }
 
-// buildOrderClause 把前端传入的 sort_by / sort_order 转成安全的 ORDER BY 片段。
-//
-// sort_by 会被直接拼进 SQL，因此必须限定在白名单内，防止注入。
-// 未命中白名单或为空时回退到 fallback（形如 "created_at DESC"）。
+// buildOrderClause 把前端传入的 sort_by / sort_order 转成白名单校验后的 ORDER BY 片段。
 func buildOrderClause(sortBy, sortOrder, fallback string, allowed []string) string {
 	field := strings.ToLower(strings.TrimSpace(sortBy))
 	if field == "" {

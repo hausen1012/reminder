@@ -322,11 +322,7 @@ func TestTime_Scan(t *testing.T) {
 
 // ==================== reminder_test.go ====================
 
-// 回归测试：Enabled 字段带 gorm default:true，若 Create 时传 false，
-// GORM 会用默认值覆盖，导致「创建时禁用」静默变成「启用」。
-//
-// 原先放在 scheduler 包，但它测的是模型层的 GORM 默认值语义，与调度无关，
-// 因此移到 models 包。本包无法复用 internal/testutil（它会反向导入 models）。
+// 验证 Create 显式传 Enabled=false 时不会被默认值覆盖为 true。
 func TestReminderCreateWithDisabledIsNotOverridden(t *testing.T) {
 	db := openTestDB(t)
 	if err := db.AutoMigrate(&Reminder{}); err != nil {

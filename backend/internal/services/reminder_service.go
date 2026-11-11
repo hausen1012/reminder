@@ -1,6 +1,4 @@
-// reminder_service 负责提醒的 CRUD/Toggle/Preview/Test，并在写库后同步调度器。
-//
-// 依赖 SchedulerHook 接口而非直接 import scheduler，避免循环依赖。
+// reminder_service 负责提醒的增删改查、状态切换及调度器同步。
 package services
 
 import (
@@ -455,8 +453,7 @@ func (s *ReminderService) prepare(in *ReminderInput) ([]byte, *time.Time, error)
 	return specRaw, next, nil
 }
 
-// normalizeContent 归一化正文与格式：格式缺省为 text，正文留空时回退为标题
-// （避免「只改标题」把正文清空）。
+// normalizeContent 归一化正文与格式，正文留空时回退为标题。
 func normalizeContent(title, content, format string) (body, normalizedFormat string) {
 	if format == "" {
 		format = "text"

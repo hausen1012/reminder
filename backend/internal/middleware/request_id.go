@@ -56,7 +56,7 @@ func newRequestID() string {
 	return "req-" + itoaUint(requestIDSeq.Add(1))
 }
 
-// itoaUint 是 strconv.FormatUint 的极简替代，避免为一个兜底分支引入 import。
+// itoaUint 将 uint64 格式化为十进制字符串。
 func itoaUint(v uint64) string {
 	if v == 0 {
 		return "0"

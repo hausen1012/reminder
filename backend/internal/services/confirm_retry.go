@@ -13,10 +13,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// ConfirmRetryManager 持有内存中的 chain_id → *time.Timer 映射。
-//
-// 定时器不能持久化，但链的状态都在库里（delivery_logs.confirm_chain_id + confirm_tokens），
-// 进程重启后由 RecoverChains 重新排下一轮。
+// ConfirmRetryManager 管理内存中的未确认重发定时器。
 type ConfirmRetryManager struct {
 	DB         *gorm.DB
 	Dispatch   *DispatchService
@@ -41,10 +38,7 @@ func NewConfirmRetryManager(db *gorm.DB, dispatch *DispatchService, confirmSvc *
 	}
 }
 
-// Schedule 注册一轮重发。
-//
-// round 是已完成的轮次数（0 表示首次触发已发出），因此这里用 round >= max 判断是否已发满；
-// 对应的 retry 入口用 round > max（校验当前这一轮），差 1 是语义不同，不是笔误。
+// Schedule 注册下一轮未确认重发。round 为已完成轮数，发满时跳过。
 func (m *ConfirmRetryManager) Schedule(r *models.Reminder, chainID string, round int) {
 	if round >= r.ConfirmMaxRetries {
 		slog.Info("跳过调度", "chain", chainID, "round", round, "max_retries", r.ConfirmMaxRetries)
@@ -103,11 +97,7 @@ func (m *ConfirmRetryManager) StopAll() {
 	}
 }
 
-// RecoverChains 在进程启动时重建未完成的重发链，返回恢复的链数量。
-//
-// 依据每条链最新一轮的 retry_round 与 fired_at 排下一轮，扣掉停机期间流逝的时间。
-// 三条规则均按链整体判断：每个提醒只恢复最新那条链；链里任一日志已确认即整条作废
-// （确认与重发存在竞态窗口，不能只看最新一条）；令牌已过期的不恢复。
+// RecoverChains 启动时恢复未完成且未过期的确认重发链。
 func (m *ConfirmRetryManager) RecoverChains() (int, error) {
 	type chainRow struct {
 		ChainID    string `gorm:"column:chain_id"`
@@ -116,10 +106,7 @@ func (m *ConfirmRetryManager) RecoverChains() (int, error) {
 		LastFired  int64  `gorm:"column:last_fired"`
 	}
 
-	// 一条 SQL 取回所有候选：每个提醒只保留最新一轮（rn=1）。
-	// 令牌挂在链的首条日志上，其余轮的日志没有对应 token 行，因此按 chain_id 聚合，
-	// 不能直接 JOIN 到 dl.id。NOT EXISTS 让「已确认」成为链级判断；
-	// 时间条件放在 SQL 里，停机很久的旧链不会被带回 Go 再筛。
+	// 取回每条未确认且未过期链的最新一轮记录
 	var rows []chainRow
 	err := m.DB.Raw(`
 		SELECT t.chain_id, t.reminder_id, t.round, t.last_fired

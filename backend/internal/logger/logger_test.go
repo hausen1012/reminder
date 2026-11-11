@@ -12,10 +12,7 @@ import (
 	"time"
 )
 
-// newLogDir 建一个临时日志目录，并把「关闭文件 → 删除目录」排到清理函数的最后。
-//
-// t.Cleanup 是后进先出：先登记目录清理（先于开文件），再登记 resetOnCleanup，
-// 清理时就会先关文件再删目录。否则 Windows 上会因文件仍被占用而删除失败。
+// newLogDir 创建临时日志目录，并登记清理逻辑（先关闭文件再删除目录）。
 func newLogDir(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
@@ -23,9 +20,7 @@ func newLogDir(t *testing.T) string {
 	return dir
 }
 
-// resetOnCleanup 在用例结束时关掉文件句柄并还原默认 logger。
-//
-// 必须先 Init("") 关掉文件——Windows 上文件仍被占用时，t.TempDir 的清理会失败。
+// resetOnCleanup 在用例结束时关闭文件句柄并还原默认 logger。
 func resetOnCleanup(t *testing.T) {
 	t.Helper()
 	old := slog.Default()

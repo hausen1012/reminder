@@ -1,6 +1,4 @@
-// Package config 解析环境变量并给出运行时配置的默认值。
-//
-// 所有可调项集中在这里，配置项的含义与文档见 docs-site/guide/configuration.md。
+// Package config 解析环境变量并提供运行时配置默认值。
 package config
 
 import (

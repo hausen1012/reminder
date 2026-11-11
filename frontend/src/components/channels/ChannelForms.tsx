@@ -1,11 +1,5 @@
-// 各类通知通道的配置表单。
-//
-// 只有存在联动逻辑的类型（SMTP 端口随连接方式切换、Webhook 的键值编辑器）需要定制表单；
-// 其余类型由 ChannelGenericForm 依据后端字段描述渲染。
-//
-// 敏感字段（密码 / 加签密钥 / Authorization）统一约定：
-// 编辑态下原值以 "***" 占位回显，用户留空提交时回填 "***" 表示"保持不修改"，
-// 后端看到占位符会保留库里已加密的原值（见 services/channel_service.go）。
+// 定制通知渠道配置表单（SMTP、钉钉、企微、Webhook）。
+// 敏感字段编辑态回显 "***"，留空提交保持原值。
 import { useRef, useState } from 'react'
 import type { Dispatch, SetStateAction } from 'react'
 import { Input } from '@/components/ui/input'
@@ -80,10 +74,7 @@ function getSecurityMode(config: Record<string, unknown>): SMTPSecurityMode {
 
 export function SMTPForm({ config, onChange, isEdit }: SubFormProps) {
   const [toText, setToText] = useState(cfgArr<string>(config, 'to').join(', '))
-  // 用 ref 在首次渲染时锁定「是否已有原密码」。
-  // 不能用 config.password_enc === '***' 实时计算：用户一旦输入，config 里的值
-  // 就变成新密码，hasOriginalSecret 会翻转为 false，之后清空输入框会被判成
-  // 「清空密码」而不是「保持不修改」，导致原密码被误删。
+  // 初始锁定原密码状态，避免输入后判定翻转
   const hasOriginalSecretRef = useRef(config.password_enc === '***')
   const hasOriginalSecret = hasOriginalSecretRef.current
   const [pwdInput, setPwdInput] = useState(hasOriginalSecret ? '' : cfgStr(config, 'password_enc'))

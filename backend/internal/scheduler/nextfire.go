@@ -1,7 +1,4 @@
-// Package scheduler 提供调度相关组件：nextfire（计算下次触发）、engine（触发器注册）、
-// sweeper（补漏扫描）、confirm_retry（未确认重发链）。
-//
-// 时区统一由 timezone.Provider 提供；时间落库统一走 models.Time（Unix 毫秒整数）。
+// Package scheduler 提供触发计算、定时调度与补漏扫描组件。
 package scheduler
 
 import (

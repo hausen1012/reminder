@@ -16,10 +16,7 @@ const KeyTimezone = "timezone"
 // KeySiteURL 是站点对外地址在 config 表中的 key，决定确认链接用哪个域名拼接。
 const KeySiteURL = "site_url"
 
-// 站点配置的 key 白名单。
-//
-// /api/config 是给面板用的通用接口，不设边界就能写入 ai_api_key_enc 之类的密钥。
-// AI 设置只走 /api/ai/settings。
+// 站点配置允许通过 /api/config 修改的白名单键。
 var allowedConfigKeys = map[string]struct{}{
 	"app_name":  {},
 	"logo_svg":  {},
@@ -128,9 +125,7 @@ func siteURL(db *gorm.DB, fallback string) string {
 	return base
 }
 
-// LoadTimezone 在启动时把库里的时区应用到 Provider；库里没有时保留环境变量默认值。
-//
-// 启动阶段不触发 OnTimezoneChanged，也不重算 next_fire_at（由调用方随后统一 Start + LoadAndRegisterAll）。
+// LoadTimezone 启动时从数据库加载时区配置至 Provider。
 func (s *ConfigService) LoadTimezone() {
 	if s.TZ == nil {
 		return

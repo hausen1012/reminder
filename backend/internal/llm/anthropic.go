@@ -11,9 +11,7 @@ import (
 )
 
 // AnthropicProvider 基于官方 Go SDK 调用 Claude。
-//
-// 走 beta 消息接口：官方地址下额外带上服务端拒答回退（fallbacks: default），
-// 用自建/中转 base_url 时不带任何 beta 头，避免对端不认识而报错。
+// 官方地址带 fallbacks: default beta 头，自定义 base_url 时不带。
 type AnthropicProvider struct {
 	client anthropic.Client
 	model  string
@@ -54,8 +52,7 @@ func (p *AnthropicProvider) Chat(ctx context.Context, req Request) (*Reply, erro
 		Model:     anthropic.Model(p.model),
 		MaxTokens: req.MaxTokens,
 		Messages:  msgs,
-		// 显式用自适应思考：Opus 5.5 无法关闭思考，这里的唯一作用是让
-		// 思考块在回放时保持原样（见 toMessageParam 的 Raw 分支）。
+		// 启用自适应思考以支持思考块原样回放
 		Thinking: anthropic.BetaThinkingConfigParamUnion{
 			OfAdaptive: &anthropic.BetaThinkingConfigAdaptiveParam{},
 		},

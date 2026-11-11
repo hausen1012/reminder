@@ -114,8 +114,7 @@ func (h *ReminderHandler) Toggle(c *gin.Context) {
 
 // Preview POST /api/reminders/preview
 // Body：{ calendar, schedule_type, schedule_spec, count? }
-//
-// 时区固定取站点设置，不再接受 per-reminder 的 timezone 覆盖。
+// 时区固定取站点设置。
 func (h *ReminderHandler) Preview(c *gin.Context) {
 	var in struct {
 		Calendar     string         `json:"calendar"`

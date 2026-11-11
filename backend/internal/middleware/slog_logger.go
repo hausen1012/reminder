@@ -11,10 +11,7 @@ import (
 // slowRequestThreshold 是「成功但慢」的请求被提升为 Warn 的阈值。
 const slowRequestThreshold = time.Second
 
-// SlogLogger 返回基于 slog 的 Gin 请求日志中间件。
-//
-// 级别按状态码与耗时决定：5xx → Error，4xx 或慢请求 → Warn，2xx/3xx → Debug
-// （面板块轮询会把 Info 级别淹掉）。失败原因由 ErrorHandler 另行记录，两处共用 request_id。
+// SlogLogger 记录 Gin 请求日志（5xx=Error，4xx/慢请求=Warn，其余=Debug）。
 func SlogLogger() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()

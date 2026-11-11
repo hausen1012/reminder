@@ -1,6 +1,4 @@
-// user_service 提供用户认证、查询与密码修改。
-//
-// 收敛在服务层后 handler 只依赖接口，可注入内存库做测试。
+// user_service 提供用户认证、查询与密码修改服务。
 package services
 
 import (
@@ -22,8 +20,7 @@ func NewUserService(db *gorm.DB) *UserService {
 	return &UserService{DB: db}
 }
 
-// Authenticate 校验用户名密码，成功返回用户。
-// 用户不存在与密码错误返回同一个错误，避免泄露用户名是否存在。
+// Authenticate 校验用户名与密码，失败时返回统一错误以防枚举。
 func (s *UserService) Authenticate(username, password string) (*models.User, error) {
 	var user models.User
 	if err := s.DB.Where("username = ?", username).First(&user).Error; err != nil {

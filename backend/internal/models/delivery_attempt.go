@@ -1,8 +1,6 @@
 package models
 
-// DeliveryAttempt 记录单个通道在一次 DeliveryLog 中的某一次尝试。
-//
-// ChannelType / ChannelName 冗余存储，便于通道删除后日志仍能完整展示。
+// DeliveryAttempt 记录单个通道在一次投递中的尝试详情。
 type DeliveryAttempt struct {
 	ID            uint   `gorm:"primaryKey" json:"id"`
 	DeliveryLogID uint   `gorm:"index" json:"delivery_log_id"`

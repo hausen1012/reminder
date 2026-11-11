@@ -1,7 +1,4 @@
-// 通知编辑对话框：新建时 type 可选；编辑时 type 锁死。
-//
-// 类型清单与字段定义来自后端 /api/channels/types。smtp / dingtalk / wecom / webhook
-// 有联动逻辑，仍用 ChannelForms 里的定制表单；其余类型统一走通用表单。
+// 通知渠道编辑与新建对话框。
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import {
   Dialog,

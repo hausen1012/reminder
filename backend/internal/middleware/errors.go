@@ -95,11 +95,7 @@ func (e *AppError) httpStatus() int {
 	}
 }
 
-// ErrorBody 构造统一的错误响应体，是整个后端唯一的错误格式：
-//
-//	{"error": {"code": "not_found", "message": "...", "field": "..."}}
-//
-// field 为空时省略。
+// ErrorBody 构造统一错误响应体：{"error": {"code", "message", "field"?}}。
 func ErrorBody(code ErrorCode, message, field string) gin.H {
 	body := gin.H{"code": code, "message": message}
 	if field != "" {
@@ -108,10 +104,7 @@ func ErrorBody(code ErrorCode, message, field string) gin.H {
 	return gin.H{"error": body}
 }
 
-// ErrorHandler 是顶层中间件：recover panic，并把 handler 通过 c.Error 注册的 AppError
-// 统一渲染为 JSON 错误体。
-//
-// 同时按状态码分级记录日志（4xx → Warn，5xx → Error），带 request_id 与访问日志对应。
+// ErrorHandler 捕获 panic 并将 c.Error 中的 AppError 渲染为 JSON 响应，按状态码分级记录日志。
 func ErrorHandler() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		defer func() {
@@ -164,10 +157,7 @@ func ErrorHandler() gin.HandlerFunc {
 	}
 }
 
-// logWithRequest 输出带请求上下文的日志。
-//
-// request_id 由 logger.FromContext 从 ctx 里取（RequestID 中间件写入），
-// 因此这里只补 method / path；没有 request_id 的测试路由会退化成默认 logger。
+// logWithRequest 输出携带请求路径与方法的结构化日志。
 func logWithRequest(c *gin.Context, level slog.Level, msg string, args ...any) {
 	attrs := []any{
 		"method", c.Request.Method,

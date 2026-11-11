@@ -69,8 +69,8 @@ describe('ThemeContext', () => {
   })
 
   it('useTheme 在 Provider 外调用应抛错', () => {
-    // 抑制 React 的错误日志噪音
-    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    // 抑制 React 错误日志
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => { })
     expect(() => render(<ThemeProbe />)).toThrow('useTheme must be used within ThemeProvider')
     spy.mockRestore()
   })

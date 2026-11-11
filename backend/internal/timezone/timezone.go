@@ -1,7 +1,4 @@
-// Package timezone 提供可在运行时修改的站点时区（config 表 key=timezone，设置页改完热更新）。
-//
-// 调度、投递、确认重发都要按「当前站点时区」解释本地时间，而时区运行期可变，
-// 因此用 Provider 而非直接传 *time.Location。
+// Package timezone 提供运行时可动态更新的站点时区 Provider。
 package timezone
 
 import (

@@ -1,12 +1,4 @@
-// 站点时区下的时间格式化。
-//
-// 后端所有时间字段都以 UTC 落库、以 RFC3339（带 Z）返回，而站点时区是全局设置
-// （config 表 key=timezone，面板「设置」页可改）。因此前端展示时间必须显式
-// 按站点时区渲染，不能依赖浏览器本地时区——否则用户在另一台设备上看到的
-// 触发时间会整体偏移。
-//
-// 这里统一用 Intl.DateTimeFormat 的 timeZone 选项，不引入 dayjs / date-fns，
-// 避免为几处格式化增加依赖。
+// 站点时区下的时间格式化工具，基于 Intl.DateTimeFormat。
 
 /** 默认站点时区，与后端 timezone.Fallback 保持一致。 */
 export const DEFAULT_SITE_TIMEZONE = 'Asia/Shanghai'
@@ -24,7 +16,7 @@ interface ZonedParts {
   second: string
 }
 
-// 拆出各字段，避免依赖各浏览器对 toLocaleString 输出格式的差异。
+// 解析日期时间分量
 function toZonedParts(dateStr: string, timeZone: string): ZonedParts | null {
   const date = new Date(dateStr)
   if (isNaN(date.getTime())) return null
@@ -129,10 +121,7 @@ export interface ZonedWallClock {
 }
 
 /**
- * 取站点时区下的当前墙上时间，可用于给表单填默认值。
- *
- * offsetMinutes 为正表示往后偏移（如 +5 分钟）。注意必须"先把偏移加到时刻上、
- * 再按时区格式化"，而不是直接给墙上时间加分钟——跨夏令时切换时后者会算错。
+ * 取站点时区下的当前墙上时间（支持分钟偏移）。
  */
 export function nowInZone(
   timeZone: string = DEFAULT_SITE_TIMEZONE,

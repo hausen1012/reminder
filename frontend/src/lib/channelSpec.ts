@@ -1,7 +1,4 @@
-// 通道类型元数据的读取与缓存。
-//
-// 类型清单由后端 /api/channels/types 提供，前端不再维护固定枚举：
-// 页面首次需要时拉取一次并缓存在模块内，避免每个组件重复请求。
+// 通道类型元数据的拉取与模块内缓存。
 import { useEffect, useState } from 'react'
 import { listChannelTypes } from '@/lib/api'
 import type { ChannelFieldSpec, ChannelTypeSpec } from '@/types'

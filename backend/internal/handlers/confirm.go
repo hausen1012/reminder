@@ -19,7 +19,7 @@ import (
 // ConfirmHandler 处理确认链接。
 type ConfirmHandler struct {
 	Svc *services.ConfirmService
-	// TZ 是站点时区：models.Time 以 UTC 落库，直接 Format 会让用户看到偏移时间
+	// TZ 是站点时区
 	TZ *timezone.Provider
 }
 
@@ -31,9 +31,7 @@ func (h *ConfirmHandler) loc() *time.Location {
 	return time.Local
 }
 
-// Confirm 处理 GET /c/:token。
-//
-// 仅展示待确认页面或已确认状态，不直接消费令牌，避免预览/爬虫误触。
+// Confirm 处理 GET /c/:token，展示提醒详情及确认状态。
 func (h *ConfirmHandler) Confirm(c *gin.Context) {
 	token := c.Param("token")
 	if token == "" {

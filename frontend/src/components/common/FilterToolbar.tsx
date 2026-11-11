@@ -1,6 +1,4 @@
-// 通用筛选栏：Select 筛选器 + 搜索框 + 刷新按钮
-//
-// 桌面端筛选器在前、搜索与刷新同排；移动端搜索与刷新占第一行，筛选器换到第二行。
+// 通用筛选栏：Select 筛选器 + 搜索框 + 刷新按钮。
 import type { ReactNode, FormEvent } from 'react'
 import { Search, RefreshCw } from 'lucide-react'
 import { Input } from '@/components/ui/input'

@@ -1,12 +1,4 @@
-// Package logger 提供全局 slog 配置。
-//
-// LOG_FORMAT=json 输出 JSON，否则用自定义的文本格式（见 format.go）；LOG_LEVEL 调整级别。
-// logDir 非空时同时写文件，按日滚动（启动时先按 TIMEZONE，router 初始化后再对齐库里的站点时区）。
-//
-//	logger.Init(cfg.LogFile)
-//	slog.Info("server starting", "port", cfg.Port)
-//
-// 所有模块统一使用 slog，不要用 log.Printf / fmt.Printf。
+// Package logger 提供全局 slog 初始化与按日滚动日志配置。
 package logger
 
 import (
@@ -24,7 +16,7 @@ import (
 // 文件级别的日志目录写失败时，重复告警会淹没有用信息；只提示一次。
 var writerWarnOnce sync.Once
 
-// activeCloser 是上一次 Init 打开的文件 writer；重复 Init 时要关闭旧句柄。
+// activeCloser 记录当前打开的文件 writer，供重新 Init 时释放资源。
 var activeCloser struct {
 	mu sync.Mutex
 	c  io.Closer

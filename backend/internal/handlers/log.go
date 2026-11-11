@@ -53,8 +53,6 @@ func (h *LogHandler) GetDetail(c *gin.Context) {
 
 // Purge DELETE /api/logs
 // Query params: older_than=7d|30d, all=true
-//
-// 先调 GET /api/logs/count?older_than=... 查看数量做二次确认。
 func (h *LogHandler) Purge(c *gin.Context) {
 	olderThan, all := parsePurgeParams(c)
 	count, err := h.Svc.Purge(olderThan, all)

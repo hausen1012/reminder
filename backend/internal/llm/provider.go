@@ -1,7 +1,4 @@
-// Package llm 提供与厂商无关的对话接口，以及 Anthropic / OpenAI 兼容协议两个实现。
-//
-// 上层（services.AIService）只面向本包的 Turn / ToolCall / ToolResult 与 Provider 接口，
-// 新增厂商时只需实现 Provider，无需改动工具编排逻辑。
+// Package llm 提供统一的对话接口及 Anthropic、OpenAI 协议实现。
 package llm
 
 import (
@@ -24,22 +21,13 @@ type ToolResult struct {
 	IsError bool   `json:"is_error"`
 }
 
-// Turn 是会话中的一轮，与厂商无关：
-//   - Role=user 且 ToolResults 为空：用户文本（Text）
-//   - Role=assistant：模型输出，可能同时带文本与工具调用
-//   - Role=user 且 ToolResults 非空：回填工具结果
-//
-// 各 Provider 负责把它翻译成自家协议（Anthropic 的 tool_result 在 user 轮里，
-// OpenAI 兼容协议是独立的 role=tool 消息）。
+// Turn 是会话中的一轮（用户文本、模型输出或工具执行结果）。
 type Turn struct {
 	Role        string
 	Text        string
 	ToolCalls   []ToolCall
 	ToolResults []ToolResult
-	// Raw 是上一轮模型响应的厂商原始结构，用于逐字回放。
-	//
-	// Anthropic 开启思考并要求工具调用时，要把 thinking 块与签名原样传回。
-	// 由 Provider 自己写入与解释，上层原样带回即可。
+	// Raw 保存上一轮模型响应的原始结构，用于支持思考块等原样回放。
 	Raw any
 }
 

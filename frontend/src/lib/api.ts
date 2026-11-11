@@ -385,12 +385,7 @@ export async function fetchAIModels(input: AISettingsInput) {
   return res.data.data?.items ?? []
 }
 
-/**
- * 发一轮对话。
- *
- * 接口是无状态的：历史由前端持有并随请求上传，服务端不保存聊天记录。
- * 超时放宽到 120 秒——工具循环可能持续数十秒。
- */
+/** 发送单轮对话，历史由前端随请求上传。 */
 export async function sendAIChat(
   message: string,
   history: AIChatMessage[],
@@ -411,16 +406,7 @@ export async function sendAIChat(
   return res.data.data
 }
 
-/**
- * 发一轮对话，并接收服务端推送的过程状态。
- *
- * 用 SSE 而不是完整 token 流：本系统的助手要跑多轮工具调用，逐字打字机的
- * 改造成本高价值低；真正让用户干等的是「重试」与「工具执行」这两个阶段。
- * 所以服务端只推 status / retry / done / error 四类事件，正文仍一次性返回。
- *
- * 这里用 fetch 而不是 axios：axios 在浏览器里拿不到增量响应体。
- * 事件格式与后端 handlers.AIHandler.ChatStream 的注释一一对应。
- */
+/** 发送对话并通过 SSE 接收过程状态（status / retry / done / error）。 */
 export async function sendAIChatStream(
   message: string,
   history: AIChatMessage[],
@@ -500,8 +486,7 @@ export async function sendAIChatStream(
     }
   }
 
-  // SSE 以空行分隔事件，data 可能跨多行（这里服务端只发单行 JSON）。
-  // 统一换行符：避免反向代理或网关把换行规范化为 CRLF（\r\n\r\n）导致分块失败。
+  // 统一换行符为 LF，按空行切分 SSE 事件
   const drain = (flush: boolean) => {
     buf = buf.replace(/\r\n/g, '\n')
     const blocks = buf.split('\n\n')

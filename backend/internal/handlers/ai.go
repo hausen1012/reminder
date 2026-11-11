@@ -74,7 +74,7 @@ func (h *AIHandler) FetchModels(c *gin.Context) {
 
 // Chat POST /api/ai/chat
 //
-// 无状态接口：对话历史由前端随请求上传，服务端不保存聊天记录。
+// 无状态对话接口，对话历史随请求上传。
 func (h *AIHandler) Chat(c *gin.Context) {
 	var in services.ChatInput
 	if err := c.ShouldBindJSON(&in); err != nil {
@@ -91,17 +91,8 @@ func (h *AIHandler) Chat(c *gin.Context) {
 
 // ChatStream POST /api/ai/chat/stream
 //
-// 用 SSE 推送「思考中 / 正在重试 / 完成」状态，不流式输出 token：
-// 真正让人干等的是重试与工具执行。
-//
-// 事件格式（每条 data 都是一行 JSON）：
-//
-//	event: status  data: {"phase":"thinking","text":"助手正在思考…"}
-//	event: retry   data: {"attempt":1,"max":10,"delay_ms":200,"reason":"服务繁忙（限流）"}
-//	event: done    data: {"reply":"...","actions":[...],"retries":1}
-//	event: error   data: {"code":"validation_failed","message":"..."}
-//
-// 一旦开始写 SSE 就不能再走 abortErr（那会追加 JSON 响应体），错误也走 event: error。
+// 通过 SSE 推送状态事件（status / retry / done / error）。
+// 事件格式：每条 data 为单行 JSON；发生错误时同样输出 event: error。
 func (h *AIHandler) ChatStream(c *gin.Context) {
 	var in services.ChatInput
 	if err := c.ShouldBindJSON(&in); err != nil {
@@ -132,8 +123,7 @@ func (h *AIHandler) ChatStream(c *gin.Context) {
 		}
 	}
 
-	// 先推一条状态：前端读到它就能立刻把「正在思考」显示出来，
-	// 而不是等第一个工具轮次开始
+	// 推送初始思考状态
 	writeEvent(services.ChatEventStatus, services.ChatStatus{Phase: "thinking", Text: "助手正在思考…"})
 
 	res, err := h.Svc.ChatStream(c.Request.Context(), in, func(event string, data any) {

@@ -3,12 +3,7 @@ import { sendAIChatStream } from '@/lib/api'
 import type { AIChatProgress } from '@/types'
 
 /**
- * sendAIChatStream 用 fetch + ReadableStream 解析 SSE。
- *
- * 这里手工拼一个分块的响应体，验证三件事：
- *  1. 跨 chunk 的事件能被正确拼接（分块边界可能切在 data 中间）；
- *  2. status / retry 事件透传给 onProgress，done 事件的正文作为返回值；
- *  3. error 事件转成带 error.message 的错误，前端能走 extractApiError。
+ * 验证 sendAIChatStream 对 SSE 分块、进度回调及错误事件的解析。
  */
 
 /** 把若干段文本包装成 fetch 能读的流式响应。 */

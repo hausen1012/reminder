@@ -1,10 +1,5 @@
-// 由后端类型元数据驱动的通用通道表单。
-//
-// smtp / dingtalk / wecom / webhook 仍用 ChannelForms.tsx 里的定制表单（有联动逻辑），
-// 其余类型（含后续新增的）统一走这里，新增通道类型不需要再写前端表单。
-//
-// 敏感字段（kind=password，键名以 _enc 结尾）沿用与定制表单一致的占位符约定：
-// 编辑态回显 "***"，输入框留空提交 "***" 表示保持原密文。
+// 由后端元数据驱动的通用通道配置表单。
+// 敏感字段编辑态回显 "***"，留空提交保持原值。
 import { useRef, useState } from 'react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -151,10 +146,7 @@ function renderControl(
   }
 }
 
-// SecretInput 处理敏感字段的占位符语义。
-//
-// 初始值是否为 "***" 用 ref 锁定：用户一旦输入，config 里的值就变成新密钥，
-// 若实时判断会把「清空输入框」误判成「保持原值」。
+// SecretInput 处理敏感字段输入，初始锁定原密文存在状态。
 function SecretInput({
   id,
   field,

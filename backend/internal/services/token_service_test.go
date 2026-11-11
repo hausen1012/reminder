@@ -492,10 +492,7 @@ func TestTokenPlaintextWithWrongKeyReturnsNotFound(t *testing.T) {
 	}
 }
 
-// ListViews 的查询数不应随令牌数量增长（防 N+1）。
-//
-// 5 个令牌时固定为 5 次查询：count + 分页 + 默认通道批量 + 用量批量，
-// 逐条查会变成 1+2N 次。
+// 验证 ListViews 采用批量查询，避免 N+1。
 func TestTokenListViews_QueryCountIndependentOfRowCount(t *testing.T) {
 	svc, db := newTokenSvc(t)
 

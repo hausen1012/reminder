@@ -15,7 +15,7 @@ export interface LoginResponse {
   user: User
 }
 
-// 通道类型由后端的类型元数据（/api/channels/types）决定，前端不再维护固定枚举。
+// 通道类型由后端类型元数据动态派生。
 export type ChannelType = string
 
 export type ChannelFieldKind =

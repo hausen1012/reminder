@@ -1,7 +1,4 @@
-// ai_service 负责 AI 助手的设置、工具编排与「待确认操作」的落库与应用。
-//
-// 写操作不直接生效：工具只生成 AIAction 草稿，用户确认后才调用既有服务。
-// 对话本身不入库，落库的只有待确认草稿与加密后的 API Key。
+// ai_service 负责 AI 助手配置、工具调用与待确认操作管理。
 package services
 
 import (
@@ -28,8 +25,6 @@ import (
 )
 
 // AI 设置在 config 表中的键名。
-//
-// ai_ 前缀与站点配置区分开；这些键不走 /api/config，改用 /api/ai/settings 读写。
 const (
 	KeyAIEnabled  = "ai_enabled"
 	KeyAIProvider = "ai_provider"
@@ -105,8 +100,7 @@ type AISettingsInput struct {
 	APIKey   string   `json:"api_key"`
 	// CustomPrompt 为空表示不使用自定义提示词（清空已保存的内容）。
 	CustomPrompt string `json:"custom_prompt"`
-	// MaxRetries 是接口失败后的重试次数。不传（null）表示用默认值；
-	// 显式传 0 表示不重试，因此这里用指针区分「没传」与「传了 0」。
+	// MaxRetries 显式传 0 表示不重试，nil 使用默认值。
 	MaxRetries *int `json:"max_retries"`
 }
 
@@ -448,9 +442,7 @@ type ChatRetry struct {
 	Reason  string `json:"reason"`
 }
 
-// ChatEventSink 接收对话过程中的状态事件。
-//
-// 回调在请求的 goroutine 里同步执行，实现必须立即返回；sink 为 nil 时事件被丢弃。
+// ChatEventSink 接收对话过程中的状态事件，sink 为 nil 时忽略。
 type ChatEventSink func(event string, data any)
 
 // Chat 处理一次用户输入：拼历史 → 跑工具循环 → 返回回复与草稿。
@@ -564,8 +556,7 @@ func (s *AIService) ChatStream(ctx context.Context, in ChatInput, sink ChatEvent
 		if len(reply.ToolCalls) == 0 {
 			break
 		}
-		// 达到输出上限时，工具参数可能被截断（JSON 不完整），执行只会得到脏草稿。
-		// 这里直接结束本轮：已生成的草稿仍返回给用户确认，但不再继续跑工具循环。
+		// 达到输出上限时结束工具循环，返回已生成的草稿。
 		if reply.Truncated {
 			truncated = true
 			break
@@ -674,10 +665,7 @@ func (s *AIService) PurgeActions(olderThan time.Duration) (int64, error) {
 	return res.RowsAffected, nil
 }
 
-// ApplyAction 执行一条待确认操作。
-//
-// 只有 pending 状态可以执行；别的状态重复确认会直接报冲突，
-// 避免前端重复点击造成重复创建。
+// ApplyAction 执行一条 pending 状态的待确认操作。
 func (s *AIService) ApplyAction(id string) (*models.AIAction, error) {
 	act, err := s.getAction(id)
 	if err != nil {
@@ -849,9 +837,7 @@ func (s *AIService) markAction(act *models.AIAction, status, errMsg, ref string)
 	}
 }
 
-// historyTurns 把客户端回传的历史消息裁剪并转成对话轮次。
-//
-// 只保留最近 maxHistoryTurns 条，非法角色与空内容按前端数据不可信处理，直接丢弃。
+// historyTurns 将客户端历史消息截取保留最近 maxHistoryTurns 条并过滤无效内容。
 func historyTurns(history []ChatMessage) []llm.Turn {
 	if len(history) > maxHistoryTurns {
 		history = history[len(history)-maxHistoryTurns:]
@@ -949,9 +935,7 @@ func normalizeMaxRetries(n *int) (int, error) {
 	return *n, nil
 }
 
-// resolveConfig 合并入参与库中设置，得到可用的配置。
-//
-// 入参的 api_key 为空或占位符时回落到库中已保存的密钥，便于「测试连接」复用现有配置。
+// resolveConfig 合并入参与库中已保存的 AI 配置。
 func (s *AIService) resolveConfig(in AISettingsInput) (*aiConfig, error) {
 	kv, err := s.configMap()
 	if err != nil {
@@ -1015,7 +999,7 @@ func newProvider(cfg *aiConfig) (llm.Provider, error) {
 	case "anthropic":
 		return llm.NewAnthropicProvider(cfg.BaseURL, cfg.APIKey, cfg.Model), nil
 	case "openai":
-		// 本地 Ollama / vLLM 通常不需要密钥，因此这里不强制。
+		// 自定义兼容厂商允许 API Key 为空
 		return llm.NewOpenAIProvider(cfg.BaseURL, cfg.APIKey, cfg.Model), nil
 	}
 	return nil, fmt.Errorf("未知的 AI 厂商: %s", cfg.Provider)

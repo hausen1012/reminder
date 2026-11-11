@@ -1,7 +1,4 @@
-// 外部 HTTP 通道共用的请求工具。
-//
-// 只负责发请求与读取响应，状态码含义由各通道自行判断；
-// 传输层错误（网络、超时）返回可重试错误。
+// HTTP 通道请求工具：发送请求并读取响应，网络与超时错误返回可重试错误。
 package notifier
 
 import (
@@ -92,9 +89,7 @@ func classifyStatus(name string, res *httpResult) error {
 	}
 }
 
-// checkBusinessCode 解析国内 IM 通道的「HTTP 200 + 业务码」响应：okCode 之外一律视为永久错误。
-//
-// 钉钉 / 企微用 errcode+errmsg，飞书用 code+msg，Bark 用 code+message，这里合并处理。
+// checkBusinessCode 解析 IM 通道的业务响应码，非 okCode 视为永久错误。
 func checkBusinessCode(name string, res *httpResult, okCode int) error {
 	var br struct {
 		Errcode int    `json:"errcode"`

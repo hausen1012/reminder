@@ -23,10 +23,7 @@ func newNotFoundTestEngine() *gin.Engine {
 	return r
 }
 
-// 未注册的 /api 路径必须返回统一错误体，而不是 gin 默认的纯文本。
-//
-// 前端 extractApiError 只认 {"error":{"message":...}}，纯文本会让它退化成
-// "Request failed with status code 404"。
+// 未注册的 /api 路径必须返回统一 JSON 错误体。
 func TestNoRoute_API_UsesUnifiedErrorBody(t *testing.T) {
 	r := newNotFoundTestEngine()
 

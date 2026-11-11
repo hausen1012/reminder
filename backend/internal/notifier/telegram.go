@@ -1,7 +1,4 @@
 // Telegram Bot API 通道。
-//
-// 走默认 http.Transport，因此在需要代理的网络环境下设置 HTTPS_PROXY 即可生效。
-// Bot Token 出现在 URL 路径中，任何日志都不能打印完整 URL。
 package notifier
 
 import (

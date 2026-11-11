@@ -18,11 +18,10 @@ type HTTPStatusError struct {
 	Body string
 }
 
-// Error 返回给上层看的错误文本（保持与旧实现的格式一致）。
+// Error 返回格式化错误描述。
 func (e *HTTPStatusError) Error() string { return e.Message }
 
 // 重试退避参数：第 n 次重试等待 base * 2^(n-1)，上限 max。
-// 用变量而不是常量，便于测试里调小以避免真实等待。
 var (
 	retryBaseDelay = 200 * time.Millisecond
 	retryMaxDelay  = 2 * time.Second
@@ -83,10 +82,7 @@ func ChatWithRetryNotify(ctx context.Context, p Provider, req Request, maxRetrie
 	return nil, lastErr
 }
 
-// RetryReason 把可重试错误翻译成一句人话，供「正在重试」的进度提示使用。
-//
-// 面板上显示「正在重试 (2/10)」时，用户最想知道的是「为什么在等」：
-// 限流通常几秒后就好了，网络错误可能需要检查本机网络。
+// RetryReason 将可重试错误转换为前端提示文案。
 func RetryReason(err error) string {
 	if err == nil {
 		return "请求失败"

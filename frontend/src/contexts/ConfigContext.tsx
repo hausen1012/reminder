@@ -69,13 +69,7 @@ export function useConfig() {
   return ctx
 }
 
-/**
- * 取当前站点时区，供时间格式化使用。
- *
- * 站点时区是全局设置（config 表 key=timezone），后端时间字段一律返回 UTC；
- * 展示时必须显式按站点时区渲染，不能依赖浏览器本地时区，
- * 否则换了设备看到的时间会整体偏移。
- */
+/** 取当前站点时区。 */
 export function useSiteTimezone(): string {
   const { config } = useConfig()
   return config.timezone || DEFAULT_SITE_TIMEZONE

@@ -14,8 +14,7 @@ import (
 	"github.com/reminder/backend/internal/textutil"
 )
 
-// OpenAIProvider 用 OpenAI Chat Completions 协议对接任意兼容厂商（DeepSeek、Moonshot、
-// 通义、Ollama、vLLM、中转站等），因此直接手写 HTTP 而不引入各家 SDK。
+// OpenAIProvider 基于 OpenAI Chat Completions 协议对接兼容厂商。
 type OpenAIProvider struct {
 	baseURL string
 	apiKey  string
@@ -177,8 +176,7 @@ func (p *OpenAIProvider) Chat(ctx context.Context, req Request) (*Reply, error) 
 		if err := json.Unmarshal(respBody, &errOut); err == nil && errOut.Error != nil && errOut.Error.Message != "" {
 			msg = errOut.Error.Message
 		}
-		// 状态码与响应体是排查上游限流/鉴权问题的关键，这里完整留痕；
-		// request_id 由 logger.FromContext 自动带上，能和面板请求对上。
+		// 记录上游状态码与响应体
 		logger.FromContext(ctx).Warn("AI 请求返回错误",
 			"provider", "openai", "model", p.model, "status", resp.StatusCode,
 			"msgs", len(msgs), "tools", len(body.Tools),

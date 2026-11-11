@@ -1,7 +1,4 @@
-// 本包测试脚手架集中处。
-//
-// 内存建库、固定时区、fake 替身与确认链造数辅助原本散落在各用例文件里
-// （尤其是 confirm_flow_test.go 被其余二十来个文件依赖），现在统一收到这里。
+// 集中维护 services 包的测试脚手架与造数辅助函数。
 package services
 
 import (
@@ -264,10 +261,7 @@ func (q *queryCounter) Trace(
 	_, _ = fc()
 }
 
-// countQueries 在独立 session 上执行 fn 并返回期间产生的 SQL 条数。
-//
-// 用独立 session 而不是改 db.Logger：session 持有自己的 logger 副本，
-// 两者查同一个连接池，也不会有并发 goroutine 读写 db.Logger 的竞争。
+// countQueries 在独立 session 上执行 fn 并返回期间执行的 SQL 条数。
 func countQueries(t *testing.T, db *gorm.DB, fn func(*gorm.DB)) int {
 	t.Helper()
 	counter := &queryCounter{}

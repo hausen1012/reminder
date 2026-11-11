@@ -64,9 +64,7 @@ func buildRenderedMessageWith(title, content, contentFormat string, vars map[str
 	}
 }
 
-// appendConfirmLink 在正文未包含确认链接时按内容格式追加一条，第二个返回值表示是否追加。
-//
-// 判据用渲染结果而不是原始模板：占位符允许前后空格，按模板字面量匹配会漏判并重复追加。
+// appendConfirmLink 在正文未包含确认链接时按内容格式追加一条，返回是否追加。
 func appendConfirmLink(body, confirmURL, contentFormat string) (string, bool) {
 	if confirmURL == "" || strings.Contains(body, confirmURL) {
 		return body, false
