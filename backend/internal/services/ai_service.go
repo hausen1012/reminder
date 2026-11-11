@@ -22,6 +22,7 @@ import (
 	"github.com/reminder/backend/internal/logger"
 	"github.com/reminder/backend/internal/middleware"
 	"github.com/reminder/backend/internal/models"
+	"github.com/reminder/backend/internal/textutil"
 	"github.com/reminder/backend/internal/timezone"
 	"gorm.io/gorm"
 )
@@ -276,6 +277,58 @@ func (s *AIService) FetchModels(ctx context.Context, in AISettingsInput) ([]stri
 	}
 }
 
+// modelListEndpoint 描述一次模型列表请求的地址与鉴权头。
+type modelListEndpoint struct {
+	name    string
+	url     string
+	headers map[string]string
+}
+
+// listModels 请求模型列表接口并按 id 去重排序；parse 负责解析响应体并返回模型名列表。
+func (s *AIService) listModels(ctx context.Context, ep modelListEndpoint, parse func([]byte) ([]string, error)) ([]string, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, ep.url, nil)
+	if err != nil {
+		return nil, err
+	}
+	for k, v := range ep.headers {
+		req.Header.Set(k, v)
+	}
+
+	client := &http.Client{Timeout: 15 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, middleware.NewAppError(middleware.CodeValidationFailed, "请求"+ep.name+"模型列表失败: "+err.Error())
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	if err != nil {
+		return nil, middleware.NewAppError(middleware.CodeValidationFailed, "读取"+ep.name+"模型响应失败: "+err.Error())
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, middleware.NewAppError(middleware.CodeValidationFailed,
+			fmt.Sprintf("获取%s模型失败 (HTTP %d): %s", ep.name, resp.StatusCode, textutil.TruncateRunes(string(body), 500)))
+	}
+
+	ids, err := parse(body)
+	if err != nil {
+		return nil, middleware.NewAppError(middleware.CodeValidationFailed, "解析"+ep.name+"模型列表响应失败: "+err.Error())
+	}
+	set := make(map[string]struct{}, len(ids))
+	for _, id := range ids {
+		if id == "" {
+			continue
+		}
+		set[id] = struct{}{}
+	}
+	models := make([]string, 0, len(set))
+	for id := range set {
+		models = append(models, id)
+	}
+	sort.Strings(models)
+	return models, nil
+}
+
 func (s *AIService) fetchOpenAIModels(ctx context.Context, cfg *aiConfig) ([]string, error) {
 	base := strings.TrimRight(strings.TrimSpace(cfg.BaseURL), "/")
 	if base == "" {
@@ -284,67 +337,37 @@ func (s *AIService) fetchOpenAIModels(ctx context.Context, cfg *aiConfig) ([]str
 	if !strings.HasSuffix(base, "/v1") && !strings.Contains(base, "/v1/") {
 		base += "/v1"
 	}
-	url := base + "/models"
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		return nil, err
-	}
+	headers := map[string]string{}
 	if cfg.APIKey != "" {
-		req.Header.Set("Authorization", "Bearer "+cfg.APIKey)
+		headers["Authorization"] = "Bearer " + cfg.APIKey
 	}
-
-	client := &http.Client{Timeout: 15 * time.Second}
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, middleware.NewAppError(middleware.CodeValidationFailed, "请求模型列表失败: "+err.Error())
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, middleware.NewAppError(middleware.CodeValidationFailed, "读取模型响应失败: "+err.Error())
-	}
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, middleware.NewAppError(middleware.CodeValidationFailed, fmt.Sprintf("获取模型失败 (HTTP %d): %s", resp.StatusCode, string(body)))
-	}
-
-	var parsed struct {
-		Data []struct {
-			ID string `json:"id"`
-		} `json:"data"`
-		Models []struct {
-			Name string `json:"name"`
-			ID   string `json:"id"`
-		} `json:"models"`
-	}
-	if err := json.Unmarshal(body, &parsed); err != nil {
-		return nil, middleware.NewAppError(middleware.CodeValidationFailed, "解析模型列表响应失败: "+err.Error())
-	}
-
-	set := make(map[string]struct{})
-	for _, item := range parsed.Data {
-		if id := strings.TrimSpace(item.ID); id != "" {
-			set[id] = struct{}{}
-		}
-	}
-	for _, item := range parsed.Models {
-		id := strings.TrimSpace(item.ID)
-		if id == "" {
-			id = strings.TrimSpace(item.Name)
-		}
-		if id != "" {
-			set[id] = struct{}{}
-		}
-	}
-
-	models := make([]string, 0, len(set))
-	for id := range set {
-		models = append(models, id)
-	}
-	sort.Strings(models)
-	return models, nil
+	return s.listModels(ctx, modelListEndpoint{name: "OpenAI", url: base + "/models", headers: headers},
+		func(body []byte) ([]string, error) {
+			var parsed struct {
+				Data []struct {
+					ID string `json:"id"`
+				} `json:"data"`
+				Models []struct {
+					Name string `json:"name"`
+					ID   string `json:"id"`
+				} `json:"models"`
+			}
+			if err := json.Unmarshal(body, &parsed); err != nil {
+				return nil, err
+			}
+			ids := make([]string, 0, len(parsed.Data)+len(parsed.Models))
+			for _, item := range parsed.Data {
+				ids = append(ids, strings.TrimSpace(item.ID))
+			}
+			for _, item := range parsed.Models {
+				id := strings.TrimSpace(item.ID)
+				if id == "" {
+					id = strings.TrimSpace(item.Name)
+				}
+				ids = append(ids, id)
+			}
+			return ids, nil
+		})
 }
 
 func (s *AIService) fetchAnthropicModels(ctx context.Context, cfg *aiConfig) ([]string, error) {
@@ -355,52 +378,28 @@ func (s *AIService) fetchAnthropicModels(ctx context.Context, cfg *aiConfig) ([]
 	if base == "" {
 		base = "https://api.anthropic.com"
 	}
-	url := base + "/v1/models"
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("x-api-key", cfg.APIKey)
-	req.Header.Set("anthropic-version", "2023-06-01")
-
-	client := &http.Client{Timeout: 15 * time.Second}
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, middleware.NewAppError(middleware.CodeValidationFailed, "请求 Anthropic 模型列表失败: "+err.Error())
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, middleware.NewAppError(middleware.CodeValidationFailed, "读取 Anthropic 模型响应失败: "+err.Error())
-	}
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, middleware.NewAppError(middleware.CodeValidationFailed, fmt.Sprintf("获取 Anthropic 模型失败 (HTTP %d): %s", resp.StatusCode, string(body)))
-	}
-
-	var parsed struct {
-		Data []struct {
-			ID string `json:"id"`
-		} `json:"data"`
-	}
-	if err := json.Unmarshal(body, &parsed); err != nil {
-		return nil, middleware.NewAppError(middleware.CodeValidationFailed, "解析 Anthropic 模型列表失败: "+err.Error())
-	}
-
-	set := make(map[string]struct{})
-	for _, item := range parsed.Data {
-		if id := strings.TrimSpace(item.ID); id != "" {
-			set[id] = struct{}{}
+	return s.listModels(ctx, modelListEndpoint{
+		name: "Anthropic",
+		url:  base + "/v1/models",
+		headers: map[string]string{
+			"x-api-key":         cfg.APIKey,
+			"anthropic-version": "2023-06-01",
+		},
+	}, func(body []byte) ([]string, error) {
+		var parsed struct {
+			Data []struct {
+				ID string `json:"id"`
+			} `json:"data"`
 		}
-	}
-	models := make([]string, 0, len(set))
-	for id := range set {
-		models = append(models, id)
-	}
-	sort.Strings(models)
-	return models, nil
+		if err := json.Unmarshal(body, &parsed); err != nil {
+			return nil, err
+		}
+		ids := make([]string, 0, len(parsed.Data))
+		for _, item := range parsed.Data {
+			ids = append(ids, strings.TrimSpace(item.ID))
+		}
+		return ids, nil
+	})
 }
 
 // ChatMessage 是客户端回传的一轮历史消息，只保留角色与文本。
@@ -558,7 +557,7 @@ func (s *AIService) ChatStream(ctx context.Context, in ChatInput, sink ChatEvent
 			log.Warn("AI 对话结束：调用失败", llm.ErrorAttrsWith(err,
 				"round", rounds, "retries", retries, "tool_rounds_limit", maxToolRounds,
 				"turns", len(turns), "tools", len(tools),
-				"user_message", truncateRunes(message, 500))...)
+				"user_message", textutil.TruncateRunes(message, 500))...)
 			return nil, middleware.NewAppError(middleware.CodeValidationFailed, "AI 调用失败: "+err.Error())
 		}
 		replyText = strings.TrimSpace(reply.Text)
@@ -642,7 +641,7 @@ func (s *AIService) ChatStream(ctx context.Context, in ChatInput, sink ChatEvent
 	log.Info("AI 对话完成",
 		"rounds", rounds, "retries", retries, "drafts", len(createdIDs),
 		"truncated", truncated, "reply_len", len([]rune(replyText)),
-		"user_message", truncateRunes(message, 500))
+		"user_message", textutil.TruncateRunes(message, 500))
 	return &ChatResult{Reply: replyText, Actions: actions, Retries: retries}, nil
 }
 
@@ -833,7 +832,7 @@ func (s *AIService) failAction(act *models.AIAction, err error) error {
 func (s *AIService) markAction(act *models.AIAction, status, errMsg, ref string) {
 	updates := map[string]any{"status": status}
 	if errMsg != "" {
-		updates["error"] = truncateRunes(errMsg, 255)
+		updates["error"] = textutil.TruncateRunes(errMsg, 255)
 	}
 	if ref != "" {
 		updates["result_ref"] = ref
@@ -843,7 +842,7 @@ func (s *AIService) markAction(act *models.AIAction, status, errMsg, ref string)
 	}
 	act.Status = status
 	if errMsg != "" {
-		act.Error = truncateRunes(errMsg, 255)
+		act.Error = textutil.TruncateRunes(errMsg, 255)
 	}
 	if ref != "" {
 		act.ResultRef = ref
@@ -1024,25 +1023,12 @@ func newProvider(cfg *aiConfig) (llm.Provider, error) {
 
 // configMap 读取 ai_ 前缀的设置。
 func (s *AIService) configMap() (map[string]string, error) {
-	var rows []models.Config
-	if err := s.DB.Where("substr(key, 1, 3) = ?", "ai_").Find(&rows).Error; err != nil {
-		return nil, err
-	}
-	out := make(map[string]string, len(rows))
-	for _, r := range rows {
-		out[r.Key] = r.Value
-	}
-	return out, nil
+	return (configStore{s.DB}).allWithPrefix("ai_")
 }
 
 // upsertConfig 写入单个配置项；空值表示删除。
 func (s *AIService) upsertConfig(key, value string) error {
-	if value == "" {
-		return s.DB.Delete(&models.Config{}, "key = ?", key).Error
-	}
-	return s.DB.Where("key = ?", key).
-		Assign(models.Config{Value: value}).
-		FirstOrCreate(&models.Config{Key: key, Value: value}).Error
+	return (configStore{s.DB}).set(key, value)
 }
 
 // boolString 把布尔转成配置表里的字符串形式。

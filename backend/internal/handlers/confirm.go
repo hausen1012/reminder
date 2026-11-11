@@ -37,21 +37,21 @@ func (h *ConfirmHandler) loc() *time.Location {
 func (h *ConfirmHandler) Confirm(c *gin.Context) {
 	token := c.Param("token")
 	if token == "" {
-		c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(confirmErrorPage("确认链接无效")))
+		h.respondPage(c, confirmErrorPage("确认链接无效"))
 		return
 	}
 
 	dl, err := h.Svc.InspectToken(token)
 	if err != nil {
 		if errors.Is(err, services.ErrConfirmTokenUsed) && dl != nil {
-			c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(confirmAlreadyPage(dl, h.loc())))
+			h.respondPage(c, confirmAlreadyPage(dl, h.loc()))
 			return
 		}
-		c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(confirmErrorPage(err.Error())))
+		h.respondPage(c, confirmErrorPage(err.Error()))
 		return
 	}
 
-	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(confirmPromptPage(token, dl, h.loc())))
+	h.respondPage(c, confirmPromptPage(token, dl, h.loc()))
 }
 
 // Submit 处理 POST /c/:token。
@@ -60,29 +60,17 @@ func (h *ConfirmHandler) Confirm(c *gin.Context) {
 func (h *ConfirmHandler) Submit(c *gin.Context) {
 	token := c.Param("token")
 	if token == "" {
-		if isJSONRequest(c) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "INVALID_TOKEN", "message": "确认链接无效"}})
-			return
-		}
-		c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(confirmErrorPage("确认链接无效")))
+		h.respondError(c, "INVALID_TOKEN", "确认链接无效", confirmErrorPage("确认链接无效"))
 		return
 	}
 
 	dl, err := h.Svc.ConsumeToken(token)
 	if err != nil {
 		if errors.Is(err, services.ErrConfirmTokenUsed) && dl != nil {
-			if isJSONRequest(c) {
-				c.JSON(http.StatusOK, gin.H{"code": 200, "message": "already_confirmed", "data": dl})
-				return
-			}
-			c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(confirmAlreadyPage(dl, h.loc())))
+			h.respondAlready(c, dl)
 			return
 		}
-		if isJSONRequest(c) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "CONFIRM_FAILED", "message": err.Error()}})
-			return
-		}
-		c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(confirmErrorPage(err.Error())))
+		h.respondError(c, "CONFIRM_FAILED", err.Error(), confirmErrorPage(err.Error()))
 		return
 	}
 
@@ -90,7 +78,30 @@ func (h *ConfirmHandler) Submit(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"code": 200, "message": "ok", "data": dl})
 		return
 	}
-	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(confirmSuccessPage(dl, h.loc())))
+	h.respondPage(c, confirmSuccessPage(dl, h.loc()))
+}
+
+// respondPage 输出 HTML 页面（浏览器直接访问确认链接时的默认形态）。
+func (h *ConfirmHandler) respondPage(c *gin.Context, page string) {
+	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(page))
+}
+
+// respondError 按请求形态输出失败：JSON 客户端拿到统一错误体，浏览器拿到 HTML 页面。
+func (h *ConfirmHandler) respondError(c *gin.Context, code, message, page string) {
+	if isJSONRequest(c) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": code, "message": message}})
+		return
+	}
+	h.respondPage(c, page)
+}
+
+// respondAlready 输出「此前已确认」：JSON 客户端视为幂等成功，浏览器展示确认时间。
+func (h *ConfirmHandler) respondAlready(c *gin.Context, dl *models.DeliveryLog) {
+	if isJSONRequest(c) {
+		c.JSON(http.StatusOK, gin.H{"code": 200, "message": "already_confirmed", "data": dl})
+		return
+	}
+	h.respondPage(c, confirmAlreadyPage(dl, h.loc()))
 }
 
 func isJSONRequest(c *gin.Context) bool {

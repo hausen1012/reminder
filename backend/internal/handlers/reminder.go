@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"strconv"
 	"strings"
 	"time"
 
@@ -22,20 +21,9 @@ func (h *ReminderHandler) List(c *gin.Context) {
 		Search:    c.Query("search"),
 		SortBy:    c.Query("sort_by"),
 		SortOrder: c.Query("sort_order"),
-	}
-	if v := c.Query("enabled"); v != "" {
-		b := v == "true" || v == "1"
-		f.Enabled = &b
-	}
-	if v := c.Query("limit"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil {
-			f.Limit = n
-		}
-	}
-	if v := c.Query("offset"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil {
-			f.Offset = n
-		}
+		Enabled:   queryBool(c, "enabled"),
+		Limit:     queryInt(c, "limit", 0),
+		Offset:    queryInt(c, "offset", 0),
 	}
 	items, total, err := h.Svc.List(f)
 	if err != nil {
@@ -188,12 +176,7 @@ func (h *ReminderHandler) Upcoming(c *gin.Context) {
 	}
 
 	withinStr := c.DefaultQuery("within", "24h")
-	limit := 10
-	if v := c.Query("limit"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil {
-			limit = n
-		}
-	}
+	limit := queryInt(c, "limit", 10)
 	within, err := time.ParseDuration(withinStr)
 	if err != nil {
 		within = 24 * time.Hour

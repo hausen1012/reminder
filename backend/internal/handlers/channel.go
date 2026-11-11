@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -33,16 +32,8 @@ func (h *ChannelHandler) List(c *gin.Context) {
 		Search:    search,
 		SortBy:    c.Query("sort_by"),
 		SortOrder: c.Query("sort_order"),
-	}
-	if limitStr != "" {
-		if n, err := strconv.Atoi(limitStr); err == nil {
-			f.Limit = n
-		}
-	}
-	if offsetStr != "" {
-		if n, err := strconv.Atoi(offsetStr); err == nil {
-			f.Offset = n
-		}
+		Limit:     queryInt(c, "limit", 0),
+		Offset:    queryInt(c, "offset", 0),
 	}
 
 	views, total, err := h.Svc.ListPaged(f)

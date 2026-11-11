@@ -19,6 +19,42 @@ func parseID(c *gin.Context, key string) (uint, error) {
 	return uint(id), nil
 }
 
+// queryInt 读取整型 query 参数；缺省或非法时返回 def。
+func queryInt(c *gin.Context, key string, def int) int {
+	v := c.Query(key)
+	if v == "" {
+		return def
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil {
+		return def
+	}
+	return n
+}
+
+// queryUint 读取无符号整型 query 参数；缺省或非法时返回 0。
+func queryUint(c *gin.Context, key string) uint {
+	v := c.Query(key)
+	if v == "" {
+		return 0
+	}
+	n, err := strconv.ParseUint(v, 10, 64)
+	if err != nil {
+		return 0
+	}
+	return uint(n)
+}
+
+// queryBool 读取布尔 query 参数，接受 true/1；缺省或其它取值返回 nil。
+func queryBool(c *gin.Context, key string) *bool {
+	v := c.Query(key)
+	if v == "" {
+		return nil
+	}
+	b := v == "true" || v == "1"
+	return &b
+}
+
 // abortBindErr 统一处理请求体解析失败：对外回一句可读文案，底层原因挂到 Cause 由 ErrorHandler 记录。
 // 请求体超限时单独返回 413。
 func abortBindErr(c *gin.Context, err error, message string) {

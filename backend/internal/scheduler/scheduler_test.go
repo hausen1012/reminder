@@ -15,7 +15,6 @@ import (
 
 // ==================== engine_test.go ====================
 
-
 // 一次 fire 应写入 pending 日志、推进 next_fire_at、递增 fire_count，
 // 并把投递任务交给 dispatcher。
 func TestEngineFire_WritesLogAndAdvances(t *testing.T) {
@@ -626,7 +625,6 @@ func TestEngineAddDailyJobRecoversPanic(t *testing.T) {
 
 // ==================== nextfire_test.go ====================
 
-
 func mustLoc(t *testing.T, name string) *time.Location {
 	t.Helper()
 	loc, err := time.LoadLocation(name)
@@ -905,7 +903,6 @@ func TestPreviewSolar_OnceStopsEarly(t *testing.T) {
 }
 
 // ==================== sweeper_test.go ====================
-
 
 // 漏触发在容忍窗口内：应补发（产生 pending 日志），而标记为 expired。
 func TestSweeperTick_FiresWithinTolerance(t *testing.T) {
@@ -1313,7 +1310,6 @@ func TestNewSweeper_PendingTTLDefault(t *testing.T) {
 
 // ==================== timezone_test.go ====================
 
-
 // 回归测试：同一时刻用不同时区偏移传入，落库后必须是同一个整数毫秒，
 // 因此 sweeper 能一致地扫到它们。
 //
@@ -1634,7 +1630,6 @@ func TestPreviewSolar_FollowsTimezoneChange(t *testing.T) {
 
 // ==================== testutil_test.go ====================
 // 本包测试脚手架：内存库、固定时区与 fake 替身。
-
 
 // testTZ 把固定时区包装成 timezone.Provider，供测试注入。
 func testTZ(loc *time.Location) *timezone.Provider {

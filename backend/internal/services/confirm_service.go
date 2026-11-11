@@ -65,34 +65,17 @@ func (s *ConfirmService) CreateToken(deliveryLogID uint, ttl time.Duration) (str
 // 令牌不存在返回 ErrConfirmTokenInvalid；已过期返回 ErrConfirmTokenExpired；
 // 对应日志已被清理返回 ErrConfirmLogMissing。
 func (s *ConfirmService) InspectToken(token string) (*models.DeliveryLog, error) {
-	var ct models.ConfirmToken
-	if err := s.DB.First(&ct, "token = ?", token).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, ErrConfirmTokenInvalid
-		}
+	ct, dl, err := s.loadToken(token)
+	if err != nil {
 		return nil, err
 	}
-
 	if ct.UsedAt != nil {
-		var dl models.DeliveryLog
-		if err := s.DB.First(&dl, ct.DeliveryLogID).Error; err == nil {
-			return &dl, ErrConfirmTokenUsed
-		}
-		return nil, ErrConfirmTokenUsed
+		return dl, ErrConfirmTokenUsed
 	}
 	if time.Now().After(ct.ExpiresAt.Time) {
 		return nil, ErrConfirmTokenExpired
 	}
-
-	var dl models.DeliveryLog
-	if err := s.DB.First(&dl, ct.DeliveryLogID).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, ErrConfirmLogMissing
-		}
-		return nil, err
-	}
-
-	return &dl, nil
+	return dl, nil
 }
 
 // ConsumeToken 消费一个令牌，成功时标记 used_at 并把该链的日志标为已确认。
@@ -100,36 +83,21 @@ func (s *ConfirmService) InspectToken(token string) (*models.DeliveryLog, error)
 // 并发点击只有一次真正生效：used_at 用带 `used_at IS NULL` 条件的原子 UPDATE 写入，
 // RowsAffected=0 即说明被抢先，按「已使用」处理并尽量返回日志，以便渲染幂等成功页。
 func (s *ConfirmService) ConsumeToken(token string) (*models.DeliveryLog, error) {
-	var ct models.ConfirmToken
-	if err := s.DB.First(&ct, "token = ?", token).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, ErrConfirmTokenInvalid
-		}
+	ct, target, err := s.loadToken(token)
+	if err != nil {
 		return nil, err
 	}
 
 	if ct.UsedAt != nil {
 		// 重复点击：不报错页，尽量带回日志让上层渲染「已经确认过了」
-		var dl models.DeliveryLog
-		if err := s.DB.First(&dl, ct.DeliveryLogID).Error; err == nil {
-			return &dl, ErrConfirmTokenUsed
-		}
-		return nil, ErrConfirmTokenUsed
+		return target, ErrConfirmTokenUsed
 	}
 	if time.Now().After(ct.ExpiresAt.Time) {
 		return nil, ErrConfirmTokenExpired
 	}
 
-	var target models.DeliveryLog
-	if err := s.DB.First(&target, ct.DeliveryLogID).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, ErrConfirmLogMissing
-		}
-		return nil, err
-	}
-
 	now := models.TimeNow()
-	err := s.DB.Transaction(func(tx *gorm.DB) error {
+	err = s.DB.Transaction(func(tx *gorm.DB) error {
 		// 条件更新保证只有一个请求能把 used_at 从 NULL 写成 now
 		res := tx.Model(&models.ConfirmToken{}).
 			Where("token = ? AND used_at IS NULL", token).
@@ -178,4 +146,27 @@ func (s *ConfirmService) BuildURL(token string) string {
 		fallback = s.Cfg.SiteURL
 	}
 	return siteURL(s.DB, fallback) + "/c/" + token
+}
+
+// loadToken 读取令牌及其对应的投递日志。
+//
+// 令牌不存在返回 ErrConfirmTokenInvalid；日志已被清理返回 ErrConfirmLogMissing
+// （此时令牌本身仍可用作「已使用」的判定依据，因此一并返回）。
+func (s *ConfirmService) loadToken(token string) (*models.ConfirmToken, *models.DeliveryLog, error) {
+	var ct models.ConfirmToken
+	if err := s.DB.First(&ct, "token = ?", token).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil, ErrConfirmTokenInvalid
+		}
+		return nil, nil, err
+	}
+
+	var dl models.DeliveryLog
+	if err := s.DB.First(&dl, ct.DeliveryLogID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return &ct, nil, ErrConfirmLogMissing
+		}
+		return nil, nil, err
+	}
+	return &ct, &dl, nil
 }

@@ -19,7 +19,6 @@ import (
 
 // ==================== auth_test.go ====================
 
-
 func newTestRouter() *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
@@ -249,7 +248,6 @@ func TestJWTAuth_WrongClaimType(t *testing.T) {
 
 // ==================== token_test.go ====================
 
-
 // 每分钟限额内应放行，超过后返回 429。
 func TestTokenAuth_RateLimited(t *testing.T) {
 	r := newTestRouter()
@@ -330,7 +328,6 @@ func TestTokenAuth_InjectsTokenID(t *testing.T) {
 
 // ==================== cors_test.go ====================
 
-
 // 普通请求应带上全部 CORS 头并继续执行。
 func TestCORS_SetsHeaders(t *testing.T) {
 	r := newTestRouter()
@@ -383,9 +380,7 @@ func TestCORS_PreflightShortCircuits(t *testing.T) {
 	}
 }
 
-
 // ==================== request_id_test.go ====================
-
 
 // 未带请求 ID 时应自动生成，并写回响应头。
 func TestRequestID_GeneratesWhenMissing(t *testing.T) {
@@ -473,7 +468,6 @@ func TestRequestIDOf_WithoutMiddleware(t *testing.T) {
 }
 
 // ==================== bodylimit_test.go ====================
-
 
 // newBodyLimitEngine 构造带 BodyLimit 与统一错误处理的最小引擎。
 func newBodyLimitEngine(maxBytes int64) *gin.Engine {
@@ -563,9 +557,7 @@ func TestBodyLimit_ZeroDisables(t *testing.T) {
 	}
 }
 
-
 // ==================== ratelimiter_test.go ====================
-
 
 // 过期槽位应被惰性清理，避免长期运行时内存只增不减。
 func TestRateLimiter_CleansUpExpiredSlots(t *testing.T) {
@@ -715,7 +707,6 @@ func TestLoginKey_NormalizesUsername(t *testing.T) {
 }
 
 // ==================== logging_test.go ====================
-
 
 // captureSlog 把全局 slog 临时重定向到内存 buffer。
 //
@@ -994,7 +985,9 @@ func TestSlogLogger_PassesThrough(t *testing.T) {
 }
 
 // 带 query 与 error 的请求也应正常记录（覆盖分支，不 panic）。
+// query 里的取值属于可能的凭据，只记参数名。
 func TestSlogLogger_WithQueryAndError(t *testing.T) {
+	logs := captureSlogAt(t, slog.LevelDebug)
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
 	r.Use(ErrorHandler())
@@ -1005,15 +998,21 @@ func TestSlogLogger_WithQueryAndError(t *testing.T) {
 	})
 
 	w := httptest.NewRecorder()
-	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/x?q=1&r=2", nil))
+	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/x?q=1&token=SECRET", nil))
 
 	if w.Code != http.StatusNotFound {
 		t.Fatalf("状态码 = %d，期望 404", w.Code)
 	}
+	out := logs.String()
+	if strings.Contains(out, "SECRET") {
+		t.Fatalf("访问日志不应包含 query 取值:\n%s", out)
+	}
+	if !strings.Contains(out, "token=%2A%2A%2A") {
+		t.Fatalf("query 参数名应保留并脱敏取值:\n%s", out)
+	}
 }
 
 // ==================== errors_test.go ====================
-
 
 // AppError.httpStatus 应根据 ErrorCode 推断正确的 HTTP 状态码。
 func TestAppError_HTTPStatusMapping(t *testing.T) {

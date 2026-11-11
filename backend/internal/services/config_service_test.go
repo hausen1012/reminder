@@ -329,3 +329,43 @@ func TestConfigService_GetAllFiltersUnknownKeys(t *testing.T) {
 		}
 	}
 }
+
+// configStore 是配置表的统一读写入口：前缀查询不应把 "_" 当通配符。
+func TestConfigStore_PrefixAndBool(t *testing.T) {
+	db := openTestDB(t)
+	store := configStore{db}
+
+	if err := store.set("ai_enabled", "true"); err != nil {
+		t.Fatalf("写入失败: %v", err)
+	}
+	if err := store.set("ai_model", "m1"); err != nil {
+		t.Fatalf("写入失败: %v", err)
+	}
+	// 只差一个字符的键不应被 ai_ 前缀带出来（"_" 是 LIKE 通配符）
+	if err := store.set("aixmodel", "should-not-match"); err != nil {
+		t.Fatalf("写入失败: %v", err)
+	}
+
+	kv, err := store.allWithPrefix("ai_")
+	if err != nil {
+		t.Fatalf("查询失败: %v", err)
+	}
+	if len(kv) != 2 || kv["ai_enabled"] != "true" || kv["ai_model"] != "m1" {
+		t.Fatalf("前缀查询结果 = %v", kv)
+	}
+
+	if v, err := store.bool("missing", true); err != nil || !v {
+		t.Fatalf("缺省开关应为 true，得到 %v, %v", v, err)
+	}
+	if v, err := store.bool("ai_enabled", false); err != nil || !v {
+		t.Fatalf("ai_enabled=true 应读出 true，得到 %v, %v", v, err)
+	}
+
+	// 空值即删除
+	if err := store.set("ai_model", ""); err != nil {
+		t.Fatalf("删除失败: %v", err)
+	}
+	if _, ok, _ := store.get("ai_model"); ok {
+		t.Fatal("空值写入后应删除该 key")
+	}
+}

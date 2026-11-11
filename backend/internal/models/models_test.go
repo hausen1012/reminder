@@ -13,7 +13,6 @@ import (
 
 // ==================== time_test.go ====================
 
-
 // openTestDB 打开一个临时 SQLite 库，供本文件的时间类型用例共用。
 func openTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
@@ -322,7 +321,6 @@ func TestTime_Scan(t *testing.T) {
 }
 
 // ==================== reminder_test.go ====================
-
 
 // 回归测试：Enabled 字段带 gorm default:true，若 Create 时传 false，
 // GORM 会用默认值覆盖，导致「创建时禁用」静默变成「启用」。

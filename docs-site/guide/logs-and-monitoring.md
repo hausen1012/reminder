@@ -129,7 +129,7 @@ grep '7bc69bc7850af4d0' /var/log/reminder/2026-11-03.log
 | `user_message` / `rounds` / `retries` / `drafts` | AI 对话：用户提问（截断 500 字）、工具轮次、重试次数、生成的草稿数 |
 
 所有凭据（通道密钥、Webhook Authorization、确认链接令牌、令牌明文、AI API Key）都不会写入日志；
-需要区分是哪个凭据时只记长度或前缀。AI 请求地址里的 query（如 `?key=sk-xxx`）会被脱敏成 `***`。
+需要区分是哪个凭据时只记长度或前缀。访问日志里的 query 与 AI 请求地址里的 query（如 `?key=sk-xxx`）都只保留参数名，取值脱敏成 `***`。
 `log` 通道是唯一例外——它的用途就是把正文打出来。
 
 ### AI 对话出问题时看什么

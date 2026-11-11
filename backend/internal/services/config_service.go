@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/reminder/backend/internal/middleware"
-	"github.com/reminder/backend/internal/models"
 	"github.com/reminder/backend/internal/timezone"
 	"gorm.io/gorm"
 )
@@ -45,16 +44,16 @@ func NewConfigService(db *gorm.DB, tz *timezone.Provider) *ConfigService {
 
 // GetAll 读取白名单内的站点配置；时区与站点地址未落库时回显当前生效值。
 func (s *ConfigService) GetAll() (map[string]string, error) {
-	var rows []models.Config
-	if err := s.DB.Find(&rows).Error; err != nil {
+	all, err := configStore{s.DB}.all()
+	if err != nil {
 		return nil, err
 	}
 	out := make(map[string]string, len(allowedConfigKeys))
-	for _, r := range rows {
-		if _, ok := allowedConfigKeys[r.Key]; !ok {
+	for k, v := range all {
+		if _, ok := allowedConfigKeys[k]; !ok {
 			continue
 		}
-		out[r.Key] = r.Value
+		out[k] = v
 	}
 	if _, ok := out[KeyTimezone]; !ok && s.TZ != nil {
 		out[KeyTimezone] = s.TZ.Name()
@@ -92,17 +91,7 @@ func (s *ConfigService) UpsertMap(cfg map[string]string) error {
 	}
 
 	for k, v := range toWrite {
-		if v == "" {
-			if err := s.DB.Delete(&models.Config{}, "key = ?", k).Error; err != nil {
-				return err
-			}
-			continue
-		}
-		// GORM Upsert 风格：Clauses(clause.OnConflict{...})
-		if err := s.DB.
-			Where("key = ?", k).
-			Assign(models.Config{Value: v}).
-			FirstOrCreate(&models.Config{Key: k, Value: v}).Error; err != nil {
+		if err := (configStore{s.DB}).set(k, v); err != nil {
 			return err
 		}
 	}
@@ -128,10 +117,9 @@ func normalizeSiteURL(raw string) (string, error) {
 // siteURL 返回拼接确认链接用的站点地址：库里优先，其次环境变量，最后默认值。
 // 每次现读库，改完站点地址立即对之后的发送生效。
 func siteURL(db *gorm.DB, fallback string) string {
-	var row models.Config
-	if err := db.First(&row, "key = ?", KeySiteURL).Error; err == nil && row.Value != "" {
+	if v, ok, err := (configStore{db}).get(KeySiteURL); err == nil && ok && v != "" {
 		// 库里的值可能没经过校验，这里同样去掉结尾斜杠
-		return strings.TrimRight(strings.TrimSpace(row.Value), "/")
+		return strings.TrimRight(strings.TrimSpace(v), "/")
 	}
 	base := strings.TrimRight(strings.TrimSpace(fallback), "/")
 	if base == "" {
@@ -147,16 +135,15 @@ func (s *ConfigService) LoadTimezone() {
 	if s.TZ == nil {
 		return
 	}
-	var row models.Config
-	err := s.DB.First(&row, "key = ?", KeyTimezone).Error
+	row, ok, err := (configStore{s.DB}).get(KeyTimezone)
 	switch {
 	case err != nil:
-		// 库里还没有时区配置：沿用环境变量给的默认值
-	case row.Value == "":
-		// 空值等同未配置
+		// 读库失败：沿用环境变量给的默认值
+	case !ok || row == "":
+		// 库里还没有时区配置：空值等同未配置
 	default:
-		if setErr := s.TZ.Set(row.Value); setErr != nil {
-			slog.Warn("库中时区无效，保留默认值", "timezone", row.Value, "error", setErr)
+		if setErr := s.TZ.Set(row); setErr != nil {
+			slog.Warn("库中时区无效，保留默认值", "timezone", row, "error", setErr)
 		}
 	}
 	slog.Info("站点时区", "timezone", s.TZ.Name())

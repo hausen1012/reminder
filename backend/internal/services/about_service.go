@@ -17,7 +17,6 @@ import (
 	"time"
 
 	"github.com/reminder/backend/internal/logger"
-	"github.com/reminder/backend/internal/models"
 	"github.com/reminder/backend/internal/version"
 	"gorm.io/gorm"
 )
@@ -97,22 +96,17 @@ func NewAboutService(db *gorm.DB, ver, buildTime string) *AboutService {
 
 // Enabled 读取自动检查开关；没有落库时默认开启。
 func (s *AboutService) Enabled() bool {
-	var row models.Config
-	if err := s.DB.First(&row, "key = ?", KeyUpdateCheckEnabled).Error; err != nil {
-		// 查不到即为默认开启；数据库错误同样按开启处理，避免误静默
-		return true
-	}
-	return row.Value != "false"
+	// 查不到即为默认开启；数据库错误同样按开启处理，避免误静默
+	enabled, err := (configStore{s.DB}).bool(KeyUpdateCheckEnabled, true)
+	return err != nil || enabled
 }
 
 // SetEnabled 保存自动检查开关；开启时删除该 key，保持默认值语义。
 func (s *AboutService) SetEnabled(enabled bool) error {
 	if enabled {
-		return s.DB.Delete(&models.Config{}, "key = ?", KeyUpdateCheckEnabled).Error
+		return (configStore{s.DB}).delete(KeyUpdateCheckEnabled)
 	}
-	return s.DB.Where("key = ?", KeyUpdateCheckEnabled).
-		Assign(models.Config{Value: "false"}).
-		FirstOrCreate(&models.Config{Key: KeyUpdateCheckEnabled, Value: "false"}).Error
+	return (configStore{s.DB}).set(KeyUpdateCheckEnabled, "false")
 }
 
 // Info 返回当前版本与上一次检查结果。

@@ -43,3 +43,17 @@ func StripMarkdown(s string) string {
 	result = strings.Join(strings.Fields(result), " ")
 	return strings.TrimSpace(result)
 }
+
+// AppendLink 按内容格式把 url 作为链接追加到正文末尾。
+//
+// html 用 <a>，markdown 用 [text](url)，其余按纯文本追加。
+func AppendLink(body, format, url, label string) string {
+	switch format {
+	case "html":
+		return body + `<br><a href="` + url + `">` + label + `</a>`
+	case "markdown":
+		return body + "\n\n[" + label + "](" + url + ")"
+	default:
+		return body + "\n" + label + "：" + url
+	}
+}

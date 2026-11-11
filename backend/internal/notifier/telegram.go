@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"net/http"
 	"strings"
 )
 
@@ -42,13 +41,12 @@ func (n *telegramNotifier) Send(ctx context.Context, configJSON []byte, msg Mess
 	}
 
 	endpoint := telegramAPIBase + "/bot" + cfg.BotToken + "/sendMessage"
-	payload := buildTelegramPayload(cfg, msg)
-	body, _ := json.Marshal(payload)
-
-	res, err := doRequest(ctx, http.MethodPost, endpoint,
-		map[string]string{"Content-Type": "application/json; charset=utf-8"}, body)
+	res, err := postJSON(ctx, "Telegram", endpoint, buildTelegramPayload(cfg, msg), nil)
 	if err != nil {
 		return redactTokenErr(err, cfg.BotToken)
+	}
+	if err := classifyStatus("Telegram", res); err != nil {
+		return err
 	}
 
 	var br struct {
@@ -57,15 +55,6 @@ func (n *telegramNotifier) Send(ctx context.Context, configJSON []byte, msg Mess
 		ErrorCode   int    `json:"error_code"`
 	}
 	_ = json.Unmarshal(res.Body, &br)
-
-	switch {
-	case res.Status == http.StatusTooManyRequests:
-		return fmt.Errorf("Telegram 限流 %d: %s", res.Status, br.Description)
-	case res.Status >= 500:
-		return fmt.Errorf("Telegram %d: %s", res.Status, br.Description)
-	case res.Status >= 400:
-		return Permanent(fmt.Errorf("Telegram %d: %s", res.Status, br.Description))
-	}
 	if !br.OK {
 		return Permanent(fmt.Errorf("Telegram 业务错误 %d: %s（%s）", br.ErrorCode, br.Description, res.Body))
 	}
@@ -73,19 +62,9 @@ func (n *telegramNotifier) Send(ctx context.Context, configJSON []byte, msg Mess
 }
 
 func buildTelegramPayload(cfg TelegramConfig, msg Message) map[string]any {
-	text := msg.Body
-	switch msg.Format {
-	case "html":
-		text = StripHTML(msg.Body)
-	case "markdown":
-		text = StripMarkdown(msg.Body)
-	}
-	if msg.Subject != "" {
-		text = msg.Subject + "\n" + text
-	}
 	payload := map[string]any{
 		"chat_id": cfg.ChatID,
-		"text":    text,
+		"text":    plainTextWithSubject(msg),
 	}
 	if cfg.DisableNotification {
 		payload["disable_notification"] = true

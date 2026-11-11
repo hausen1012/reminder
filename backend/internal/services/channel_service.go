@@ -6,13 +6,13 @@ package services
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
 	"time"
 
 	"github.com/reminder/backend/internal/crypto/secretbox"
+	"github.com/reminder/backend/internal/logger"
 	"github.com/reminder/backend/internal/middleware"
 	"github.com/reminder/backend/internal/models"
 	"github.com/reminder/backend/internal/notifier"
@@ -173,15 +173,7 @@ func (s *ChannelService) List() ([]*ChannelView, error) {
 
 // ListPaged 返回通道分页结果（按 id 升序）。
 func (s *ChannelService) ListPaged(f ChannelListFilter) ([]*ChannelView, int64, error) {
-	if f.Limit <= 0 {
-		f.Limit = 50
-	}
-	if f.Limit > 200 {
-		f.Limit = 200
-	}
-	if f.Offset < 0 {
-		f.Offset = 0
-	}
+	f.Limit, f.Offset = normalizePage(f.Limit, f.Offset)
 
 	q := s.DB.Model(&models.Channel{})
 	if search := strings.TrimSpace(f.Search); search != "" {
@@ -212,15 +204,11 @@ func (s *ChannelService) Delete(id uint) error {
 	if _, err := s.getOrNotFound(id); err != nil {
 		return err
 	}
-	var reminderCount int64
-	if err := s.DB.Model(&models.ReminderChannel{}).Where("channel_id = ?", id).Count(&reminderCount).Error; err != nil {
+	bound, err := s.isChannelBound("channel_id = ?", id)
+	if err != nil {
 		return err
 	}
-	var tokenCount int64
-	if err := s.DB.Model(&models.TokenDefaultChannel{}).Where("channel_id = ?", id).Count(&tokenCount).Error; err != nil {
-		return err
-	}
-	if reminderCount+tokenCount > 0 {
+	if bound {
 		return middleware.NewAppError(middleware.CodeConflict, "该通知被提醒或令牌绑定，请先解除绑定")
 	}
 	return s.DB.Delete(&models.Channel{}, id).Error
@@ -231,20 +219,30 @@ func (s *ChannelService) BatchDelete(ids []uint) error {
 	if len(ids) == 0 {
 		return nil
 	}
-	var reminderCount int64
-	if err := s.DB.Model(&models.ReminderChannel{}).Where("channel_id IN ?", ids).Count(&reminderCount).Error; err != nil {
+	bound, err := s.isChannelBound("channel_id IN ?", ids)
+	if err != nil {
 		return err
 	}
-	var tokenCount int64
-	if err := s.DB.Model(&models.TokenDefaultChannel{}).Where("channel_id IN ?", ids).Count(&tokenCount).Error; err != nil {
-		return err
-	}
-	if reminderCount+tokenCount > 0 {
+	if bound {
 		return middleware.NewAppError(middleware.CodeConflict, "部分通知被提醒或令牌绑定，请先解除绑定")
 	}
 	return s.DB.Transaction(func(tx *gorm.DB) error {
 		return tx.Delete(&models.Channel{}, ids).Error
 	})
+}
+
+// isChannelBound 判断给定通道是否仍被提醒或令牌的默认通道引用。
+func (s *ChannelService) isChannelBound(cond string, arg any) (bool, error) {
+	for _, model := range []any{&models.ReminderChannel{}, &models.TokenDefaultChannel{}} {
+		var count int64
+		if err := s.DB.Model(model).Where(cond, arg).Count(&count).Error; err != nil {
+			return false, err
+		}
+		if count > 0 {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // DryRun 用表单配置试发通知，不写 delivery_log。
@@ -263,17 +261,9 @@ func (s *ChannelService) DryRun(ctx context.Context, chType string, config map[s
 		"now":          time.Now().In(s.TZ.Get()).Format("2006-01-02 15:04:05"),
 	}
 	// 与正式投递一致：展开后的标题与正文回写 vars，Webhook 模板引用时不残留占位符
-	bodyRendered := notifier.Render(body, vars)
-	vars["content"] = bodyRendered
-	subjectRendered := notifier.Render(subject, vars)
-	vars["title"] = subjectRendered
-	rendered := notifier.Message{
-		Subject: subjectRendered,
-		Body:    bodyRendered,
-		Vars:    vars,
-	}
+	rendered := buildRenderedMessage(subject, body, "text", vars)
 	if err := n.Send(ctx, plainConfig, rendered); err != nil {
-		slog.Warn("通道试发失败", "type", chType, "error", err)
+		logger.FromContext(ctx).Warn("通道试发失败", "type", chType, "error", err)
 		// 试发失败通常是配置问题，返回 400 + 原文案而不是 500
 		return middleware.NewAppError(middleware.CodeValidationFailed, "试发失败: "+err.Error())
 	}
@@ -354,14 +344,7 @@ func (s *ChannelService) Stats(window time.Duration) ([]*ChannelStats, error) {
 // --- internal helpers ---
 
 func (s *ChannelService) getOrNotFound(id uint) (*models.Channel, error) {
-	var ch models.Channel
-	if err := s.DB.First(&ch, id).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, middleware.NewAppError(middleware.CodeNotFound, "通道不存在")
-		}
-		return nil, err
-	}
-	return &ch, nil
+	return firstByID[models.Channel](s.DB, id, "通道不存在")
 }
 
 func (s *ChannelService) validateInput(in ChannelInput, isUpdate bool, ch *models.Channel) error {
@@ -426,9 +409,7 @@ func isBlankField(v any) bool {
 		return true
 	case string:
 		return strings.TrimSpace(val) == ""
-	case []string:
-		return len(asStringSlice(val)) == 0
-	case []any:
+	case []string, []any:
 		return len(asStringSlice(val)) == 0
 	case int:
 		return val <= 0
@@ -440,57 +421,6 @@ func isBlankField(v any) bool {
 		return val <= 0
 	}
 	return false
-}
-
-func asString(v any) string {
-	s, _ := v.(string)
-	return s
-}
-
-func asPositiveInt(v any) int {
-	switch n := v.(type) {
-	case int:
-		if n > 0 {
-			return n
-		}
-	case int32:
-		if n > 0 {
-			return int(n)
-		}
-	case int64:
-		if n > 0 {
-			return int(n)
-		}
-	case float64:
-		if n > 0 {
-			return int(n)
-		}
-	}
-	return 0
-}
-
-func asStringSlice(v any) []string {
-	switch items := v.(type) {
-	case []string:
-		out := make([]string, 0, len(items))
-		for _, item := range items {
-			if s := strings.TrimSpace(item); s != "" {
-				out = append(out, s)
-			}
-		}
-		return out
-	case []any:
-		out := make([]string, 0, len(items))
-		for _, item := range items {
-			s, _ := item.(string)
-			if s = strings.TrimSpace(s); s != "" {
-				out = append(out, s)
-			}
-		}
-		return out
-	default:
-		return nil
-	}
 }
 
 func mergeConfig(ch *models.Channel, patch map[string]any) map[string]any {

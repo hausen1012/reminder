@@ -46,3 +46,23 @@ func buildOrderClause(sortBy, sortOrder, fallback string, allowed []string) stri
 	}
 	return field + " DESC"
 }
+
+// 列表接口分页参数的统一边界。
+const (
+	defaultPageLimit = 50
+	maxPageLimit     = 200
+)
+
+// normalizePage 归一化分页参数：limit 缺省为 50、上限 200，offset 不得为负。
+func normalizePage(limit, offset int) (int, int) {
+	if limit <= 0 {
+		limit = defaultPageLimit
+	}
+	if limit > maxPageLimit {
+		limit = maxPageLimit
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	return limit, offset
+}

@@ -7,6 +7,7 @@ package notifier
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -29,7 +30,12 @@ type httpResult struct {
 //
 // 构造请求失败视为永久错误；网络或超时错误不做包装，交给 dispatch 重试。
 func doRequest(ctx context.Context, method, endpoint string, headers map[string]string, body []byte) (*httpResult, error) {
-	reqCtx, cancel := context.WithTimeout(ctx, sendTimeout)
+	return doRequestTimeout(ctx, sendTimeout, method, endpoint, headers, body)
+}
+
+// doRequestTimeout 与 doRequest 相同，但使用指定的单次请求超时。
+func doRequestTimeout(ctx context.Context, timeout time.Duration, method, endpoint string, headers map[string]string, body []byte) (*httpResult, error) {
+	reqCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
 	var reader io.Reader
@@ -57,7 +63,22 @@ func doRequest(ctx context.Context, method, endpoint string, headers map[string]
 	return &httpResult{Status: resp.StatusCode, Body: respBody}, nil
 }
 
-// classifyStatus 把 HTTP 状态码映射为错误：5xx 可重试，4xx 中限流可重试、其余永久错误。
+// postJSON 把 payload 序列化为 JSON 并 POST 到 endpoint；未指定 Content-Type 时补上 JSON 类型。
+func postJSON(ctx context.Context, name, endpoint string, payload any, headers map[string]string) (*httpResult, error) {
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return nil, Permanent(fmt.Errorf("序列化%s请求失败: %w", name, err))
+	}
+	if headers == nil {
+		headers = map[string]string{}
+	}
+	if _, ok := headers["Content-Type"]; !ok {
+		headers["Content-Type"] = "application/json; charset=utf-8"
+	}
+	return doRequest(ctx, http.MethodPost, endpoint, headers, body)
+}
+
+// classifyStatus 把 HTTP 状态码映射为错误：5xx 与 429 可重试，其余 4xx 为永久错误。
 func classifyStatus(name string, res *httpResult) error {
 	switch {
 	case res.Status >= 200 && res.Status < 300:
@@ -69,4 +90,31 @@ func classifyStatus(name string, res *httpResult) error {
 	default:
 		return Permanent(fmt.Errorf("%s %d: %s", name, res.Status, res.Body))
 	}
+}
+
+// checkBusinessCode 解析国内 IM 通道的「HTTP 200 + 业务码」响应：okCode 之外一律视为永久错误。
+//
+// 钉钉 / 企微用 errcode+errmsg，飞书用 code+msg，Bark 用 code+message，这里合并处理。
+func checkBusinessCode(name string, res *httpResult, okCode int) error {
+	var br struct {
+		Errcode int    `json:"errcode"`
+		Errmsg  string `json:"errmsg"`
+		Code    int    `json:"code"`
+		Msg     string `json:"msg"`
+		Message string `json:"message"`
+	}
+	if err := json.Unmarshal(res.Body, &br); err != nil {
+		return fmt.Errorf("解析%s响应失败: %w (body=%s)", name, err, res.Body)
+	}
+	code, msg := br.Errcode, br.Errmsg
+	if code == 0 {
+		code, msg = br.Code, br.Msg
+	}
+	if msg == "" {
+		msg = br.Message
+	}
+	if code != okCode {
+		return Permanent(fmt.Errorf("%s业务错误 code=%d msg=%s", name, code, msg))
+	}
+	return nil
 }

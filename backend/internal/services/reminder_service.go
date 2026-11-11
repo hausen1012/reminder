@@ -77,38 +77,19 @@ func (s *ReminderService) Create(in ReminderInput) (*ReminderView, error) {
 	if in.ScheduleType == "" {
 		in.ScheduleType = "once"
 	}
-	if err := s.validate(&in); err != nil {
+	specRaw, next, err := s.prepare(&in)
+	if err != nil {
 		return nil, err
 	}
-	specRaw, err := json.Marshal(in.ScheduleSpec)
-	if err != nil {
-		return nil, middleware.NewAppError(middleware.CodeValidationFailed, "schedule_spec 不是合法 JSON").WithField("schedule_spec")
-	}
-	spec, err := scheduler.ParseSpec(specRaw)
-	if err != nil {
-		return nil, middleware.NewAppError(middleware.CodeValidationFailed, err.Error()).WithField("schedule_spec")
-	}
-	loc := s.TZ.Get()
-	next, err := scheduler.Compute(in.Calendar, in.ScheduleType, spec, time.Now(), loc)
-	if err != nil {
-		return nil, middleware.NewAppError(middleware.CodeValidationFailed, err.Error()).WithField("schedule_spec")
-	}
+	content, contentFormat := normalizeContent(in.Title, in.Content, in.ContentFormat)
 
 	source := in.Source
 	if source == "" {
 		source = "web"
 	}
-	contentFormat := in.ContentFormat
-	if contentFormat == "" {
-		contentFormat = "text"
-	}
-	// 与 Update 保持一致：正文留空时回退为标题。
-	if strings.TrimSpace(in.Content) == "" {
-		in.Content = strings.TrimSpace(in.Title)
-	}
 	r := &models.Reminder{
 		Title:                   strings.TrimSpace(in.Title),
-		Content:                 in.Content,
+		Content:                 content,
 		ContentFormat:           contentFormat,
 		Calendar:                in.Calendar,
 		ScheduleType:            in.ScheduleType,
@@ -148,32 +129,11 @@ func (s *ReminderService) Update(id uint, in ReminderInput) (*ReminderView, erro
 	if err != nil {
 		return nil, err
 	}
-	if err := s.validate(&in); err != nil {
+	specRaw, next, err := s.prepare(&in)
+	if err != nil {
 		return nil, err
 	}
-	specRaw, err := json.Marshal(in.ScheduleSpec)
-	if err != nil {
-		return nil, middleware.NewAppError(middleware.CodeValidationFailed, "schedule_spec 不是合法 JSON").WithField("schedule_spec")
-	}
-	spec, err := scheduler.ParseSpec(specRaw)
-	if err != nil {
-		return nil, middleware.NewAppError(middleware.CodeValidationFailed, err.Error()).WithField("schedule_spec")
-	}
-	loc := s.TZ.Get()
-	next, err := scheduler.Compute(in.Calendar, in.ScheduleType, spec, time.Now(), loc)
-	if err != nil {
-		return nil, middleware.NewAppError(middleware.CodeValidationFailed, err.Error()).WithField("schedule_spec")
-	}
-
-	contentFormat := in.ContentFormat
-	if contentFormat == "" {
-		contentFormat = "text"
-	}
-	// 与 Create 一致：正文留空时回退为标题，避免「只改标题」把正文清空
-	content := in.Content
-	if strings.TrimSpace(content) == "" {
-		content = strings.TrimSpace(in.Title)
-	}
+	content, contentFormat := normalizeContent(in.Title, in.Content, in.ContentFormat)
 	updates := map[string]any{
 		"title":                      strings.TrimSpace(in.Title),
 		"content":                    content,
@@ -184,16 +144,13 @@ func (s *ReminderService) Update(id uint, in ReminderInput) (*ReminderView, erro
 		"require_confirm":            in.RequireConfirm,
 		"confirm_retry_interval_sec": in.ConfirmRetryIntervalSec,
 		"confirm_max_retries":        in.ConfirmMaxRetries,
+		"next_fire_at":               models.TimePtr(next),
 	}
 	if in.Enabled != nil {
 		updates["enabled"] = *in.Enabled
 		if !*in.Enabled {
 			updates["next_fire_at"] = nil
-		} else {
-			updates["next_fire_at"] = models.TimePtr(next)
 		}
-	} else {
-		updates["next_fire_at"] = models.TimePtr(next)
 	}
 
 	err = s.DB.Transaction(func(tx *gorm.DB) error {
@@ -267,12 +224,7 @@ func (s *ReminderService) List(f ListFilter) ([]*ReminderView, int64, error) {
 	if err := q.Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
-	if f.Limit <= 0 {
-		f.Limit = 50
-	}
-	if f.Limit > 200 {
-		f.Limit = 200
-	}
+	f.Limit, f.Offset = normalizePage(f.Limit, f.Offset)
 
 	orderClause := buildOrderClause(f.SortBy, f.SortOrder, "created_at DESC",
 		[]string{"id", "created_at", "next_fire_at", "title"})
@@ -478,21 +430,42 @@ func (s *ReminderService) TestDryRun(ctx context.Context, title, content, conten
 
 // loadChannelsByIDs 根据 ID 列表加载通道。
 func (s *ReminderService) loadChannelsByIDs(ids []uint) ([]*models.Channel, error) {
-	if len(ids) == 0 {
-		return nil, nil
-	}
-	var rows []models.Channel
-	if err := s.DB.Where("id IN ?", ids).Find(&rows).Error; err != nil {
-		return nil, err
-	}
-	out := make([]*models.Channel, 0, len(rows))
-	for i := range rows {
-		out = append(out, &rows[i])
-	}
-	return out, nil
+	return loadChannelsByIDs(s.DB, ids)
 }
 
 // --- internal helpers ---
+
+// prepare 校验入参并计算下次触发时间，返回待落库的 schedule_spec 与 next_fire_at。
+func (s *ReminderService) prepare(in *ReminderInput) ([]byte, *time.Time, error) {
+	if err := s.validate(in); err != nil {
+		return nil, nil, err
+	}
+	specRaw, err := json.Marshal(in.ScheduleSpec)
+	if err != nil {
+		return nil, nil, middleware.NewAppError(middleware.CodeValidationFailed, "schedule_spec 不是合法 JSON").WithField("schedule_spec")
+	}
+	spec, err := scheduler.ParseSpec(specRaw)
+	if err != nil {
+		return nil, nil, middleware.NewAppError(middleware.CodeValidationFailed, err.Error()).WithField("schedule_spec")
+	}
+	next, err := scheduler.Compute(in.Calendar, in.ScheduleType, spec, time.Now(), s.TZ.Get())
+	if err != nil {
+		return nil, nil, middleware.NewAppError(middleware.CodeValidationFailed, err.Error()).WithField("schedule_spec")
+	}
+	return specRaw, next, nil
+}
+
+// normalizeContent 归一化正文与格式：格式缺省为 text，正文留空时回退为标题
+// （避免「只改标题」把正文清空）。
+func normalizeContent(title, content, format string) (body, normalizedFormat string) {
+	if format == "" {
+		format = "text"
+	}
+	if strings.TrimSpace(content) == "" {
+		content = strings.TrimSpace(title)
+	}
+	return content, format
+}
 
 func (s *ReminderService) validate(in *ReminderInput) error {
 	if strings.TrimSpace(in.Title) == "" {
@@ -558,61 +531,19 @@ func (s *ReminderService) validateChannels(ids []uint) error {
 }
 
 func (s *ReminderService) replaceChannels(tx *gorm.DB, reminderID uint, ids []uint) error {
-	if err := tx.Where("reminder_id = ?", reminderID).Delete(&models.ReminderChannel{}).Error; err != nil {
-		return err
-	}
-	if len(ids) == 0 {
-		return nil
-	}
-	rows := make([]models.ReminderChannel, 0, len(ids))
-	seen := map[uint]bool{}
-	for _, id := range ids {
-		if id == 0 || seen[id] {
-			continue
-		}
-		seen[id] = true
-		rows = append(rows, models.ReminderChannel{ReminderID: reminderID, ChannelID: id})
-	}
-	if len(rows) == 0 {
-		return nil
-	}
-	return tx.Create(&rows).Error
+	return replaceJoinRows(tx, &models.ReminderChannel{}, "reminder_id", reminderID, ids,
+		func(ownerID, targetID uint) models.ReminderChannel {
+			return models.ReminderChannel{ReminderID: ownerID, ChannelID: targetID}
+		})
 }
 
 func (s *ReminderService) channelIDs(reminderID uint) ([]uint, error) {
-	var ids []uint
-	err := s.DB.Model(&models.ReminderChannel{}).
-		Where("reminder_id = ?", reminderID).
-		Order("channel_id ASC").
-		Pluck("channel_id", &ids).Error
-	if err != nil {
-		return nil, err
-	}
-	return ids, nil
+	return reminderChannelIDs(s.DB, reminderID)
 }
 
 // channelIDsBatch 一次查出多条提醒绑定的通道，避免列表接口 N+1 查询。
 func (s *ReminderService) channelIDsBatch(reminderIDs []uint) (map[uint][]uint, error) {
-	out := make(map[uint][]uint, len(reminderIDs))
-	if len(reminderIDs) == 0 {
-		return out, nil
-	}
-	type pair struct {
-		ReminderID uint
-		ChannelID  uint
-	}
-	var rows []pair
-	if err := s.DB.Model(&models.ReminderChannel{}).
-		Select("reminder_id, channel_id").
-		Where("reminder_id IN ?", reminderIDs).
-		Order("reminder_id ASC, channel_id ASC").
-		Scan(&rows).Error; err != nil {
-		return nil, err
-	}
-	for _, row := range rows {
-		out[row.ReminderID] = append(out[row.ReminderID], row.ChannelID)
-	}
-	return out, nil
+	return joinIDsBatch(s.DB, &models.ReminderChannel{}, "reminder_id", "channel_id", reminderIDs)
 }
 
 // viewsOf 把一批提醒转成视图，通道绑定一次性批量查出（避免 N+1）。
@@ -633,14 +564,7 @@ func (s *ReminderService) viewsOf(rows []models.Reminder) ([]*ReminderView, erro
 }
 
 func (s *ReminderService) getOrNotFound(id uint) (*models.Reminder, error) {
-	var r models.Reminder
-	if err := s.DB.First(&r, id).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, middleware.NewAppError(middleware.CodeNotFound, "提醒不存在")
-		}
-		return nil, err
-	}
-	return &r, nil
+	return firstByID[models.Reminder](s.DB, id, "提醒不存在")
 }
 
 func (s *ReminderService) toView(r *models.Reminder, chIDs []uint) *ReminderView {

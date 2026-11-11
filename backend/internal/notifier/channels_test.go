@@ -13,7 +13,6 @@ import (
 
 // ==================== webhook_test.go ====================
 
-
 // webhook：POST 无模板时使用默认 {subject,body}。
 func TestWebhook_DefaultPostBody(t *testing.T) {
 	var captured map[string]any
@@ -191,7 +190,6 @@ func TestTemplateRenderEdge(t *testing.T) {
 
 // ==================== dingtalk_test.go ====================
 
-
 // 钉钉：成功响应（errcode=0）应返回 nil。
 func TestDingTalk_SendSuccess(t *testing.T) {
 	var captured []byte
@@ -254,14 +252,14 @@ func TestDingTalk_BusinessError(t *testing.T) {
 	}
 }
 
-// 钉钉：4xx 永久错误，5xx 可重试。
+// 钉钉：4xx 永久错误，429 限流与 5xx 可重试。
 func TestDingTalk_HTTPStatus(t *testing.T) {
 	cases := []struct {
 		status    int
 		permanent bool
 	}{
 		{http.StatusBadRequest, true},
-		{http.StatusTooManyRequests, true},
+		{http.StatusTooManyRequests, false},
 		{http.StatusInternalServerError, false},
 		{http.StatusBadGateway, false},
 	}
@@ -409,8 +407,24 @@ func TestStripMarkdown(t *testing.T) {
 	}
 }
 
-// ==================== wecom_test.go ====================
+// AppendLink 按内容格式把链接追加到正文。
+func TestAppendLink(t *testing.T) {
+	cases := []struct {
+		format string
+		want   string
+	}{
+		{"text", "正文\n点击确认提醒：https://x/c/t"},
+		{"markdown", "正文\n\n[点击确认提醒](https://x/c/t)"},
+		{"html", `正文<br><a href="https://x/c/t">点击确认提醒</a>`},
+	}
+	for _, tc := range cases {
+		if got := AppendLink("正文", tc.format, "https://x/c/t", "点击确认提醒"); got != tc.want {
+			t.Fatalf("AppendLink(%q) = %q，期望 %q", tc.format, got, tc.want)
+		}
+	}
+}
 
+// ==================== wecom_test.go ====================
 
 // 企微：发送成功。
 func TestWeCom_SendSuccess(t *testing.T) {
@@ -523,7 +537,6 @@ func TestBuildWeComPayload(t *testing.T) {
 }
 
 // ==================== feishu_test.go ====================
-
 
 // 飞书：成功响应（code=0）应返回 nil，并带上文本消息结构。
 func TestFeishu_SendSuccess(t *testing.T) {
@@ -699,7 +712,6 @@ func TestFeishu_StripsMarkdown(t *testing.T) {
 
 // ==================== bark_test.go ====================
 
-
 func TestBark_SendSuccess(t *testing.T) {
 	var captured []byte
 	var path string
@@ -823,7 +835,6 @@ func TestBark_StripsFormatting(t *testing.T) {
 }
 
 // ==================== ntfy_test.go ====================
-
 
 func TestNtfy_SendSuccess(t *testing.T) {
 	var (
@@ -1003,7 +1014,6 @@ func TestNormalizeCSV(t *testing.T) {
 
 // ==================== apprise_test.go ====================
 
-
 // 状态化模式：只配 key 时请求 /notify/{key}，请求体不带 urls。
 func TestApprise_KeyMode(t *testing.T) {
 	var (
@@ -1165,7 +1175,6 @@ func TestApprise_StripsFormatting(t *testing.T) {
 
 // ==================== telegram_test.go ====================
 
-
 // withTelegramBase 把 Bot API 根地址指向本地测试服务。
 func withTelegramBase(t *testing.T, base string) {
 	t.Helper()
@@ -1276,7 +1285,6 @@ func TestTelegram_MissingConfig(t *testing.T) {
 
 // ==================== smtp_test.go ====================
 
-
 func TestResolveSMTPSecurityMode(t *testing.T) {
 	cases := []struct {
 		name string
@@ -1345,7 +1353,6 @@ func TestSMTPMissingRequiredFieldsIsPermanent(t *testing.T) {
 }
 
 // ==================== smtp_mime_test.go ====================
-
 
 // buildMIME：纯文本格式。
 func TestBuildMIME_Text(t *testing.T) {
@@ -1452,7 +1459,6 @@ func TestResolveSMTPSecurityMode_AllBranches(t *testing.T) {
 }
 
 // ==================== log_test.go ====================
-
 
 // log 通道：各种格式都应正常返回 nil（输出到日志，不调外部服务）。
 func TestLogNotifier_Send(t *testing.T) {

@@ -2,8 +2,6 @@
 package handlers
 
 import (
-	"strconv"
-
 	"github.com/gin-gonic/gin"
 	"github.com/reminder/backend/internal/services"
 )
@@ -15,14 +13,11 @@ type TokenHandler struct {
 
 // List GET /api/tokens
 func (h *TokenHandler) List(c *gin.Context) {
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
-	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+	limit := queryInt(c, "limit", 10)
+	offset := queryInt(c, "offset", 0)
 	search := c.Query("search")
 	if limit < 1 || limit > 100 {
 		limit = 10
-	}
-	if offset < 0 {
-		offset = 0
 	}
 
 	views, total, err := h.Svc.ListViews(limit, offset, search)

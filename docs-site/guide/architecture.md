@@ -41,11 +41,12 @@
 | `handlers` | HTTP 入参解析、调用服务、输出统一响应体 |
 | `services` | 业务逻辑：CRUD、校验、渲染、投递、确认链 |
 | `scheduler` | 下次触发计算、触发器注册、兜底扫描 |
-| `notifier` | 各通道的发送实现，统一 `Notifier` 接口 |
+| `notifier` | 各通道的发送实现，统一 `Notifier` 接口；HTTP 请求、状态码分类与纯文本降级共用同一套工具 |
 | `models` | GORM 模型 |
 | `middleware` | 鉴权、日志、错误渲染、CORS、限流 |
 | `crypto/secretbox` | 通道敏感字段与 AI 草稿的对称加解密 |
 | `llm` | 厂商无关的对话接口，Anthropic 与 OpenAI 兼容协议两个实现 |
+| `textutil` | 日志与消息共用的 URL 脱敏、query 脱敏与按字符截断 |
 | `version` | 构建时注入的版本号与构建时间 |
 
 两条约束：服务层依赖 `SchedulerHook` 接口而非 scheduler 具体实现，避免循环依赖；

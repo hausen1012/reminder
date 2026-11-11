@@ -1,17 +1,20 @@
 package notifier
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log/slog"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/reminder/backend/internal/textutil"
 )
+
+// webhookTimeout 是 Webhook 单次请求的超时：用户可能指向较慢的自建服务。
+const webhookTimeout = 15 * time.Second
 
 // WebhookConfig 是 Webhook 通道的配置。
 //
@@ -35,7 +38,7 @@ func (n *webhookNotifier) Send(ctx context.Context, configJSON []byte, msg Messa
 	if err := json.Unmarshal(configJSON, &cfg); err != nil {
 		return Permanent(fmt.Errorf("解析 Webhook 配置失败: %w", err))
 	}
-	slog.Debug("Webhook 开始发送", "method", cfg.Method, "url", redactURLString(cfg.URL), "subject", msg.Subject, "body_len", len(msg.Body))
+	slog.Debug("Webhook 开始发送", "method", cfg.Method, "url", textutil.RedactURLString(cfg.URL), "subject", msg.Subject, "body_len", len(msg.Body))
 	if cfg.URL == "" {
 		return Permanent(fmt.Errorf("Webhook url 未配置"))
 	}
@@ -47,24 +50,27 @@ func (n *webhookNotifier) Send(ctx context.Context, configJSON []byte, msg Messa
 		return Permanent(fmt.Errorf("Webhook method 仅支持 GET/POST，收到 %s", method))
 	}
 
-	reqCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
-	defer cancel()
-
 	// 提前校验 URL 格式，避免无效 URL 触发无意义重试
 	parsedURL, urlErr := url.Parse(cfg.URL)
 	if urlErr != nil || parsedURL.Scheme == "" || parsedURL.Host == "" {
 		return Permanent(fmt.Errorf("Webhook url 不合法: %s（需要 http:// 或 https:// 开头）", cfg.URL))
 	}
 
-	var req *http.Request
-	var err error
+	headers := map[string]string{}
+	for k, v := range cfg.Headers {
+		headers[k] = v
+	}
+	if cfg.AuthorizationEnc != "" {
+		headers["Authorization"] = cfg.AuthorizationEnc
+	}
+
+	var (
+		res *httpResult
+		err error
+	)
 	switch method {
 	case http.MethodGet:
-		u, err := url.Parse(cfg.URL)
-		if err != nil {
-			return Permanent(fmt.Errorf("Webhook url 不合法: %w", err))
-		}
-		q := u.Query()
+		q := parsedURL.Query()
 		for k, vTmpl := range cfg.QueryTemplate {
 			rendered := Render(vTmpl, msg.Vars)
 			// 渲染结果可能带 {{confirm_url}} 之类的凭据，只记长度
@@ -78,53 +84,29 @@ func (n *webhookNotifier) Send(ctx context.Context, configJSON []byte, msg Messa
 			}
 			q.Set("body", msg.Body)
 		}
-		u.RawQuery = q.Encode()
-		req, err = http.NewRequestWithContext(reqCtx, http.MethodGet, u.String(), nil)
-		if err != nil {
-			return Permanent(fmt.Errorf("构造 GET 请求失败: %w", err))
-		}
+		parsedURL.RawQuery = q.Encode()
+		// 只记 header 名不记取值，Authorization 是解密后的凭据
+		slog.Debug("Webhook 发送请求", "method", http.MethodGet, "url", textutil.RedactURL(parsedURL), "header_keys", headerKeyList(headers))
+		res, err = doRequestTimeout(ctx, webhookTimeout, http.MethodGet, parsedURL.String(), headers, nil)
 	case http.MethodPost:
-		bodyBytes, err := buildPostBody(cfg.BodyTemplate, msg)
-		if err != nil {
-			return Permanent(fmt.Errorf("构造 Webhook body 失败: %w", err))
-		}
-		req, err = http.NewRequestWithContext(reqCtx, http.MethodPost, cfg.URL, bytes.NewReader(bodyBytes))
-		if err != nil {
-			return Permanent(fmt.Errorf("构造 POST 请求失败: %w", err))
+		bodyBytes, buildErr := buildPostBody(cfg.BodyTemplate, msg)
+		if buildErr != nil {
+			return Permanent(fmt.Errorf("构造 Webhook body 失败: %w", buildErr))
 		}
 		ct := cfg.ContentType
 		if ct == "" {
 			ct = "application/json; charset=utf-8"
 		}
-		req.Header.Set("Content-Type", ct)
+		headers["Content-Type"] = ct
+		slog.Debug("Webhook 发送请求", "method", http.MethodPost, "url", textutil.RedactURLString(cfg.URL), "header_keys", headerKeyList(headers))
+		res, err = doRequestTimeout(ctx, webhookTimeout, http.MethodPost, cfg.URL, headers, bodyBytes)
 	}
-
-	for k, v := range cfg.Headers {
-		req.Header.Set(k, v)
-	}
-	if cfg.AuthorizationEnc != "" {
-		req.Header.Set("Authorization", cfg.AuthorizationEnc)
-	}
-
-	// 只记 header 名不记取值，Authorization 是解密后的凭据
-	slog.Debug("Webhook 发送请求", "method", req.Method, "url", redactURL(req.URL), "header_keys", headerKeys(req.Header))
-
-	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		// 这里只返回错误，dispatch 会带重试轮次与通道信息统一记录
 		return fmt.Errorf("请求 Webhook 失败: %w", err)
 	}
-	defer resp.Body.Close()
-
-	respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
-	slog.Debug("Webhook 响应", "status", resp.StatusCode, "body_len", len(respBody), "body", string(respBody))
-	if resp.StatusCode >= 500 {
-		return fmt.Errorf("Webhook 5xx %d: %s", resp.StatusCode, respBody)
-	}
-	if resp.StatusCode >= 400 {
-		return Permanent(fmt.Errorf("Webhook %d: %s", resp.StatusCode, respBody))
-	}
-	return nil
+	slog.Debug("Webhook 响应", "status", res.Status, "body_len", len(res.Body), "body", string(res.Body))
+	return classifyStatus("Webhook", res)
 }
 
 // buildPostBody 构造 POST 请求体。

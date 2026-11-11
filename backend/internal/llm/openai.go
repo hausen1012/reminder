@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/reminder/backend/internal/logger"
+	"github.com/reminder/backend/internal/textutil"
 )
 
 // OpenAIProvider 用 OpenAI Chat Completions 协议对接任意兼容厂商（DeepSeek、Moonshot、
@@ -162,7 +163,7 @@ func (p *OpenAIProvider) Chat(ctx context.Context, req Request) (*Reply, error) 
 	resp, err := p.client.Do(httpReq)
 	if err != nil {
 		logger.FromContext(ctx).Warn("AI 请求失败",
-			"provider", "openai", "model", p.model, "url", redactURLString(reqURL),
+			"provider", "openai", "model", p.model, "url", textutil.RedactURLString(reqURL),
 			"msgs", len(msgs), "tools", len(body.Tools),
 			"elapsed_ms", time.Since(started).Milliseconds(), "error", err)
 		return nil, fmt.Errorf("请求 AI 服务失败: %w", err)
@@ -236,12 +237,9 @@ func (p *OpenAIProvider) Chat(ctx context.Context, req Request) (*Reply, error) 
 	return reply, nil
 }
 
+// truncate 截断上游响应体，只用于日志与错误文案。
 func truncate(b []byte, n int) string {
-	s := strings.TrimSpace(string(b))
-	if len([]rune(s)) <= n {
-		return s
-	}
-	return string([]rune(s)[:n]) + "…"
+	return textutil.TruncateRunes(strings.TrimSpace(string(b)), n)
 }
 
 var _ Provider = (*OpenAIProvider)(nil)

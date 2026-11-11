@@ -14,6 +14,8 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+
+	"github.com/reminder/backend/internal/textutil"
 )
 
 // AppriseConfig 是 Apprise 通道的配置。
@@ -34,7 +36,7 @@ func (n *appriseNotifier) Send(ctx context.Context, configJSON []byte, msg Messa
 		return Permanent(fmt.Errorf("解析 Apprise 配置失败: %w", err))
 	}
 	apiURL := strings.TrimRight(strings.TrimSpace(cfg.APIURL), "/")
-	slog.Debug("Apprise 开始发送", "url", redactURLString(apiURL), "subject", msg.Subject, "body_len", len(msg.Body))
+	slog.Debug("Apprise 开始发送", "url", textutil.RedactURLString(apiURL), "subject", msg.Subject, "body_len", len(msg.Body))
 	if apiURL == "" {
 		return Permanent(fmt.Errorf("Apprise api_url 未配置"))
 	}
@@ -50,11 +52,8 @@ func (n *appriseNotifier) Send(ctx context.Context, configJSON []byte, msg Messa
 		endpoint += "/" + key
 	}
 
-	body := buildApprisePayload(cfg, urls, msg)
-	raw, _ := json.Marshal(body)
-
-	res, err := doRequest(ctx, http.MethodPost, endpoint,
-		map[string]string{"Content-Type": "application/json"}, raw)
+	res, err := postJSON(ctx, "Apprise", endpoint, buildApprisePayload(cfg, urls, msg),
+		map[string]string{"Content-Type": "application/json"})
 	if err != nil {
 		return err
 	}
@@ -74,16 +73,9 @@ func (n *appriseNotifier) Send(ctx context.Context, configJSON []byte, msg Messa
 }
 
 func buildApprisePayload(cfg AppriseConfig, urls []string, msg Message) map[string]any {
-	body := msg.Body
-	switch msg.Format {
-	case "html":
-		body = StripHTML(msg.Body)
-	case "markdown":
-		body = StripMarkdown(msg.Body)
-	}
 	payload := map[string]any{
 		"title": msg.Subject,
-		"body":  body,
+		"body":  plainText(msg),
 		"type":  normalizeAppriseType(cfg.Type),
 	}
 	if len(urls) > 0 {

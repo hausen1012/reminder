@@ -509,38 +509,21 @@ func (e *Engine) fire(id uint) {
 	var logID uint
 	err = e.db.Transaction(func(tx *gorm.DB) error {
 		// 乐观锁：用旧 next_fire_at 做等值条件，防止重复触发
-		oldNext := r.NextFireAt
-		q := tx.Model(&models.Reminder{}).Where("id = ? AND enabled = ?", id, true)
-		if oldNext != nil {
-			q = q.Where("next_fire_at = ?", *oldNext)
-		} else {
-			q = q.Where("next_fire_at IS NULL")
-		}
 		updates := map[string]any{
 			"last_fired_at": nowUTC,
-			"next_fire_at":  nextStored,
 			"fire_count":    gorm.Expr("fire_count + 1"),
 		}
-		res := q.Updates(updates)
-		if res.Error != nil {
-			return res.Error
+		q := tx.Model(&models.Reminder{}).Where("id = ? AND enabled = ?", id, true)
+		ok, err := advanceReminder(q, &r, nextStored, updates)
+		if err != nil {
+			return err
 		}
-		if res.RowsAffected == 0 {
+		if !ok {
 			// 别的路径（sweeper 或并发触发）已经处理过这条，跳过
 			return errSkipped
 		}
 		// 插入 pending 日志
-		titleSnapshot := r.Title
-		contentSnapshot := r.Content
-		dlog := &models.DeliveryLog{
-			ReminderID: r.ID,
-			FiredAt:    nowUTC,
-			Title:      titleSnapshot,
-			Content:    contentSnapshot,
-			Status:     "pending",
-			Source:     r.Source,
-			RetryRound: 0,
-		}
+		dlog := newDeliveryLog(&r, "pending", nowUTC, 0)
 		if err := tx.Create(dlog).Error; err != nil {
 			return err
 		}

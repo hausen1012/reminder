@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -17,28 +16,16 @@ type LogHandler struct {
 // List GET /api/logs
 func (h *LogHandler) List(c *gin.Context) {
 	f := services.LogFilter{
-		Status: c.Query("status"),
-		Source: c.Query("source"),
-		Search: c.Query("search"),
-	}
-	if v := c.Query("reminder_id"); v != "" {
-		if n, err := strconv.ParseUint(v, 10, 64); err == nil {
-			f.ReminderID = uint(n)
-		}
+		Status:     c.Query("status"),
+		Source:     c.Query("source"),
+		Search:     c.Query("search"),
+		ReminderID: queryUint(c, "reminder_id"),
+		Limit:      queryInt(c, "limit", 0),
+		Offset:     queryInt(c, "offset", 0),
 	}
 	if v := c.Query("since"); v != "" {
 		if t, err := time.Parse(time.RFC3339, v); err == nil {
 			f.Since = &t
-		}
-	}
-	if v := c.Query("limit"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil {
-			f.Limit = n
-		}
-	}
-	if v := c.Query("offset"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil {
-			f.Offset = n
 		}
 	}
 	items, total, err := h.Svc.List(f)

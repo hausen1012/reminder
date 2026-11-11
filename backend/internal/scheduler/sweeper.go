@@ -196,42 +196,21 @@ func (s *Sweeper) markExpired(r *models.Reminder, now time.Time) error {
 	nextStored := models.TimePtr(newNext)
 
 	return s.db.Transaction(func(tx *gorm.DB) error {
-		oldNext := r.NextFireAt
-		q := tx.Model(&models.Reminder{}).Where("id = ?", r.ID)
-		if oldNext != nil {
-			// 同 engine.fire：整数毫秒列的等值比较是精确的
-			q = q.Where("next_fire_at = ?", *oldNext)
-		} else {
-			q = q.Where("next_fire_at IS NULL")
-		}
-		updates := map[string]any{
-			"next_fire_at": nextStored,
-		}
+		updates := map[string]any{}
 		if r.ScheduleType == "once" && newNext == nil {
 			// 单次已过期：禁用，避免下次启动再扫到
 			updates["enabled"] = false
 		}
-		res := q.Updates(updates)
-		if res.Error != nil {
-			return res.Error
+		q := tx.Model(&models.Reminder{}).Where("id = ?", r.ID)
+		ok, err := advanceReminder(q, r, nextStored, updates)
+		if err != nil {
+			return err
 		}
-		if res.RowsAffected == 0 {
+		if !ok {
 			// 别人改过了，跳过
 			return errSweepSkipped
 		}
-		dlog := &models.DeliveryLog{
-			ReminderID: r.ID,
-			FiredAt:    *r.NextFireAt,
-			Title:      r.Title,
-			Content:    r.Content,
-			Status:     "expired",
-			Source:     r.Source,
-			RetryRound: 0,
-		}
-		if err := tx.Create(dlog).Error; err != nil {
-			return err
-		}
-		return nil
+		return tx.Create(newDeliveryLog(r, "expired", *r.NextFireAt, 0)).Error
 	})
 }
 

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/reminder/backend/internal/textutil"
 )
 
 // slowRequestThreshold 是「成功但慢」的请求被提升为 Warn 的阈值。
@@ -60,7 +61,8 @@ func SlogLogger() gin.HandlerFunc {
 			attrs = append(attrs, slog.Any("token_id", tokenID))
 		}
 		if query != "" {
-			attrs = append(attrs, slog.String("query", query))
+			// query 里可能带令牌或一次性凭据，只保留参数名
+			attrs = append(attrs, slog.String("query", textutil.RedactQuery(query)))
 		}
 		if size := c.Writer.Size(); size > 0 {
 			attrs = append(attrs, slog.Int("bytes", size))

@@ -12,6 +12,8 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+
+	"github.com/reminder/backend/internal/textutil"
 )
 
 // DefaultBarkServer 是 Bark 官方服务端地址。
@@ -39,7 +41,7 @@ func (n *barkNotifier) Send(ctx context.Context, configJSON []byte, msg Message)
 	if server == "" {
 		server = DefaultBarkServer
 	}
-	slog.Debug("Bark 开始发送", "server", redactURLString(server), "subject", msg.Subject, "body_len", len(msg.Body))
+	slog.Debug("Bark 开始发送", "server", textutil.RedactURLString(server), "subject", msg.Subject, "body_len", len(msg.Body))
 	if cfg.DeviceKey == "" {
 		return Permanent(fmt.Errorf("Bark device_key 未配置"))
 	}
@@ -47,43 +49,21 @@ func (n *barkNotifier) Send(ctx context.Context, configJSON []byte, msg Message)
 		return Permanent(fmt.Errorf("Bark server_url 非法: %w", err))
 	}
 
-	payload := buildBarkPayload(cfg, msg)
-	body, _ := json.Marshal(payload)
-
-	res, err := doRequest(ctx, http.MethodPost, server+"/push",
-		map[string]string{"Content-Type": "application/json; charset=utf-8"}, body)
+	res, err := postJSON(ctx, "Bark", server+"/push", buildBarkPayload(cfg, msg), nil)
 	if err != nil {
 		return err
 	}
 	if err := classifyStatus("Bark", res); err != nil {
 		return err
 	}
-
-	var br struct {
-		Code    int    `json:"code"`
-		Message string `json:"message"`
-	}
-	if err := json.Unmarshal(res.Body, &br); err != nil {
-		return fmt.Errorf("解析 Bark 响应失败: %w (body=%s)", err, res.Body)
-	}
-	if br.Code != 200 {
-		return Permanent(fmt.Errorf("Bark 业务错误 code=%d message=%s", br.Code, br.Message))
-	}
-	return nil
+	return checkBusinessCode("Bark", res, http.StatusOK)
 }
 
 func buildBarkPayload(cfg BarkConfig, msg Message) map[string]any {
-	body := msg.Body
-	switch msg.Format {
-	case "html":
-		body = StripHTML(msg.Body)
-	case "markdown":
-		body = StripMarkdown(msg.Body)
-	}
 	payload := map[string]any{
 		"device_key": cfg.DeviceKey,
 		"title":      msg.Subject,
-		"body":       body,
+		"body":       plainText(msg),
 	}
 	if cfg.Group != "" {
 		payload["group"] = cfg.Group

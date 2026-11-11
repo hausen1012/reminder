@@ -11,6 +11,8 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+
+	"github.com/reminder/backend/internal/textutil"
 )
 
 // DefaultNtfyServer 是 ntfy 官方服务端地址。
@@ -39,14 +41,14 @@ func (n *ntfyNotifier) Send(ctx context.Context, configJSON []byte, msg Message)
 		server = DefaultNtfyServer
 	}
 	topic := strings.TrimSpace(cfg.Topic)
-	slog.Debug("ntfy 开始发送", "server", redactURLString(server), "topic", topic, "subject", msg.Subject, "body_len", len(msg.Body))
+	slog.Debug("ntfy 开始发送", "server", textutil.RedactURLString(server), "topic", topic, "subject", msg.Subject, "body_len", len(msg.Body))
 	if topic == "" {
 		return Permanent(fmt.Errorf("ntfy topic 未配置"))
 	}
 
 	endpoint := server + "/" + topic
 	headers := map[string]string{}
-	body := buildNtfyBody(cfg, msg)
+	body := buildNtfyBody(msg)
 	if msg.Subject != "" {
 		headers["Title"] = msg.Subject
 	}
@@ -67,17 +69,9 @@ func (n *ntfyNotifier) Send(ctx context.Context, configJSON []byte, msg Message)
 	return classifyStatus("ntfy", res)
 }
 
-// buildNtfyBody 返回消息正文：html / markdown 降级为纯文本。
-func buildNtfyBody(cfg NtfyConfig, msg Message) string {
-	body := msg.Body
-	switch msg.Format {
-	case "html":
-		body = StripHTML(msg.Body)
-	case "markdown":
-		// ntfy 客户端默认按纯文本展示，markdown 标记直接去掉
-		body = StripMarkdown(msg.Body)
-	}
-	return body
+// buildNtfyBody 返回消息正文：ntfy 客户端按纯文本展示，富文本先降级。
+func buildNtfyBody(msg Message) string {
+	return plainText(msg)
 }
 
 // normalizeCSV 去掉逗号分隔项的多余空白；空项被丢弃。

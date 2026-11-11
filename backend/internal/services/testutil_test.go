@@ -197,14 +197,11 @@ func getLogByID(t *testing.T, db *gorm.DB, id uint) models.DeliveryLog {
 // getTokenByChain 取某条确认链上的确认令牌。
 func getTokenByChain(t *testing.T, db *gorm.DB, chainID string) models.ConfirmToken {
 	t.Helper()
-	var tok models.ConfirmToken
-	err := db.Joins("JOIN delivery_logs ON delivery_logs.id = confirm_tokens.delivery_log_id").
-		Where("delivery_logs.confirm_chain_id = ?", chainID).
-		First(&tok).Error
+	tok, err := tokenByChain(db, chainID)
 	if err != nil {
 		t.Fatalf("查询 token 失败: %v", err)
 	}
-	return tok
+	return *tok
 }
 
 // waitFor 轮询等待条件成立，超时即测试失败。

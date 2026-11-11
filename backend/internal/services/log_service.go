@@ -78,12 +78,7 @@ func (s *LogService) List(f LogFilter) ([]*LogView, int64, error) {
 		return q
 	}
 
-	if f.Limit <= 0 {
-		f.Limit = 50
-	}
-	if f.Limit > 200 {
-		f.Limit = 200
-	}
+	f.Limit, f.Offset = normalizePage(f.Limit, f.Offset)
 
 	type row struct {
 		models.DeliveryLog
@@ -184,11 +179,7 @@ func (s *LogService) GetDetail(id uint) (*LogView, error) {
 	// 取 confirm_url
 	var confirmURL string
 	if dl.ConfirmChainID != nil && *dl.ConfirmChainID != "" {
-		var tok models.ConfirmToken
-		if err := s.DB.Model(&models.ConfirmToken{}).
-			Joins("JOIN delivery_logs ON delivery_logs.id = confirm_tokens.delivery_log_id").
-			Where("delivery_logs.confirm_chain_id = ?", *dl.ConfirmChainID).
-			First(&tok).Error; err == nil {
+		if tok, err := tokenByChain(s.DB, *dl.ConfirmChainID); err == nil {
 			confirmURL = s.confirmURL(tok.Token)
 		}
 	}

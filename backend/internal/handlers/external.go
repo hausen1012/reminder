@@ -5,8 +5,6 @@
 package handlers
 
 import (
-	"strconv"
-
 	"github.com/gin-gonic/gin"
 	"github.com/reminder/backend/internal/middleware"
 	"github.com/reminder/backend/internal/services"
@@ -72,16 +70,8 @@ func (h *ExternalHandler) ListReminders(c *gin.Context) {
 	tokenID, _ := c.Get("token_id")
 	f := services.ListFilter{
 		Search: c.Query("search"),
-	}
-	if v := c.Query("limit"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil {
-			f.Limit = n
-		}
-	}
-	if v := c.Query("offset"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil {
-			f.Offset = n
-		}
+		Limit:  queryInt(c, "limit", 0),
+		Offset: queryInt(c, "offset", 0),
 	}
 	if keyID, ok := tokenID.(uint); ok {
 		f.TokenID = &keyID

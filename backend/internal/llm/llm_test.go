@@ -22,7 +22,6 @@ import (
 
 // ==================== provider_test.go ====================
 
-
 // OpenAI 兼容实现：请求体形状与工具调用解析。
 func TestOpenAIProvider_Chat_SendsToolsAndParsesToolCalls(t *testing.T) {
 	var gotBody map[string]any
@@ -194,7 +193,6 @@ func TestRequiredOf(t *testing.T) {
 
 // ==================== errors_test.go ====================
 
-
 // captureSlog 把全局 slog 临时重定向到内存 buffer。
 func captureSlog(t *testing.T) *bytes.Buffer {
 	t.Helper()
@@ -341,7 +339,6 @@ func attrsToMap(attrs []any) map[string]any {
 }
 
 // ==================== retry_test.go ====================
-
 
 // scriptProvider 按调用次数返回预置结果，用于验证重试次数。
 type scriptProvider struct {

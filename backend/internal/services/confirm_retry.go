@@ -256,10 +256,7 @@ func (m *ConfirmRetryManager) retry(reminderID uint, chainID string, round int) 
 		return
 	}
 
-	var tok models.ConfirmToken
-	err := m.DB.Joins("JOIN delivery_logs ON delivery_logs.id = confirm_tokens.delivery_log_id").
-		Where("delivery_logs.confirm_chain_id = ?", chainID).
-		First(&tok).Error
+	tok, err := tokenByChain(m.DB, chainID)
 	if err != nil {
 		slog.Warn("停止确认链", "chain", chainID, "reason", "查找 token 失败", "round", round, "error", err)
 		m.stopChain(chainID)

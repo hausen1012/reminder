@@ -1,18 +1,17 @@
 package notifier
 
 import (
-	"bytes"
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log/slog"
-	"net/http"
 	"net/url"
 	"time"
+
+	"github.com/reminder/backend/internal/textutil"
 )
 
 // DingTalkConfig 是钉钉机器人 Webhook 的配置。
@@ -32,7 +31,7 @@ func (n *dingtalkNotifier) Send(ctx context.Context, configJSON []byte, msg Mess
 	if err := json.Unmarshal(configJSON, &cfg); err != nil {
 		return Permanent(fmt.Errorf("解析钉钉配置失败: %w", err))
 	}
-	slog.Debug("钉钉开始发送", "subject", msg.Subject, "body_len", len(msg.Body), "format", msg.Format, "url", redactURLString(cfg.WebhookURL))
+	slog.Debug("钉钉开始发送", "subject", msg.Subject, "body_len", len(msg.Body), "format", msg.Format, "url", textutil.RedactURLString(cfg.WebhookURL))
 	if cfg.WebhookURL == "" {
 		return Permanent(fmt.Errorf("钉钉 webhook_url 未配置"))
 	}
@@ -46,43 +45,14 @@ func (n *dingtalkNotifier) Send(ctx context.Context, configJSON []byte, msg Mess
 		endpoint = signed
 	}
 
-	payload := buildDingTalkPayload(cfg, msg)
-	body, _ := json.Marshal(payload)
-
-	reqCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-	req, err := http.NewRequestWithContext(reqCtx, http.MethodPost, endpoint, bytes.NewReader(body))
+	res, err := postJSON(ctx, "钉钉", endpoint, buildDingTalkPayload(cfg, msg), nil)
 	if err != nil {
-		return Permanent(fmt.Errorf("构造请求失败: %w", err))
+		return err
 	}
-	req.Header.Set("Content-Type", "application/json; charset=utf-8")
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("请求钉钉失败: %w", err)
+	if err := classifyStatus("钉钉", res); err != nil {
+		return err
 	}
-	defer resp.Body.Close()
-
-	respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
-	if resp.StatusCode >= 500 {
-		return fmt.Errorf("钉钉 5xx %d: %s", resp.StatusCode, respBody)
-	}
-	if resp.StatusCode >= 400 {
-		return Permanent(fmt.Errorf("钉钉 %d: %s", resp.StatusCode, respBody))
-	}
-
-	// 业务码解析
-	var br struct {
-		Errcode int    `json:"errcode"`
-		Errmsg  string `json:"errmsg"`
-	}
-	if err := json.Unmarshal(respBody, &br); err != nil {
-		return fmt.Errorf("解析钉钉响应失败: %w (body=%s)", err, respBody)
-	}
-	if br.Errcode != 0 {
-		return Permanent(fmt.Errorf("钉钉业务错误 errcode=%d errmsg=%s", br.Errcode, br.Errmsg))
-	}
-	return nil
+	return checkBusinessCode("钉钉", res, 0)
 }
 
 func signDingTalk(rawURL, secret string) (string, error) {
@@ -122,18 +92,10 @@ func buildDingTalkPayload(cfg DingTalkConfig, msg Message) map[string]any {
 		}
 		return p
 	default:
-		// format = "text" 或降级逻辑
-		body := msg.Body
-		if msg.Format == "html" {
-			body = StripHTML(msg.Body)
-		}
-		content := body
-		if msg.Subject != "" {
-			content = msg.Subject + "\n" + body
-		}
+		// text 原文；html 去标签后按纯文本发送
 		p := map[string]any{
 			"msgtype": "text",
-			"text":    map[string]any{"content": content},
+			"text":    map[string]any{"content": plainTextWithSubject(msg)},
 		}
 		if cfg.AtAll || len(cfg.AtMobiles) > 0 {
 			p["at"] = map[string]any{"atMobiles": cfg.AtMobiles, "isAtAll": cfg.AtAll}

@@ -12,6 +12,7 @@ import (
 	"github.com/reminder/backend/internal/middleware"
 	"github.com/reminder/backend/internal/models"
 	"github.com/reminder/backend/internal/notifier"
+	"github.com/reminder/backend/internal/textutil"
 )
 
 // ai_tools 定义暴露给模型的工具；写操作只生成 AIAction 草稿，不直接落库。
@@ -236,7 +237,7 @@ func (s *AIService) toolListReminders(_ context.Context, raw json.RawMessage) (s
 		out = append(out, item{
 			ID:                      v.ID,
 			Title:                   v.Title,
-			Content:                 truncateRunes(v.Content, 200),
+			Content:                 textutil.TruncateRunes(v.Content, 200),
 			Calendar:                v.Calendar,
 			ScheduleType:            v.ScheduleType,
 			ScheduleSpec:            v.ScheduleSpec,
@@ -376,7 +377,7 @@ func (s *AIService) createAction(kind, summary string, payload any) (string, err
 	act := &models.AIAction{
 		ID:         uuid.NewString(),
 		Kind:       kind,
-		Summary:    truncateRunes(summary, 255),
+		Summary:    textutil.TruncateRunes(summary, 255),
 		PayloadEnc: enc,
 		Status:     "pending",
 	}
@@ -429,45 +430,6 @@ func jsonInt(m map[string]any, key string) (int64, error) {
 	return 0, middleware.NewAppError(middleware.CodeValidationFailed, "参数类型错误: "+key).WithField(key)
 }
 
-// asMap 把任意值规整为 map[string]any。
-func asMap(v any) map[string]any {
-	if m, ok := v.(map[string]any); ok {
-		return m
-	}
-	return nil
-}
-
-// asBool 把任意值规整为 bool。
-func asBool(v any) bool {
-	b, _ := v.(bool)
-	return b
-}
-
-// asUintSlice 把 JSON 数字数组转成 []uint。
-func asUintSlice(v any) []uint {
-	items, ok := v.([]any)
-	if !ok {
-		if u, ok := v.([]uint); ok {
-			return u
-		}
-		return nil
-	}
-	out := make([]uint, 0, len(items))
-	for _, item := range items {
-		switch n := item.(type) {
-		case float64:
-			if n > 0 {
-				out = append(out, uint(n))
-			}
-		case int:
-			if n > 0 {
-				out = append(out, uint(n))
-			}
-		}
-	}
-	return out
-}
-
 // toJSONString 把任意值序列化为紧凑 JSON 字符串（工具结果）。
 func toJSONString(v any) string {
 	b, err := json.Marshal(v)
@@ -475,15 +437,6 @@ func toJSONString(v any) string {
 		return "{}"
 	}
 	return string(b)
-}
-
-// truncateRunes 按字符截断，避免截出半个汉字；截断时补省略号。
-func truncateRunes(s string, n int) string {
-	r := []rune(s)
-	if len(r) <= n {
-		return s
-	}
-	return string(r[:n]) + "…"
 }
 
 // draftIDOf 从工具结果 JSON 里取出 draft_id；不是写工具的结果时返回空串。

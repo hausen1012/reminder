@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"sync"
 	"testing"
@@ -1248,5 +1250,55 @@ func TestAIChat_LogsCarryRequestID(t *testing.T) {
 
 	if out := logs.String(); !strings.Contains(out, "request_id=req-42") {
 		t.Fatalf("对话日志应带 request_id:\n%s", out)
+	}
+}
+
+// FetchModels 的两种协议共用同一套请求/解析流程：去重、排序、非 2xx 报错。
+func TestAIFetchModels(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/models" {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		// OpenAI 兼容协议走 Authorization，Anthropic 协议走 x-api-key
+		switch {
+		case r.Header.Get("Authorization") == "Bearer sk-test":
+			_, _ = w.Write([]byte(`{"data":[{"id":"gpt-b"},{"id":"gpt-a"},{"id":"gpt-a"}],"models":[{"name":"gpt-c"}]}`))
+		case r.Header.Get("x-api-key") == "sk-test" && r.Header.Get("anthropic-version") != "":
+			_, _ = w.Write([]byte(`{"data":[{"id":"claude-b"},{"id":"claude-a"}]}`))
+		default:
+			w.WriteHeader(http.StatusUnauthorized)
+		}
+	}))
+	defer srv.Close()
+
+	db := openTestDB(t)
+	chnSvc, _ := newChannelSvcForTestWithDB(t, db)
+	svc := NewAIService(db, chnSvc.Box, testTZ(cstZone()), nil, chnSvc)
+
+	openaiModels, err := svc.FetchModels(t.Context(), AISettingsInput{
+		Provider: "openai", BaseURL: srv.URL, APIKey: "sk-test",
+	})
+	if err != nil {
+		t.Fatalf("获取 OpenAI 模型失败: %v", err)
+	}
+	if strings.Join(openaiModels, ",") != "gpt-a,gpt-b,gpt-c" {
+		t.Fatalf("OpenAI 模型列表 = %v，期望去重并升序", openaiModels)
+	}
+
+	anthropicModels, err := svc.FetchModels(t.Context(), AISettingsInput{
+		Provider: "anthropic", BaseURL: srv.URL, APIKey: "sk-test",
+	})
+	if err != nil {
+		t.Fatalf("获取 Anthropic 模型失败: %v", err)
+	}
+	if strings.Join(anthropicModels, ",") != "claude-a,claude-b" {
+		t.Fatalf("Anthropic 模型列表 = %v", anthropicModels)
+	}
+
+	if _, err := svc.FetchModels(t.Context(), AISettingsInput{
+		Provider: "openai", BaseURL: srv.URL, APIKey: "wrong",
+	}); err == nil {
+		t.Fatal("非 2xx 应返回错误")
 	}
 }

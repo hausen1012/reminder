@@ -2,6 +2,8 @@ package services
 
 import (
 	"testing"
+
+	"github.com/reminder/backend/internal/models"
 )
 
 // 排序字段白名单：合法值生效，非法值一律回退到默认排序。
@@ -75,5 +77,76 @@ func TestReminderCreate_BlankContentFallsBackToTitle(t *testing.T) {
 	}
 	if v.Content != "标题" {
 		t.Fatalf("空白正文应回退为标题，实际 %q", v.Content)
+	}
+}
+
+// 分页参数归一化：缺省/超限/负数都有确定结果。
+func TestNormalizePage(t *testing.T) {
+	cases := []struct {
+		name              string
+		limit, offset     int
+		wantLimit, wantOf int
+	}{
+		{"缺省 limit", 0, 0, 50, 0},
+		{"超限 limit", 500, 0, 200, 0},
+		{"负数 offset", 10, -5, 10, 0},
+		{"正常值原样保留", 20, 40, 20, 40},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			limit, offset := normalizePage(tc.limit, tc.offset)
+			if limit != tc.wantLimit || offset != tc.wantOf {
+				t.Fatalf("normalizePage(%d, %d) = (%d, %d)，期望 (%d, %d)",
+					tc.limit, tc.offset, limit, offset, tc.wantLimit, tc.wantOf)
+			}
+		})
+	}
+}
+
+// 关联表批量查询与整表替换：批量结果按主体分组，替换时去重并丢弃 0。
+func TestJoinHelpers(t *testing.T) {
+	db := openTestDB(t)
+	ch1 := createChannel(t, db, "log")
+	ch2 := createChannel(t, db, "log")
+
+	for _, rid := range []uint{1, 2} {
+		if err := replaceJoinRows(db, &models.ReminderChannel{}, "reminder_id", rid,
+			[]uint{ch1.ID, ch2.ID, ch1.ID, 0},
+			func(ownerID, targetID uint) models.ReminderChannel {
+				return models.ReminderChannel{ReminderID: ownerID, ChannelID: targetID}
+			}); err != nil {
+			t.Fatalf("替换关联失败: %v", err)
+		}
+	}
+
+	got, err := joinIDs(db, &models.ReminderChannel{}, "reminder_id", 1, "channel_id")
+	if err != nil {
+		t.Fatalf("查询关联失败: %v", err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("去重后应剩 2 条关联，实际 %v", got)
+	}
+
+	batch, err := joinIDsBatch(db, &models.ReminderChannel{}, "reminder_id", "channel_id", []uint{1, 2})
+	if err != nil {
+		t.Fatalf("批量查询失败: %v", err)
+	}
+	if len(batch[1]) != 2 || len(batch[2]) != 2 {
+		t.Fatalf("批量结果 = %v", batch)
+	}
+
+	if err := replaceJoinRows(db, &models.ReminderChannel{}, "reminder_id", 1, nil,
+		func(ownerID, targetID uint) models.ReminderChannel {
+			return models.ReminderChannel{ReminderID: ownerID, ChannelID: targetID}
+		}); err != nil {
+		t.Fatalf("清空关联失败: %v", err)
+	}
+	got, _ = joinIDs(db, &models.ReminderChannel{}, "reminder_id", 1, "channel_id")
+	if len(got) != 0 {
+		t.Fatalf("清空后应为空，实际 %v", got)
+	}
+
+	if _, err := firstByID[models.Channel](db, 9999, "通道不存在"); err == nil {
+		t.Fatal("不存在的记录应返回 404")
 	}
 }

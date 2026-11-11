@@ -4,6 +4,7 @@ package services
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/6tail/lunar-go/calendar"
@@ -41,11 +42,17 @@ func buildVars(r *models.Reminder, firedAt, planned time.Time, loc *time.Locatio
 
 // buildRenderedMessage 渲染标题与正文，并把展开后的结果写回 vars["title"] / vars["content"]，
 // 保证下游（尤其 Webhook 模板）拿到的是展开后的内容。正文先渲染：标题里可以引用 {{content}}。
-//
-// 例外：DispatchService.Run（需先注入 confirm_url）与 ChannelService.DryRun（纯试发）
-// 自行构造 Message，是有意保留的分叉。
 func buildRenderedMessage(title, content, contentFormat string, vars map[string]string) notifier.Message {
+	return buildRenderedMessageWith(title, content, contentFormat, vars, nil)
+}
+
+// buildRenderedMessageWith 在 buildRenderedMessage 的基础上，允许在正文渲染后、
+// 写回 vars["content"] 之前追加内容（例如自动补上确认链接）。
+func buildRenderedMessageWith(title, content, contentFormat string, vars map[string]string, decorate func(body string) string) notifier.Message {
 	body := notifier.Render(content, vars)
+	if decorate != nil {
+		body = decorate(body)
+	}
 	vars["content"] = body
 	subject := notifier.Render(title, vars)
 	vars["title"] = subject
@@ -55,6 +62,16 @@ func buildRenderedMessage(title, content, contentFormat string, vars map[string]
 		Format:  contentFormat,
 		Vars:    vars,
 	}
+}
+
+// appendConfirmLink 在正文未包含确认链接时按内容格式追加一条，第二个返回值表示是否追加。
+//
+// 判据用渲染结果而不是原始模板：占位符允许前后空格，按模板字面量匹配会漏判并重复追加。
+func appendConfirmLink(body, confirmURL, contentFormat string) (string, bool) {
+	if confirmURL == "" || strings.Contains(body, confirmURL) {
+		return body, false
+	}
+	return notifier.AppendLink(body, contentFormat, confirmURL, "点击确认提醒"), true
 }
 
 // formatLunar 把公历时间转成「农历二〇二六年五月十七」形式的中文串。

@@ -1,12 +1,11 @@
 package handlers
 
 import (
-	"log/slog"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/reminder/backend/internal/logger"
 	"github.com/reminder/backend/internal/models"
 	"github.com/reminder/backend/internal/scheduler"
 	"gorm.io/gorm"
@@ -35,11 +34,12 @@ func (h *HealthHandler) Check(c *gin.Context) {
 
 	var reminderCount, logCount int64
 	if h.DB != nil && dbAlive {
+		log := logger.FromContext(c.Request.Context())
 		if err := h.DB.Model(&models.Reminder{}).Count(&reminderCount).Error; err != nil {
-			slog.Warn("健康检查统计提醒数失败", "error", err)
+			log.Warn("健康检查统计提醒数失败", "error", err)
 		}
 		if err := h.DB.Model(&models.DeliveryLog{}).Count(&logCount).Error; err != nil {
-			slog.Warn("健康检查统计日志数失败", "error", err)
+			log.Warn("健康检查统计日志数失败", "error", err)
 		}
 	}
 
@@ -96,17 +96,7 @@ type SchedulerHandler struct {
 // Status GET /api/scheduler/status（支持 limit/offset 分页）
 func (h *SchedulerHandler) Status(c *gin.Context) {
 	// 分页参数
-	offset, limit := 0, 0
-	if v := c.Query("limit"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil {
-			limit = n
-		}
-	}
-	if v := c.Query("offset"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil {
-			offset = n
-		}
-	}
+	offset, limit := queryInt(c, "offset", 0), queryInt(c, "limit", 0)
 
 	var entries []scheduler.RegisteredEntry
 	registeredCount := 0

@@ -16,6 +16,7 @@ import (
 	"github.com/reminder/backend/internal/middleware"
 	"github.com/reminder/backend/internal/models"
 	"github.com/reminder/backend/internal/notifier"
+	"github.com/reminder/backend/internal/textutil"
 	"github.com/reminder/backend/internal/timezone"
 	"gorm.io/gorm"
 )
@@ -90,10 +91,7 @@ func (d *DispatchService) Run(ctx context.Context, r *models.Reminder, deliveryL
 			slog.Warn("加载确认日志失败，无法复用已有确认链", "log", deliveryLogID, "error", err)
 		} else if currentLog.ConfirmChainID != nil && *currentLog.ConfirmChainID != "" {
 			confirmChainID = *currentLog.ConfirmChainID
-			var tok models.ConfirmToken
-			err := d.DB.Joins("JOIN delivery_logs ON delivery_logs.id = confirm_tokens.delivery_log_id").
-				Where("delivery_logs.confirm_chain_id = ?", confirmChainID).
-				First(&tok).Error
+			tok, err := tokenByChain(d.DB, confirmChainID)
 			if err != nil {
 				slog.Warn("复用确认 token 失败，本轮将不带确认链接", "chain", confirmChainID, "log", deliveryLogID, "error", err)
 			} else {
@@ -118,31 +116,15 @@ func (d *DispatchService) Run(ctx context.Context, r *models.Reminder, deliveryL
 		}
 	}
 
-	body := notifier.Render(r.Content, vars)
-	slog.Debug("内容渲染完成", "reminder", r.ID, "body_len", len(body), "confirm", confirmChainID != "")
-	// 判据用渲染结果而不是原始模板：占位符允许前后空格，按模板字面量匹配会漏判并重复追加
-	if cu := vars["confirm_url"]; cu != "" && !strings.Contains(body, cu) {
-		slog.Debug("自动追加确认链接", "reminder", r.ID)
-		switch r.ContentFormat {
-		case "html":
-			body += `<br><a href="` + cu + `">点击确认链接</a>`
-		case "markdown":
-			body += "\n\n[点击确认提醒](" + cu + ")"
-		default:
-			body += "\n点击确认提醒：" + cu
+	// 先注入 confirm_url，再统一渲染标题与正文；正文渲染后按格式补上确认链接
+	rendered := buildRenderedMessageWith(r.Title, r.Content, r.ContentFormat, vars, func(body string) string {
+		next, appended := appendConfirmLink(body, vars["confirm_url"], r.ContentFormat)
+		if appended {
+			slog.Debug("自动追加确认链接", "reminder", r.ID)
 		}
-	}
-	// 渲染后的 body 写回 vars，保证下游（如 webhook 的 {{content}}）拿到展开后的内容
-	vars["content"] = body
-	subject := notifier.Render(r.Title, vars)
-	vars["title"] = subject
-	rendered := notifier.Message{
-		Subject: subject,
-		Body:    body,
-		Format:  r.ContentFormat,
-		Vars:    vars,
-	}
-
+		return next
+	})
+	slog.Debug("内容渲染完成", "reminder", r.ID, "body_len", len(rendered.Body), "confirm", confirmChainID != "")
 	type result struct {
 		channelID   uint
 		channelType string
@@ -214,8 +196,80 @@ func (d *DispatchService) Run(ctx context.Context, r *models.Reminder, deliveryL
 	}
 }
 
-// sendWithRetry 在单个通道上按 RetryDelays 串行重试并写入 DeliveryAttempt；
-// 永久错误立即停止，返回是否最终成功。
+// sendPlan 是单通道发送前的准备结果：通知器、按通道上限截断后的消息与解密后的配置。
+type sendPlan struct {
+	notifier notifier.Notifier
+	msg      notifier.Message
+	config   []byte
+}
+
+// sendAttempt 是一次尝试的记录回调；为 nil 时不落库（试发）。
+type sendAttempt func(attempt int, status, errMsg string, latencyMs int)
+
+// prepare 解析通道类型、按该通道上限截断正文并解密配置。
+func (d *DispatchService) prepare(ch *models.Channel, msg notifier.Message) (*sendPlan, error) {
+	n, err := notifier.Get(ch.Type)
+	if err != nil {
+		return nil, err
+	}
+	return d.buildPlan(ch, n, msg)
+}
+
+// buildPlan 用已解析的通知器构造发送计划（截断正文 + 解密配置）。
+func (d *DispatchService) buildPlan(ch *models.Channel, n notifier.Notifier, msg notifier.Message) (*sendPlan, error) {
+	plainConfig, err := d.ChannelSvc.DecryptedConfig(ch)
+	if err != nil {
+		return nil, err
+	}
+	return &sendPlan{
+		notifier: n,
+		msg:      notifier.LimitBody(ch.Type, msg),
+		config:   plainConfig,
+	}, nil
+}
+
+// runRetries 在单个通道上按 RetryDelays 串行发送；永久错误立即停止。
+//
+// stage 只用于日志文案（「发送」/「试发」），record 为 nil 时不落 attempt。
+// 返回 nil 表示某次尝试成功，否则返回最后一次错误。
+func (d *DispatchService) runRetries(ctx context.Context, ch *models.Channel, plan *sendPlan, stage string, record sendAttempt) error {
+	var lastErr error
+	for i, delay := range d.RetryDelays {
+		if delay > 0 {
+			select {
+			case <-ctx.Done():
+				slog.Warn("投递上下文已取消，停止重试", "channel", ch.ID, "attempt", i+1, "error", ctx.Err())
+				return ctx.Err()
+			case <-time.After(delay):
+			}
+		}
+		started := time.Now()
+		err := plan.notifier.Send(ctx, plan.config, plan.msg)
+		latency := int(time.Since(started).Milliseconds())
+		if err == nil {
+			// 单次成功属于高频细节，只在 debug 级别输出
+			slog.Debug("通道"+stage+"成功", "channel", ch.ID, "name", ch.Name, "type", ch.Type, "attempt", i+1, "latency_ms", latency)
+			if record != nil {
+				record(i+1, "success", "", latency)
+			}
+			return nil
+		}
+		lastErr = err
+		permanent := notifier.IsPermanent(err)
+		slog.Warn("通道"+stage+"失败", "channel", ch.ID, "name", ch.Name, "type", ch.Type,
+			"attempt", i+1, "of", len(d.RetryDelays), "latency_ms", latency, "permanent", permanent, "error", err)
+		if record != nil {
+			record(i+1, "failed", err.Error(), latency)
+		}
+		if permanent {
+			return err
+		}
+	}
+	slog.Warn("通道重试次数用尽，最终失败", "channel", ch.ID, "name", ch.Name, "attempts", len(d.RetryDelays))
+	return lastErr
+}
+
+// sendWithRetry 在单个通道上发送并记录每次尝试，返回是否最终成功。
 func (d *DispatchService) sendWithRetry(ctx context.Context, ch *models.Channel, deliveryLogID uint, msg notifier.Message) bool {
 	n, err := notifier.Get(ch.Type)
 	if err != nil {
@@ -223,64 +277,17 @@ func (d *DispatchService) sendWithRetry(ctx context.Context, ch *models.Channel,
 		d.writeAttempt(deliveryLogID, ch, 1, "failed", err.Error(), 0)
 		return false
 	}
-	// 各通道长度上限不同，按通道各自截断
-	msg = notifier.LimitBody(ch.Type, msg)
-	plainConfig, err := d.ChannelSvc.DecryptedConfig(ch)
+	plan, err := d.buildPlan(ch, n, msg)
 	if err != nil {
 		slog.Error("解密通道配置失败，无法发送", "log", deliveryLogID, "channel", ch.ID, "name", ch.Name, "type", ch.Type, "error", err)
 		// 落库的提示文案去掉 AppError 的 code/field 前缀，方便用户直接读
 		d.writeAttempt(deliveryLogID, ch, 1, "failed", friendlyErr(err), 0)
 		return false
 	}
-
-	for i, delay := range d.RetryDelays {
-		if delay > 0 {
-			select {
-			case <-ctx.Done():
-				slog.Warn("投递上下文已取消，停止重试", "log", deliveryLogID, "channel", ch.ID, "attempt", i+1, "error", ctx.Err())
-				return false
-			case <-time.After(delay):
-			}
-		}
-		started := time.Now()
-		err := n.Send(ctx, plainConfig, msg)
-		latency := int(time.Since(started).Milliseconds())
-		if err == nil {
-			// 单次成功属于高频细节，只在 debug 级别输出
-			slog.Debug("通道发送成功", "log", deliveryLogID, "channel", ch.ID, "name", ch.Name, "type", ch.Type, "attempt", i+1, "latency_ms", latency)
-			d.writeAttempt(deliveryLogID, ch, i+1, "success", "", latency)
-			return true
-		}
-		permanent := notifier.IsPermanent(err)
-		slog.Warn("通道发送失败", "log", deliveryLogID, "channel", ch.ID, "name", ch.Name, "type", ch.Type,
-			"attempt", i+1, "of", len(d.RetryDelays), "latency_ms", latency, "permanent", permanent, "error", err)
-		d.writeAttempt(deliveryLogID, ch, i+1, "failed", err.Error(), latency)
-		if permanent {
-			return false
-		}
+	record := func(attempt int, status, errMsg string, latencyMs int) {
+		d.writeAttempt(deliveryLogID, ch, attempt, status, errMsg, latencyMs)
 	}
-	slog.Warn("通道重试次数用尽，最终失败", "log", deliveryLogID, "channel", ch.ID, "name", ch.Name, "attempts", len(d.RetryDelays))
-	return false
-}
-
-// writeAttempt 落一条 DeliveryAttempt。
-func (d *DispatchService) writeAttempt(deliveryLogID uint, ch *models.Channel, attempt int, status, errMsg string, latencyMs int) {
-	if len(errMsg) > 1000 {
-		errMsg = errMsg[:1000]
-	}
-	row := &models.DeliveryAttempt{
-		DeliveryLogID: deliveryLogID,
-		ChannelID:     ch.ID,
-		ChannelType:   ch.Type,
-		ChannelName:   ch.Name,
-		Attempt:       attempt,
-		Status:        status,
-		Error:         errMsg,
-		LatencyMs:     latencyMs,
-	}
-	if err := d.DB.Create(row).Error; err != nil {
-		slog.Error("写 attempt 失败", "log", deliveryLogID, "channel", ch.ID, "error", err)
-	}
+	return d.runRetries(ctx, ch, plan, "发送", record) == nil
 }
 
 // finalize 更新 DeliveryLog 的终态字段。
@@ -297,24 +304,24 @@ func (d *DispatchService) finalize(deliveryLogID uint, status, renderedTitle, re
 
 // loadChannels 取提醒绑定的全部通道；没有绑定时返回空切片。
 func (d *DispatchService) loadChannels(reminderID uint) ([]*models.Channel, error) {
-	var ids []uint
-	if err := d.DB.Model(&models.ReminderChannel{}).
-		Where("reminder_id = ?", reminderID).
-		Pluck("channel_id", &ids).Error; err != nil {
-		return nil, err
+	return loadReminderChannels(d.DB, reminderID)
+}
+
+// writeAttempt 落一条 DeliveryAttempt。
+func (d *DispatchService) writeAttempt(deliveryLogID uint, ch *models.Channel, attempt int, status, errMsg string, latencyMs int) {
+	row := &models.DeliveryAttempt{
+		DeliveryLogID: deliveryLogID,
+		ChannelID:     ch.ID,
+		ChannelType:   ch.Type,
+		ChannelName:   ch.Name,
+		Attempt:       attempt,
+		Status:        status,
+		Error:         textutil.TruncateRunes(errMsg, 1000),
+		LatencyMs:     latencyMs,
 	}
-	if len(ids) == 0 {
-		return nil, nil
+	if err := d.DB.Create(row).Error; err != nil {
+		slog.Error("写 attempt 失败", "log", deliveryLogID, "channel", ch.ID, "error", err)
 	}
-	var rows []models.Channel
-	if err := d.DB.Where("id IN ?", ids).Find(&rows).Error; err != nil {
-		return nil, err
-	}
-	out := make([]*models.Channel, 0, len(rows))
-	for i := range rows {
-		out = append(out, &rows[i])
-	}
-	return out, nil
 }
 
 // DryRun 发送测试消息，不落任何日志；失败时返回 400 + 可读文案而不是 500。
@@ -347,35 +354,14 @@ func (d *DispatchService) DryRun(ctx context.Context, channels []*models.Channel
 
 // sendDryRun 单通道试发（有重试，不写 attempt）。
 func (d *DispatchService) sendDryRun(ctx context.Context, ch *models.Channel, msg notifier.Message) error {
-	n, err := notifier.Get(ch.Type)
+	plan, err := d.prepare(ch, msg)
 	if err != nil {
 		return err
 	}
-	msg = notifier.LimitBody(ch.Type, msg)
-	plainConfig, err := d.ChannelSvc.DecryptedConfig(ch)
-	if err != nil {
-		return fmt.Errorf("解密配置失败: %w", err)
+	if err := d.runRetries(ctx, ch, plan, "试发", nil); err != nil {
+		return err
 	}
-	for i, delay := range d.RetryDelays {
-		if delay > 0 {
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			case <-time.After(delay):
-			}
-		}
-		if sendErr := n.Send(ctx, plainConfig, msg); sendErr == nil {
-			slog.Debug("试发成功", "channel", ch.ID, "name", ch.Name, "attempt", i+1)
-			return nil
-		} else {
-			slog.Warn("试发通道发送失败", "channel", ch.ID, "name", ch.Name, "type", ch.Type,
-				"attempt", i+1, "of", len(d.RetryDelays), "permanent", notifier.IsPermanent(sendErr), "error", sendErr)
-			if notifier.IsPermanent(sendErr) {
-				return sendErr
-			}
-		}
-	}
-	return fmt.Errorf("所有重试均失败")
+	return nil
 }
 
 // --- helpers ---

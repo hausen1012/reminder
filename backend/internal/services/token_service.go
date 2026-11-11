@@ -7,7 +7,6 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
-	"errors"
 	"log/slog"
 	"math/big"
 	"strings"
@@ -101,34 +100,28 @@ func (s *TokenService) List(limit, offset int, search string) ([]*models.Token, 
 
 // Toggle 启用/禁用。
 func (s *TokenService) Toggle(id uint) (*models.Token, error) {
-	var key models.Token
-	if err := s.DB.First(&key, id).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, middleware.NewAppError(middleware.CodeNotFound, "令牌不存在")
-		}
+	key, err := s.getOrNotFound(id)
+	if err != nil {
 		return nil, err
 	}
 	key.Enabled = !key.Enabled
-	if err := s.DB.Model(&key).Update("enabled", key.Enabled).Error; err != nil {
+	if err := s.DB.Model(key).Update("enabled", key.Enabled).Error; err != nil {
 		return nil, err
 	}
-	return &key, nil
+	return key, nil
 }
 
 // Delete 删除令牌并级联清理关联的默认通道绑定。
 func (s *TokenService) Delete(id uint) error {
-	var key models.Token
-	if err := s.DB.First(&key, id).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return middleware.NewAppError(middleware.CodeNotFound, "令牌不存在")
-		}
+	key, err := s.getOrNotFound(id)
+	if err != nil {
 		return err
 	}
 	return s.DB.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Where("token_id = ?", id).Delete(&models.TokenDefaultChannel{}).Error; err != nil {
 			return err
 		}
-		return tx.Delete(&key).Error
+		return tx.Delete(key).Error
 	})
 }
 
@@ -172,35 +165,13 @@ func (s *TokenService) TouchLastUsed(keyID uint) {
 
 // DefaultChannelIDs 返回令牌绑定的默认通道 ID 列表。
 func (s *TokenService) DefaultChannelIDs(keyID uint) []uint {
-	var ids []uint
-	s.DB.Model(&models.TokenDefaultChannel{}).
-		Where("token_id = ?", keyID).
-		Pluck("channel_id", &ids)
+	ids, _ := joinIDs(s.DB, &models.TokenDefaultChannel{}, "token_id", keyID, "channel_id")
 	return ids
 }
 
 // DefaultChannelIDsBatch 一次查出多个令牌的默认通道，避免列表接口 N+1 查询。
 func (s *TokenService) DefaultChannelIDsBatch(keyIDs []uint) (map[uint][]uint, error) {
-	out := make(map[uint][]uint, len(keyIDs))
-	if len(keyIDs) == 0 {
-		return out, nil
-	}
-	type pair struct {
-		TokenID   uint
-		ChannelID uint
-	}
-	var rows []pair
-	if err := s.DB.Model(&models.TokenDefaultChannel{}).
-		Select("token_id, channel_id").
-		Where("token_id IN ?", keyIDs).
-		Order("token_id ASC, channel_id ASC").
-		Scan(&rows).Error; err != nil {
-		return nil, err
-	}
-	for _, row := range rows {
-		out[row.TokenID] = append(out[row.TokenID], row.ChannelID)
-	}
-	return out, nil
+	return joinIDsBatch(s.DB, &models.TokenDefaultChannel{}, "token_id", "channel_id", keyIDs)
 }
 
 // Stats24h 返回近 24 小时使用次数（按 reminders 表 TokenID 统计）。
@@ -246,17 +217,19 @@ func (s *TokenService) UpdateDefaultChannels(id uint, channelIDs []uint) error {
 // GetPlaintext 返回令牌明文。解密失败（通常是更换 ENCRYPTION_KEY）时返回 404 + 提示，
 // 不会把密文当明文返回。
 func (s *TokenService) GetPlaintext(id uint) (string, error) {
-	var key models.Token
-	if err := s.DB.First(&key, id).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return "", middleware.NewAppError(middleware.CodeNotFound, "令牌不存在")
-		}
+	key, err := s.getOrNotFound(id)
+	if err != nil {
 		return "", err
 	}
 	if strings.TrimSpace(key.Plaintext) == "" {
 		return "", middleware.NewAppError(middleware.CodeNotFound, "该令牌暂无可查看的明文，请重新创建")
 	}
 	return s.openPlaintext(key.Plaintext)
+}
+
+// getOrNotFound 按 ID 取令牌，不存在时返回 404。
+func (s *TokenService) getOrNotFound(id uint) (*models.Token, error) {
+	return firstByID[models.Token](s.DB, id, "令牌不存在")
 }
 
 // --- 明文加解密 ---
@@ -292,22 +265,10 @@ func (s *TokenService) openPlaintext(stored string) (string, error) {
 // --- internal ---
 
 func (s *TokenService) replaceDefaultChannels(tx *gorm.DB, keyID uint, ids []uint) error {
-	if err := tx.Where("token_id = ?", keyID).Delete(&models.TokenDefaultChannel{}).Error; err != nil {
-		return err
-	}
-	if len(ids) == 0 {
-		return nil
-	}
-	rows := make([]models.TokenDefaultChannel, 0, len(ids))
-	seen := map[uint]bool{}
-	for _, id := range ids {
-		if id == 0 || seen[id] {
-			continue
-		}
-		seen[id] = true
-		rows = append(rows, models.TokenDefaultChannel{TokenID: keyID, ChannelID: id})
-	}
-	return tx.Create(&rows).Error
+	return replaceJoinRows(tx, &models.TokenDefaultChannel{}, "token_id", keyID, ids,
+		func(ownerID, targetID uint) models.TokenDefaultChannel {
+			return models.TokenDefaultChannel{TokenID: ownerID, ChannelID: targetID}
+		})
 }
 
 // generateKey 生成 bdrk_ + 24 字节 base62 令牌。
@@ -388,15 +349,12 @@ func (s *TokenService) ListViews(limit, offset int, search string) ([]*TokenView
 
 // GetView 返回单个令牌的富视图。
 func (s *TokenService) GetView(id uint) (*TokenView, error) {
-	var key models.Token
-	if err := s.DB.First(&key, id).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, middleware.NewAppError(middleware.CodeNotFound, "令牌不存在")
-		}
+	key, err := s.getOrNotFound(id)
+	if err != nil {
 		return nil, err
 	}
 	return &TokenView{
-		Token:             key,
+		Token:             *key,
 		DefaultChannelIDs: s.DefaultChannelIDs(key.ID),
 		Usage24h:          s.Stats24h(key.ID),
 	}, nil
