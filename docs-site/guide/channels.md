@@ -9,17 +9,17 @@
 |---|---|---|
 | `smtp` | 邮件，通过任意 SMTP 服务器发送 | 是 |
 | `dingtalk` | 钉钉群机器人 Webhook | 是 |
-| `wecom` | 企业微信群机器人 Webhook | 是 |
+| `wecom` | 企微群机器人 Webhook | 是 |
 | `feishu` | 飞书群自定义机器人 Webhook | 是 |
+| `webhook` | HTTP 回调，可自定义方法、头、Body 模板 | 是 |
 | `telegram` | Telegram Bot，发送到指定会话 | 是 |
 | `bark` | Bark iOS 推送，支持自建服务端 | 是 |
-| `ntfy` | ntfy 话题推送，支持自建服务端与访问令牌 | 是 |
 | `apprise` | 通过 Apprise API 服务转发到其支持的全部渠道 | 是 |
-| `webhook` | HTTP 回调，可自定义方法、头、Body 模板 | 是 |
+| `ntfy` | ntfy 话题推送，支持自建服务端与访问令牌 | 是 |
 
 通道类型创建后**不可变更**，因为不同类型的配置结构完全不同。要换类型请新建一个通道。
 
-## SMTP 邮件
+## 邮件
 
 | 字段 | 说明 |
 |---|---|
@@ -64,7 +64,7 @@
 
 格式处理：`markdown` 走钉钉的 markdown 消息类型；`text` 与 `html`（先剥掉标签）走 text 类型。
 
-## 企业微信机器人
+## 企微机器人
 
 | 字段 | 说明 |
 |---|---|
@@ -84,79 +84,6 @@
 
 飞书自定义机器人只发送纯文本消息：`markdown` 与 `html` 正文都会先转换为纯文本。
 正文超过 4000 字时会被截断并追加省略号（对端请求体上限为 20 KB）。
-
-## Telegram
-
-| 字段 | 说明 |
-|---|---|
-| `bot_token_enc` | Bot Token，向 `@BotFather` 申请，加密存储 |
-| `chat_id` | 目标用户或群组的 chat_id |
-| `disable_notification` | 静默发送，客户端不播放提示音 |
-
-发送前需要把机器人加入目标会话。个人会话的 chat_id 可从 `getUpdates` 接口读取，
-群组 chat_id 为负数。
-
-正文超过 4096 字时会被截断并追加省略号。
-
-::: tip 需要代理的网络环境
-程序通过 Go 标准库的默认 HTTP 客户端访问 `api.telegram.org`，该客户端会读取
-`HTTPS_PROXY` 环境变量。在无法直连的网络里给服务进程设置该变量即可，无需改动通道配置。
-:::
-
-## Bark
-
-iOS 推送通道，可以走 Bark 官方服务端，也可以指向自建实例。
-
-| 字段 | 说明 |
-|---|---|
-| `device_key_enc` | Bark App 首页显示的推送 Key，加密存储 |
-| `server_url` | 服务端地址，默认 `https://api.day.app`；自建时填自己的地址 |
-| `group` | 通知分组名，可留空 |
-| `sound` | 铃声名，可留空 |
-| `icon` | 通知图标 URL，iOS 15 及以上生效，可留空 |
-
-正文超过 2000 字时会被截断并追加省略号。`markdown` 与 `html` 正文都会先转换为纯文本。
-
-## ntfy
-
-| 字段 | 说明 |
-|---|---|
-| `server_url` | 服务端地址，默认 `https://ntfy.sh`；自建时填自己的地址 |
-| `topic` | 话题名，只允许字母、数字、下划线、连字符与点号 |
-| `token_enc` | 访问令牌，服务端启用鉴权时填写，加密存储 |
-| `priority` | 优先级：`min` / `low` / `default` / `high` / `urgent` |
-| `tags` | 标签，多个用英文逗号分隔，客户端会显示成标签或 emoji |
-
-发送时用 `POST {server}/{topic}`，标题、优先级、标签放在请求头，正文即消息体；
-配置了访问令牌时以 `Authorization: Bearer <token>` 发送。
-
-正文超过 1200 字时会被截断并追加省略号。
-
-::: warning 公开话题任何人都能订阅
-未开启鉴权的 ntfy 服务端上，话题名就是唯一凭据。话题名尽量随机，或在服务端开启访问控制。
-:::
-
-## Apprise
-
-对接已部署的 [Apprise API](https://github.com/caronc/apprise-api) 服务，
-借助它把同一条消息转发到自身未内置的渠道。
-
-| 字段 | 说明 |
-|---|---|
-| `api_url` | Apprise API 服务地址，如 `http://localhost:8000` |
-| `key_enc` | Apprise API 里保存的配置 KEY，加密存储 |
-| `urls` | 目标列表，每行一个 Apprise URL；填了之后按无状态模式发送 |
-| `type` | 消息类型：`info` / `success` / `warning` / `failure` |
-
-两种模式：
-
-- **状态化**：只填 `key_enc`，服务端使用该 KEY 已保存的目标列表发送
-- **无状态**：填 `urls`（`key_enc` 只用于鉴权、可留空），目标随请求下发
-
-`key_enc` 与 `urls` 至少要填一个。正文超过 2000 字时会被截断并追加省略号。
-
-服务端返回非 200 时按状态码区分：`424`（没有任何目标发送成功）与 `4xx` 视为永久错误，
-`429`、`5xx` 会重试。
 
 ## Webhook
 
@@ -192,6 +119,79 @@ tag: reminder
 ::: warning Webhook 不做格式转换
 其他通道会自动把 markdown / html 降级成纯文本，但 Webhook **不会**。
 `{{content}}` 拿到的是渲染后的原始内容，格式转换由你的模板自己负责。
+:::
+
+## Telegram
+
+| 字段 | 说明 |
+|---|---|
+| `bot_token_enc` | Bot Token，向 `@BotFather` 申请，加密存储 |
+| `chat_id` | 目标用户或群组的 chat_id |
+| `disable_notification` | 静默发送，客户端不播放提示音 |
+
+发送前需要把机器人加入目标会话。个人会话的 chat_id 可从 `getUpdates` 接口读取，
+群组 chat_id 为负数。
+
+正文超过 4096 字时会被截断并追加省略号。
+
+::: tip 需要代理的网络环境
+程序通过 Go 标准库的默认 HTTP 客户端访问 `api.telegram.org`，该客户端会读取
+`HTTPS_PROXY` 环境变量。在无法直连的网络里给服务进程设置该变量即可，无需改动通道配置。
+:::
+
+## Bark
+
+iOS 推送通道，可以走 Bark 官方服务端，也可以指向自建实例。
+
+| 字段 | 说明 |
+|---|---|
+| `device_key_enc` | Bark App 首页显示的推送 Key，加密存储 |
+| `server_url` | 服务端地址，默认 `https://api.day.app`；自建时填自己的地址 |
+| `group` | 通知分组名，可留空 |
+| `sound` | 铃声名，可留空 |
+| `icon` | 通知图标 URL，iOS 15 及以上生效，可留空 |
+
+正文超过 2000 字时会被截断并追加省略号。`markdown` 与 `html` 正文都会先转换为纯文本。
+
+## Apprise
+
+对接已部署的 [Apprise API](https://github.com/caronc/apprise-api) 服务，
+借助它把同一条消息转发到自身未内置的渠道。
+
+| 字段 | 说明 |
+|---|---|
+| `api_url` | Apprise API 服务地址，如 `http://localhost:8000` |
+| `key_enc` | Apprise API 里保存的配置 KEY，加密存储 |
+| `urls` | 目标列表，每行一个 Apprise URL；填了之后按无状态模式发送 |
+| `type` | 消息类型：`info` / `success` / `warning` / `failure` |
+
+两种模式：
+
+- **状态化**：只填 `key_enc`，服务端使用该 KEY 已保存的目标列表发送
+- **无状态**：填 `urls`（`key_enc` 只用于鉴权、可留空），目标随请求下发
+
+`key_enc` 与 `urls` 至少要填一个。正文超过 2000 字时会被截断并追加省略号。
+
+服务端返回非 200 时按状态码区分：`424`（没有任何目标发送成功）与 `4xx` 视为永久错误，
+`429`、`5xx` 会重试。
+
+## ntfy
+
+| 字段 | 说明 |
+|---|---|
+| `server_url` | 服务端地址，默认 `https://ntfy.sh`；自建时填自己的地址 |
+| `topic` | 话题名，只允许字母、数字、下划线、连字符与点号 |
+| `token_enc` | 访问令牌，服务端启用鉴权时填写，加密存储 |
+| `priority` | 优先级：`min` / `low` / `default` / `high` / `urgent` |
+| `tags` | 标签，多个用英文逗号分隔，客户端会显示成标签或 emoji |
+
+发送时用 `POST {server}/{topic}`，标题、优先级、标签放在请求头，正文即消息体；
+配置了访问令牌时以 `Authorization: Bearer <token>` 发送。
+
+正文超过 1200 字时会被截断并追加省略号。
+
+::: warning 公开话题任何人都能订阅
+未开启鉴权的 ntfy 服务端上，话题名就是唯一凭据。话题名尽量随机，或在服务端开启访问控制。
 :::
 
 ## 敏感字段与脱敏

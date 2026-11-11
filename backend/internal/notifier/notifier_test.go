@@ -257,8 +257,18 @@ func TestSpec_SelfConsistent(t *testing.T) {
 	}
 }
 
-// specOrder 必须恰好覆盖 specs 里全部类型，且无重复。
+// specOrder 必须恰好覆盖 specs 里全部类型，顺序符合前端展示与文档预期，且无重复。
 func TestSpecs_OrderCoversAll(t *testing.T) {
+	wantOrder := []string{"smtp", "dingtalk", "wecom", "feishu", "webhook", "telegram", "bark", "apprise", "ntfy"}
+	if !reflect.DeepEqual(specOrder, wantOrder) {
+		t.Fatalf("specOrder = %v，期望 %v", specOrder, wantOrder)
+	}
+	if s, ok := SpecOf("smtp"); !ok || s.Label != "邮件" {
+		t.Fatalf("smtp Label = %q，期望 邮件", s.Label)
+	}
+	if s, ok := SpecOf("wecom"); !ok || s.Label != "企微机器人" {
+		t.Fatalf("wecom Label = %q，期望 企微机器人", s.Label)
+	}
 	if len(specOrder) != len(specs) {
 		t.Fatalf("specOrder 有 %d 项，specs 有 %d 项", len(specOrder), len(specs))
 	}

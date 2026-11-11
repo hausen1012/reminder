@@ -16,15 +16,15 @@
 
 | 通道 | `text` | `markdown` | `html` |
 |---|---|---|---|
-| SMTP | `text/plain` | 转成 HTML 后发送 | 原样作为 `text/html` |
+| 邮件 | `text/plain` | 转成 HTML 后发送 | 原样作为 `text/html` |
 | 钉钉 | text 消息 | markdown 消息 | 剥掉标签后按 text |
-| 企业微信 | text 消息 | markdown 消息 | 剥掉标签后按 text |
+| 企微 | text 消息 | markdown 消息 | 剥掉标签后按 text |
 | 飞书 | text 消息 | 剥掉标记后按 text | 剥掉标签后按 text |
+| Webhook | 原样 | 原样 | 原样 |
 | Telegram | text 消息 | 剥掉标记后按 text | 剥掉标签后按 text |
 | Bark | text 推送 | 剥掉标记后按 text | 剥掉标签后按 text |
-| ntfy | text 消息 | 剥掉标记后按 text | 剥掉标签后按 text |
 | Apprise | text 消息 | 剥掉标记后按 text | 剥掉标签后按 text |
-| Webhook | 原样 | 原样 | 原样 |
+| ntfy | text 消息 | 剥掉标记后按 text | 剥掉标签后按 text |
 
 Webhook 不做任何转换，`{{content}}` 拿到什么就发什么，转换责任交给你的模板。
 

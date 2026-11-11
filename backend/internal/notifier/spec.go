@@ -55,7 +55,7 @@ type Spec struct {
 var specs = map[string]Spec{
 	"smtp": {
 		Type:        "smtp",
-		Label:       "邮件 SMTP",
+		Label:       "邮件",
 		Description: "通过任意 SMTP 服务器发送邮件",
 		Fields: []FieldSpec{
 			{Key: "host", Label: "SMTP Host", Kind: FieldText, Placeholder: "smtp.example.com", Required: true},
@@ -85,7 +85,7 @@ var specs = map[string]Spec{
 	},
 	"wecom": {
 		Type:        "wecom",
-		Label:       "企业微信机器人",
+		Label:       "企微机器人",
 		Description: "企业微信群自定义机器人 Webhook",
 		Fields: []FieldSpec{
 			{Key: "webhook_url", Label: "Webhook URL", Kind: FieldText, Placeholder: "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=...", Required: true},
@@ -186,7 +186,7 @@ var specs = map[string]Spec{
 }
 
 // specOrder 决定类型枚举与前端下拉框的顺序。
-var specOrder = []string{"smtp", "dingtalk", "wecom", "feishu", "telegram", "bark", "ntfy", "apprise", "webhook"}
+var specOrder = []string{"smtp", "dingtalk", "wecom", "feishu", "webhook", "telegram", "bark", "apprise", "ntfy"}
 
 // SpecOf 按类型取元数据。
 func SpecOf(typ string) (Spec, bool) {
