@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi, afterEach } from 'vitest'
 import {
+  copyToClipboard,
   formatChineseLunarDay,
   formatChineseLunarMonth,
   formatChineseLunarYear,
@@ -67,3 +68,54 @@ describe('从 schedule_spec 提取时分', () => {
     expect(getReminderSpecMinute({ at: 'bad' })).toBeUndefined()
   })
 })
+
+describe('copyToClipboard 安全复制', () => {
+  const originalClipboard = navigator.clipboard
+  const originalExecCommand = document.execCommand
+
+  afterEach(() => {
+    Object.defineProperty(navigator, 'clipboard', {
+      value: originalClipboard,
+      configurable: true,
+      writable: true,
+    })
+    document.execCommand = originalExecCommand
+  })
+
+  it('优先使用 navigator.clipboard.writeText', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText },
+      configurable: true,
+      writable: true,
+    })
+
+    await expect(copyToClipboard('hello')).resolves.toBeUndefined()
+    expect(writeText).toHaveBeenCalledWith('hello')
+  })
+
+  it('当 navigator.clipboard 不存在时自动降级到 execCommand', async () => {
+    Object.defineProperty(navigator, 'clipboard', {
+      value: undefined,
+      configurable: true,
+      writable: true,
+    })
+    const execCommand = vi.fn().mockReturnValue(true)
+    document.execCommand = execCommand
+
+    await expect(copyToClipboard('fallback-test')).resolves.toBeUndefined()
+    expect(execCommand).toHaveBeenCalledWith('copy')
+  })
+
+  it('当两者均不可用或失败时抛出友好异常', async () => {
+    Object.defineProperty(navigator, 'clipboard', {
+      value: undefined,
+      configurable: true,
+      writable: true,
+    })
+    document.execCommand = vi.fn().mockReturnValue(false)
+
+    await expect(copyToClipboard('fail-test')).rejects.toThrow('当前环境限制自动复制，请手动选中文本复制')
+  })
+})
+

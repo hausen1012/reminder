@@ -40,6 +40,7 @@ import {
   extractApiError,
 } from '@/lib/api'
 import { formatInZone } from '@/lib/datetime'
+import { copyToClipboard } from '@/lib/utils'
 import { useSiteTimezone } from '@/contexts/ConfigContext'
 import type { Token, Channel } from '@/types'
 
@@ -249,7 +250,7 @@ export default function TokensPage() {
     setCopyingId(keyId)
     try {
       const plaintext = await getTokenPlaintext(keyId)
-      await navigator.clipboard.writeText(plaintext)
+      await copyToClipboard(plaintext)
       toast({ title: '令牌已复制' })
     } catch (err) {
       toast({ title: '复制失败', description: extractApiError(err), variant: 'destructive' })
@@ -341,9 +342,8 @@ export default function TokensPage() {
                   <tr>
                     <th className="px-4 py-2.5 w-[14rem]">名称</th>
                     <th className="px-4 py-2.5 w-[10rem]">令牌</th>
-                    <th className="px-4 py-2.5 w-[10rem]">通知渠道</th>
-                    <th className="px-4 py-2.5 w-16 text-center">启用</th>
-                    <th className="px-4 py-2.5 w-44">最近使用</th>
+                    <th className="px-4 py-2.5">通知渠道</th>
+                    <th className="px-4 py-2.5 w-20 text-center">启用</th>
                     <th className="px-4 py-2.5 w-36 text-right">操作</th>
                   </tr>
                 </thead>
@@ -355,7 +355,7 @@ export default function TokensPage() {
                           {key.name}
                         </div>
                       </td>
-                      <td className="max-w-[15rem] px-4 py-2.5">
+                      <td className="max-w-[10rem] px-4 py-2.5">
                         <div className="flex items-center gap-1.5">
                           <code className="truncate text-xs text-muted-foreground">{key.prefix}...</code>
                           <button
@@ -369,16 +369,13 @@ export default function TokensPage() {
                           </button>
                         </div>
                       </td>
-                      <td className="max-w-[10rem] px-4 py-2.5 text-xs text-muted-foreground">
+                      <td className="px-4 py-2.5 text-xs text-muted-foreground">
                         <span className="block truncate" title={formatChannelNames(channels, key.default_channel_ids)}>
                           {formatChannelNames(channels, key.default_channel_ids)}
                         </span>
                       </td>
                       <td className="px-4 py-2.5 text-center">
                         <Switch checked={key.enabled} onCheckedChange={() => handleToggle(key)} />
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-2.5 text-xs text-muted-foreground">
-                        {formatRecentTime(key.last_used_at)}
                       </td>
                       <td className="px-4 py-2.5">
                         <div className="flex justify-end gap-0.5">
@@ -400,11 +397,11 @@ export default function TokensPage() {
             </div>
           </div>
 
-          {/* 移动端卡片列表：名称 + 令牌前缀/最近使用一行，渠道与操作收进次要行 */}
+          {/* 移动端卡片列表：名称 + 令牌前缀一行，渠道与操作收进次要行 */}
           <div className="divide-y md:hidden">
             {filteredItems.map((key) => (
               <div key={key.id} className="px-3 py-2.5">
-                <div className="flex items-center gap-2.5">
+                <div className="flex items-start gap-2.5">
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium" title={key.name}>{key.name}</p>
                     <div className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -419,14 +416,12 @@ export default function TokensPage() {
                       >
                         <Copy className="h-3 w-3" />
                       </button>
-                      <span>·</span>
-                      <span className="truncate">最近使用 {formatRecentTime(key.last_used_at)}</span>
                     </div>
                     <p className="mt-0.5 truncate text-xs text-muted-foreground" title={formatChannelNames(channels, key.default_channel_ids)}>
                       渠道：{formatChannelNames(channels, key.default_channel_ids)}
                     </p>
                   </div>
-                  <Switch checked={key.enabled} onCheckedChange={() => handleToggle(key)} className="shrink-0" />
+                  <Switch checked={key.enabled} onCheckedChange={() => handleToggle(key)} className="mt-0.5 shrink-0" />
                 </div>
 
                 <div className="mt-1 flex justify-end gap-1">
@@ -504,9 +499,13 @@ export default function TokensPage() {
                   <code className="min-w-0 flex-1 select-all break-all text-sm">{createdResult.plaintext}</code>
                   <button
                     type="button"
-                    onClick={() => {
-                      navigator.clipboard.writeText(createdResult.plaintext)
-                      toast({ title: '令牌已复制' })
+                    onClick={async () => {
+                      try {
+                        await copyToClipboard(createdResult.plaintext)
+                        toast({ title: '令牌已复制' })
+                      } catch (err) {
+                        toast({ title: '复制失败', description: extractApiError(err), variant: 'destructive' })
+                      }
                     }}
                     className="rounded p-1 text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
                     title="复制令牌"
@@ -540,9 +539,13 @@ export default function TokensPage() {
                   <code className="min-w-0 flex-1 select-all break-all text-sm">{detailPlaintext}</code>
                   <button
                     type="button"
-                    onClick={() => {
-                      navigator.clipboard.writeText(detailPlaintext)
-                      toast({ title: '令牌已复制' })
+                    onClick={async () => {
+                      try {
+                        await copyToClipboard(detailPlaintext)
+                        toast({ title: '令牌已复制' })
+                      } catch (err) {
+                        toast({ title: '复制失败', description: extractApiError(err), variant: 'destructive' })
+                      }
                     }}
                     className="rounded p-1 text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
                     title="复制令牌"

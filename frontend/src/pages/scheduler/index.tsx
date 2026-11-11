@@ -208,34 +208,25 @@ export default function SchedulerPage() {
               </div>
             </div>
 
-            {/* 移动端卡片列表：标题 + 类型角标，触发时间并列一行 */}
+            {/* 移动端卡片列表：标题 + 类型角标，下次触发时间 */}
             <div className="divide-y md:hidden">
-              {entries.map((e) => {
-                const channelNames = (e.channels ?? []).map((c) => c.name).join('、')
-                return (
-                  <div
-                    key={e.id}
-                    className="px-3 py-2.5 active:bg-muted/30 transition-colors"
-                    onClick={() => navigate(`/reminders`)}
-                  >
-                    <div className="flex items-baseline gap-2">
-                      <p className="min-w-0 flex-1 truncate text-sm font-medium" title={e.title}>{e.title || '—'}</p>
-                      <span className="shrink-0 text-[10px] font-medium text-muted-foreground">
-                        {TYPE_LABEL[e.schedule_type] ?? e.schedule_type}
-                      </span>
-                    </div>
-                    <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
-                      <span>下次 {formatInZone(e.next_fire_at, tz)}</span>
-                      <span>上次 {formatInZone(e.last_fired_at, tz)}</span>
-                    </div>
-                    {channelNames && (
-                      <p className="mt-0.5 truncate text-xs text-muted-foreground" title={channelNames}>
-                        {channelNames}
-                      </p>
-                    )}
+              {entries.map((e) => (
+                <div
+                  key={e.id}
+                  className="px-3 py-2.5 active:bg-muted/30 transition-colors"
+                  onClick={() => navigate(`/reminders`)}
+                >
+                  <div className="flex items-baseline gap-2">
+                    <p className="min-w-0 flex-1 truncate text-sm font-medium" title={e.title}>{e.title || '—'}</p>
+                    <span className="shrink-0 text-[10px] font-medium text-muted-foreground">
+                      {TYPE_LABEL[e.schedule_type] ?? e.schedule_type}
+                    </span>
                   </div>
-                )
-              })}
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    下次触发 {formatInZone(e.next_fire_at, tz)}
+                  </p>
+                </div>
+              ))}
             </div>
 
             <Pagination

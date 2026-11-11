@@ -10,6 +10,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { useToast } from '@/components/ui/use-toast'
+import { copyToClipboard } from '@/lib/utils'
+import { extractApiError } from '@/lib/api'
 
 interface Props {
   token: string
@@ -23,9 +25,13 @@ function oneHourLater(): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:00`
 }
 
-function copy(text: string, toast: ReturnType<typeof useToast>['toast']) {
-  navigator.clipboard.writeText(text)
-  toast({ title: '已复制' })
+async function copy(text: string, toast: ReturnType<typeof useToast>['toast']) {
+  try {
+    await copyToClipboard(text)
+    toast({ title: '已复制' })
+  } catch (err) {
+    toast({ title: '复制失败', description: extractApiError(err), variant: 'destructive' })
+  }
 }
 
 function CurlBlock({ curl, label }: { curl: string; label: string }) {

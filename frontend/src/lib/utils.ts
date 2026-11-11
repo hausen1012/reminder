@@ -96,3 +96,54 @@ export function formatReminderDetail(reminder: Reminder): string {
 
   return solarLine === '选择日期' ? '公历' : solarLine.replace(/-/g, '/')
 }
+
+/**
+ * 安全复制文本至剪贴板
+ * 优先使用 navigator.clipboard.writeText；非 HTTPS（如局域网 HTTP）下自动降级为 textarea + execCommand('copy')
+ */
+export async function copyToClipboard(text: string): Promise<void> {
+  // 1. 优先使用现代安全上下文的 Clipboard API
+  if (typeof navigator !== 'undefined' && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+    try {
+      await navigator.clipboard.writeText(text)
+      return
+    } catch {
+      // 权限拒绝或非激活窗口时，继续尝试 fallback
+    }
+  }
+
+  // 2. 降级使用传统 textarea + execCommand（兼容 HTTP 局域网访问）
+  if (typeof document !== 'undefined' && typeof document.createElement === 'function') {
+    const textarea = document.createElement('textarea')
+    textarea.value = text
+    textarea.style.position = 'fixed'
+    textarea.style.top = '0'
+    textarea.style.left = '0'
+    textarea.style.width = '2em'
+    textarea.style.height = '2em'
+    textarea.style.padding = '0'
+    textarea.style.border = 'none'
+    textarea.style.outline = 'none'
+    textarea.style.boxShadow = 'none'
+    textarea.style.background = 'transparent'
+    textarea.style.opacity = '0'
+    textarea.setAttribute('readonly', '')
+    document.body.appendChild(textarea)
+    try {
+      textarea.focus()
+      textarea.select()
+      textarea.setSelectionRange(0, text.length)
+      const successful = document.execCommand('copy')
+      if (successful) {
+        return
+      }
+    } catch {
+      // execCommand 受限
+    } finally {
+      document.body.removeChild(textarea)
+    }
+  }
+
+  throw new Error('当前环境限制自动复制，请手动选中文本复制')
+}
+

@@ -53,6 +53,7 @@ import { listLogs, getLogDetail, purgeLogs, countPurgeLogs, batchDeleteLogs, ext
 import { formatInZone } from '@/lib/datetime'
 import { useSiteTimezone } from '@/contexts/ConfigContext'
 import { SOURCE_BADGE_CLASS, sourceLabel } from '@/lib/constants'
+import { copyToClipboard } from '@/lib/utils'
 import type { DeliveryLog, LogFilter } from '@/types'
 
 const STATUS_ICON: Record<string, typeof CheckCircle2> = {
@@ -472,7 +473,7 @@ export default function LogsPage() {
             </div>
           </div>
 
-          {/* 移动端卡片列表：标题/状态、时间/来源、确认与重试入口各占一行 */}
+          {/* 移动端卡片列表：标题与状态同行，详情提至右上角，重试项折叠 */}
           <div className="divide-y md:hidden">
             {displayRows.map(({ main, subs }) => {
               const MainStatusIcon = STATUS_ICON[main.status] ?? Clock;
@@ -490,9 +491,15 @@ export default function LogsPage() {
                         aria-label={`选择日志 ${main.reminder_title || main.title}`}
                       />
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium" title={main.title || main.reminder_title}>
-                          {main.reminder_title || main.title}
-                        </p>
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <span className="truncate text-sm font-medium" title={main.title || main.reminder_title}>
+                            {main.reminder_title || main.title}
+                          </span>
+                          <Badge variant="outline" className={`gap-1 shrink-0 text-[11px] ${mainColor}`}>
+                            <MainStatusIcon className="h-3 w-3" />
+                            {STATUS_LABEL[main.status] ?? main.status}
+                          </Badge>
+                        </div>
                         <p className="mt-0.5 truncate text-xs text-muted-foreground">
                           {formatInZone(main.fired_at, tz)}
                           {' · '}
@@ -500,14 +507,19 @@ export default function LogsPage() {
                           {main.confirmed ? ' · 已确认' : main.confirm_chain_id ? ' · 待确认' : ''}
                         </p>
                       </div>
-                      <Badge variant="outline" className={`gap-1 shrink-0 text-[11px] ${mainColor}`}>
-                        <MainStatusIcon className="h-3 w-3" />
-                        {STATUS_LABEL[main.status] ?? main.status}
-                      </Badge>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-8 shrink-0 self-center px-2 text-xs"
+                        onClick={() => handleDetail(main.id)}
+                      >
+                        <ExternalLink className="h-3 w-3 mr-1" />
+                        详情
+                      </Button>
                     </div>
 
-                    <div className="mt-1 flex items-center justify-between pl-6">
-                      {subs.length > 0 ? (
+                    {subs.length > 0 && (
+                      <div className="mt-1 pl-6">
                         <button
                           onClick={() => toggleExpand(main.id)}
                           className="inline-flex items-center gap-1 text-xs text-muted-foreground active:text-foreground"
@@ -519,14 +531,8 @@ export default function LogsPage() {
                           )}
                           重试 ({subs.length})
                         </button>
-                      ) : (
-                        <span />
-                      )}
-                      <Button size="sm" variant="ghost" className="h-8 px-2 text-xs" onClick={() => handleDetail(main.id)}>
-                        <ExternalLink className="h-3 w-3 mr-1" />
-                        详情
-                      </Button>
-                    </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* 展开的重试子项 */}
@@ -662,9 +668,13 @@ export default function LogsPage() {
                           size="sm"
                           variant="outline"
                           className="self-start sm:self-auto"
-                          onClick={() => {
-                            navigator.clipboard.writeText(detail.confirm_url ?? '')
-                            toast({ title: '链接已复制' })
+                          onClick={async () => {
+                            try {
+                              await copyToClipboard(detail.confirm_url ?? '')
+                              toast({ title: '链接已复制' })
+                            } catch (err) {
+                              toast({ title: '复制失败', description: extractApiError(err), variant: 'destructive' })
+                            }
                           }}
                         >
                           <Copy className="h-3 w-3 mr-1" />
