@@ -1,6 +1,7 @@
 import { useLayoutEffect, useRef, useState } from 'react'
 import { ChevronDown } from 'lucide-react'
 import type { Channel } from '@/types'
+import { useChannelTypes, labelOf } from '@/lib/channelSpec'
 
 interface Props {
   channels: Channel[]
@@ -30,6 +31,7 @@ export function ChannelMultiSelect({
   onOpenChange,
   onChange,
 }: Props) {
+  const { specs } = useChannelTypes()
   const triggerRef = useRef<HTMLButtonElement>(null)
   // 触发按钮上方空间不足时改为向下展开，避免列表被对话框裁切
   const [dropUp, setDropUp] = useState(true)
@@ -102,7 +104,7 @@ export function ChannelMultiSelect({
                     className="h-4 w-4"
                   />
                   <span className="truncate">{ch.name}</span>
-                  <span className="ml-auto shrink-0 text-xs text-muted-foreground">{ch.type}</span>
+                  <span className="ml-auto shrink-0 text-xs text-muted-foreground">{labelOf(specs, ch.type)}</span>
                 </label>
               )
             })}

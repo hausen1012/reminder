@@ -29,7 +29,7 @@ Thumbs.db
 *.swo
 
 # Logs
-logs/
+/logs/
 *.log
 
 # 本地数据库与临时文件

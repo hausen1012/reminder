@@ -52,6 +52,7 @@ import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { listLogs, getLogDetail, purgeLogs, countPurgeLogs, batchDeleteLogs, extractApiError } from '@/lib/api'
 import { formatInZone } from '@/lib/datetime'
 import { useSiteTimezone } from '@/contexts/ConfigContext'
+import { useChannelTypes, labelOf } from '@/lib/channelSpec'
 import { SOURCE_BADGE_CLASS, sourceLabel } from '@/lib/constants'
 import { copyToClipboard } from '@/lib/utils'
 import type { DeliveryLog, LogFilter } from '@/types'
@@ -90,7 +91,6 @@ const CHANNEL_ICONS: Record<string, typeof Mail> = {
   ntfy: Bell,
   apprise: Share2,
   webhook: Link2,
-  log: FileText,
 }
 
 function latencyColor(ms: number): string {
@@ -101,6 +101,7 @@ function latencyColor(ms: number): string {
 
 export default function LogsPage() {
   const tz = useSiteTimezone()
+  const { specs } = useChannelTypes()
   const [items, setItems] = useState<DeliveryLog[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -713,7 +714,7 @@ export default function LogsPage() {
                           <td className="px-3 py-2 text-muted-foreground">
                             <span className="inline-flex items-center gap-1">
                               <ChannelIcon className="h-3 w-3" />
-                              {a.channel_type}
+                              {labelOf(specs, a.channel_type)}
                             </span>
                           </td>
                           <td className="px-3 py-2">{a.attempt}</td>
@@ -766,7 +767,7 @@ export default function LogsPage() {
                           <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
                             <span className="inline-flex items-center gap-1">
                               <ChannelIcon className="h-3 w-3" />
-                              {a.channel_type}
+                              {labelOf(specs, a.channel_type)}
                             </span>
                             <span>#{a.attempt}</span>
                             <span>{formatInZone(a.created_at, tz)}</span>
