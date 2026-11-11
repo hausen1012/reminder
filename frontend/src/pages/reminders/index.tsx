@@ -413,7 +413,7 @@ export default function RemindersPage() {
             </div>
           </div>
 
-          {/* 移动端卡片列表：只保留标题、触发时间与操作，明细放次要行 */}
+          {/* 移动端卡片列表：首行标题+渠道（文本）+开关，次行内容备注，底行时间规则+类型+来源+操作 */}
           <div className="divide-y md:hidden">
             {items.map((r) => {
               const chNames = r.channel_ids.map((cid) => channelMap.get(cid) || `#${cid}`)
@@ -423,52 +423,88 @@ export default function RemindersPage() {
                     <Checkbox
                       checked={selectedIds.has(r.id)}
                       onCheckedChange={() => toggleSelect(r.id)}
-                      className="mt-1.5 shrink-0"
+                      className="mt-1 shrink-0"
                       aria-label={`选择提醒 ${r.title}`}
                     />
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium" title={r.title}>{r.title}</p>
-                      <div className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
-                        <span className={r.enabled ? 'text-foreground font-medium' : ''}>
-                          {r.enabled ? formatNextFireInZone(r.next_fire_at, tz) : '已停用'}
-                        </span>
-                        <span>·</span>
-                        <span>{TYPE_LABEL[r.schedule_type] ?? r.schedule_type}</span>
-                        <span
-                          className={
-                            'inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium ' +
-                            (SOURCE_BADGE_CLASS[r.source] ?? 'bg-muted text-muted-foreground')
-                          }
-                        >
-                          {sourceLabel(r.source)}
-                        </span>
+                      {/* 首行：标题 + 渠道（文本），右侧开关 */}
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-baseline gap-1.5 min-w-0">
+                          <span className="truncate text-sm font-medium" title={r.title}>
+                            {r.title}
+                          </span>
+                          {chNames.length > 0 && (
+                            <span
+                              className="truncate text-xs text-muted-foreground shrink-0 max-w-[45%]"
+                              title={chNames.join('、')}
+                            >
+                              · {chNames.join('、')}
+                            </span>
+                          )}
+                        </div>
+                        <Switch
+                          checked={r.enabled}
+                          onCheckedChange={() => handleToggle(r)}
+                          className="shrink-0"
+                          aria-label={`启用提醒 ${r.title}`}
+                        />
                       </div>
-                      <p className="mt-0.5 truncate text-xs text-muted-foreground" title={formatReminderDetail(r)}>
-                        {formatReminderDetail(r)}
-                        {chNames.length > 0 && ` · ${chNames.join('、')}`}
-                      </p>
-                    </div>
-                    <Switch checked={r.enabled} onCheckedChange={() => handleToggle(r)} className="mt-0.5 shrink-0" />
-                  </div>
 
-                  <div className="mt-1 flex justify-end gap-1 pl-6">
-                    <Button size="sm" variant="ghost" className="h-8 px-2 text-xs" onClick={() => handleDuplicate(r)}>
-                      <Copy className="h-3.5 w-3.5 mr-1" />
-                      复制
-                    </Button>
-                    <Button size="sm" variant="ghost" className="h-8 px-2 text-xs" onClick={() => setEditing(r)}>
-                      <Pencil className="h-3.5 w-3.5 mr-1" />
-                      编辑
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-8 px-2 text-xs text-destructive hover:text-destructive"
-                      onClick={() => setToDelete(r)}
-                    >
-                      <Trash2 className="h-3.5 w-3.5 mr-1" />
-                      删除
-                    </Button>
+                      {/* 次行：内容备注（如有） */}
+                      {r.content && (
+                        <p className="mt-0.5 truncate text-xs text-muted-foreground" title={r.content}>
+                          {r.content}
+                        </p>
+                      )}
+
+                      {/* 底行：调度规则 + 类型 + 来源，右侧快捷操作 */}
+                      <div className="mt-1.5 flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-1.5 min-w-0 text-xs text-muted-foreground">
+                          <span className="truncate" title={formatReminderDetail(r)}>
+                            {formatReminderDetail(r)}
+                          </span>
+                          <span className="shrink-0">·</span>
+                          <span className="shrink-0">{TYPE_LABEL[r.schedule_type] ?? r.schedule_type}</span>
+                          <span
+                            className={
+                              'inline-flex shrink-0 items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium ' +
+                              (SOURCE_BADGE_CLASS[r.source] ?? 'bg-muted text-muted-foreground')
+                            }
+                          >
+                            {sourceLabel(r.source)}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-0.5 shrink-0">
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7"
+                            onClick={() => handleDuplicate(r)}
+                            title="复制"
+                          >
+                            <Copy className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7"
+                            onClick={() => setEditing(r)}
+                            title="编辑"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7 text-destructive hover:text-destructive"
+                            onClick={() => setToDelete(r)}
+                            title="删除"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               )

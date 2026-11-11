@@ -397,46 +397,79 @@ export default function TokensPage() {
             </div>
           </div>
 
-          {/* 移动端卡片列表：名称 + 令牌前缀一行，渠道与操作收进次要行 */}
+          {/* 移动端卡片列表：首行名称+开关，次行通知渠道，底行令牌与操作按钮同行 */}
           <div className="divide-y md:hidden">
             {filteredItems.map((key) => (
               <div key={key.id} className="px-3 py-2.5">
                 <div className="flex items-start gap-2.5">
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium" title={key.name}>{key.name}</p>
-                    <div className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
-                      <code className="truncate">{key.prefix}...</code>
-                      <button
-                        type="button"
-                        onClick={() => handleCopyFromList(key.id)}
-                        disabled={copyingId === key.id}
-                        className="shrink-0 rounded p-0.5 text-muted-foreground active:text-foreground disabled:opacity-50"
-                        aria-label="复制完整令牌"
-                        title="复制完整令牌"
-                      >
-                        <Copy className="h-3 w-3" />
-                      </button>
+                    {/* 首行：名称 + 开关 */}
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="truncate text-sm font-medium" title={key.name}>
+                        {key.name}
+                      </p>
+                      <Switch
+                        checked={key.enabled}
+                        onCheckedChange={() => handleToggle(key)}
+                        className="shrink-0"
+                        aria-label={`启用令牌 ${key.name}`}
+                      />
                     </div>
-                    <p className="mt-0.5 truncate text-xs text-muted-foreground" title={formatChannelNames(channels, key.default_channel_ids)}>
-                      渠道：{formatChannelNames(channels, key.default_channel_ids)}
-                    </p>
-                  </div>
-                  <Switch checked={key.enabled} onCheckedChange={() => handleToggle(key)} className="mt-0.5 shrink-0" />
-                </div>
 
-                <div className="mt-1 flex justify-end gap-1">
-                  <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={() => openDetail(key)}>
-                    <Pencil className="h-3.5 w-3.5 mr-1" />
-                    编辑
-                  </Button>
-                  <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={() => openCurl(key)}>
-                    <Terminal className="h-3.5 w-3.5 mr-1" />
-                    curl
-                  </Button>
-                  <Button variant="ghost" size="sm" className="h-8 px-2 text-xs text-destructive hover:text-destructive" onClick={() => setToDelete(key)}>
-                    <Trash2 className="h-3.5 w-3.5 mr-1" />
-                    删除
-                  </Button>
+                    {/* 渠道放上面，文字改为通知渠道 */}
+                    <p
+                      className="mt-0.5 truncate text-xs text-muted-foreground"
+                      title={formatChannelNames(channels, key.default_channel_ids)}
+                    >
+                      通知渠道：{formatChannelNames(channels, key.default_channel_ids)}
+                    </p>
+
+                    {/* 令牌放下一行，将编辑、删除等按钮图标和令牌放一行 */}
+                    <div className="mt-1.5 flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5 min-w-0 text-xs text-muted-foreground">
+                        <code className="truncate font-mono">{key.prefix}...</code>
+                        <button
+                          type="button"
+                          onClick={() => handleCopyFromList(key.id)}
+                          disabled={copyingId === key.id}
+                          className="shrink-0 rounded p-0.5 text-muted-foreground hover:text-foreground active:text-foreground disabled:opacity-50"
+                          aria-label="复制完整令牌"
+                          title="复制完整令牌"
+                        >
+                          <Copy className="h-3 w-3" />
+                        </button>
+                      </div>
+                      <div className="flex items-center gap-0.5 shrink-0">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={() => openDetail(key)}
+                          title="编辑"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={() => openCurl(key)}
+                          title="curl 命令"
+                        >
+                          <Terminal className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-destructive hover:text-destructive"
+                          onClick={() => setToDelete(key)}
+                          title="删除"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             ))}

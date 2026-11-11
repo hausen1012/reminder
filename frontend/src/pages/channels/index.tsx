@@ -290,38 +290,56 @@ export default function ChannelsPage() {
             </div>
           </div>
 
-          {/* 移动端卡片列表：名称 + 类型/创建时间两行，操作按钮收进底部一行 */}
+          {/* 移动端卡片列表：首行名称，次行类型文本 + 快捷操作 */}
           <div className="divide-y md:hidden">
             {items.map((ch) => (
               <div key={ch.id} className="px-3 py-2.5">
-                <div className="flex items-center gap-2.5">
+                <div className="flex items-start gap-2.5">
                   <Checkbox
                     checked={selectedIds.has(ch.id)}
                     onCheckedChange={() => toggleSelect(ch.id)}
-                    className="shrink-0"
+                    className="mt-0.5 shrink-0"
                     aria-label={`选择渠道 ${ch.name}`}
                   />
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium" title={ch.name}>{ch.name}</p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                      {labelOf(specs, ch.type)} · 创建于 {formatInZone(ch.created_at, tz)}
+                    <p className="truncate text-sm font-medium" title={ch.name}>
+                      {ch.name}
                     </p>
+                    <div className="mt-1.5 flex items-center justify-between gap-2">
+                      <span className="truncate text-xs text-muted-foreground" title={labelOf(specs, ch.type)}>
+                        {labelOf(specs, ch.type)}
+                      </span>
+                      <div className="flex items-center gap-0.5 shrink-0">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7"
+                          onClick={() => handleDuplicate(ch)}
+                          title="复制"
+                        >
+                          <Copy className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7"
+                          onClick={() => setEditing(ch)}
+                          title="编辑"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7 text-destructive hover:text-destructive"
+                          onClick={() => setToDelete(ch)}
+                          title="删除"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </div>
                   </div>
-                </div>
-
-                <div className="mt-1 flex justify-end gap-1 pl-6">
-                  <Button size="sm" variant="ghost" className="h-8 px-2 text-xs" onClick={() => handleDuplicate(ch)}>
-                    <Copy className="h-3.5 w-3.5 mr-1" />
-                    复制
-                  </Button>
-                  <Button size="sm" variant="ghost" className="h-8 px-2 text-xs" onClick={() => setEditing(ch)}>
-                    <Pencil className="h-3.5 w-3.5 mr-1" />
-                    编辑
-                  </Button>
-                  <Button size="sm" variant="ghost" className="h-8 px-2 text-xs text-destructive hover:text-destructive" onClick={() => setToDelete(ch)}>
-                    <Trash2 className="h-3.5 w-3.5 mr-1" />
-                    删除
-                  </Button>
                 </div>
               </div>
             ))}
