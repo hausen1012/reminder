@@ -35,7 +35,7 @@ const DialogContent = React.forwardRef<
         // 桌面端居中弹窗；宽度默认 max-w-lg，调用方传 max-w-* 时由 tailwind-merge 覆盖
         'fixed z-50 grid w-full max-w-lg gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 sm:left-[50%] sm:top-[50%] sm:translate-x-[-50%] sm:translate-y-[-50%] sm:rounded-lg',
         // 移动端：底部弹层；高度受限时可滚动，长表单不会冲出屏幕
-        'max-sm:inset-x-0 max-sm:bottom-0 max-sm:top-auto max-sm:h-auto max-sm:max-h-[92dvh] max-sm:translate-x-0 max-sm:translate-y-0 max-sm:overflow-y-auto max-sm:scroll-area max-sm:rounded-b-none max-sm:rounded-t-2xl max-sm:pb-[calc(1.5rem+env(safe-area-inset-bottom))]',
+        'max-sm:inset-x-0 max-sm:bottom-0 max-sm:top-auto max-sm:h-auto max-sm:max-h-[92dvh] max-sm:translate-x-0 max-sm:translate-y-0 max-sm:overflow-y-auto max-sm:overflow-x-hidden max-sm:scroll-area max-sm:rounded-b-none max-sm:rounded-t-2xl max-sm:pb-[calc(1.5rem+env(safe-area-inset-bottom))]',
         className,
         // 放在最后：移动端全宽，覆盖调用方传入的 max-w-*
         'max-sm:max-w-none',

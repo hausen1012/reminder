@@ -540,9 +540,9 @@ export default function LogsPage() {
                     const SubStatusIcon = STATUS_ICON[sub.status] ?? Clock;
                     const subColor = STATUS_COLOR[sub.status] ?? '';
                     return (
-                      <div key={sub.id} className="flex items-center gap-2 border-t bg-muted/20 px-3 py-2 pl-9">
-                        <span className="text-xs text-muted-foreground">重发 #{sub.retry_round}</span>
-                        <span className="truncate text-xs text-muted-foreground">{formatInZone(sub.fired_at, tz)}</span>
+                      <div key={sub.id} className="flex items-center gap-2 border-t bg-muted/20 px-3 py-2 pl-7 sm:pl-9 min-w-0">
+                        <span className="shrink-0 text-xs text-muted-foreground">重发 #{sub.retry_round}</span>
+                        <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">{formatInZone(sub.fired_at, tz)}</span>
                         <Badge variant="outline" className={`ml-auto gap-1 shrink-0 text-[11px] ${subColor}`}>
                           <SubStatusIcon className="h-3 w-3" />
                           {STATUS_LABEL[sub.status] ?? sub.status}
@@ -574,15 +574,15 @@ export default function LogsPage() {
             <>
               <Separator className="my-1" />
 
-          <Tabs defaultValue="basic" className="mt-2">
-            <TabsList className="w-full justify-start overflow-x-auto flex-nowrap gap-0">
-              <TabsTrigger value="basic" className="shrink-0">基本信息</TabsTrigger>
-              <TabsTrigger value="content" className="shrink-0">发送内容</TabsTrigger>
+          <Tabs defaultValue="basic" className="mt-2 w-full min-w-0">
+            <TabsList className="w-full max-w-full justify-start overflow-x-auto flex-nowrap gap-0 scroll-area">
+              <TabsTrigger value="basic" className="shrink-0">概览</TabsTrigger>
+              <TabsTrigger value="content" className="shrink-0">内容</TabsTrigger>
               {detail.confirm_chain_id && (
-                <TabsTrigger value="confirm" className="shrink-0">确认信息</TabsTrigger>
+                <TabsTrigger value="confirm" className="shrink-0">确认</TabsTrigger>
               )}
               <TabsTrigger value="attempts" className="shrink-0">
-                投递详情
+                投递
                 {detail.attempts && detail.attempts.length > 0 && (
                   <span className="ml-1.5 rounded-full bg-muted-foreground/20 px-1.5 py-0.5 text-xs">
                     {detail.attempts.length}
@@ -591,7 +591,7 @@ export default function LogsPage() {
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="basic" className="space-y-3">
+            <TabsContent value="basic" className="space-y-3 min-w-0">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2.5 text-sm">
                 <div className="flex items-center gap-2">
                   <span className="text-muted-foreground min-w-[5rem]">日志 ID</span>
@@ -626,7 +626,7 @@ export default function LogsPage() {
               </div>
             </TabsContent>
 
-            <TabsContent value="content" className="space-y-3">
+            <TabsContent value="content" className="space-y-3 min-w-0">
               <div className="flex items-center gap-2 text-sm">
                 <span className="text-muted-foreground min-w-[5rem]">标题：</span>
                 <span className="font-medium">{detail.title || '—'}</span>
@@ -640,9 +640,9 @@ export default function LogsPage() {
             </TabsContent>
 
             {detail.confirm_chain_id && (
-              <TabsContent value="confirm" className="space-y-3">
+              <TabsContent value="confirm" className="space-y-3 min-w-0">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
-                  <div className="col-span-2 flex flex-wrap items-center gap-2">
+                  <div className="col-span-2 min-w-0 flex flex-wrap items-center gap-2">
                     <span className="text-muted-foreground min-w-[5rem]">确认链 ID</span>
                     <code className="rounded bg-muted px-2 py-0.5 text-xs font-mono break-all">
                       {detail.confirm_chain_id}
@@ -652,22 +652,22 @@ export default function LogsPage() {
                     )}
                   </div>
                   {detail.confirmed_at && (
-                    <div className="col-span-2 flex items-center gap-2">
+                    <div className="col-span-2 min-w-0 flex items-center gap-2">
                       <span className="text-muted-foreground min-w-[5rem]">确认时间</span>
                       <span>{formatInZone(detail.confirmed_at, tz)}</span>
                     </div>
                   )}
                   {detail.confirm_url && (
-                    <div className="col-span-2">
+                    <div className="col-span-2 min-w-0">
                       <span className="text-muted-foreground">确认链接：</span>
-                      <div className="mt-1.5 flex flex-col gap-2 sm:flex-row sm:items-center">
-                        <code className="min-w-0 flex-1 truncate rounded border bg-muted px-3 py-1.5 text-xs">
+                      <div className="mt-1.5 flex flex-col gap-2 sm:flex-row sm:items-center min-w-0">
+                        <code className="min-w-0 flex-1 break-all rounded border bg-muted px-3 py-1.5 text-xs font-mono">
                           {detail.confirm_url}
                         </code>
                         <Button
                           size="sm"
                           variant="outline"
-                          className="self-start sm:self-auto"
+                          className="self-start sm:self-auto shrink-0"
                           onClick={async () => {
                             try {
                               await copyToClipboard(detail.confirm_url ?? '')
