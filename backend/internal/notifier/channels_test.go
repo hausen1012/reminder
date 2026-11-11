@@ -368,14 +368,22 @@ func TestBase64Encode(t *testing.T) {
 	}
 }
 
-// StripHTML 应去掉所有标签并 trim。
+// StripHTML 应去掉所有标签并保留链接、图片与换行。
 func TestStripHTML(t *testing.T) {
 	cases := map[string]string{
-		"<p>段落</p>":                  "段落",
-		"<a href='x'>链接</a>":         "链接",
-		"  <b>粗</b>  ":               "粗",
-		"纯文本":                        "纯文本",
-		"<div><span>嵌套</span></div>": "嵌套",
+		"<p>段落</p>":                                 "段落",
+		"<a href='x'>链接</a>":                        "链接 (x)",
+		"<a href='https://x.com'>https://x.com</a>": "https://x.com",
+		"  <b>粗</b>  ":                              "粗",
+		"纯文本":                                       "纯文本",
+		"<div><span>嵌套</span></div>":                "嵌套",
+		"<p>第一行</p><p>第二行</p>":                      "第一行\n\n第二行",
+		`正文<br><a href="https://x/c/t">点击确认提醒</a>`:  "正文\n点击确认提醒 (https://x/c/t)",
+		"<ul><li>甲</li><li>乙</li></ul>":             "甲\n乙",
+		`<img src="https://x/i.png" alt="图片">`:      "图片",
+		`<img src="https://x/i.png">`:               "https://x/i.png",
+		"AT&amp;T 与 a &lt; b":                       "AT&T 与 a < b",
+		"<code>user_id</code> 与 <strong>粗</strong>": "user_id 与 粗",
 	}
 	for in, want := range cases {
 		if got := StripHTML(in); got != want {
@@ -384,7 +392,7 @@ func TestStripHTML(t *testing.T) {
 	}
 }
 
-// StripMarkdown 应去掉常见标记。
+// StripMarkdown 应去掉常见标记，并保留链接、代码与换行。
 func TestStripMarkdown(t *testing.T) {
 	cases := []struct {
 		in   string
@@ -393,12 +401,22 @@ func TestStripMarkdown(t *testing.T) {
 		{"# 标题", "标题"},
 		{"**加粗**", "加粗"},
 		{"*斜体*", "斜体"},
-		{"[链接](http://x)", "链接"},
+		{"[链接](http://x)", "链接 (http://x)"},
+		{"[http://x](http://x)", "http://x"},
 		{"![图片](http://x)", "图片"},
 		{"> 引用", "引用"},
 		{"- 列表项", "列表项"},
 		{"1. 有序", "有序"},
-		{"`代码`", ""},
+		{"`代码`", "代码"},
+		{"```go\nfunc main() {}\n```", "func main() {}"},
+		{"第一行\n\n- 任务1\n- 任务2", "第一行\n\n任务1\n任务2"},
+		// 下划线只在成对包裹时是强调标记，词内下划线必须原样保留
+		{"参数 user_id 与 mentioned_list", "参数 user_id 与 mentioned_list"},
+		{"[文档](https://x.com/a_b_c/d_e)", "文档 (https://x.com/a_b_c/d_e)"},
+		// 代码块内的标记不做二次处理
+		{"`**粗**` 与 `a_b`", "**粗** 与 a_b"},
+		{"[**加粗链接**](https://x.com/**raw**)", "加粗链接 (https://x.com/**raw**)"},
+		{"<div>原始HTML</div>", "原始HTML"},
 	}
 	for _, tc := range cases {
 		if got := StripMarkdown(tc.in); got != tc.want {

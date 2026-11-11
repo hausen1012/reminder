@@ -19,14 +19,24 @@
 | 邮件 | `text/plain` | 转成 HTML 后发送 | 原样作为 `text/html` |
 | 钉钉 | text 消息 | markdown 消息 | 剥掉标签后按 text |
 | 企微 | text 消息 | markdown 消息 | 剥掉标签后按 text |
-| 飞书 | text 消息 | 剥掉标记后按 text | 剥掉标签后按 text |
+| 飞书 | text 消息 | 转成纯文本 | 剥掉标签后按 text |
 | Webhook | 原样 | 原样 | 原样 |
-| Telegram | text 消息 | 剥掉标记后按 text | 剥掉标签后按 text |
-| Bark | text 推送 | 剥掉标记后按 text | 剥掉标签后按 text |
-| Apprise | text 消息 | 剥掉标记后按 text | 剥掉标签后按 text |
-| ntfy | text 消息 | 剥掉标记后按 text | 剥掉标签后按 text |
+| Telegram | text 消息 | 转成纯文本 | 剥掉标签后按 text |
+| Bark | text 推送 | 转成纯文本 | 剥掉标签后按 text |
+| Apprise | text 消息 | 转成纯文本 | 剥掉标签后按 text |
+| ntfy | text 消息 | 转成纯文本 | 剥掉标签后按 text |
 
 Webhook 不做任何转换，`{{content}}` 拿到什么就发什么，转换责任交给你的模板。
+
+### 降级为纯文本的结果
+
+`markdown` 与 `html` 在只支持纯文本的通道上会被转换成纯文本，转换规则：
+
+- 段落、标题、列表项之间保留换行，连续空行压缩为一个
+- 链接保留为 `文本 (URL)`，纯文本接收方也能看到地址
+- 图片取 `alt` 文字，`alt` 为空时取图片地址
+- 代码保留原始内容，代码块内的标记不再处理
+- HTML 实体字符解码（`&amp;` → `&`）
 
 ### 长度上限与截断
 
