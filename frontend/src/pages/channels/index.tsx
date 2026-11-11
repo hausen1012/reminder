@@ -244,9 +244,9 @@ export default function ChannelsPage() {
                         onCheckedChange={toggleSelectAll}
                       />
                     </th>
-                    <th className="px-4 py-2.5">名称</th>
-                    <th className="px-4 py-2.5 w-28">类型</th>
-                    <th className="px-4 py-2.5 w-44 whitespace-nowrap cursor-pointer select-none" onClick={() => toggleSort('created_at')}>
+                    <th className="px-4 py-2.5 w-6/12">名称</th>
+                    <th className="px-4 py-2.5 w-4/12">类型</th>
+                    <th className="px-4 py-2.5 w-2/12 min-w-[11rem] whitespace-nowrap cursor-pointer select-none" onClick={() => toggleSort('created_at')}>
                       创建时间<SortIcon active={sortBy === 'created_at'} direction={sortOrder} />
                     </th>
                     <th className="px-4 py-2.5 w-36 text-right">操作</th>
@@ -265,7 +265,11 @@ export default function ChannelsPage() {
                         <td className="px-4 py-2.5">
                           <span className="font-medium truncate block" title={ch.name}>{ch.name}</span>
                         </td>
-                        <td className="px-4 py-2.5 text-xs text-muted-foreground">{labelOf(specs, ch.type)}</td>
+                        <td className="px-4 py-2.5 text-xs text-muted-foreground">
+                          <span className="truncate block" title={labelOf(specs, ch.type)}>
+                            {labelOf(specs, ch.type)}
+                          </span>
+                        </td>
                         <td className="px-4 py-2.5 text-xs whitespace-nowrap text-muted-foreground">
                           {formatInZone(ch.created_at, tz)}
                         </td>

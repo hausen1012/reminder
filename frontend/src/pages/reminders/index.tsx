@@ -413,10 +413,11 @@ export default function RemindersPage() {
             </div>
           </div>
 
-          {/* 移动端卡片列表：首行标题+渠道（文本）+开关，次行内容备注，底行时间规则+类型+来源+操作 */}
+          {/* 移动端卡片列表：首行标题+开关，次行内容备注+渠道，底行时间规则+类型+来源+操作 */}
           <div className="divide-y md:hidden">
             {items.map((r) => {
               const chNames = r.channel_ids.map((cid) => channelMap.get(cid) || `#${cid}`)
+              const secondLine = [r.content, chNames.join('、')].filter(Boolean).join(' · ')
               return (
                 <div key={r.id} className="px-3 py-2.5">
                   <div className="flex items-start gap-2.5">
@@ -427,21 +428,11 @@ export default function RemindersPage() {
                       aria-label={`选择提醒 ${r.title}`}
                     />
                     <div className="min-w-0 flex-1">
-                      {/* 首行：标题 + 渠道（文本），右侧开关 */}
+                      {/* 首行：标题，右侧开关 */}
                       <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-baseline gap-1.5 min-w-0">
-                          <span className="truncate text-sm font-medium" title={r.title}>
-                            {r.title}
-                          </span>
-                          {chNames.length > 0 && (
-                            <span
-                              className="truncate text-xs text-muted-foreground shrink-0 max-w-[45%]"
-                              title={chNames.join('、')}
-                            >
-                              · {chNames.join('、')}
-                            </span>
-                          )}
-                        </div>
+                        <span className="truncate text-sm font-medium" title={r.title}>
+                          {r.title}
+                        </span>
                         <Switch
                           checked={r.enabled}
                           onCheckedChange={() => handleToggle(r)}
@@ -450,10 +441,10 @@ export default function RemindersPage() {
                         />
                       </div>
 
-                      {/* 次行：内容备注（如有） */}
-                      {r.content && (
-                        <p className="mt-0.5 truncate text-xs text-muted-foreground" title={r.content}>
-                          {r.content}
+                      {/* 次行：内容备注 + 通知渠道 */}
+                      {secondLine && (
+                        <p className="mt-0.5 truncate text-xs text-muted-foreground" title={secondLine}>
+                          {secondLine}
                         </p>
                       )}
 
