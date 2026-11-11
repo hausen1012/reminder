@@ -150,7 +150,7 @@ export default function SchedulerPage() {
             variant="plain"
             icon={CalendarClock}
             title="暂无注册任务"
-            description="当前调度引擎中没有待触发的任务。当创建有效提醒或存在重发任务时将在此排队。"
+            description="当前没有待触发的任务"
             action={{
               label: '前往提醒管理',
               variant: 'outline',

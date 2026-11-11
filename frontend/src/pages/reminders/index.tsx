@@ -273,7 +273,7 @@ export default function RemindersPage() {
           <EmptyState
             icon={SearchX}
             title="未找到匹配的提醒"
-            description="没有找到符合当前筛选条件的提醒，尝试调整关键词或清除筛选。"
+            description="未找到匹配的提醒，可尝试调整筛选条件。"
             action={{
               label: '清除筛选',
               variant: 'outline',
@@ -294,7 +294,7 @@ export default function RemindersPage() {
           <EmptyState
             icon={Bell}
             title="还没有提醒"
-            description="创建你的第一条提醒，到达设定时间或触发周期后将准时推送通知。"
+            description="暂无提醒，点击下方按钮开始创建。"
             action={{
               label: '新建提醒',
               icon: Plus,

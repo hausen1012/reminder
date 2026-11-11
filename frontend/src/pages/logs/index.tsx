@@ -343,7 +343,7 @@ export default function LogsPage() {
           <EmptyState
             icon={SearchX}
             title="未找到匹配的日志"
-            description="当前筛选条件下没有日志记录，尝试清除筛选或调整搜索关键词。"
+            description="未找到匹配的日志，可尝试调整筛选条件。"
             action={{
               label: '清除筛选',
               variant: 'outline',
@@ -358,7 +358,7 @@ export default function LogsPage() {
           <EmptyState
             icon={Inbox}
             title="还没有发送日志"
-            description="创建提醒并在触发或测试发送后，投递结果、延迟与重试记录将展示在这里。"
+            description="暂无发送日志，触发提醒后将在此显示。"
           />
         )
       ) : (

@@ -324,7 +324,7 @@ export default function TokensPage() {
           <EmptyState
             icon={KeyRound}
             title="还没有令牌"
-            description="创建 API 访问令牌，可通过 HTTP 请求直接触发提醒或投递消息。"
+            description="创建 API 访问令牌以通过外部请求触发提醒。"
             action={{
               label: '新建令牌',
               icon: Plus,

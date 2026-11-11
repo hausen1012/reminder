@@ -251,7 +251,7 @@ export function AISettingsSection() {
             ))}
           </SelectContent>
         </Select>
-        <p className="text-xs text-muted-foreground">用于快速填入推荐地址与模型，之后仍可修改</p>
+        <p className="text-xs text-muted-foreground">快速填入推荐地址与模型</p>
       </div>
 
       <div className="space-y-2">
@@ -281,8 +281,8 @@ export function AISettingsSection() {
         />
         <p className="text-xs text-muted-foreground">
           {provider === 'anthropic'
-            ? 'Anthropic Messages API 的服务根地址，例如 https://api.anthropic.com。'
-            : '兼容 OpenAI 协议的 API 端点（OpenAI/DeepSeek/Qwen/Kimi/ollama 等）。'}
+            ? 'Anthropic API 服务地址，留空使用官方默认地址。'
+            : '兼容 OpenAI 接口规范的 API 服务地址。'}
         </p>
       </div>
 
@@ -344,7 +344,7 @@ export function AISettingsSection() {
           )}
         </div>
         <p className="text-xs text-muted-foreground">
-          对话默认使用的模型，可在输入框直接填写，或从右侧下拉选择
+          对话默认使用的模型
         </p>
       </div>
 
@@ -424,8 +424,7 @@ export function AISettingsSection() {
           onChange={(e) => setMaxRetries(Number(e.target.value))}
         />
         <p className="text-xs text-muted-foreground">
-          接口失败（限流、超时、网络错误、服务端 5xx）后的自动重试次数，默认 10。
-          填 0 表示不重试；密钥错误、参数错误这类不会重试。
+          请求失败时的自动重试次数，填 0 表示不重试。
         </p>
       </div>
 
@@ -440,8 +439,7 @@ export function AISettingsSection() {
           onChange={(e) => setCustomPrompt(e.target.value)}
         />
         <p className="text-xs text-muted-foreground">
-          追加在内置规则之后，用于补充称呼、语气与业务约定（最多 4000 字）。
-          它不能改变工具使用与「待确认后才生效」等硬性规则；留空表示只用内置提示词。
+          追加在系统规则后，用于定制回复风格与约定（最多 4000 字）。
         </p>
       </div>
 

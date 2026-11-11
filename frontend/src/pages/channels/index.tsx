@@ -222,7 +222,7 @@ export default function ChannelsPage() {
           <EmptyState
             icon={Radio}
             title="还没有通知渠道"
-            description="添加邮件、企微、飞书、钉钉、Bark 等渠道，用于接收提醒消息。"
+            description="添加邮件、机器人或 Webhook 等通知渠道。"
             action={{
               label: '新建渠道',
               icon: Plus,

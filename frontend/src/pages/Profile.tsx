@@ -43,7 +43,7 @@ const SECTIONS = [
   {
     id: 'ai',
     label: 'AI 助手',
-    description: '开启后可用自然语言对话来创建通知渠道与提醒；助手生成的写操作需要你确认后才生效',
+    description: '使用自然语言创建提醒与通知渠道',
   },
 ] as const
 
@@ -366,9 +366,7 @@ export default function Profile() {
                             inputMode="url"
                           />
                           <p className="text-xs text-muted-foreground">
-                            「需要确认」的提醒会在正文里附带 <code>/c/&lt;token&gt;</code> 链接，用此地址拼成完整 URL。
-                            填 <code>localhost</code> 时手机上点开会是空的——请填内网 IP、域名或反向代理地址。
-                            修改后对之后发送的提醒生效，已发出的消息不会改写。
+                            用于生成确认提醒的访问链接，请填写设备可访问的地址或域名。
                           </p>
                           {siteUrl && (
                             <p className="text-xs text-muted-foreground break-all">
@@ -406,7 +404,7 @@ export default function Profile() {
                             </SelectContent>
                           </Select>
                           <p className="text-xs text-muted-foreground">
-                            提醒里填写的时间（如 09:00）按此时区解释。修改后所有提醒的下次触发时间会立即重算，无需重启。
+                            所有提醒均按此时区计算，修改后立即生效。
                           </p>
                         </div>
                         <Button type="submit" size="sm" disabled={savingTz}>

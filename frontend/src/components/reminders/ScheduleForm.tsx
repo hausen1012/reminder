@@ -211,7 +211,7 @@ export function ScheduleForm({ value, onChange }: Props) {
 
       {value.schedule_type === 'cron' && (
         <p className="text-xs text-muted-foreground">
-          5 字段标准 cron。例：每天 09:00 → <code>0 9 * * *</code>；工作日早 9 点 → <code>0 9 * * 1-5</code>。
+          标准 5 位 Cron 表达式，如每天 9 点：<code>0 9 * * *</code>
         </p>
       )}
     </div>

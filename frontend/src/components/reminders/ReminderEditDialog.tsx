@@ -266,7 +266,7 @@ export function ReminderEditDialog({ reminder, open, onClose, onSaved }: Props) 
               onChange={patchSchedule}
             />
             <p className="text-xs text-muted-foreground">
-              时间按站点时区（{siteTimezone}）解释；如需更换请到「设置」页修改。
+              时间按站点时区（{siteTimezone}）解释
             </p>
           </div>
 

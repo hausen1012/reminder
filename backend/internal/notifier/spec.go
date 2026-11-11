@@ -108,7 +108,7 @@ var specs = map[string]Spec{
 	"telegram": {
 		Type:        "telegram",
 		Label:       "Telegram",
-		Description: "通过 Bot API 发送到指定会话；需要网络能访问 api.telegram.org，可用 HTTPS_PROXY 配置代理",
+		Description: "通过 Telegram Bot API 发送到指定会话",
 		Fields: []FieldSpec{
 			{Key: "bot_token_enc", Label: "Bot Token", Kind: FieldPassword, Placeholder: "123456:ABC-DEF...", Required: true, Help: "向 @BotFather 申请"},
 			{Key: "chat_id", Label: "Chat ID", Kind: FieldText, Placeholder: "用户或群组的 chat_id", Required: true, Help: "把机器人拉进目标会话后从 getUpdates 获取"},
@@ -155,7 +155,7 @@ var specs = map[string]Spec{
 		RequireAny:  []string{"key_enc", "urls"},
 		Fields: []FieldSpec{
 			{Key: "api_url", Label: "API 地址", Kind: FieldText, Placeholder: "http://localhost:8000", Required: true, Default: "http://localhost:8000"},
-			{Key: "key_enc", Label: "配置 KEY", Kind: FieldPassword, Help: "Apprise API 里保存的配置 KEY；留空时必须在 URLs 里填写目标"},
+			{Key: "key_enc", Label: "配置 KEY", Kind: FieldPassword, Help: "已保存的配置 KEY，留空时请填写 URLs"},
 			{Key: "urls", Label: "URLs", Kind: FieldTextarea, Placeholder: "每行一个 Apprise URL，填写后按无状态模式发送", Help: "示例：discord://webhook_id/webhook_token"},
 			{Key: "type", Label: "消息类型", Kind: FieldSelect, Default: "info", Options: []Option{
 				{Value: "info", Label: "info"},
