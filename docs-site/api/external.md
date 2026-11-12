@@ -20,7 +20,8 @@ X-AUTH: bdrk_xxxxxxxx
 ## 通用约定
 
 - 请求与响应都是 JSON，`Content-Type: application/json`
-- 时间字段使用 `YYYY-MM-DDTHH:mm:ss` 的本地时间（按**站点时区**解释，站点时区在面板「设置」页配置）
+- 请求里的 `schedule_spec` 时间（`at` / `start_at`）用 `YYYY-MM-DDTHH:mm:ss` 本地时间，按**站点时区**解释；
+  响应里的时间字段是 RFC3339 UTC 字符串（如 `2026-07-01T01:00:00Z`）
 - 只能访问**本令牌创建的**提醒，访问其他提醒一律返回「提醒不存在」
 - 分页用 `limit` / `offset`
 
@@ -82,7 +83,6 @@ X-AUTH: bdrk_xxxxxxxx
     "confirm_retry_interval_sec": 0,
     "confirm_max_retries": 0,
     "next_fire_at": "2026-07-01T01:00:00Z",
-    "last_fired_at": null,
     "fire_count": 0,
     "next_fire_at_local": "2026-07-01 09:00",
     "channel_ids": [1],

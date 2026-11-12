@@ -671,7 +671,7 @@ func TestDispatchRun_LogsNoChannels(t *testing.T) {
 	dispatch.Run(context.Background(), r, logID)
 
 	out := logs.String()
-	if !strings.Contains(out, "level=WARN") || !strings.Contains(out, "没有可用的通道") {
+	if !strings.Contains(out, "level=WARN") || !strings.Contains(out, "提醒没有绑定任何通道") {
 		t.Fatalf("缺少无通道的 Warn 日志:\n%s", out)
 	}
 }

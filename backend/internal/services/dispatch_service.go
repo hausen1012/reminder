@@ -60,7 +60,7 @@ func (d *DispatchService) Run(ctx context.Context, r *models.Reminder, deliveryL
 		return
 	}
 	if len(channels) == 0 {
-		slog.Warn("提醒没有可用的通道（未绑定或全部被禁用），本次投递标记为 failed", "reminder", r.ID, "log", deliveryLogID)
+		slog.Warn("提醒没有绑定任何通道，本次投递标记为 failed", "reminder", r.ID, "log", deliveryLogID)
 		d.finalize(deliveryLogID, "failed", r.Title, r.Content)
 		return
 	}

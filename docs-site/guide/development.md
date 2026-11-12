@@ -89,16 +89,16 @@ cd backend && go test ./... -race -count=1
 ```
 
 测试覆盖的重点路径：调度乐观锁、兜底补发与过期、通道投递状态机、确认重发链、
-外部 API 令牌隔离、确认链接转义、AI 工具编排与待确认操作。
+外部 API 令牌隔离、AI 工具编排与待确认操作。
 
 AI 相关测试用 fake `llm.Provider` 注入脚本化响应（`services/ai_service_test.go`），
-不访问真实网络；OpenAI 兼容协议用 `httptest` 验证请求形状（`llm/provider_test.go`）。
+不访问真实网络；OpenAI 兼容协议用 `httptest` 验证请求形状（`llm/llm_test.go`）。
 
 写测试的三个惯例：
 
 - 内存 SQLite 与固定时区统一走 `internal/testutil`（`testutil.NewDB(t)`、`testutil.CST()`、`testutil.TZ(loc)`）
-- 每个包共享的脚手架（fake、造数辅助、等待函数）集中放在该包的 `testutil_test.go`
-- handler 测试通过 `httptest` 打真实路由，而不是直接调用方法
+- 每个包共享的脚手架（fake、造数辅助、等待函数）集中放在该包的 `testutil_test.go`（如 `services/testutil_test.go`）
+- 跨层行为通过 `httptest` 打到真实路由验证（如 `router/router_test.go`）；业务规则在服务层直接测，不针对 handler 单独写用例
 
 ## 前端测试
 
@@ -118,7 +118,7 @@ cd frontend && npm run test:coverage
 3. 在 `notifier/spec.go` 的 `specs` 里补上元数据（显示名、字段定义、格式与长度能力），并加进 `specOrder`
 4. 补充发送逻辑的单元测试
 
-`registry_test.go` 会校验 `Registry` 与 `specs` 的键一一对应，漏掉任一处测试即失败。
+`notifier_test.go` 中的 `TestRegistry_CoversAllSpecs` 会校验 `Registry` 与 `specs` 的键一一对应，漏掉任一处测试即失败。
 必填校验、AI 工具的类型枚举、`/api/channels/types` 都由元数据派生，无需另行维护。
 
 前端只在类型存在联动逻辑时才需要定制表单（参考 `ChannelForms.tsx`），
@@ -142,13 +142,13 @@ handler 里只需 `abortErr(c, err)`，不要自己拼错误响应体。
 
 | 场景 | 做法 |
 |---|---|
-| 要记 URL | `notifier.redactURL` / `redactURLString`，会抹掉 query 取值与 userinfo；`llm.redactURLString` 同理 |
-| 要记 header | `notifier.headerKeys`，只出名字不出值 |
+| 要记 URL | `textutil.RedactURL` / `textutil.RedactURLString`，会抹掉 query 取值与 userinfo |
+| 要记 header | `notifier.headerKeyList`，只出名字不出值 |
 | 要记渲染后的正文 / 变量 | 只记长度（`body_len`、`vars_count`），不记内容 |
 | 要记 AI 上游错误 | `llm.ErrorAttrs(err)` / `ErrorAttrsWith(err, ...)`，展开出 `status` / `body` / `upstream_request_id` |
 
 正文里可能带 `{{confirm_url}}`（一次性确认令牌），变量里还可能带用户内容，记全文等于把令牌与隐私写进日志。
-`log` 通道与 AI 的 `user_message`（截断 500 字）是仅有的例外。
+AI 的 `user_message`（截断 500 字）是仅有的例外。
 
 ### 写日志的约定
 

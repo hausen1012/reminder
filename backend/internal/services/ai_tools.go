@@ -71,7 +71,7 @@ func (s *AIService) toolDefinitions() []toolDefinition {
 		{
 			spec: llm.Tool{
 				Name:        "list_channels",
-				Description: "列出当前已配置的通知通道（id、名称、类型、是否启用）。创建提醒前先调用它确认可用的 channel_ids。",
+				Description: "列出当前已配置的通知通道（id、名称、类型）。创建提醒前先调用它确认可用的 channel_ids。",
 				InputSchema: map[string]any{"type": "object", "properties": map[string]any{}},
 			},
 			run: s.toolListChannels,
@@ -387,7 +387,7 @@ func (s *AIService) createAction(kind, summary string, payload any) (string, err
 	return toJSONString(map[string]any{
 		"draft_id": act.ID,
 		"status":   "pending",
-		"note":     "已生成待确认操作，尚未生效。请告诉用户点击卡片上的「确认执行」后才会真正创建。",
+		"note":     "已生成待确认操作，尚未生效。请告诉用户点击卡片上的「确认」后才会真正创建。",
 	}), nil
 }
 

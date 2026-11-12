@@ -17,7 +17,7 @@ type Reminder struct {
 
 	// 默认值由创建逻辑显式赋值；与 next_fire_at 建立复合索引 idx_reminders_due。
 	Enabled bool   `gorm:"index;index:idx_reminders_due,priority:1" json:"enabled"`
-	Source  string `gorm:"size:16;index" json:"source"` // web | api
+	Source  string `gorm:"size:16;index" json:"source"` // web | ai | api
 	TokenID *uint  `gorm:"index" json:"token_id,omitempty"`
 
 	RequireConfirm          bool `gorm:"default:false" json:"require_confirm"`

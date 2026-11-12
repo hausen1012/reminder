@@ -82,7 +82,7 @@ Engine 定时器到期
   ├─ 插入 delivery_log（status=pending）
   └─ 异步调用 DispatchService.Run
         │
-        ├─ 加载提醒绑定的启用通道（无通道 → failed）
+        ├─ 加载提醒绑定的通道（无通道 → failed）
         ├─ 构建模板变量
         ├─ 需要确认 → 创建/复用确认链与令牌，注入 confirm_url
         ├─ 渲染标题与正文
@@ -116,11 +116,11 @@ Engine 定时器到期
 
 | 目录 | 说明 |
 |---|---|
-| `pages` | 页面级组件：首页、提醒、通知、日志、令牌、监控、设置 |
+| `pages` | 页面级组件：首页、提醒、通知、日志、令牌、监控、设置、关于 |
 | `components` | 可复用组件，按功能分目录 |
+| `components/ui` | 基础 UI 组件（Radix / shadcn 原语） |
 | `contexts` | 认证、主题、站点配置、关于信息的全局状态 |
 | `lib` | API 封装与工具函数 |
-| `ui` | 基础 UI 组件 |
 
 路由使用 `HashRouter`，这样静态文件服务不需要为每个前端路由配置回退规则。
 

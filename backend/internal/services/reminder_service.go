@@ -192,7 +192,7 @@ func (s *ReminderService) Get(id uint) (*ReminderView, error) {
 
 // ListFilter 列表过滤条件。
 type ListFilter struct {
-	Source    string // manual | api | ""
+	Source    string // web | ai | api | ""（空或 all 表示不过滤）
 	Enabled   *bool
 	Search    string
 	TokenID   *uint
@@ -405,7 +405,7 @@ func (s *ReminderService) TestDryRun(ctx context.Context, title, content, conten
 	if strings.TrimSpace(title) == "" {
 		return middleware.NewAppError(middleware.CodeValidationFailed, "标题必填")
 	}
-	// 加载绑定的 enabled 通道
+	// 加载绑定的通道
 	channels, err := s.loadChannelsByIDs(channelIDs)
 	if err != nil {
 		return err

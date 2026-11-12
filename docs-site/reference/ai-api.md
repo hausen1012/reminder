@@ -21,6 +21,7 @@
   "provider": "openai",
   "base_url": "https://api.deepseek.com",
   "model": "deepseek-chat",
+  "models": ["deepseek-chat", "deepseek-reasoner"],
   "api_key": "sk-xxx",
   "custom_prompt": "称呼我为老板，回复尽量一句话说完",
   "max_retries": 10
@@ -32,6 +33,7 @@
 | `provider` | `anthropic` 或 `openai`（后者指 OpenAI 兼容协议） |
 | `base_url` | 留空时：`anthropic` 走官方地址，`openai` 走 `https://api.openai.com` |
 | `model` | 模型名；留空时按厂商给默认值 |
+| `models` | 对话窗模型下拉框的候选列表。省略时若 `model` 非空则只用该模型；传空数组时清空候选，下拉框回退到 `model` |
 | `api_key` | 传 `"***"` 表示保留已保存的密钥；传空串表示清除；传新值则覆盖 |
 | `custom_prompt` | 追加在内置系统提示词之后的用户自定义内容；空串表示不用。最多 4000 字，超出返回 `validation_failed` |
 | `max_retries` | 接口失败后的最大重试次数。**省略**表示用默认值 `10`；显式传 `0` 表示不重试。合法范围 0–100（负数越界），越界返回 `validation_failed` |
@@ -55,7 +57,7 @@
 { "code": 200, "message": "ok", "data": { "items": ["deepseek-chat", "deepseek-reasoner"] } }
 ```
 
-设置页的「获取模型列表」按钮用它填充下拉候选。拉取失败（地址错、密钥错、厂商不提供该接口）
+设置页的「刷新模型」按钮用它填充模型列表。拉取失败（地址错、密钥错、厂商不提供该接口）
 返回 `validation_failed`，此时仍可手动填写模型名。
 
 ## 对话
@@ -204,8 +206,8 @@ HTTP 状态恒为 `200`，错误通过 `event: error` 下发。只有在写第�
 
 ## 涉及的配置键
 
-AI 设置存在 `config` 表，前缀 `ai_`：`ai_enabled`、`ai_provider`、`ai_base_url`、
-`ai_model`、`ai_api_key_enc`、`ai_custom_prompt`、`ai_max_retries`。
+AI 设置存在 `config` 表，前缀 `ai_`：`ai_enabled`、`ai_provider`、`ai_base_url`、`ai_model`、
+`ai_models`、`ai_api_key_enc`、`ai_custom_prompt`、`ai_max_retries`。
 它们不通过 `/api/config` 暴露。
 
 `ai_custom_prompt` 为明文（不是密钥），值为空时该行被删除，回退到只用内置提示词。

@@ -21,9 +21,10 @@ curl http://localhost:8765/api/external/v1/channels \
       "name": "邮件通知",
       "type": "smtp",
       "config": {
-        "host": "***",
-        "port": "***",
-        "from_addr": "***"
+        "host": "smtp.example.com",
+        "port": 587,
+        "from_addr": "reminder@example.com",
+        "password_enc": "***"
       },
       "created_at": "2026-06-30T12:00:00Z",
       "updated_at": "2026-06-30T12:00:00Z"
@@ -33,8 +34,7 @@ curl http://localhost:8765/api/external/v1/channels \
 ```
 
 ::: warning 敏感字段被脱敏
-`config` 中以 `_enc` 结尾的字段，以及部分关键字段，会被替换为 `***`。
-外部 API 拿到的不是完整配置，仅用于识别通道用途。
+`config` 中只有以 `_enc` 结尾的字段会被替换为 `***`（原本为空的保持空串），其余字段原样返回。
 :::
 
 ## 如何选定 channel_ids

@@ -25,7 +25,7 @@ JWT 有效期为 72 小时。改密码后旧 JWT 仍然有效直到过期——�
 登录失败限流：同一「用户名 + 客户端 IP」连续失败 `LOGIN_MAX_ATTEMPTS` 次（默认 5）后，
 在 `LOGIN_LOCKOUT_MINUTES`（默认 15 分钟）内一律返回 `429 rate_limited`，
 响应头 `Retry-After` 给出**剩余锁定秒数**（与配置的锁定时长一致，不足 1 秒按 1 秒返回）。
-用户名大小写不敏感；成功登录会清零计数。详见[配置项](/guide/configuration)。
+成功登录会清零计数。详见[配置项](/guide/configuration)。
 
 ## 提醒
 
@@ -92,7 +92,7 @@ JWT 有效期为 72 小时。改密码后旧 JWT 仍然有效直到过期——�
 | `GET` | `/api/logs` | 列表，支持 `status` / `source` / `search` / `reminder_id` / `since` / 分页 |
 | `GET` | `/api/logs/:id` | 详情，含通道级 attempts 与确认链接 |
 | `GET` | `/api/logs/count` | 按清理条件统计待删条数 |
-| `DELETE` | `/api/logs` | 清理，`?older_than=7d` 或 `?all=true` |
+| `DELETE` | `/api/logs` | 清理，`?older_than=168h` 或 `?all=true` |
 | `DELETE` | `/api/logs/batch` | 批量删除指定日志 |
 
 `older_than` 接受 Go 时长格式，如 `168h`（7 天）、`720h`（30 天），前端会把天数换算成小时。
@@ -104,14 +104,14 @@ JWT 有效期为 72 小时。改密码后旧 JWT 仍然有效直到过期——�
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| `GET` | `/api/tokens` | 列表，支持 `search` 与分页 |
+| `GET` | `/api/tokens` | 列表，支持 `search` 与分页（默认 10 条，上限 100） |
 | `POST` | `/api/tokens` | 新建，返回明文 |
 | `GET` | `/api/tokens/:id` | 详情 |
 | `GET` | `/api/tokens/:id/plaintext` | 取回明文 |
 | `PATCH` | `/api/tokens/:id/toggle` | 启用 / 禁用 |
 | `PUT` | `/api/tokens/:id/channels` | 修改默认通道 |
 | `DELETE` | `/api/tokens/:id` | 删除 |
-| `GET` | `/api/tokens/stats` | 各令牌近 24 小时调用次数 |
+| `GET` | `/api/tokens/stats` | 各令牌近 24 小时通过它创建的提醒数 |
 
 ## 监控与配置
 
@@ -144,7 +144,7 @@ JWT 有效期为 72 小时。改密码后旧 JWT 仍然有效直到过期——�
 | 键 | 说明 |
 |---|---|
 | `app_name` | 站点名称 |
-| `logo_svg` | 自定义 Logo 的 SVG 源码 |
+| `logo_svg` | 自定义 Logo：SVG 源码，或图片的 `data:image/...` URL |
 | `timezone` | 站点时区 |
 | `site_url` | 站点对外地址，用于拼接确认链接 `/c/:token` 与日志详情里的确认地址 |
 
