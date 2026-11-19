@@ -247,7 +247,6 @@ export function AISettingsSection() {
             ))}
           </SelectContent>
         </Select>
-        <p className="text-xs text-muted-foreground">快速填入推荐地址与模型</p>
       </div>
 
       <div className="space-y-2">
@@ -271,15 +270,10 @@ export function AISettingsSection() {
         <Label htmlFor="ai-base-url">API 地址（Base URL）</Label>
         <Input
           id="ai-base-url"
-          placeholder={provider === 'anthropic' ? '留空使用官方地址' : 'https://api.openai.com/v1'}
+          placeholder={provider === 'anthropic' ? '官方默认（https://api.anthropic.com）' : 'https://api.openai.com/v1'}
           value={baseURL}
           onChange={(e) => setBaseURL(e.target.value)}
         />
-        <p className="text-xs text-muted-foreground">
-          {provider === 'anthropic'
-            ? 'Anthropic API 服务地址，留空使用官方默认地址。'
-            : '兼容 OpenAI 接口规范的 API 服务地址。'}
-        </p>
       </div>
 
       <div className="space-y-2">
@@ -288,7 +282,7 @@ export function AISettingsSection() {
           <Input
             id="ai-api-key"
             type={showKey ? 'text' : 'password'}
-            placeholder={hasKey ? '已配置，留空表示不修改' : '填写厂商提供的 API Key'}
+            placeholder={hasKey ? '已配置密钥（留空保持不变）' : '输入 API Key（本地服务可留空）'}
             value={apiKey}
             onChange={(e) => setApiKey(e.target.value)}
             className="pr-10"
@@ -303,9 +297,6 @@ export function AISettingsSection() {
             {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
           </button>
         </div>
-        <p className="text-xs text-muted-foreground">
-          密钥加密后保存；本地 Ollama 等服务可留空
-        </p>
       </div>
 
       {/* 默认模型：输入框 + 下拉快速选择 */}
@@ -339,9 +330,6 @@ export function AISettingsSection() {
             </Select>
           )}
         </div>
-        <p className="text-xs text-muted-foreground">
-          对话默认使用的模型
-        </p>
       </div>
 
       {/* 模型列表：与截图完全一致的头部按钮和输入行设计 */}
@@ -418,14 +406,12 @@ export function AISettingsSection() {
           step={1}
           value={maxRetries}
           onChange={(e) => setMaxRetries(Number(e.target.value))}
+          placeholder="0 表示不自动重试"
         />
-        <p className="text-xs text-muted-foreground">
-          请求失败时的自动重试次数，填 0 表示不重试。
-        </p>
       </div>
 
       <div className="space-y-2 sm:col-span-2">
-        <Label htmlFor="ai-custom-prompt">自定义提示词（可选）</Label>
+        <Label htmlFor="ai-custom-prompt">自定义提示词</Label>
         <Textarea
           id="ai-custom-prompt"
           rows={5}
@@ -434,9 +420,6 @@ export function AISettingsSection() {
           value={customPrompt}
           onChange={(e) => setCustomPrompt(e.target.value)}
         />
-        <p className="text-xs text-muted-foreground">
-          追加在系统规则后，用于定制回复风格与约定（最多 4000 字）。
-        </p>
       </div>
 
       <div className="flex gap-2 sm:col-span-2">

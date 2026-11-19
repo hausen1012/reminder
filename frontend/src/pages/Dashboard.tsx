@@ -156,8 +156,7 @@ export default function Dashboard() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-1 pb-2">
             <CardTitle className="min-w-0 truncate text-xs font-medium md:text-sm">
-              今日待发<span className="hidden md:inline">提醒</span>{' '}
-              <span className="ml-1 text-xs text-muted-foreground">({todayCount})</span>
+              今日待发
             </CardTitle>
             <Bell className="h-4 w-4 shrink-0 text-muted-foreground" />
           </CardHeader>
@@ -170,7 +169,7 @@ export default function Dashboard() {
                 <p className="text-xs text-muted-foreground mt-1 truncate">
                   {nextUpcoming
                     ? `下个触发：${formatInZone(nextUpcoming.next_fire_at, tz, 'clock')}`
-                    : '今天待触发任务已全部完成'}
+                    : '今日无待触发提醒'}
                 </p>
                 <Link
                   to="/reminders"
@@ -187,7 +186,7 @@ export default function Dashboard() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-1 pb-2">
             <CardTitle className="min-w-0 truncate text-xs font-medium md:text-sm">
-              最近发送 <span className="ml-1 text-xs text-muted-foreground">({logs.length})</span>
+              最近发送
             </CardTitle>
             <ScrollText className="h-4 w-4 shrink-0 text-muted-foreground" />
           </CardHeader>
@@ -228,9 +227,8 @@ export default function Dashboard() {
             ) : (
               <>
                 <div className="text-xl font-bold md:text-2xl">{channelSuccessRate}%</div>
-                <p className="text-xs text-muted-foreground mt-1">过去 24h 发送成功率</p>
                 {totalChannelSend > 0 ? (
-                  <div className="flex items-center gap-2.5 mt-2 text-xs text-muted-foreground">
+                  <div className="flex items-center gap-2.5 mt-1 text-xs text-muted-foreground">
                     <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
                       <CheckCircle2 className="h-3.5 w-3.5" />
                       {totalChannelSuccess}
@@ -241,13 +239,14 @@ export default function Dashboard() {
                     </span>
                   </div>
                 ) : (
-                  <Link
-                    to="/channels"
-                    className="text-xs text-primary hover:underline inline-flex items-center gap-1 mt-2 font-medium"
-                  >
-                    管理渠道 <ArrowRight className="h-3 w-3" />
-                  </Link>
+                  <p className="text-xs text-muted-foreground mt-1">过去 24h 无发送记录</p>
                 )}
+                <Link
+                  to="/channels"
+                  className="text-xs text-primary hover:underline inline-flex items-center gap-1 mt-2 font-medium"
+                >
+                  管理渠道 <ArrowRight className="h-3 w-3" />
+                </Link>
               </>
             )}
           </CardContent>

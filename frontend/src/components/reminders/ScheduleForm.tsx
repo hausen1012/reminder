@@ -57,6 +57,14 @@ const LUNAR_INTERVAL_PRESETS = [
   { label: '每年', every: 1, unit: 'year' },
 ] as const
 
+const CRON_PRESETS = [
+  { label: '工作日 09:00', expr: '0 9 * * 1-5' },
+  { label: '每天 09:00', expr: '0 9 * * *' },
+  { label: '每周一 09:00', expr: '0 9 * * 1' },
+  { label: '每小时', expr: '0 * * * *' },
+  { label: '每 30 分钟', expr: '*/30 * * * *' },
+] as const
+
 export function ScheduleForm({ value, onChange }: Props) {
   const [calendarOpen, setCalendarOpen] = useState(false)
   const [customInterval, setCustomInterval] = useState(false)
@@ -219,11 +227,28 @@ export function ScheduleForm({ value, onChange }: Props) {
       {value.schedule_type === 'cron' && (
         <div className="space-y-2">
           <Label htmlFor="spec-expr">Cron 表达式</Label>
+          <div className="flex flex-wrap items-center gap-1.5 pb-0.5">
+            {CRON_PRESETS.map((p) => (
+              <button
+                key={p.expr}
+                type="button"
+                onClick={() => patchSpec({ expr: p.expr })}
+                className={cn(
+                  'rounded-md px-2 py-0.5 text-xs font-medium transition-colors',
+                  spec.expr === p.expr
+                    ? 'bg-primary text-primary-foreground shadow-sm'
+                    : 'border border-border/80 bg-background text-muted-foreground hover:bg-muted hover:text-foreground',
+                )}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
           <Input
             id="spec-expr"
             value={String(spec.expr ?? '')}
             onChange={(e) => patchSpec({ expr: e.target.value })}
-            placeholder="例如：0 9 * * 1-5"
+            placeholder="标准 5 位格式，例如：0 9 * * 1-5"
           />
         </div>
       )}
@@ -266,12 +291,6 @@ export function ScheduleForm({ value, onChange }: Props) {
             />
           )}
         </div>
-      )}
-
-      {value.schedule_type === 'cron' && (
-        <p className="text-xs text-muted-foreground">
-          标准 5 位 Cron 表达式，如每天 9 点：<code>0 9 * * *</code>
-        </p>
       )}
     </div>
   )
