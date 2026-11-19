@@ -11,7 +11,6 @@ import {
   Card,
   CardHeader,
   CardTitle,
-  CardDescription,
   CardContent,
 } from '@/components/ui/card'
 import { TimezoneSelect } from '@/components/common/TimezoneSelect'
@@ -23,21 +22,9 @@ import { cn } from '@/lib/utils'
 
 // 设置页分区：账户信息、基础设置、AI 助手
 const SECTIONS = [
-  {
-    id: 'account',
-    label: '账户信息',
-    description: '管理当前登录账户与密码安全',
-  },
-  {
-    id: 'general',
-    label: '基础设置',
-    description: '配置站点外观、站点地址与时区',
-  },
-  {
-    id: 'ai',
-    label: 'AI 助手',
-    description: '使用自然语言创建提醒与通知渠道',
-  },
+  { id: 'account', label: '账户信息' },
+  { id: 'general', label: '基础设置' },
+  { id: 'ai', label: 'AI 助手' },
 ] as const
 
 type SectionId = (typeof SECTIONS)[number]['id']
@@ -171,12 +158,9 @@ export default function Profile() {
               hidden={active !== section.id}
               className="space-y-6"
             >
-              <div className="space-y-1.5">
-                <h2 className="text-lg font-semibold leading-none tracking-tight">
-                  {section.label}
-                </h2>
-                <p className="text-sm text-muted-foreground">{section.description}</p>
-              </div>
+              <h2 className="text-lg font-semibold leading-none tracking-tight">
+                {section.label}
+              </h2>
 
               {/* 账户信息 */}
               {section.id === 'account' && (
@@ -185,7 +169,6 @@ export default function Profile() {
                   <Card>
                     <CardHeader>
                       <CardTitle className="text-base font-medium">基本信息</CardTitle>
-                      <CardDescription>当前登录系统的账户与角色信息</CardDescription>
                     </CardHeader>
                     <CardContent>
                       <div className="flex items-center gap-4">
@@ -193,12 +176,7 @@ export default function Profile() {
                           {user?.username ? user.username.slice(0, 2).toUpperCase() : <UserIcon className="h-6 w-6" />}
                         </div>
                         <div className="space-y-1">
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium text-foreground">{user?.username || 'admin'}</span>
-                            <span className="rounded-full bg-secondary px-2 py-0.5 text-xs text-muted-foreground font-normal">
-                              UID: {user?.id ?? 1}
-                            </span>
-                          </div>
+                          <span className="block font-medium text-foreground">{user?.username || 'admin'}</span>
                           <p className="text-xs text-muted-foreground">
                             注册时间：{user?.created_at ? formatInZone(user.created_at, timezone, 'datetime') : '—'}
                           </p>
@@ -211,7 +189,6 @@ export default function Profile() {
                   <Card>
                     <CardHeader>
                       <CardTitle className="text-base font-medium">修改密码</CardTitle>
-                      <CardDescription>定期更换密码以确保系统安全，长度不少于 6 位</CardDescription>
                     </CardHeader>
                     <CardContent>
                       <form onSubmit={handlePassword} className="space-y-4 max-w-xl">
@@ -237,6 +214,7 @@ export default function Profile() {
                               required
                               minLength={6}
                               autoComplete="new-password"
+                              placeholder="至少 6 位"
                             />
                           </div>
                           <div className="space-y-2">
@@ -269,10 +247,7 @@ export default function Profile() {
               {/* 基础设置 */}
               {section.id === 'general' && (
                 <Card>
-                  <CardHeader>
-                    <CardTitle className="text-base font-medium">基础设置</CardTitle>
-                  </CardHeader>
-                  <CardContent>
+                  <CardContent className="pt-4 md:pt-6">
                     <form onSubmit={handleGeneralSave} className="space-y-6 max-w-xl">
                       <div className="space-y-2">
                         <Label htmlFor="app-name">站点名称</Label>

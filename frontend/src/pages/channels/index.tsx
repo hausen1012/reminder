@@ -201,8 +201,8 @@ export default function ChannelsPage() {
         Boolean(search.trim()) ? (
           <EmptyState
             icon={SearchX}
-            title="未找到匹配的通知渠道"
-            description="没有找到符合搜索条件的通知渠道，尝试调整关键词。"
+            title="未找到匹配渠道"
+            description="换个关键词或清除筛选。"
             action={{
               label: '清空搜索',
               variant: 'outline',
@@ -222,7 +222,7 @@ export default function ChannelsPage() {
           <EmptyState
             icon={Radio}
             title="还没有通知渠道"
-            description="添加邮件、机器人或 Webhook 等通知渠道。"
+            description="支持邮件、机器人、Webhook 等类型。"
             action={{
               label: '新建渠道',
               icon: Plus,

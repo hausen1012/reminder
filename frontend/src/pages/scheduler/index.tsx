@@ -145,7 +145,7 @@ export default function SchedulerPage() {
             variant="plain"
             icon={CalendarClock}
             title="暂无注册任务"
-            description="当前没有待触发的任务"
+            description="有提醒启用后会出现在这里。"
             action={{
               label: '前往提醒管理',
               variant: 'outline',

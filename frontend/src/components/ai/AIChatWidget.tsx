@@ -45,6 +45,13 @@ const STATUS_LABEL: Record<string, string> = {
   failed: '执行失败',
 }
 
+// 空态示例：点击后填入输入框，由用户确认再发送
+const examples = [
+  '每天早上 9 点提醒我喝水，发到钉钉',
+  '帮我建一个邮件通知渠道',
+  '把标题是「交房租」的提醒改成每月 1 号',
+]
+
 function loadHistory(): AIChatMessage[] {
   try {
     const raw = sessionStorage.getItem(STORAGE_KEY)
@@ -314,11 +321,18 @@ export function AIChatWidget({ onEnabledChange }: AIChatWidgetProps = {}) {
             {history.length === 0 && actions.length === 0 && (
               <div className="py-8 text-center text-sm text-muted-foreground">
                 <MessageSquare className="mx-auto mb-3 h-8 w-8 opacity-40" />
-                用自然语言告诉我要做什么
-                <div className="mt-3 space-y-1 text-xs">
-                  <p>「每天早上 9 点提醒我喝水，发到钉钉」</p>
-                  <p>「帮我建一个邮件通知渠道」</p>
-                  <p>「把标题是『交房租』的提醒改成每月 1 号」</p>
+                试试这样说
+                <div className="mt-3 flex flex-col items-stretch gap-1.5">
+                  {examples.map((text) => (
+                    <button
+                      key={text}
+                      type="button"
+                      onClick={() => setInput(text)}
+                      className="rounded-md border border-border/70 bg-card px-3 py-1.5 text-left text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    >
+                      {text}
+                    </button>
+                  ))}
                 </div>
               </div>
             )}
@@ -351,7 +365,7 @@ export function AIChatWidget({ onEnabledChange }: AIChatWidgetProps = {}) {
             {actions.length > 0 && (
               <div className="space-y-2 border-t pt-3">
                 <div className="flex items-center justify-between">
-                  <p className="text-xs font-medium text-muted-foreground">待确认操作（点确认后才生效）</p>
+                  <p className="text-xs font-medium text-muted-foreground">待确认操作</p>
                   {actions.filter((a) => a.status === 'pending').length > 1 && (
                     <button
                       type="button"
@@ -379,7 +393,6 @@ export function AIChatWidget({ onEnabledChange }: AIChatWidgetProps = {}) {
             <Textarea
               rows={2}
               value={input}
-              placeholder="描述你要的提醒或通知渠道…"
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => {
                 // Ctrl/Cmd + Enter 发送，避免与中文输入法的回车冲突
@@ -388,12 +401,10 @@ export function AIChatWidget({ onEnabledChange }: AIChatWidgetProps = {}) {
                   handleSend()
                 }
               }}
+              placeholder={sending ? '回复中，可随时中止…' : '描述你要的提醒或通知渠道…'}
               disabled={sending}
             />
-            <div className="flex items-center justify-between gap-2">
-              <span className="shrink-0 text-[11px] text-muted-foreground">
-                {sending ? '可随时中止' : 'Ctrl / ⌘ + Enter 发送'}
-              </span>
+            <div className="flex items-center justify-end gap-2">
               <div className="flex min-w-0 items-center gap-1.5">
                 {/* 模型切换：与发送按钮同排，宽度设上限并截断，避免长模型名撑破输入区 */}
                 {availableModels.length > 0 && (

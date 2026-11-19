@@ -327,8 +327,8 @@ export default function LogsPage() {
         Boolean(filter.status || filter.source || filter.search) ? (
           <EmptyState
             icon={SearchX}
-            title="未找到匹配的日志"
-            description="未找到匹配的日志，可尝试调整筛选条件。"
+            title="未找到匹配日志"
+            description="换个条件或清除筛选。"
             action={{
               label: '清除筛选',
               variant: 'outline',
@@ -343,7 +343,6 @@ export default function LogsPage() {
           <EmptyState
             icon={Inbox}
             title="还没有发送日志"
-            description="暂无发送日志，触发提醒后将在此显示。"
           />
         )
       ) : (
@@ -778,7 +777,6 @@ export default function LogsPage() {
                   size="compact"
                   icon={Send}
                   title="暂无投递记录"
-                  description="本次触发尚未产生各渠道的投递尝试详情。"
                   className="my-2"
                 />
               )}

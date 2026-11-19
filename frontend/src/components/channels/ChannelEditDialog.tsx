@@ -184,9 +184,6 @@ export function ChannelEditDialog({ channel, open, onClose, onSaved }: Props) {
                 ))}
               </SelectContent>
             </Select>
-            {isEdit && (
-              <p className="text-xs text-muted-foreground">通知类型创建后不可修改。</p>
-            )}
           </div>
 
           {CustomForm ? (

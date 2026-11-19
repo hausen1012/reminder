@@ -243,7 +243,18 @@ describe('AI 助手浮窗', () => {
     renderWidget()
 
     await userEvent.click(await screen.findByLabelText('打开 AI 助手'))
-    expect(screen.getByText(/用自然语言告诉我要做什么/)).toBeInTheDocument()
+    expect(screen.getByText(/试试这样说/)).toBeInTheDocument()
+  })
+
+  it('点击空态示例后填入输入框，不直接发送', async () => {
+    vi.mocked(getAISettings).mockResolvedValue(enabledSettings)
+    renderWidget()
+
+    await userEvent.click(await screen.findByLabelText('打开 AI 助手'))
+    await userEvent.click(screen.getByRole('button', { name: '每天早上 9 点提醒我喝水，发到钉钉' }))
+
+    expect(screen.getByDisplayValue('每天早上 9 点提醒我喝水，发到钉钉')).toBeInTheDocument()
+    expect(vi.mocked(sendAIChatStream)).not.toHaveBeenCalled()
   })
 
   it('待确认草稿展示卡片，确认后从列表移除', async () => {

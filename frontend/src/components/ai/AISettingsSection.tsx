@@ -77,6 +77,8 @@ export function AISettingsSection() {
   const [apiKey, setApiKey] = useState('')
   const [showKey, setShowKey] = useState(false)
   const [customPrompt, setCustomPrompt] = useState('')
+  // 当前命中的厂商预设；手动改动任何一个字段后清空，下拉框回到未选中态
+  const [presetKey, setPresetKey] = useState('')
   // 接口失败后的最大重试次数；0 表示不重试（后端只在字段缺省时才用默认的 10）
   const [maxRetries, setMaxRetries] = useState<number | ''>(10)
   const [hasKey, setHasKey] = useState(false)
@@ -204,12 +206,18 @@ export function AISettingsSection() {
   function applyPreset(name: string) {
     const p = PRESETS[name]
     if (!p) return
+    setPresetKey(name)
     setBaseURL(p.base_url)
     setModel(p.model)
     if (p.models && p.models.length > 0) {
       setModels(p.models)
     }
     setProvider(name === 'anthropic' ? 'anthropic' : 'openai')
+  }
+
+  // 手动编辑任一预设相关字段后，预设不再代表当前配置
+  function clearPreset() {
+    setPresetKey('')
   }
 
   const validModels = Array.from(new Set(models.map((m) => m.trim()).filter(Boolean)))
@@ -227,7 +235,7 @@ export function AISettingsSection() {
 
       <div className="space-y-2">
         <Label>供应商预设</Label>
-        <Select onValueChange={applyPreset}>
+        <Select value={presetKey} onValueChange={applyPreset}>
           <SelectTrigger>
             <SelectValue placeholder="选择常见厂商…" />
           </SelectTrigger>
@@ -251,7 +259,7 @@ export function AISettingsSection() {
 
       <div className="space-y-2">
         <Label htmlFor="ai-provider">厂商协议</Label>
-        <Select value={provider} onValueChange={(v) => setProvider(v as AIProvider)}>
+        <Select value={provider} onValueChange={(v) => { clearPreset(); setProvider(v as AIProvider) }}>
           <SelectTrigger id="ai-provider">
             <SelectValue />
           </SelectTrigger>
@@ -272,7 +280,10 @@ export function AISettingsSection() {
           id="ai-base-url"
           placeholder={provider === 'anthropic' ? '官方默认（https://api.anthropic.com）' : 'https://api.openai.com/v1'}
           value={baseURL}
-          onChange={(e) => setBaseURL(e.target.value)}
+          onChange={(e) => {
+            clearPreset()
+            setBaseURL(e.target.value)
+          }}
         />
       </div>
 
@@ -307,7 +318,10 @@ export function AISettingsSection() {
             id="ai-model"
             placeholder={provider === 'anthropic' ? 'claude-opus-5-5' : 'deepseek-chat'}
             value={model}
-            onChange={(e) => setModel(e.target.value)}
+            onChange={(e) => {
+              clearPreset()
+              setModel(e.target.value)
+            }}
             className="flex-1"
           />
           {validModels.length > 0 && (
@@ -368,7 +382,7 @@ export function AISettingsSection() {
         <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
           {models.length === 0 ? (
             <div className="py-4 text-center text-xs text-muted-foreground border rounded-md border-dashed">
-              暂无模型。点击右上角「刷新模型」自动获取，或「添加模型」手动填写
+              暂无模型
             </div>
           ) : (
             models.map((m, index) => (

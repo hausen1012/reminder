@@ -5,7 +5,6 @@ import {
   ScrollText,
   Send,
   Cpu,
-  ArrowRight,
   CheckCircle2,
   XCircle,
   Loader2,
@@ -19,7 +18,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { EmptyState } from '@/components/common/EmptyState'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { useAuth } from '@/contexts/AuthContext'
 import { listTodayReminders, listLogs, listChannelStats, getSchedulerStatus } from '@/lib/api'
 import { formatReminderDetail } from '@/lib/utils'
 import { formatInZone } from '@/lib/datetime'
@@ -36,7 +34,6 @@ function MiniLoader() {
 }
 
 export default function Dashboard() {
-  const { user } = useAuth()
   const tz = useSiteTimezone()
   const { toast } = useToast()
 
@@ -122,12 +119,9 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-5 md:space-y-6">
-      {/* 头部区：标题、问候语及全局快捷操作 */}
+      {/* 头部区：标题及全局快捷操作 */}
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between md:gap-4">
-        <div>
-          <PageHeader title="首页" />
-          <p className="text-sm text-muted-foreground mt-1">你好，{user?.username}。这是今天的概况。</p>
-        </div>
+        <PageHeader title="首页" />
         <div className="flex items-center gap-2">
           <Button
             variant="outline"
@@ -150,140 +144,124 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* 四张核心指标卡：移动端两列，减少纵向滚动 */}
+      {/* 四张核心指标卡：整卡可点跳转对应页面，移动端两列，减少纵向滚动 */}
       <div className="grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-4">
         {/* 卡片 1：今日待发 */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between gap-1 pb-2">
-            <CardTitle className="min-w-0 truncate text-xs font-medium md:text-sm">
-              今日待发
-            </CardTitle>
-            <Bell className="h-4 w-4 shrink-0 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            {todayLoading ? (
-              <MiniLoader />
-            ) : (
-              <>
-                <div className="text-xl font-bold md:text-2xl">{todayCount}</div>
-                <p className="text-xs text-muted-foreground mt-1 truncate">
-                  {nextUpcoming
-                    ? `下个触发：${formatInZone(nextUpcoming.next_fire_at, tz, 'clock')}`
-                    : '今日无待触发提醒'}
-                </p>
-                <Link
-                  to="/reminders"
-                  className="text-xs text-primary hover:underline inline-flex items-center gap-1 mt-2 font-medium"
-                >
-                  查看全部 <ArrowRight className="h-3 w-3" />
-                </Link>
-              </>
-            )}
-          </CardContent>
-        </Card>
+        <Link to="/reminders" className="group block rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          <Card className="h-full transition-colors group-hover:border-primary/40">
+            <CardHeader className="flex flex-row items-center justify-between gap-1 pb-2">
+              <CardTitle className="min-w-0 truncate text-xs font-medium md:text-sm">
+                今日待发
+              </CardTitle>
+              <Bell className="h-4 w-4 shrink-0 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              {todayLoading ? (
+                <MiniLoader />
+              ) : (
+                <>
+                  <div className="text-xl font-bold md:text-2xl">{todayCount}</div>
+                  <p className="text-xs text-muted-foreground mt-1 truncate">
+                    {nextUpcoming
+                      ? `下个触发：${formatInZone(nextUpcoming.next_fire_at, tz, 'clock')}`
+                      : '今日无待触发提醒'}
+                  </p>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </Link>
 
         {/* 卡片 2：最近发送 */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between gap-1 pb-2">
-            <CardTitle className="min-w-0 truncate text-xs font-medium md:text-sm">
-              最近发送
-            </CardTitle>
-            <ScrollText className="h-4 w-4 shrink-0 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            {logsLoading ? (
-              <MiniLoader />
-            ) : (
-              <>
-                <div className="text-xl font-bold md:text-2xl">{logsCount}</div>
-                <div className="text-xs text-muted-foreground mt-1 flex items-center gap-1.5">
-                  <span>过去 24 小时</span>
-                  {logsFailed > 0 ? (
-                    <span className="text-destructive font-medium">· {logsFailed} 次异常</span>
-                  ) : logs.length > 0 ? (
-                    <span className="text-emerald-600 dark:text-emerald-400 font-medium">· 全送达</span>
-                  ) : null}
-                </div>
-                <Link
-                  to="/logs"
-                  className="text-xs text-primary hover:underline inline-flex items-center gap-1 mt-2 font-medium"
-                >
-                  查看日志 <ArrowRight className="h-3 w-3" />
-                </Link>
-              </>
-            )}
-          </CardContent>
-        </Card>
+        <Link to="/logs" className="group block rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          <Card className="h-full transition-colors group-hover:border-primary/40">
+            <CardHeader className="flex flex-row items-center justify-between gap-1 pb-2">
+              <CardTitle className="min-w-0 truncate text-xs font-medium md:text-sm">
+                最近发送
+              </CardTitle>
+              <ScrollText className="h-4 w-4 shrink-0 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              {logsLoading ? (
+                <MiniLoader />
+              ) : (
+                <>
+                  <div className="text-xl font-bold md:text-2xl">{logsCount}</div>
+                  <div className="text-xs text-muted-foreground mt-1 flex items-center gap-1.5">
+                    <span>过去 24 小时</span>
+                    {logsFailed > 0 ? (
+                      <span className="text-destructive font-medium">· {logsFailed} 次异常</span>
+                    ) : logs.length > 0 ? (
+                      <span className="text-emerald-600 dark:text-emerald-400 font-medium">· 全送达</span>
+                    ) : null}
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </Link>
 
         {/* 卡片 3：发送成功率 */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between gap-1 pb-2">
-            <CardTitle className="min-w-0 truncate text-xs font-medium md:text-sm">发送成功率</CardTitle>
-            <Send className="h-4 w-4 shrink-0 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            {channelStatsLoading ? (
-              <MiniLoader />
-            ) : (
-              <>
-                <div className="text-xl font-bold md:text-2xl">{channelSuccessRate}%</div>
-                {totalChannelSend > 0 ? (
-                  <div className="flex items-center gap-2.5 mt-1 text-xs text-muted-foreground">
-                    <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
-                      <CheckCircle2 className="h-3.5 w-3.5" />
-                      {totalChannelSuccess}
-                    </span>
-                    <span className="inline-flex items-center gap-1 text-destructive">
-                      <XCircle className="h-3.5 w-3.5" />
-                      {totalChannelSend - totalChannelSuccess}
-                    </span>
-                  </div>
-                ) : (
-                  <p className="text-xs text-muted-foreground mt-1">过去 24h 无发送记录</p>
-                )}
-                <Link
-                  to="/channels"
-                  className="text-xs text-primary hover:underline inline-flex items-center gap-1 mt-2 font-medium"
-                >
-                  管理渠道 <ArrowRight className="h-3 w-3" />
-                </Link>
-              </>
-            )}
-          </CardContent>
-        </Card>
+        <Link to="/channels" className="group block rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          <Card className="h-full transition-colors group-hover:border-primary/40">
+            <CardHeader className="flex flex-row items-center justify-between gap-1 pb-2">
+              <CardTitle className="min-w-0 truncate text-xs font-medium md:text-sm">发送成功率</CardTitle>
+              <Send className="h-4 w-4 shrink-0 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              {channelStatsLoading ? (
+                <MiniLoader />
+              ) : (
+                <>
+                  <div className="text-xl font-bold md:text-2xl">{channelSuccessRate}%</div>
+                  {totalChannelSend > 0 ? (
+                    <div className="flex items-center gap-2.5 mt-1 text-xs text-muted-foreground">
+                      <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                        {totalChannelSuccess}
+                      </span>
+                      <span className="inline-flex items-center gap-1 text-destructive">
+                        <XCircle className="h-3.5 w-3.5" />
+                        {totalChannelSend - totalChannelSuccess}
+                      </span>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground mt-1">过去 24h 无发送记录</p>
+                  )}
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </Link>
 
         {/* 卡片 4：调度引擎 */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between gap-1 pb-2">
-            <CardTitle className="min-w-0 truncate text-xs font-medium md:text-sm">调度引擎</CardTitle>
-            <Cpu className="h-4 w-4 shrink-0 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            {schedulerLoading ? (
-              <MiniLoader />
-            ) : (
-              <>
-                <div className="flex items-center gap-2">
-                  <span
-                    className={`inline-block h-2.5 w-2.5 shrink-0 rounded-full ${
-                      engineRunning ? 'bg-emerald-500 animate-pulse' : 'bg-destructive'
-                    }`}
-                  />
-                  <span className="text-xl font-bold md:text-2xl">{engineRunning ? '运行中' : '已停止'}</span>
-                </div>
-                <p className="text-xs text-muted-foreground mt-1 truncate">
-                  {engineRunning ? `已装载 ${engineRegistered} 个调度任务` : '调度器离线，提醒将无法触发'}
-                </p>
-                <Link
-                  to="/scheduler"
-                  className="text-xs text-primary hover:underline inline-flex items-center gap-1 mt-2 font-medium"
-                >
-                  系统监控 <ArrowRight className="h-3 w-3" />
-                </Link>
-              </>
-            )}
-          </CardContent>
-        </Card>
+        <Link to="/scheduler" className="group block rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          <Card className="h-full transition-colors group-hover:border-primary/40">
+            <CardHeader className="flex flex-row items-center justify-between gap-1 pb-2">
+              <CardTitle className="min-w-0 truncate text-xs font-medium md:text-sm">调度引擎</CardTitle>
+              <Cpu className="h-4 w-4 shrink-0 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              {schedulerLoading ? (
+                <MiniLoader />
+              ) : (
+                <>
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`inline-block h-2.5 w-2.5 shrink-0 rounded-full ${
+                        engineRunning ? 'bg-emerald-500 animate-pulse' : 'bg-destructive'
+                      }`}
+                    />
+                    <span className="text-xl font-bold md:text-2xl">{engineRunning ? '运行中' : '已停止'}</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1 truncate">
+                    {engineRunning ? `已装载 ${engineRegistered} 个调度任务` : '调度器离线，提醒将无法触发'}
+                  </p>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </Link>
       </div>
 
       {/* 详情主区域 */}
@@ -315,7 +293,6 @@ export default function Dashboard() {
                 size="compact"
                 icon={CalendarCheck}
                 title="今天没有待触发的提醒"
-                description="日程很轻松，或者现在安排一个新提醒。"
                 action={{
                   label: '新建提醒',
                   icon: Plus,
@@ -376,7 +353,6 @@ export default function Dashboard() {
                 size="compact"
                 icon={Inbox}
                 title="过去 24 小时暂无发送记录"
-                description="有提醒触发后将在此处显示投递日志。"
               />
             ) : (
               <div className="space-y-2 max-h-[420px] overflow-y-auto overflow-x-hidden scroll-area pr-1 md:space-y-2.5">

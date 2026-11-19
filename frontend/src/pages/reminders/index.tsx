@@ -271,8 +271,8 @@ export default function RemindersPage() {
         source !== 'all' || enabled !== 'all' || Boolean(search.trim()) ? (
           <EmptyState
             icon={SearchX}
-            title="未找到匹配的提醒"
-            description="未找到匹配的提醒，可尝试调整筛选条件。"
+            title="未找到匹配提醒"
+            description="换个条件或清除筛选。"
             action={{
               label: '清除筛选',
               variant: 'outline',
@@ -294,7 +294,6 @@ export default function RemindersPage() {
           <EmptyState
             icon={Bell}
             title="还没有提醒"
-            description="暂无提醒，点击下方按钮开始创建。"
             action={{
               label: '新建提醒',
               icon: Plus,

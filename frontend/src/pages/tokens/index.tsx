@@ -303,8 +303,8 @@ export default function TokensPage() {
         search.trim() || enabled !== 'all' ? (
           <EmptyState
             icon={SearchX}
-            title="没有匹配的令牌"
-            description="未找到符合搜索条件的令牌，尝试更换关键词。"
+            title="未找到匹配令牌"
+            description="换个关键词或清除筛选。"
             action={{
               label: '清除筛选',
               variant: 'outline',
@@ -325,7 +325,7 @@ export default function TokensPage() {
           <EmptyState
             icon={KeyRound}
             title="还没有令牌"
-            description="创建 API 访问令牌以通过外部请求触发提醒。"
+            description="供程序调用外部 API 创建提醒。"
             action={{
               label: '新建令牌',
               icon: Plus,
@@ -506,7 +506,7 @@ export default function TokensPage() {
                 onOpenChange={setNewChannelsOpen}
                 onChange={setNewChannelIDs}
                 placeholder="未设置默认通知渠道"
-                emptyText="还没有通知渠道，先到「通知」页面创建一个。"
+                emptyText="还没有通知渠道，先到「通知」页创建。"
               />
             </div>
           </div>
@@ -617,7 +617,7 @@ export default function TokensPage() {
                   onOpenChange={setDetailChannelsOpen}
                   onChange={setDetailChannelIDs}
                   placeholder="未设置默认通知渠道"
-                  emptyText="还没有通知渠道，先到「通知」页面创建一个。"
+                  emptyText="还没有通知渠道，先到「通知」页创建。"
                 />
               </div>
             </div>

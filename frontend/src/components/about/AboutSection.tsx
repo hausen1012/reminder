@@ -85,13 +85,11 @@ export function AboutSection() {
           <div className="flex flex-wrap items-center gap-2 text-sm">
             {update?.error ? (
               <span className="text-destructive">检查失败：{update.error}</span>
-            ) : !update ? (
-              <span className="text-muted-foreground">尚未检查</span>
             ) : (
               <>
-                {!update.comparable ? (
+                {update && !update.comparable ? (
                   <span className="text-muted-foreground">当前为开发构建，不参与版本比较</span>
-                ) : update.update_available ? (
+                ) : update?.update_available ? (
                   <>
                     <Badge variant="warning">有新版本</Badge>
                     <span>{update.latest_version}</span>
@@ -105,7 +103,7 @@ export function AboutSection() {
                       <ExternalLink className="h-3 w-3" />
                     </a>
                   </>
-                ) : update.latest_version ? (
+                ) : update?.latest_version ? (
                   <>
                     <Badge variant="success">
                       <CheckCircle2 className="mr-1 h-3 w-3" />
@@ -179,9 +177,6 @@ export function AboutSection() {
             hausen1012.github.io/reminder
             <ExternalLink className="h-3 w-3" />
           </a>
-          <p className="text-xs text-muted-foreground">
-            遇到问题或有建议，欢迎到 GitHub 提 Issue；具体用法见文档站点。
-          </p>
         </CardContent>
       </Card>
     </div>
