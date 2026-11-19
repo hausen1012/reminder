@@ -28,7 +28,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useToast } from '@/components/ui/use-toast'
-import type { AIProvider } from '@/types'
+import type { AIProvider, AISettings } from '@/types'
 
 const PROVIDER_LABEL: Record<AIProvider, string> = {
   openai: 'OpenAI',
@@ -86,6 +86,8 @@ export function AISettingsSection() {
   const [saving, setSaving] = useState(false)
   const [testing, setTesting] = useState(false)
   const [fetchingModels, setFetchingModels] = useState(false)
+  // 已保存配置的快照；用于判断表单是否有未提交的改动
+  const [saved, setSaved] = useState<AISettings | null>(null)
 
   useEffect(() => {
     getAISettings()
@@ -100,6 +102,7 @@ export function AISettingsSection() {
         setApiKey('') // 输入框留空表示"不修改"；只有 hasKey 时才有原值
         setCustomPrompt(s.custom_prompt ?? '')
         setMaxRetries(s.max_retries ?? 10)
+        setSaved(s)
       })
       .catch(() => {})
       .finally(() => setLoading(false))
@@ -125,16 +128,17 @@ export function AISettingsSection() {
     e.preventDefault()
     setSaving(true)
     try {
-      const saved = await updateAISettings(toInput())
-      setHasKey(saved.api_key === '***')
+      const next = await updateAISettings(toInput())
+      setHasKey(next.api_key === '***')
       setApiKey('')
-      if (saved.models && saved.models.length > 0) {
-        setModels(saved.models)
+      if (next.models && next.models.length > 0) {
+        setModels(next.models)
       }
       // 回填后端归一化后的值，让输入框显示真正生效的重试次数
-      if (typeof saved.max_retries === 'number' && saved.max_retries >= 0) {
-        setMaxRetries(saved.max_retries)
+      if (typeof next.max_retries === 'number' && next.max_retries >= 0) {
+        setMaxRetries(next.max_retries)
       }
+      setSaved(next)
       toast({ title: 'AI 设置已保存' })
     } catch (err) {
       toast({ title: '保存失败', description: extractApiError(err), variant: 'destructive' })
@@ -221,6 +225,25 @@ export function AISettingsSection() {
   }
 
   const validModels = Array.from(new Set(models.map((m) => m.trim()).filter(Boolean)))
+
+  // 与已保存配置逐项比较；api_key 留空表示保持原值，不算改动
+  function isDirty(s: AISettings): boolean {
+    const input = toInput()
+    // api_key 留空或回传原密文标记都表示"不修改"
+    const keyChanged = input.api_key !== '' && input.api_key !== '***'
+    return (
+      input.enabled !== s.enabled ||
+      input.provider !== s.provider ||
+      input.base_url !== (s.base_url ?? '') ||
+      input.model !== (s.model ?? '') ||
+      input.custom_prompt !== (s.custom_prompt ?? '') ||
+      input.max_retries !== (s.max_retries ?? 10) ||
+      keyChanged ||
+      JSON.stringify(validModels) !== JSON.stringify(s.models ?? [])
+    )
+  }
+
+  const dirty = saved ? isDirty(saved) : false
 
   if (loading) {
     return <p className="text-sm text-muted-foreground">加载中…</p>
@@ -449,14 +472,15 @@ export function AISettingsSection() {
         />
       </div>
 
-      <div className="flex gap-2 sm:col-span-2">
-        <Button type="submit" size="sm" disabled={saving}>
+      <div className="flex items-center gap-3 sm:col-span-2">
+        <Button type="submit" size="sm" disabled={saving || !dirty}>
           {saving ? '保存中...' : '保存'}
         </Button>
         <Button type="button" size="sm" variant="outline" onClick={handleTest} disabled={testing}>
           {testing && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
           测试连接
         </Button>
+        {dirty && !saving && <span className="text-xs text-muted-foreground">有未保存的修改</span>}
       </div>
     </form>
   )

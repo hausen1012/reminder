@@ -23,7 +23,7 @@ import { formatReminderDetail } from '@/lib/utils'
 import { formatInZone } from '@/lib/datetime'
 import { useSiteTimezone } from '@/contexts/ConfigContext'
 import { PageHeader } from '@/components/common/PageHeader'
-import { LOG_STATUS_PILL_CLASS, logStatusLabel, sourceLabel } from '@/lib/constants'
+import { logStatusLabel, logStatusVariant, sourceLabel } from '@/lib/constants'
 import { ReminderEditDialog } from '@/components/reminders/ReminderEditDialog'
 import { useToast } from '@/components/ui/use-toast'
 import type { Reminder, DeliveryLog, SchedulerStatus } from '@/types'
@@ -112,8 +112,6 @@ export default function Dashboard() {
 
   const engineRunning = schedulerStatus?.engine?.running ?? false
   const engineRegistered = schedulerStatus?.engine?.registered_count ?? 0
-
-  const statusBadge = (status: string) => LOG_STATUS_PILL_CLASS[status] ?? 'bg-muted text-muted-foreground'
 
   const nextUpcoming = todayReminders[0]
 
@@ -373,13 +371,9 @@ export default function Dashboard() {
                             {log.reminder_title || log.title}
                           </span>
                         </div>
-                        <span
-                          className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 whitespace-nowrap ${statusBadge(
-                            log.status,
-                          )}`}
-                        >
+                        <Badge variant={logStatusVariant(log.status)} className="shrink-0 text-xs">
                           {logStatusLabel(log.status)}
-                        </span>
+                        </Badge>
                       </div>
                       <div className="text-xs text-muted-foreground mt-1.5 truncate">
                         {formatInZone(log.fired_at, tz)}

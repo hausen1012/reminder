@@ -1,11 +1,12 @@
 // 令牌管理页
 import { useEffect, useState } from 'react'
-import { Plus, Trash2, Copy, CheckCircle2, Pencil, Terminal, AlertCircle, KeyRound, SearchX } from 'lucide-react'
+import { Plus, Trash2, Copy, CheckCircle2, Pencil, Terminal, KeyRound, SearchX } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
+import { Card } from '@/components/ui/card'
 import { EmptyState } from '@/components/common/EmptyState'
 import { PageHeader } from '@/components/common/PageHeader'
 import { FilterToolbar } from '@/components/common/FilterToolbar'
+import { ListError, ListLoading } from '@/components/common/ListState'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
@@ -46,7 +47,7 @@ import type { Token, Channel } from '@/types'
 
 function formatChannelNames(channels: Channel[], ids: number[]): string {
   if (ids.length === 0) return '未设置'
-  return ids.map((id) => channels.find((c) => c.id === id)?.name ?? `#${id}`).join(', ')
+  return ids.map((id) => channels.find((c) => c.id === id)?.name ?? `#${id}`).join('、')
 }
 
 export default function TokensPage() {
@@ -286,19 +287,9 @@ export default function TokensPage() {
       </FilterToolbar>
 
       {loading ? (
-        <p className="text-sm text-muted-foreground">加载中…</p>
+        <ListLoading />
       ) : loadError ? (
-        <Card>
-          <CardContent className="py-10 text-center text-sm text-destructive">
-            <div className="flex items-center justify-center gap-2">
-              <AlertCircle className="h-5 w-5" />
-              <span>加载失败：{loadError}</span>
-            </div>
-            <Button variant="outline" size="sm" className="mt-3" onClick={refresh}>
-              重试
-            </Button>
-          </CardContent>
-        </Card>
+        <ListError message={loadError} onRetry={refresh} />
       ) : items.length === 0 ? (
         search.trim() || enabled !== 'all' ? (
           <EmptyState

@@ -82,6 +82,13 @@ export default function Profile() {
     setSiteUrl(config.site_url ?? '')
   }, [config])
 
+  // 与已保存的配置比较，用于提示存在未提交的修改
+  const hasChanges =
+    appName !== (config.app_name ?? '') ||
+    logoSvg !== (config.logo_svg ?? '') ||
+    timezone !== (config.timezone ?? 'Asia/Shanghai') ||
+    siteUrl !== (config.site_url ?? '')
+
   async function handleGeneralSave(e: FormEvent) {
     e.preventDefault()
     setSaving(true)
@@ -299,11 +306,14 @@ export default function Profile() {
                         <TimezoneSelect id="site-tz" value={timezone} onValueChange={setTimezone} />
                       </div>
 
-                      <div className="pt-2">
-                        <Button type="submit" size="sm" disabled={saving}>
+                      <div className="flex items-center gap-3 pt-2">
+                        <Button type="submit" size="sm" disabled={saving || !hasChanges}>
                           {saving && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
                           {saving ? '保存中…' : '保存设置'}
                         </Button>
+                        {hasChanges && !saving && (
+                          <span className="text-xs text-muted-foreground">有未保存的修改</span>
+                        )}
                       </div>
                     </form>
                   </CardContent>

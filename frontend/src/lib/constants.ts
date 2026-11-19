@@ -38,10 +38,10 @@ export const SOURCE_LABEL: Record<string, string> = {
 }
 
 // 徽章配色：Web 中性、AI 强调、API 次强调，便于快速扫读。
-export const SOURCE_BADGE_CLASS: Record<string, string> = {
-  web: 'bg-muted text-muted-foreground',
-  ai: 'bg-violet-500/15 text-violet-700 dark:text-violet-300',
-  api: 'bg-sky-500/15 text-sky-700 dark:text-sky-300',
+export const SOURCE_BADGE_VARIANT: Record<string, 'muted' | 'violet' | 'info'> = {
+  web: 'muted',
+  ai: 'violet',
+  api: 'info',
 }
 
 /** 取来源展示文案，未知来源原样返回。 */
@@ -59,22 +59,25 @@ export const LOG_STATUS_LABEL: Record<string, string> = {
   expired: '已过期',
 }
 
-// 状态胶囊底色，用于首页等紧凑列表。
-export const LOG_STATUS_PILL_CLASS: Record<string, string> = {
-  success: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300',
-  partial: 'bg-amber-500/15 text-amber-700 dark:text-amber-300',
-  failed: 'bg-red-500/15 text-red-700 dark:text-red-300',
-  pending: 'bg-sky-500/15 text-sky-700 dark:text-sky-300',
-  expired: 'bg-muted text-muted-foreground',
+// 投递日志状态的徽章样式：状态语义直接对应 Badge 变体，避免各页各写一份色值。
+const LOG_STATUS_VARIANT: Record<string, 'success' | 'warning' | 'danger' | 'info' | 'muted'> = {
+  success: 'success',
+  partial: 'warning',
+  failed: 'danger',
+  pending: 'info',
+  expired: 'muted',
 }
 
-// 状态文字与图标色，用于日志页表格。
-export const LOG_STATUS_TEXT_CLASS: Record<string, string> = {
-  success: 'text-emerald-600 dark:text-emerald-400',
-  partial: 'text-amber-600 dark:text-amber-400',
-  failed: 'text-red-600 dark:text-red-400',
-  pending: 'text-sky-600 dark:text-sky-400',
-  expired: 'text-muted-foreground',
+/** 取日志状态对应的 Badge 变体，未知状态按中性色处理。 */
+export function logStatusVariant(status: string): 'success' | 'warning' | 'danger' | 'info' | 'muted' {
+  return LOG_STATUS_VARIANT[status] ?? 'muted'
+}
+
+/** 投递耗时的文字色：100ms 内正常，500ms 内偏慢，再长为异常。 */
+export function latencyClass(ms: number): string {
+  if (ms < 100) return 'text-emerald-600 dark:text-emerald-400'
+  if (ms < 500) return 'text-amber-600 dark:text-amber-400'
+  return 'text-red-600 dark:text-red-400'
 }
 
 // 提醒调度类型展示文案。

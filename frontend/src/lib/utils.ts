@@ -102,6 +102,28 @@ export function formatReminderDetail(reminder: Reminder): string {
 }
 
 /**
+ * 在指定区间插入一段文本，返回新文本与插入后应落位的光标下标。
+ *
+ * 插入内容与相邻文本之间按需补一个空格：前一段不以空白结尾、后一段不以空白开头时才补，
+ * 避免连续插入多个变量时出现重复空格。
+ */
+export function insertSnippet(
+  text: string,
+  snippet: string,
+  start: number,
+  end: number,
+): { text: string; cursor: number } {
+  const from = Math.max(0, Math.min(start, text.length))
+  const to = Math.max(from, Math.min(end, text.length))
+  const before = text.slice(0, from)
+  const after = text.slice(to)
+  const lead = before && !/\s$/.test(before) ? ' ' : ''
+  const trail = after && !/^\s/.test(after) ? ' ' : ''
+  const inserted = lead + snippet + trail
+  return { text: before + inserted + after, cursor: from + inserted.length }
+}
+
+/**
  * 安全复制文本至剪贴板
  * 优先使用 navigator.clipboard.writeText；非 HTTPS（如局域网 HTTP）下自动降级为 textarea + execCommand('copy')
  */

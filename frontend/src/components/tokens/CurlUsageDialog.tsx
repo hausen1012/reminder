@@ -34,13 +34,13 @@ function CurlBlock({ curl }: { curl: string }) {
   const { toast } = useToast()
   return (
     <div className="relative mt-2">
-      <pre className="overflow-x-auto whitespace-pre-wrap break-all rounded-lg border bg-slate-950 p-3 pr-10 text-xs leading-relaxed text-slate-50 sm:p-4 sm:pr-12">
+      <pre className="overflow-x-auto whitespace-pre-wrap break-all rounded-lg border bg-muted p-3 pr-10 text-xs leading-relaxed sm:p-4 sm:pr-12">
         <code>{curl}</code>
       </pre>
       <Button
         variant="ghost"
         size="icon"
-        className="absolute right-1 top-1.5 h-7 w-7 text-slate-400 hover:text-slate-50 sm:right-2 sm:top-2"
+        className="absolute right-1 top-1.5 h-7 w-7 text-muted-foreground hover:text-foreground sm:right-2 sm:top-2"
         onClick={() => copy(curl, toast)}
         title="复制 curl 命令"
       >

@@ -83,7 +83,7 @@ export function AppLayout() {
           {config.logo_svg ? (
             <AppLogo svg={config.logo_svg} className="h-6 w-auto shrink-0" />
           ) : (
-            <BellRing className="h-5 w-5 shrink-0" strokeWidth={1.5} />
+            <BellRing className="h-5 w-5 shrink-0" strokeWidth={1.75} />
           )}
           <span className="truncate">{config.app_name || 'Reminder'}</span>
         </div>
@@ -183,7 +183,7 @@ export function Sidebar({ onNavClick }: SidebarProps) {
         {config.logo_svg ? (
           <AppLogo svg={config.logo_svg} className="h-6 w-auto shrink-0" />
         ) : (
-          <BellRing className="h-5 w-5 shrink-0" strokeWidth={1.5} />
+          <BellRing className="h-5 w-5 shrink-0" strokeWidth={1.75} />
         )}
         <span className="truncate">{config.app_name || 'Reminder'}</span>
       </div>
@@ -204,7 +204,7 @@ export function Sidebar({ onNavClick }: SidebarProps) {
               )
             }
           >
-            <item.icon className="h-[18px] w-[18px] md:h-4 md:w-4" />
+            <item.icon className="h-[18px] w-[18px] md:h-4 md:w-4" strokeWidth={1.75} />
             {item.label}
             {item.to === '/about' && hasUnreadUpdate && (
               <span

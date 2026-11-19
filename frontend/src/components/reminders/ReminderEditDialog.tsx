@@ -1,5 +1,5 @@
 // ReminderEditDialog 是提醒的新建 / 编辑表单。
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   Select,
@@ -28,7 +28,7 @@ import { ScheduleForm, type ScheduleValue } from './ScheduleForm'
 import { createReminder, extractApiError, listChannels, testReminderDryRun, updateReminder } from '@/lib/api'
 import type { Channel, Reminder, ReminderInput } from '@/types'
 import { toContentFormat } from '@/types'
-import { cn } from '@/lib/utils'
+import { cn, insertSnippet } from '@/lib/utils'
 
 const INSERT_PLACEHOLDERS = [
   { label: '日期', code: '{{now_date}}' },
@@ -93,6 +93,22 @@ export function ReminderEditDialog({ reminder, open, onClose, onSaved }: Props) 
   )
   const [customInterval, setCustomInterval] = useState(false)
   const [customMax, setCustomMax] = useState(false)
+  const contentRef = useRef<HTMLTextAreaElement>(null)
+
+  // 在光标处插入变量；未定位过光标时追加到末尾，并把光标放到插入内容之后
+  function insertPlaceholder(code: string) {
+    const el = contentRef.current
+    const text = input.content
+    const start = el?.selectionStart ?? text.length
+    const end = el?.selectionEnd ?? text.length
+    const next = insertSnippet(text, code, start, end)
+    patch('content', next.text)
+    requestAnimationFrame(() => {
+      if (!el) return
+      el.focus()
+      el.setSelectionRange(next.cursor, next.cursor)
+    })
+  }
 
   useEffect(() => {
     listChannels()
@@ -259,23 +275,22 @@ export function ReminderEditDialog({ reminder, open, onClose, onSaved }: Props) 
             </div>
             <Textarea
               id="r-content"
+              ref={contentRef}
               value={input.content}
               onChange={(e) => patch('content', e.target.value)}
               rows={3}
               placeholder="输入提醒详细内容…"
             />
             <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-              <span className="text-[11px] text-muted-foreground select-none">插入变量：</span>
               {INSERT_PLACEHOLDERS.map((p) => (
                 <button
                   key={p.code}
                   type="button"
-                  onClick={() => patch('content', (input.content ? input.content + ' ' : '') + p.code)}
+                  onClick={() => insertPlaceholder(p.code)}
                   className="inline-flex items-center rounded border border-border/60 bg-muted/40 px-1.5 py-0.5 text-[11px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                  title={`点击插入 ${p.code}`}
+                  title={`插入 ${p.code}`}
                 >
                   {p.label}
-                  <span className="ml-1 text-[10px] text-muted-foreground/70">{p.code}</span>
                 </button>
               ))}
             </div>

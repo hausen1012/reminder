@@ -28,8 +28,6 @@ export function Pagination({
 }: Props) {
   const totalPages = Math.max(1, Math.ceil(total / limit))
   const currentPage = Math.min(Math.floor(offset / limit) + 1, totalPages)
-  const start = total === 0 ? 0 : offset + 1
-  const end = Math.min(offset + limit, total)
   const canChangeLimit = Boolean(onLimitChange)
 
   function goTo(page: number) {
@@ -49,7 +47,7 @@ export function Pagination({
   return (
     <div className="flex flex-col gap-1.5 border-t px-4 py-2 text-sm md:flex-row md:items-center md:justify-between">
       <div className="text-xs text-muted-foreground md:text-sm">
-        共 {total} 条&nbsp;&nbsp;第 {start}-{end} 条
+        共 {total} 条
       </div>
       <div className="flex flex-wrap items-center justify-between gap-1.5 md:justify-end">
         {canChangeLimit && (

@@ -1,9 +1,9 @@
 // 提醒列表页：toolbar（来源筛选/状态/搜索/新建）+ 表格 + 编辑/试发/删除。
 import { useEffect, useState, useMemo, useCallback } from 'react'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Plus, Pencil, Trash2, Copy, AlertCircle, Bell, SearchX } from 'lucide-react'
+import { Plus, Pencil, Trash2, Copy, Bell, SearchX } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
+import { Card } from '@/components/ui/card'
 import { EmptyState } from '@/components/common/EmptyState'
 import { Switch } from '@/components/ui/switch'
 import {
@@ -34,6 +34,7 @@ import { sourceLabel, SCHEDULE_TYPE_LABEL } from '@/lib/constants'
 import { SortIcon } from '@/components/common/SortIcon'
 import { PageHeader } from '@/components/common/PageHeader'
 import { FilterToolbar } from '@/components/common/FilterToolbar'
+import { ListError, ListLoading } from '@/components/common/ListState'
 import type { Channel, Reminder } from '@/types'
 
 export default function RemindersPage() {
@@ -254,19 +255,9 @@ export default function RemindersPage() {
       </FilterToolbar>
 
       {loading ? (
-        <p className="text-sm text-muted-foreground">加载中…</p>
+        <ListLoading />
       ) : loadError ? (
-        <Card>
-          <CardContent className="py-10 text-center text-sm text-destructive">
-            <div className="flex items-center justify-center gap-2">
-              <AlertCircle className="h-5 w-5" />
-              <span>加载失败：{loadError}</span>
-            </div>
-            <Button variant="outline" size="sm" className="mt-3" onClick={refresh}>
-              重试
-            </Button>
-          </CardContent>
-        </Card>
+        <ListError message={loadError} onRetry={refresh} />
       ) : items.length === 0 ? (
         source !== 'all' || enabled !== 'all' || Boolean(search.trim()) ? (
           <EmptyState
@@ -363,8 +354,8 @@ export default function RemindersPage() {
                           {chNames.length === 0 ? (
                             <span className="text-xs text-muted-foreground">—</span>
                           ) : (
-                            <span className="truncate block text-xs" title={chNames.join(', ')}>
-                              {chNames.join(', ')}
+                            <span className="truncate block text-xs" title={chNames.join('、')}>
+                              {chNames.join('、')}
                             </span>
                           )}
                         </td>

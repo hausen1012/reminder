@@ -24,10 +24,18 @@ import {
   CornerDownRight,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
+import { Card } from '@/components/ui/card'
 import { EmptyState } from '@/components/common/EmptyState'
 import { PageHeader } from '@/components/common/PageHeader'
 import { FilterToolbar } from '@/components/common/FilterToolbar'
+import { ListError, ListLoading } from '@/components/common/ListState'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { Badge } from '@/components/ui/badge'
 import {
   Select,
@@ -54,7 +62,7 @@ import { listLogs, getLogDetail, purgeLogs, countPurgeLogs, batchDeleteLogs, ext
 import { formatInZone } from '@/lib/datetime'
 import { useSiteTimezone } from '@/contexts/ConfigContext'
 import { useChannelTypes, labelOf } from '@/lib/channelSpec'
-import { SOURCE_BADGE_CLASS, logStatusLabel, LOG_STATUS_TEXT_CLASS, sourceLabel } from '@/lib/constants'
+import { SOURCE_BADGE_VARIANT, latencyClass, logStatusLabel, logStatusVariant, sourceLabel } from '@/lib/constants'
 import { copyToClipboard } from '@/lib/utils'
 import type { DeliveryLog, LogFilter } from '@/types'
 
@@ -78,12 +86,6 @@ const CHANNEL_ICONS: Record<string, typeof Mail> = {
   webhook: Link2,
 }
 
-function latencyColor(ms: number): string {
-  if (ms < 100) return 'text-emerald-600 dark:text-emerald-400'
-  if (ms < 500) return 'text-amber-600 dark:text-amber-400'
-  return 'text-red-600 dark:text-red-400'
-}
-
 export default function LogsPage() {
   const tz = useSiteTimezone()
   const { specs } = useChannelTypes()
@@ -100,7 +102,6 @@ export default function LogsPage() {
   const [detailLoading, setDetailLoading] = useState(false)
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set())
   const [purgeOpen, setPurgeOpen] = useState(false)
-  const [purgeMenuOpen, setPurgeMenuOpen] = useState(false)
   const [purgeMode, setPurgeMode] = useState<'7d' | '30d' | 'all'>('7d')
   const [purgeCount, setPurgeCount] = useState(0)
   const [purging, setPurging] = useState(false)
@@ -245,24 +246,24 @@ export default function LogsPage() {
               删除选中 ({selectedIds.size})
             </Button>
           )}
-          {/* 桌面端：三种清理范围并排 */}
-          <div className="hidden flex-wrap items-center gap-2 md:flex">
-            <Button variant="outline" size="sm" onClick={() => openPurge('7d')}>
-              <Trash2 className="h-4 w-4 mr-1" />
-              清理 7 天前
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => openPurge('30d')}>
-              清理 30 天前
-            </Button>
-            <Button variant="destructive" size="sm" onClick={() => openPurge('all')}>
-              全部清理
-            </Button>
-          </div>
-          {/* 移动端：收进一个入口，避免按钮撑满页头 */}
-          <Button variant="outline" size="sm" className="flex-1 md:hidden" onClick={() => setPurgeMenuOpen(true)}>
-            <Trash2 className="h-4 w-4 mr-1" />
-            清理日志
-          </Button>
+          {/* 清理范围收进下拉菜单，桌面与移动端同一入口 */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="flex-1 md:flex-none">
+                <Trash2 className="h-4 w-4 mr-1" />
+                清理日志
+                <ChevronDown className="ml-1 h-3.5 w-3.5 opacity-60" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onSelect={() => openPurge('7d')}>清理 7 天前</DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => openPurge('30d')}>清理 30 天前</DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={() => openPurge('all')}>
+                全部清理
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </PageHeader>
 
@@ -310,19 +311,9 @@ export default function LogsPage() {
       </FilterToolbar>
 
       {loading ? (
-        <p className="text-sm text-muted-foreground">加载中…</p>
+        <ListLoading />
       ) : loadError ? (
-        <Card>
-          <CardContent className="py-10 text-center text-sm text-destructive">
-            <div className="flex items-center justify-center gap-2">
-              <AlertCircle className="h-5 w-5" />
-              <span>加载失败：{loadError}</span>
-            </div>
-            <Button variant="outline" size="sm" className="mt-3" onClick={refresh}>
-              重试
-            </Button>
-          </CardContent>
-        </Card>
+        <ListError message={loadError} onRetry={refresh} />
       ) : items.length === 0 ? (
         Boolean(filter.status || filter.source || filter.search) ? (
           <EmptyState
@@ -370,7 +361,6 @@ export default function LogsPage() {
                 <tbody>
                   {displayRows.map(({ main, subs }) => {
                     const MainStatusIcon = STATUS_ICON[main.status] ?? Clock
-                    const mainColor = LOG_STATUS_TEXT_CLASS[main.status] ?? ''
                     return (
                     <Fragment key={main.id}>
                       <tr className="border-b hover:bg-muted/30">
@@ -400,13 +390,13 @@ export default function LogsPage() {
                           {formatInZone(main.fired_at, tz)}
                         </td>
                         <td className="px-4 py-2.5">
-                          <Badge variant="outline" className={`gap-1 ${mainColor}`}>
+                          <Badge variant={logStatusVariant(main.status)} className="gap-1">
                             <MainStatusIcon className="h-3 w-3" />
                             {logStatusLabel(main.status)}
                           </Badge>
                         </td>
                         <td className="px-4 py-2.5">
-                          <Badge variant="secondary" className={SOURCE_BADGE_CLASS[main.source]}>
+                          <Badge variant={SOURCE_BADGE_VARIANT[main.source] ?? 'muted'}>
                             {sourceLabel(main.source)}
                           </Badge>
                         </td>
@@ -428,7 +418,6 @@ export default function LogsPage() {
                       </tr>
                       {expandedRows.has(main.id) && subs.map((sub) => {
                         const SubStatusIcon = STATUS_ICON[sub.status] ?? Clock
-                        const subColor = LOG_STATUS_TEXT_CLASS[sub.status] ?? ''
                         return (
                         <tr key={sub.id} className="border-b bg-muted/20 text-xs">
                           <td />
@@ -440,7 +429,7 @@ export default function LogsPage() {
                           </td>
                           <td className="px-4 py-2">{formatInZone(sub.fired_at, tz)}</td>
                           <td className="px-4 py-2">
-                            <Badge variant="outline" className={`gap-1 ${subColor}`}>
+                            <Badge variant={logStatusVariant(sub.status)} className="gap-1">
                               <SubStatusIcon className="h-3 w-3" />
                               {logStatusLabel(sub.status)}
                             </Badge>
@@ -465,7 +454,6 @@ export default function LogsPage() {
           <div className="divide-y md:hidden">
             {displayRows.map(({ main, subs }) => {
               const MainStatusIcon = STATUS_ICON[main.status] ?? Clock;
-              const mainColor = LOG_STATUS_TEXT_CLASS[main.status] ?? '';
               const isExpanded = expandedRows.has(main.id);
               return (
                 <div key={main.id}>
@@ -483,7 +471,7 @@ export default function LogsPage() {
                           <span className="truncate text-sm font-medium" title={main.title || main.reminder_title}>
                             {main.reminder_title || main.title}
                           </span>
-                          <Badge variant="outline" className={`gap-1 shrink-0 text-[11px] ${mainColor}`}>
+                          <Badge variant={logStatusVariant(main.status)} className="gap-1 shrink-0 text-[11px]">
                             <MainStatusIcon className="h-3 w-3" />
                             {logStatusLabel(main.status)}
                           </Badge>
@@ -526,12 +514,11 @@ export default function LogsPage() {
                   {/* 展开的重试子项 */}
                   {isExpanded && subs.map((sub) => {
                     const SubStatusIcon = STATUS_ICON[sub.status] ?? Clock;
-                    const subColor = LOG_STATUS_TEXT_CLASS[sub.status] ?? '';
                     return (
                       <div key={sub.id} className="flex items-center gap-2 border-t bg-muted/20 px-3 py-2 pl-7 sm:pl-9 min-w-0">
                         <span className="shrink-0 text-xs text-muted-foreground">重发 #{sub.retry_round}</span>
                         <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">{formatInZone(sub.fired_at, tz)}</span>
-                        <Badge variant="outline" className={`ml-auto gap-1 shrink-0 text-[11px] ${subColor}`}>
+                        <Badge variant={logStatusVariant(sub.status)} className="ml-auto gap-1 shrink-0 text-[11px]">
                           <SubStatusIcon className="h-3 w-3" />
                           {logStatusLabel(sub.status)}
                         </Badge>
@@ -722,7 +709,7 @@ export default function LogsPage() {
                               </span>
                             )}
                           </td>
-                          <td className={`px-3 py-2 font-mono ${latencyColor(a.latency_ms)}`}>
+                          <td className={`px-3 py-2 font-mono ${latencyClass(a.latency_ms)}`}>
                             {a.latency_ms}ms
                           </td>
                           <td className="px-3 py-2 max-w-[200px]" title={a.error}>
@@ -761,7 +748,7 @@ export default function LogsPage() {
                             </span>
                             <span>#{a.attempt}</span>
                             <span>{formatInZone(a.created_at, tz)}</span>
-                            <span className={`font-mono ${latencyColor(a.latency_ms)}`}>{a.latency_ms}ms</span>
+                            <span className={`font-mono ${latencyClass(a.latency_ms)}`}>{a.latency_ms}ms</span>
                           </div>
                           {a.error && (
                             <p className="mt-1 break-words text-xs text-destructive">{a.error}</p>
@@ -803,48 +790,6 @@ export default function LogsPage() {
         }}
         onCancel={() => setBatchConfirmOpen(false)}
       />
-
-      {/* 移动端：清理范围选择 */}
-      <Dialog open={purgeMenuOpen} onOpenChange={setPurgeMenuOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>清理日志</DialogTitle>
-            <DialogDescription>选择要删除的时间范围，删除后不可恢复。</DialogDescription>
-          </DialogHeader>
-          <div className="flex flex-col gap-2">
-            <Button
-              variant="outline"
-              className="justify-start"
-              onClick={() => {
-                setPurgeMenuOpen(false)
-                openPurge('7d')
-              }}
-            >
-              清理 7 天前
-            </Button>
-            <Button
-              variant="outline"
-              className="justify-start"
-              onClick={() => {
-                setPurgeMenuOpen(false)
-                openPurge('30d')
-              }}
-            >
-              清理 30 天前
-            </Button>
-            <Button
-              variant="destructive"
-              className="justify-start"
-              onClick={() => {
-                setPurgeMenuOpen(false)
-                openPurge('all')
-              }}
-            >
-              全部清理
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
 
       {/* 清理确认对话框 */}
       <Dialog open={purgeOpen} onOpenChange={setPurgeOpen}>

@@ -1,8 +1,8 @@
 // 通知页：列表 + 新建/编辑对话框 + 发送测试 + 删除
 import { useCallback, useEffect, useState } from 'react'
-import { Plus, Pencil, Trash2, Copy, AlertCircle, Radio, SearchX } from 'lucide-react'
+import { Plus, Pencil, Trash2, Copy, Radio, SearchX } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
+import { Card } from '@/components/ui/card'
 import { EmptyState } from '@/components/common/EmptyState'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Pagination } from '@/components/common/pagination'
@@ -13,6 +13,7 @@ import { extractApiError } from '@/lib/api'
 import { SortIcon } from '@/components/common/SortIcon'
 import { PageHeader } from '@/components/common/PageHeader'
 import { FilterToolbar } from '@/components/common/FilterToolbar'
+import { ListError, ListLoading } from '@/components/common/ListState'
 import { ChannelEditDialog } from '@/components/channels/ChannelEditDialog'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import {
@@ -184,19 +185,9 @@ export default function ChannelsPage() {
       />
 
       {loading ? (
-        <p className="text-sm text-muted-foreground">加载中…</p>
+        <ListLoading />
       ) : loadError ? (
-        <Card>
-          <CardContent className="py-10 text-center text-sm text-destructive">
-            <div className="flex items-center justify-center gap-2">
-              <AlertCircle className="h-5 w-5" />
-              <span>加载失败：{loadError}</span>
-            </div>
-            <Button variant="outline" size="sm" className="mt-3" onClick={refresh}>
-              重试
-            </Button>
-          </CardContent>
-        </Card>
+        <ListError message={loadError} onRetry={refresh} />
       ) : items.length === 0 ? (
         Boolean(search.trim()) ? (
           <EmptyState
