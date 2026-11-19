@@ -3,7 +3,6 @@ import { Loader2, User as UserIcon } from 'lucide-react'
 import { extractApiError, updatePassword } from '@/lib/api'
 import { useConfig } from '@/contexts/ConfigContext'
 import { AuthContext } from '@/contexts/AuthContext'
-import { COMMON_TIMEZONES } from '@/lib/constants'
 import { formatInZone } from '@/lib/datetime'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -15,13 +14,7 @@ import {
   CardDescription,
   CardContent,
 } from '@/components/ui/card'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+import { TimezoneSelect } from '@/components/common/TimezoneSelect'
 import { useToast } from '@/components/ui/use-toast'
 import { AppLogo } from '@/components/common/AppLogo'
 import { AISettingsSection } from '@/components/ai/AISettingsSection'
@@ -328,18 +321,7 @@ export default function Profile() {
 
                       <div className="space-y-2">
                         <Label htmlFor="site-tz">站点时区</Label>
-                        <Select value={timezone} onValueChange={setTimezone}>
-                          <SelectTrigger id="site-tz">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {COMMON_TIMEZONES.map((tz) => (
-                              <SelectItem key={tz} value={tz}>
-                                {tz}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <TimezoneSelect id="site-tz" value={timezone} onValueChange={setTimezone} />
                       </div>
 
                       <div className="pt-2">

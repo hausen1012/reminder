@@ -1,4 +1,5 @@
 // 站点时区下的时间格式化工具，基于 Intl.DateTimeFormat。
+import { COMMON_TIMEZONES } from '@/lib/constants'
 
 /** 默认站点时区，与后端 timezone.Fallback 保持一致。 */
 export const DEFAULT_SITE_TIMEZONE = 'Asia/Shanghai'
@@ -163,4 +164,38 @@ export function toWallClockString(w: ZonedWallClock, withSeconds = false): strin
 /** 站点时区下若干分钟后的墙上时间字符串（带秒），用于示例数据。 */
 export function wallClockAfter(timeZone: string, minutes: number): string {
   return toWallClockString(nowInZone(timeZone, minutes), true)
+}
+
+/**
+ * 获取系统支持的完整时区列表。
+ * 优先使用 Intl.supportedValuesOf('timeZone')，当环境不支持时降级至常用时区列表。
+ * 若传入当前值，会确保该值包含在列表中以保障正确回显。
+ */
+export function getAllTimezones(currentTimezone?: string): string[] {
+  let list: string[] = []
+  const intlWithSupportedValues = Intl as unknown as {
+    supportedValuesOf?: (key: string) => string[]
+  }
+  if (typeof intlWithSupportedValues.supportedValuesOf === 'function') {
+    try {
+      const values = intlWithSupportedValues.supportedValuesOf('timeZone')
+      if (Array.isArray(values)) {
+        list = values
+      }
+    } catch {
+      // 忽略异常，降级
+    }
+  }
+
+  if (!list || list.length === 0) {
+    list = [...COMMON_TIMEZONES]
+  } else if (!list.includes('UTC')) {
+    list = [...list, 'UTC']
+  }
+
+  if (currentTimezone && !list.includes(currentTimezone)) {
+    return [currentTimezone, ...list]
+  }
+
+  return list
 }

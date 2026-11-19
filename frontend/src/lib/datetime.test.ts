@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatInZone, formatNextFireInZone } from '@/lib/datetime'
+import { formatInZone, formatNextFireInZone, getAllTimezones } from '@/lib/datetime'
 
 // 2026-07-01T01:00:00Z 在 Asia/Shanghai 是 09:00，在 UTC 是 01:00。
 // 用它来验证"展示按站点时区而非浏览器时区"这一核心约定。
@@ -48,5 +48,20 @@ describe('formatNextFireInZone', () => {
 
   it('空值返回占位符', () => {
     expect(formatNextFireInZone(undefined, 'Asia/Shanghai')).toBe('—')
+  })
+})
+
+describe('getAllTimezones', () => {
+  it('返回包含常见时区和 UTC 的非空列表', () => {
+    const list = getAllTimezones()
+    expect(list.length).toBeGreaterThan(10)
+    expect(list).toContain('Asia/Shanghai')
+    expect(list).toContain('UTC')
+  })
+
+  it('若当前时区不在列表中，应自动前置或包含以保证回显', () => {
+    const custom = 'Custom/Neverland'
+    const list = getAllTimezones(custom)
+    expect(list).toContain(custom)
   })
 })
