@@ -142,6 +142,21 @@ describe('SMTPForm', () => {
     expect(readState().to).toEqual(['a@x.com', 'b@x.com'])
   })
 
+  it('端口输入框允许清空后重新填入数字', async () => {
+    const user = userEvent.setup()
+    render(<Controlled form={SMTPForm} initial={{ port: 587 }} />)
+
+    const portInput = screen.getByPlaceholderText('587')
+    expect(portInput).toHaveValue(587)
+
+    await user.clear(portInput)
+    expect(portInput).toHaveValue(null)
+
+    await user.type(portInput, '25')
+    expect(portInput).toHaveValue(25)
+    expect(readState().port).toBe(25)
+  })
+
   it('编辑态且已有密码时，密码框占位提示"留空表示不修改"', () => {
     render(<Controlled form={SMTPForm} initial={{ password_enc: '***' }} isEdit />)
     expect(screen.getByPlaceholderText('留空表示不修改')).toBeInTheDocument()

@@ -99,8 +99,16 @@ function renderControl(
           id={id}
           type="number"
           placeholder={field.placeholder}
-          value={typeof value === 'number' ? value : Number(value ?? 0) || ''}
-          onChange={(e) => updateField(onChange, field.key, Number(e.target.value))}
+          value={typeof value === 'number' || typeof value === 'string' ? value : ''}
+          onChange={(e) => {
+            const v = e.target.value
+            if (v === '') {
+              updateField(onChange, field.key, '')
+              return
+            }
+            const num = parseInt(v, 10)
+            updateField(onChange, field.key, isNaN(num) ? '' : num)
+          }}
         />
       )
     case 'textarea':

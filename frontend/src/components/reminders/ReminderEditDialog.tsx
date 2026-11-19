@@ -88,7 +88,7 @@ export function ReminderEditDialog({ reminder, open, onClose, onSaved }: Props) 
   const initialSec = input.confirm_retry_interval_sec || 7200
   const initialIsHour = initialSec >= 3600 && initialSec % 3600 === 0
   const [intervalUnit, setIntervalUnit] = useState<'minute' | 'hour'>(initialIsHour ? 'hour' : 'minute')
-  const [intervalValue, setIntervalValue] = useState<number>(
+  const [intervalValue, setIntervalValue] = useState<number | ''>(
     initialIsHour ? initialSec / 3600 : Math.max(1, Math.round(initialSec / 60)),
   )
   const [customInterval, setCustomInterval] = useState(false)
@@ -130,11 +130,13 @@ export function ReminderEditDialog({ reminder, open, onClose, onSaved }: Props) 
     }
   }, [reminder, tz])
 
-  function handleIntervalChange(val: number, unit: 'minute' | 'hour') {
+  function handleIntervalChange(val: number | '', unit: 'minute' | 'hour') {
     setIntervalValue(val)
     setIntervalUnit(unit)
-    const totalSec = Math.max(60, val * (unit === 'hour' ? 3600 : 60))
-    patch('confirm_retry_interval_sec', totalSec)
+    if (typeof val === 'number' && val > 0) {
+      const totalSec = Math.max(60, val * (unit === 'hour' ? 3600 : 60))
+      patch('confirm_retry_interval_sec', totalSec)
+    }
   }
 
   function patch<K extends keyof ReminderInput>(key: K, val: ReminderInput[K]) {
@@ -184,10 +186,20 @@ export function ReminderEditDialog({ reminder, open, onClose, onSaved }: Props) 
     }
     setSaving(true)
     try {
+      const sanitizedSpec = { ...input.schedule_spec }
+      if (input.schedule_type === 'interval') {
+        sanitizedSpec.every = Math.max(1, Number(sanitizedSpec.every) || 1)
+      }
+      const payload: ReminderInput = {
+        ...input,
+        schedule_spec: sanitizedSpec,
+        confirm_max_retries: Math.max(1, Number(input.confirm_max_retries) || 3),
+        confirm_retry_interval_sec: Math.max(60, Number(input.confirm_retry_interval_sec) || 60),
+      }
       if (isEdit && reminder) {
-        await updateReminder(reminder.id, input)
+        await updateReminder(reminder.id, payload)
       } else {
-        await createReminder(input)
+        await createReminder(payload)
       }
       toast({ title: isEdit ? '提醒已更新' : '提醒已创建', variant: 'success' })
       onSaved()
@@ -348,7 +360,20 @@ export function ReminderEditDialog({ reminder, open, onClose, onSaved }: Props) 
                         type="number"
                         min={1}
                         value={intervalValue}
-                        onChange={(e) => handleIntervalChange(Number(e.target.value) || 1, intervalUnit)}
+                        onChange={(e) => {
+                          const val = e.target.value
+                          if (val === '') {
+                            handleIntervalChange('', intervalUnit)
+                            return
+                          }
+                          const num = parseInt(val, 10)
+                          handleIntervalChange(isNaN(num) ? '' : num, intervalUnit)
+                        }}
+                        onBlur={() => {
+                          if (intervalValue === '' || intervalValue < 1) {
+                            handleIntervalChange(1, intervalUnit)
+                          }
+                        }}
                         className="h-8 w-20 text-center text-xs"
                         aria-label="重试间隔数值"
                       />
@@ -412,7 +437,20 @@ export function ReminderEditDialog({ reminder, open, onClose, onSaved }: Props) 
                         min={1}
                         max={100}
                         value={input.confirm_max_retries}
-                        onChange={(e) => patch('confirm_max_retries', Number(e.target.value) || 1)}
+                        onChange={(e) => {
+                          const val = e.target.value
+                          if (val === '') {
+                            patch('confirm_max_retries', '' as unknown as number)
+                            return
+                          }
+                          const num = parseInt(val, 10)
+                          patch('confirm_max_retries', (isNaN(num) ? '' : num) as unknown as number)
+                        }}
+                        onBlur={() => {
+                          if (input.confirm_max_retries === ('' as unknown as number) || Number(input.confirm_max_retries) < 1) {
+                            patch('confirm_max_retries', 3)
+                          }
+                        }}
                         className="h-8 w-20 text-center text-xs"
                         aria-label="最大重试次数"
                       />

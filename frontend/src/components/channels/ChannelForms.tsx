@@ -96,8 +96,21 @@ export function SMTPForm({ config, onChange, isEdit }: SubFormProps) {
           <Input
             type="number"
             placeholder="587"
-            value={cfgNum(config, 'port', 587) || ''}
-            onChange={(e) => updateField(onChange, 'port', Number(e.target.value))}
+            value={typeof config.port === 'number' || typeof config.port === 'string' ? config.port : 587}
+            onChange={(e) => {
+              const val = e.target.value
+              if (val === '') {
+                updateField(onChange, 'port', '')
+                return
+              }
+              const num = parseInt(val, 10)
+              updateField(onChange, 'port', isNaN(num) ? '' : num)
+            }}
+            onBlur={() => {
+              if (config.port === '' || config.port === undefined || Number(config.port) <= 0) {
+                updateField(onChange, 'port', 587)
+              }
+            }}
           />
         </div>
       </div>

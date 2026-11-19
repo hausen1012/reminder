@@ -148,11 +148,12 @@ export function ScheduleForm({ value, onChange }: Props) {
           </SelectContent>
         </Select>
         {value.schedule_type === 'interval' && (() => {
-          const every = Number(spec.every ?? 1)
+          const everyRaw = spec.every
+          const everyNum = Number(everyRaw ?? 1)
           const rawUnit = String(spec.unit ?? (value.calendar === 'lunar' ? 'month' : 'day'))
           const unit = value.calendar === 'lunar' && rawUnit !== 'month' && rawUnit !== 'year' ? 'month' : rawUnit
           const presets = value.calendar === 'lunar' ? LUNAR_INTERVAL_PRESETS : SOLAR_INTERVAL_PRESETS
-          const matched = presets.find((p) => p.every === every && p.unit === unit)
+          const matched = presets.find((p) => p.every === everyNum && p.unit === unit)
           const isCustom = customInterval || !matched
 
           return (
@@ -199,8 +200,21 @@ export function ScheduleForm({ value, onChange }: Props) {
                   <Input
                     type="number"
                     min={1}
-                    value={every}
-                    onChange={(e) => patchSpec({ every: Number(e.target.value) || 1 })}
+                    value={everyRaw === '' ? '' : (everyRaw !== undefined ? Number(everyRaw) : 1)}
+                    onChange={(e) => {
+                      const val = e.target.value
+                      if (val === '') {
+                        patchSpec({ every: '' })
+                        return
+                      }
+                      const num = parseInt(val, 10)
+                      patchSpec({ every: isNaN(num) ? '' : Math.max(1, num) })
+                    }}
+                    onBlur={() => {
+                      if (spec.every === '' || spec.every === undefined || Number(spec.every) < 1) {
+                        patchSpec({ every: 1 })
+                      }
+                    }}
                     className="h-8 w-20 text-center text-xs"
                     aria-label="周期数值"
                   />

@@ -78,7 +78,7 @@ export function AISettingsSection() {
   const [showKey, setShowKey] = useState(false)
   const [customPrompt, setCustomPrompt] = useState('')
   // 接口失败后的最大重试次数；0 表示不重试（后端只在字段缺省时才用默认的 10）
-  const [maxRetries, setMaxRetries] = useState(10)
+  const [maxRetries, setMaxRetries] = useState<number | ''>(10)
   const [hasKey, setHasKey] = useState(false)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -115,7 +115,7 @@ export function AISettingsSection() {
       models: cleanedModels,
       api_key: key,
       custom_prompt: customPrompt.trim(),
-      max_retries: maxRetries,
+      max_retries: maxRetries === '' ? 0 : Number(maxRetries),
     }
   }
 
@@ -405,7 +405,20 @@ export function AISettingsSection() {
           max={MAX_MAX_RETRIES}
           step={1}
           value={maxRetries}
-          onChange={(e) => setMaxRetries(Number(e.target.value))}
+          onChange={(e) => {
+            const val = e.target.value
+            if (val === '') {
+              setMaxRetries('')
+              return
+            }
+            const num = parseInt(val, 10)
+            setMaxRetries(isNaN(num) ? '' : Math.min(MAX_MAX_RETRIES, Math.max(0, num)))
+          }}
+          onBlur={() => {
+            if (maxRetries === '') {
+              setMaxRetries(0)
+            }
+          }}
           placeholder="0 表示不自动重试"
         />
       </div>
