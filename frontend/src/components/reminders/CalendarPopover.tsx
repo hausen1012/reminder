@@ -70,7 +70,7 @@ export function CalendarPopover({ date, hour: initHour, minute: initMin, initial
     return now.day
   })
   const [hour, setHour] = useState(initHour ?? now.hour)
-  const [minute, setMinute] = useState(initMin ?? now.minute)
+  const [minute, setMinute] = useState(initMin ?? 0)
   const [timePanelOpen, setTimePanelOpen] = useState(false)
 
   // 计算 fixed 位置（使用 useLayoutEffect 避免首次渲染时位置闪烁）
@@ -276,13 +276,13 @@ export function CalendarPopover({ date, hour: initHour, minute: initMin, initial
   }
 
   function goToday() {
-    // same as 上面的 "今天"：按站点时区取当前墙上时间
+    // same as 上面的 "今天"：按站点时区取当前墙上时间整点
     const n = nowInZone(tz)
     setSolarYear(n.year)
     setSolarMonth(n.month)
     setSelectedDay(n.day)
     setHour(n.hour)
-    setMinute(n.minute)
+    setMinute(0)
   }
 
   function toggleTimePanel() {

@@ -25,7 +25,7 @@ type toolDefinition struct {
 
 // 开启「需要确认」但模型没给重发参数时的兜底值，与提醒表单默认值一致。
 const (
-	defaultConfirmRetryIntervalSec = 300
+	defaultConfirmRetryIntervalSec = 7200
 	defaultConfirmMaxRetries       = 3
 )
 
@@ -108,11 +108,11 @@ func (s *AIService) toolDefinitions() []toolDefinition {
 						"require_confirm": map[string]any{
 							"type": "boolean",
 							"description": "是否需要确认。用户要求「需要确认 / 没点确认就重发 / 直到我确认」时必须传 true，" +
-								"并配置下面两个重发参数（不传则用默认 300 秒、3 次）",
+								"并配置下面两个重发参数（不传则用默认 7200 秒、3 次）",
 						},
 						"confirm_retry_interval_sec": map[string]any{
 							"type": "integer", "minimum": 60,
-							"description": "确认重发间隔（秒），最小 60，默认 300。仅 require_confirm=true 时有意义",
+							"description": "确认重发间隔（秒），最小 60，默认 7200。仅 require_confirm=true 时有意义",
 						},
 						"confirm_max_retries": map[string]any{
 							"type": "integer", "minimum": 1,
@@ -142,7 +142,7 @@ func (s *AIService) toolDefinitions() []toolDefinition {
 						"enabled":       map[string]any{"type": "boolean"},
 						"require_confirm": map[string]any{
 							"type":        "boolean",
-							"description": "是否需要确认；设为 true 时未给重发参数则沿用原值，原值为空则用默认 300 秒、3 次",
+							"description": "是否需要确认；设为 true 时未给重发参数则沿用原值，原值为空则用默认 7200 秒、3 次",
 						},
 						"confirm_retry_interval_sec": map[string]any{"type": "integer", "minimum": 60, "description": "确认重发间隔（秒）"},
 						"confirm_max_retries":        map[string]any{"type": "integer", "minimum": 1, "description": "确认最大重发次数"},

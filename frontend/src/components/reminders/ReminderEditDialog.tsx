@@ -32,8 +32,9 @@ interface Props {
 }
 
 function defaultInput(siteTimezone: string): ReminderInput {
-  // 默认时间 = 站点时区下的当前时间 + 5 分钟
-  const at = toWallClockString(nowInZone(siteTimezone, 5))
+  // 默认时间 = 站点时区下的当前时间整点
+  const now = nowInZone(siteTimezone)
+  const at = toWallClockString({ ...now, minute: 0 })
   return {
     title: '',
     content: '',
@@ -44,7 +45,7 @@ function defaultInput(siteTimezone: string): ReminderInput {
     source: 'web',
     channel_ids: [],
     require_confirm: false,
-    confirm_retry_interval_sec: 300,
+    confirm_retry_interval_sec: 7200,
     confirm_max_retries: 3,
   }
 }
@@ -52,7 +53,7 @@ function defaultInput(siteTimezone: string): ReminderInput {
 export function ReminderEditDialog({ reminder, open, onClose, onSaved }: Props) {
   const isEdit = Boolean(reminder)
   // 站点时区是全局设置：既用于提示用户时间按哪个时区解释，
-  // 也用于生成"当前时间 + 5 分钟"这类默认值（不能按浏览器时区算）。
+  // 也用于生成当前时间整点这类默认值（不能按浏览器时区算）。
   const tz = useSiteTimezone()
   const [input, setInput] = useState<ReminderInput>(() => defaultInput(tz))
   const [saving, setSaving] = useState(false)
@@ -81,7 +82,7 @@ export function ReminderEditDialog({ reminder, open, onClose, onSaved }: Props) 
         schedule_spec: reminder.schedule_spec,
         channel_ids: reminder.channel_ids,
         require_confirm: reminder.require_confirm,
-        confirm_retry_interval_sec: reminder.confirm_retry_interval_sec || 300,
+        confirm_retry_interval_sec: reminder.confirm_retry_interval_sec || 7200,
         confirm_max_retries: reminder.confirm_max_retries || 3,
       })
     } else {
