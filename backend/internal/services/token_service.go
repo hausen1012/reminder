@@ -75,12 +75,15 @@ func (s *TokenService) Create(name string, defaultChannelIDs []uint) (string, *m
 	return plain, key, nil
 }
 
-// List 返回所有令牌，支持分页和搜索。
-func (s *TokenService) List(limit, offset int, search string) ([]*models.Token, int64, error) {
+// List 分页查询令牌，支持名称搜索与启用状态过滤（enabled 为 nil 时不过滤）。
+func (s *TokenService) List(limit, offset int, search string, enabled *bool) ([]*models.Token, int64, error) {
 	var rows []models.Token
 	query := s.DB.Model(&models.Token{})
 	if search != "" {
 		query = query.Where("name LIKE ?", "%"+search+"%")
+	}
+	if enabled != nil {
+		query = query.Where("enabled = ?", *enabled)
 	}
 	var total int64
 	if err := query.Count(&total).Error; err != nil {
@@ -313,8 +316,8 @@ type TokenView struct {
 }
 
 // ListViews 返回令牌富列表，支持分页和搜索；默认通道与 24h 用量按整页批量查询。
-func (s *TokenService) ListViews(limit, offset int, search string) ([]*TokenView, int64, error) {
-	keys, total, err := s.List(limit, offset, search)
+func (s *TokenService) ListViews(limit, offset int, search string, enabled *bool) ([]*TokenView, int64, error) {
+	keys, total, err := s.List(limit, offset, search, enabled)
 	if err != nil {
 		return nil, 0, err
 	}

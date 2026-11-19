@@ -16,11 +16,12 @@ func (h *TokenHandler) List(c *gin.Context) {
 	limit := queryInt(c, "limit", 10)
 	offset := queryInt(c, "offset", 0)
 	search := c.Query("search")
+	enabled := queryBool(c, "enabled")
 	if limit < 1 || limit > 100 {
 		limit = 10
 	}
 
-	views, total, err := h.Svc.ListViews(limit, offset, search)
+	views, total, err := h.Svc.ListViews(limit, offset, search, enabled)
 	if err != nil {
 		abortErr(c, err)
 		return
@@ -134,7 +135,7 @@ func (h *TokenHandler) UpdateDefaultChannels(c *gin.Context) {
 
 // Stats GET /api/tokens/stats
 func (h *TokenHandler) Stats(c *gin.Context) {
-	views, _, err := h.Svc.ListViews(1000, 0, "")
+	views, _, err := h.Svc.ListViews(1000, 0, "", nil)
 	if err != nil {
 		abortErr(c, err)
 		return

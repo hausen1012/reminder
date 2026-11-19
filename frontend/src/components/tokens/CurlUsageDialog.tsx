@@ -12,17 +12,13 @@ import {
 import { useToast } from '@/components/ui/use-toast'
 import { copyToClipboard } from '@/lib/utils'
 import { extractApiError } from '@/lib/api'
+import { wallClockAfter } from '@/lib/datetime'
+import { useSiteTimezone } from '@/contexts/ConfigContext'
 
 interface Props {
   token: string
   open: boolean
   onClose: () => void
-}
-
-function oneHourLater(): string {
-  const d = new Date(Date.now() + 3600_000)
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:00`
 }
 
 async function copy(text: string, toast: ReturnType<typeof useToast>['toast']) {
@@ -55,7 +51,9 @@ function CurlBlock({ curl }: { curl: string }) {
 }
 
 export function CurlUsageDialog({ token, open, onClose }: Props) {
-  const at = useMemo(() => oneHourLater(), [open])
+  const tz = useSiteTimezone()
+  // 示例里的 at 按站点时区生成，与后端解释一致
+  const at = useMemo(() => wallClockAfter(tz, 60), [tz])
 
   const curlSimple = useMemo(
     () => `curl -X POST /api/external/v1/reminders \\

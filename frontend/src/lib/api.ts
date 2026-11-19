@@ -248,7 +248,7 @@ export async function countPurgeLogs(olderThan?: string, all?: boolean) {
 
 // --- 令牌 ---
 
-export async function listTokens(params?: { limit?: number; offset?: number; search?: string }) {
+export async function listTokens(params?: { limit?: number; offset?: number; search?: string; enabled?: boolean }) {
   const res = await api.get<ApiResponse<TokenListResp>>('/tokens', { params })
   return res.data.data ?? { items: [], total: 0 }
 }

@@ -30,17 +30,11 @@ import {
 import { formatReminderDetail } from '@/lib/utils'
 import { formatInZone, formatNextFireInZone } from '@/lib/datetime'
 import { useSiteTimezone } from '@/contexts/ConfigContext'
-import { sourceLabel } from '@/lib/constants'
+import { sourceLabel, SCHEDULE_TYPE_LABEL } from '@/lib/constants'
 import { SortIcon } from '@/components/common/SortIcon'
 import { PageHeader } from '@/components/common/PageHeader'
 import { FilterToolbar } from '@/components/common/FilterToolbar'
 import type { Channel, Reminder } from '@/types'
-
-const TYPE_LABEL: Record<string, string> = {
-  once: '单次',
-  interval: '周期',
-  cron: 'Cron',
-}
 
 export default function RemindersPage() {
   const tz = useSiteTimezone()
@@ -58,6 +52,8 @@ export default function RemindersPage() {
 
   const [source, setSource] = useState<string>('all')
   const [enabled, setEnabled] = useState<string>('all')
+  // 搜索分输入态与生效态：输入不触发请求，提交（回车/点击搜索）才刷新列表
+  const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')
   const [limit, setLimit] = useState(10)
   const [offset, setOffset] = useState(0)
@@ -141,7 +137,7 @@ export default function RemindersPage() {
   async function handleDuplicate(r: Reminder) {
     try {
       await createReminder({
-        title: r.title + '-copy',
+        title: r.title + '-副本',
         content: r.content,
         content_format: r.content_format,
         calendar: r.calendar,
@@ -221,9 +217,12 @@ export default function RemindersPage() {
         </PageHeader>
 
       <FilterToolbar
-        searchValue={search}
-        onSearchChange={setSearch}
-        onSearch={refresh}
+        searchValue={searchInput}
+        onSearchChange={setSearchInput}
+        onSearch={() => {
+          setOffset(0)
+          setSearch(searchInput)
+        }}
         onRefresh={refresh}
         placeholder="搜索标题或内容…"
       >
@@ -281,6 +280,7 @@ export default function RemindersPage() {
                 setSource('all')
                 setEnabled('all')
                 setSearch('')
+                setSearchInput('')
                 setOffset(0)
               },
             }}
@@ -354,7 +354,7 @@ export default function RemindersPage() {
                             {formatReminderDetail(r)}
                           </div>
                           <div className="text-[11px] text-muted-foreground/80">
-                            {TYPE_LABEL[r.schedule_type] ?? r.schedule_type}
+                            {SCHEDULE_TYPE_LABEL[r.schedule_type] ?? r.schedule_type}
                           </div>
                         </td>
                         <td className="px-4 py-2.5 text-xs whitespace-nowrap">
@@ -449,7 +449,7 @@ export default function RemindersPage() {
                             {formatReminderDetail(r)}
                           </span>
                           <span className="shrink-0">·</span>
-                          <span className="shrink-0">{TYPE_LABEL[r.schedule_type] ?? r.schedule_type}</span>
+                          <span className="shrink-0">{SCHEDULE_TYPE_LABEL[r.schedule_type] ?? r.schedule_type}</span>
                           <span className="inline-flex shrink-0 items-center rounded px-1.5 py-0.5 text-[10px] text-muted-foreground bg-muted">
                             {sourceLabel(r.source)}
                           </span>

@@ -54,7 +54,7 @@ import { listLogs, getLogDetail, purgeLogs, countPurgeLogs, batchDeleteLogs, ext
 import { formatInZone } from '@/lib/datetime'
 import { useSiteTimezone } from '@/contexts/ConfigContext'
 import { useChannelTypes, labelOf } from '@/lib/channelSpec'
-import { SOURCE_BADGE_CLASS, sourceLabel } from '@/lib/constants'
+import { SOURCE_BADGE_CLASS, logStatusLabel, LOG_STATUS_TEXT_CLASS, sourceLabel } from '@/lib/constants'
 import { copyToClipboard } from '@/lib/utils'
 import type { DeliveryLog, LogFilter } from '@/types'
 
@@ -64,22 +64,6 @@ const STATUS_ICON: Record<string, typeof CheckCircle2> = {
   failed: XCircle,
   pending: Clock,
   expired: PauseCircle,
-}
-
-const STATUS_COLOR: Record<string, string> = {
-  success: 'text-green-600',
-  partial: 'text-yellow-600',
-  failed: 'text-red-600',
-  pending: 'text-blue-600',
-  expired: 'text-gray-500',
-}
-
-const STATUS_LABEL: Record<string, string> = {
-  success: '成功',
-  partial: '部分成功',
-  failed: '失败',
-  pending: '发送中',
-  expired: '已过期',
 }
 
 const CHANNEL_ICONS: Record<string, typeof Mail> = {
@@ -95,9 +79,9 @@ const CHANNEL_ICONS: Record<string, typeof Mail> = {
 }
 
 function latencyColor(ms: number): string {
-  if (ms < 100) return 'text-green-600'
-  if (ms < 500) return 'text-yellow-600'
-  return 'text-red-600'
+  if (ms < 100) return 'text-emerald-600 dark:text-emerald-400'
+  if (ms < 500) return 'text-amber-600 dark:text-amber-400'
+  return 'text-red-600 dark:text-red-400'
 }
 
 export default function LogsPage() {
@@ -387,7 +371,7 @@ export default function LogsPage() {
                 <tbody>
                   {displayRows.map(({ main, subs }) => {
                     const MainStatusIcon = STATUS_ICON[main.status] ?? Clock
-                    const mainColor = STATUS_COLOR[main.status] ?? ''
+                    const mainColor = LOG_STATUS_TEXT_CLASS[main.status] ?? ''
                     return (
                     <Fragment key={main.id}>
                       <tr className="border-b hover:bg-muted/30">
@@ -419,7 +403,7 @@ export default function LogsPage() {
                         <td className="px-4 py-2.5">
                           <Badge variant="outline" className={`gap-1 ${mainColor}`}>
                             <MainStatusIcon className="h-3 w-3" />
-                            {STATUS_LABEL[main.status] ?? main.status}
+                            {logStatusLabel(main.status)}
                           </Badge>
                         </td>
                         <td className="px-4 py-2.5">
@@ -429,7 +413,7 @@ export default function LogsPage() {
                         </td>
                         <td className="px-4 py-2.5 text-xs">
                           {main.confirmed ? (
-                            <span className="text-green-600">已确认</span>
+                            <span className="text-emerald-600 dark:text-emerald-400">已确认</span>
                           ) : main.confirm_chain_id ? (
                             <span className="text-muted-foreground">待确认</span>
                           ) : (
@@ -445,7 +429,7 @@ export default function LogsPage() {
                       </tr>
                       {expandedRows.has(main.id) && subs.map((sub) => {
                         const SubStatusIcon = STATUS_ICON[sub.status] ?? Clock
-                        const subColor = STATUS_COLOR[sub.status] ?? ''
+                        const subColor = LOG_STATUS_TEXT_CLASS[sub.status] ?? ''
                         return (
                         <tr key={sub.id} className="border-b bg-muted/20 text-xs">
                           <td />
@@ -459,7 +443,7 @@ export default function LogsPage() {
                           <td className="px-4 py-2">
                             <Badge variant="outline" className={`gap-1 ${subColor}`}>
                               <SubStatusIcon className="h-3 w-3" />
-                              {STATUS_LABEL[sub.status] ?? sub.status}
+                              {logStatusLabel(sub.status)}
                             </Badge>
                           </td>
                           <td />
@@ -482,7 +466,7 @@ export default function LogsPage() {
           <div className="divide-y md:hidden">
             {displayRows.map(({ main, subs }) => {
               const MainStatusIcon = STATUS_ICON[main.status] ?? Clock;
-              const mainColor = STATUS_COLOR[main.status] ?? '';
+              const mainColor = LOG_STATUS_TEXT_CLASS[main.status] ?? '';
               const isExpanded = expandedRows.has(main.id);
               return (
                 <div key={main.id}>
@@ -502,7 +486,7 @@ export default function LogsPage() {
                           </span>
                           <Badge variant="outline" className={`gap-1 shrink-0 text-[11px] ${mainColor}`}>
                             <MainStatusIcon className="h-3 w-3" />
-                            {STATUS_LABEL[main.status] ?? main.status}
+                            {logStatusLabel(main.status)}
                           </Badge>
                         </div>
                         <p className="mt-0.5 truncate text-xs text-muted-foreground">
@@ -543,14 +527,14 @@ export default function LogsPage() {
                   {/* 展开的重试子项 */}
                   {isExpanded && subs.map((sub) => {
                     const SubStatusIcon = STATUS_ICON[sub.status] ?? Clock;
-                    const subColor = STATUS_COLOR[sub.status] ?? '';
+                    const subColor = LOG_STATUS_TEXT_CLASS[sub.status] ?? '';
                     return (
                       <div key={sub.id} className="flex items-center gap-2 border-t bg-muted/20 px-3 py-2 pl-7 sm:pl-9 min-w-0">
                         <span className="shrink-0 text-xs text-muted-foreground">重发 #{sub.retry_round}</span>
                         <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">{formatInZone(sub.fired_at, tz)}</span>
                         <Badge variant="outline" className={`ml-auto gap-1 shrink-0 text-[11px] ${subColor}`}>
                           <SubStatusIcon className="h-3 w-3" />
-                          {STATUS_LABEL[sub.status] ?? sub.status}
+                          {logStatusLabel(sub.status)}
                         </Badge>
                         <Button size="sm" variant="ghost" className="h-7 shrink-0 px-2 text-xs" onClick={() => handleDetail(sub.id)}>
                           详情
@@ -653,7 +637,10 @@ export default function LogsPage() {
                       {detail.confirm_chain_id}
                     </code>
                     {detail.confirmed && (
-                      <Badge className="bg-green-600">已确认</Badge>
+                      <Badge variant="success" className="gap-1">
+                        <CheckCircle2 className="h-3 w-3" />
+                        已确认
+                      </Badge>
                     )}
                   </div>
                   {detail.confirmed_at && (
@@ -725,12 +712,12 @@ export default function LogsPage() {
                           <td className="px-3 py-2 whitespace-nowrap">{formatInZone(a.created_at, tz)}</td>
                           <td className="px-3 py-2">
                             {a.status === 'success' ? (
-                              <span className="inline-flex items-center gap-1 text-green-600">
+                              <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
                                 <CheckCircle2 className="h-3 w-3" />
                                 成功
                               </span>
                             ) : (
-                              <span className="inline-flex items-center gap-1 text-red-600">
+                              <span className="inline-flex items-center gap-1 text-red-600 dark:text-red-400">
                                 <XCircle className="h-3 w-3" />
                                 失败
                               </span>
@@ -757,12 +744,12 @@ export default function LogsPage() {
                           <div className="flex items-center justify-between gap-2">
                             <span className="truncate font-medium">{a.channel_name}</span>
                             {a.status === 'success' ? (
-                              <span className="inline-flex shrink-0 items-center gap-1 text-xs text-green-600">
+                              <span className="inline-flex shrink-0 items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400">
                                 <CheckCircle2 className="h-3 w-3" />
                                 成功
                               </span>
                             ) : (
-                              <span className="inline-flex shrink-0 items-center gap-1 text-xs text-red-600">
+                              <span className="inline-flex shrink-0 items-center gap-1 text-xs text-red-600 dark:text-red-400">
                                 <XCircle className="h-3 w-3" />
                                 失败
                               </span>

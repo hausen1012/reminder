@@ -91,7 +91,7 @@ func TestTokenList(t *testing.T) {
 		}
 	}
 
-	rows, total, err := svc.List(10, 0, "")
+	rows, total, err := svc.List(10, 0, "", nil)
 	if err != nil {
 		t.Fatalf("列表失败: %v", err)
 	}
@@ -99,7 +99,7 @@ func TestTokenList(t *testing.T) {
 		t.Fatalf("应为 3 条，实际 total=%d len=%d", total, len(rows))
 	}
 
-	rows, total, err = svc.List(2, 0, "")
+	rows, total, err = svc.List(2, 0, "", nil)
 	if err != nil {
 		t.Fatalf("分页失败: %v", err)
 	}
@@ -107,12 +107,37 @@ func TestTokenList(t *testing.T) {
 		t.Fatalf("分页应为 total=3 len=2，实际 total=%d len=%d", total, len(rows))
 	}
 
-	rows, total, err = svc.List(10, 0, "乙")
+	rows, total, err = svc.List(10, 0, "乙", nil)
 	if err != nil {
 		t.Fatalf("搜索失败: %v", err)
 	}
 	if total != 1 || rows[0].Name != "乙" {
 		t.Fatalf("搜索应命中 1 条，实际 total=%d", total)
+	}
+
+	// 启用状态过滤：total 与分页都必须按过滤后的集合统计
+	disabled, err := svc.Toggle(rows[0].ID)
+	if err != nil {
+		t.Fatalf("切换状态失败: %v", err)
+	}
+	if disabled.Enabled {
+		t.Fatal("切换后应为禁用")
+	}
+	off := false
+	rows, total, err = svc.List(10, 0, "", &off)
+	if err != nil {
+		t.Fatalf("按禁用过滤失败: %v", err)
+	}
+	if total != 1 || len(rows) != 1 || rows[0].Name != "乙" {
+		t.Fatalf("禁用过滤应为 1 条，实际 total=%d len=%d", total, len(rows))
+	}
+	on := true
+	rows, total, err = svc.List(10, 0, "", &on)
+	if err != nil {
+		t.Fatalf("按启用过滤失败: %v", err)
+	}
+	if total != 2 || len(rows) != 2 {
+		t.Fatalf("启用过滤应为 2 条，实际 total=%d len=%d", total, len(rows))
 	}
 }
 
@@ -268,7 +293,7 @@ func TestTokenViews(t *testing.T) {
 		}
 	}
 
-	views, total, err := svc.ListViews(10, 0, "")
+	views, total, err := svc.ListViews(10, 0, "", nil)
 	if err != nil {
 		t.Fatalf("ListViews 失败: %v", err)
 	}
@@ -505,7 +530,7 @@ func TestTokenListViews_QueryCountIndependentOfRowCount(t *testing.T) {
 	var views []*TokenView
 	n := countQueries(t, db, func(scoped *gorm.DB) {
 		scopedSvc := NewTokenService(scoped, nil)
-		items, total, err := scopedSvc.ListViews(10, 0, "")
+		items, total, err := scopedSvc.ListViews(10, 0, "", nil)
 		if err != nil {
 			t.Fatalf("ListViews 失败: %v", err)
 		}

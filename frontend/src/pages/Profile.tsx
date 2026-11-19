@@ -259,7 +259,7 @@ export default function Profile() {
                             />
                           </div>
                         </div>
-                        {pwdMsg && <p className="text-sm text-green-600 dark:text-green-400">{pwdMsg}</p>}
+                        {pwdMsg && <p className="text-sm text-emerald-600 dark:text-emerald-400">{pwdMsg}</p>}
                         {pwdError && <p className="text-sm text-destructive">{pwdError}</p>}
                         <div>
                           <Button type="submit" size="sm" disabled={pwdLoading}>
@@ -291,7 +291,7 @@ export default function Profile() {
                         <div className="flex items-center gap-3">
                           <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border bg-background">
                             {logoSvg ? (
-                              <AppLogo svg={logoSvg} className="h-8 w-8 object-contain" alt="图标" />
+                              <AppLogo svg={logoSvg} className="h-8 max-w-full object-contain" alt="图标" />
                             ) : (
                               <span className="text-xs text-muted-foreground">无</span>
                             )}

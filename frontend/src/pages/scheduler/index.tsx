@@ -8,17 +8,12 @@ import { Button } from '@/components/ui/button'
 import { Pagination } from '@/components/common/pagination'
 import { PageHeader } from '@/components/common/PageHeader'
 import { extractApiError, getSchedulerStatus } from '@/lib/api'
+import { SCHEDULE_TYPE_LABEL } from '@/lib/constants'
 import { formatInZone } from '@/lib/datetime'
 import { useSiteTimezone } from '@/contexts/ConfigContext'
 import type { SchedulerStatus } from '@/types'
 
 const PAGE_LIMIT = 10
-
-const TYPE_LABEL: Record<string, string> = {
-  once: '单次',
-  interval: '周期',
-  cron: 'Cron',
-}
 
 export default function SchedulerPage() {
   const navigate = useNavigate()
@@ -178,12 +173,11 @@ export default function SchedulerPage() {
                       return (
                         <tr
                           key={e.id}
-                          className="border-b last:border-b-0 hover:bg-muted/30 cursor-pointer transition-colors"
-                          onClick={() => navigate(`/reminders`)}
+                          className="border-b last:border-b-0 hover:bg-muted/30 transition-colors"
                         >
                           <td className="px-4 py-2.5 truncate max-w-[200px]" title={e.title}>{e.title || '—'}</td>
                           <td className="px-4 py-2.5">
-                            {TYPE_LABEL[e.schedule_type] ?? e.schedule_type}
+                            {SCHEDULE_TYPE_LABEL[e.schedule_type] ?? e.schedule_type}
                           </td>
                           <td className="px-4 py-2.5 text-muted-foreground max-w-[12rem]">
                             {channelNames ? (
@@ -213,13 +207,12 @@ export default function SchedulerPage() {
               {entries.map((e) => (
                 <div
                   key={e.id}
-                  className="px-3 py-2.5 active:bg-muted/30 transition-colors"
-                  onClick={() => navigate(`/reminders`)}
+                  className="px-3 py-2.5"
                 >
                   <div className="flex items-baseline gap-2">
                     <p className="min-w-0 flex-1 truncate text-sm font-medium" title={e.title}>{e.title || '—'}</p>
                     <span className="shrink-0 text-[10px] font-medium text-muted-foreground">
-                      {TYPE_LABEL[e.schedule_type] ?? e.schedule_type}
+                      {SCHEDULE_TYPE_LABEL[e.schedule_type] ?? e.schedule_type}
                     </span>
                   </div>
                   <p className="mt-0.5 text-xs text-muted-foreground">

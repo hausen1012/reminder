@@ -107,7 +107,7 @@ export default function ChannelsPage() {
   async function handleDuplicate(ch: Channel) {
     try {
       await createChannel({
-        name: ch.name + '-copy',
+        name: ch.name + '-副本',
         type: ch.type,
         config: ch.config,
       })

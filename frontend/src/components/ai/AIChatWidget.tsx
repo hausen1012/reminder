@@ -342,7 +342,7 @@ export function AIChatWidget({ onEnabledChange }: AIChatWidgetProps = {}) {
             {sending && (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Loader2 className="h-4 w-4 animate-spin" />
-                <span className={progress?.kind === 'retry' ? 'text-amber-600' : undefined}>
+                <span className={progress?.kind === 'retry' ? 'text-amber-600 dark:text-amber-400' : undefined}>
                   {progressText(progress)}
                 </span>
               </div>

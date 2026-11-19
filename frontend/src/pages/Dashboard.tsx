@@ -25,7 +25,7 @@ import { formatReminderDetail } from '@/lib/utils'
 import { formatInZone } from '@/lib/datetime'
 import { useSiteTimezone } from '@/contexts/ConfigContext'
 import { PageHeader } from '@/components/common/PageHeader'
-import { sourceLabel } from '@/lib/constants'
+import { LOG_STATUS_PILL_CLASS, logStatusLabel, sourceLabel } from '@/lib/constants'
 import { ReminderEditDialog } from '@/components/reminders/ReminderEditDialog'
 import { useToast } from '@/components/ui/use-toast'
 import type { Reminder, DeliveryLog, SchedulerStatus } from '@/types'
@@ -45,6 +45,7 @@ export default function Dashboard() {
   const [todayLoading, setTodayLoading] = useState(true)
 
   const [logs, setLogs] = useState<DeliveryLog[]>([])
+  const [logsTotal, setLogsTotal] = useState(0)
   const [logsLoading, setLogsLoading] = useState(true)
 
   const [channelStats, setChannelStats] = useState<ChannelStats[]>([])
@@ -71,8 +72,14 @@ export default function Dashboard() {
       .finally(() => setTodayLoading(false))
 
     const pLogs = listLogs({ limit: 200, since: since24h })
-      .then((r) => setLogs(r.items ?? []))
-      .catch(() => setLogs([]))
+      .then((r) => {
+        setLogs(r.items ?? [])
+        setLogsTotal(r.total ?? 0)
+      })
+      .catch(() => {
+        setLogs([])
+        setLogsTotal(0)
+      })
       .finally(() => setLogsLoading(false))
 
     const pChannels = listChannelStats('24h')
@@ -103,20 +110,13 @@ export default function Dashboard() {
   const channelSuccessRate = totalChannelSend > 0 ? ((totalChannelSuccess / totalChannelSend) * 100).toFixed(1) : '—'
 
   const logsFailed = logs.filter((l) => l.status === 'failed' || l.status === 'partial').length
+  // 列表只拉取最近 200 条用于展示，卡片计数用服务端总数
+  const logsCount = Math.max(logsTotal, logs.length)
 
   const engineRunning = schedulerStatus?.engine?.running ?? false
   const engineRegistered = schedulerStatus?.engine?.registered_count ?? 0
 
-  const statusBadge = (status: string) => {
-    const map: Record<string, string> = {
-      success: 'bg-green-100 text-green-800 dark:bg-green-900/60 dark:text-green-300',
-      failed: 'bg-red-100 text-red-800 dark:bg-red-900/60 dark:text-red-300',
-      partial: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/60 dark:text-yellow-300',
-      pending: 'bg-blue-100 text-blue-800 dark:bg-blue-900/60 dark:text-blue-300',
-      expired: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300',
-    }
-    return map[status] ?? 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300'
-  }
+  const statusBadge = (status: string) => LOG_STATUS_PILL_CLASS[status] ?? 'bg-muted text-muted-foreground'
 
   const nextUpcoming = todayReminders[0]
 
@@ -195,7 +195,7 @@ export default function Dashboard() {
               <MiniLoader />
             ) : (
               <>
-                <div className="text-xl font-bold md:text-2xl">{logs.length}</div>
+                <div className="text-xl font-bold md:text-2xl">{logsCount}</div>
                 <div className="text-xs text-muted-foreground mt-1 flex items-center gap-1.5">
                   <span>过去 24 小时</span>
                   {logsFailed > 0 ? (
@@ -359,7 +359,7 @@ export default function Dashboard() {
         <Card className="min-w-0">
           <CardHeader className="flex flex-row items-center justify-between gap-2">
             <CardTitle className="min-w-0 truncate text-base">
-              最近发送 <span className="text-xs font-normal text-muted-foreground">({logs.length})</span>
+              最近发送 <span className="text-xs font-normal text-muted-foreground">({logsCount})</span>
             </CardTitle>
             <Link to="/logs" className="shrink-0 text-xs text-muted-foreground hover:text-foreground">
               全部记录
@@ -402,7 +402,7 @@ export default function Dashboard() {
                             log.status,
                           )}`}
                         >
-                          {log.status}
+                          {logStatusLabel(log.status)}
                         </span>
                       </div>
                       <div className="text-xs text-muted-foreground mt-1.5 truncate">

@@ -1,5 +1,5 @@
 // 令牌管理页
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Plus, Trash2, Copy, CheckCircle2, Pencil, Terminal, AlertCircle, KeyRound, SearchX } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -88,7 +88,12 @@ export default function TokensPage() {
     setLoading(true)
     try {
       const [data, allChannels] = await Promise.all([
-        listTokens({ limit, offset, search: search.trim() || undefined }),
+        listTokens({
+          limit,
+          offset,
+          search: search.trim() || undefined,
+          enabled: enabled === 'all' ? undefined : enabled === 'true',
+        }),
         listChannels(),
       ])
       setItems(data.items ?? [])
@@ -105,16 +110,7 @@ export default function TokensPage() {
 
   useEffect(() => {
     refresh()
-  }, [offset, limit, search])
-
-  useEffect(() => {
-    setOffset(0)
-  }, [enabled])
-
-  const filteredItems = useMemo(() => {
-    if (enabled === 'all') return items
-    return items.filter((item) => (enabled === 'true') === item.enabled)
-  }, [items, enabled])
+  }, [offset, limit, search, enabled])
 
   useEffect(() => {
     setOffset(0)
@@ -303,16 +299,21 @@ export default function TokensPage() {
             </Button>
           </CardContent>
         </Card>
-      ) : filteredItems.length === 0 ? (
-        Boolean(search.trim()) ? (
+      ) : items.length === 0 ? (
+        search.trim() || enabled !== 'all' ? (
           <EmptyState
             icon={SearchX}
             title="没有匹配的令牌"
             description="未找到符合搜索条件的令牌，尝试更换关键词。"
             action={{
-              label: '清空搜索',
+              label: '清除筛选',
               variant: 'outline',
-              onClick: () => setSearch(''),
+              onClick: () => {
+                setSearch('')
+                setSearchInput('')
+                setEnabled('all')
+                setOffset(0)
+              },
             }}
             secondaryAction={{
               label: '新建令牌',
@@ -348,7 +349,7 @@ export default function TokensPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredItems.map((key) => (
+                  {items.map((key) => (
                     <tr key={key.id} className="border-b last:border-b-0 hover:bg-muted/30">
                       <td className="max-w-[14rem] px-4 py-2.5">
                         <div className="truncate font-medium" title={key.name}>
@@ -399,7 +400,7 @@ export default function TokensPage() {
 
           {/* 移动端卡片列表：首行名称+开关，次行通知渠道，底行令牌与操作按钮同行 */}
           <div className="divide-y md:hidden">
-            {filteredItems.map((key) => (
+            {items.map((key) => (
               <div key={key.id} className="px-3 py-2.5">
                 <div className="flex items-start gap-2.5">
                   <div className="min-w-0 flex-1">

@@ -159,3 +159,8 @@ export function toWallClockString(w: ZonedWallClock, withSeconds = false): strin
   const base = `${w.year}-${pad(w.month)}-${pad(w.day)}T${pad(w.hour)}:${pad(w.minute)}`
   return withSeconds ? `${base}:00` : base
 }
+
+/** 站点时区下若干分钟后的墙上时间字符串（带秒），用于示例数据。 */
+export function wallClockAfter(timeZone: string, minutes: number): string {
+  return toWallClockString(nowInZone(timeZone, minutes), true)
+}

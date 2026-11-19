@@ -104,7 +104,7 @@ JWT 有效期为 72 小时。改密码后旧 JWT 仍然有效直到过期——�
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| `GET` | `/api/tokens` | 列表，支持 `search` 与分页（默认 10 条，上限 100） |
+| `GET` | `/api/tokens` | 列表，支持 `search`、`enabled` 与分页（默认 10 条，上限 100） |
 | `POST` | `/api/tokens` | 新建，返回明文 |
 | `GET` | `/api/tokens/:id` | 详情 |
 | `GET` | `/api/tokens/:id/plaintext` | 取回明文 |
