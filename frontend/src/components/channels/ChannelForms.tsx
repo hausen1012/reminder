@@ -63,9 +63,9 @@ function toSMTPSecurityMode(v: string): SMTPSecurityMode {
 }
 
 const CONNECTION_LABEL: Record<SMTPSecurityMode, string> = {
-  starttls: '推荐：加密连接（常见邮箱）',
-  implicit_tls: '465 专用加密连接',
-  plain: '不加密连接（仅特殊服务器）',
+  starttls: 'STARTTLS (587)',
+  implicit_tls: 'SSL / TLS (465)',
+  plain: '无加密 (25)',
 }
 
 function getSecurityMode(config: Record<string, unknown>): SMTPSecurityMode {
@@ -303,7 +303,7 @@ export function WebhookForm({ config, onChange, isEdit }: SubFormProps) {
       </div>
 
       <div className="space-y-2">
-        <Label>Authorization（可选，加密存储）</Label>
+        <Label>Authorization</Label>
         <Input
           type="password"
           placeholder={isEdit && hasOriginalAuth ? '留空表示不修改' : '例如：Bearer xxx 或 Basic xxx'}
@@ -321,7 +321,7 @@ export function WebhookForm({ config, onChange, isEdit }: SubFormProps) {
       </div>
 
       <div className="space-y-2">
-        <Label>自定义 Headers（每行一个，格式 key: value）</Label>
+        <Label>自定义 Headers</Label>
         <Textarea
           rows={3}
           placeholder={'X-Source: reminder\nX-Tag: prod'}
@@ -344,7 +344,7 @@ export function WebhookForm({ config, onChange, isEdit }: SubFormProps) {
             />
           </div>
           <div className="space-y-2">
-            <Label>Body 模板（支持 {'{{title}}'} {'{{content}}'} 等占位）</Label>
+            <Label>Body 模板</Label>
             <Textarea
               rows={5}
               placeholder={'{\n  "title": "{{title}}",\n  "content": "{{content}}"\n}'}
@@ -357,7 +357,7 @@ export function WebhookForm({ config, onChange, isEdit }: SubFormProps) {
 
       {method === 'GET' && (
         <div className="space-y-2">
-          <Label>Query 模板（每行一个，格式 key: 值模板）</Label>
+          <Label>Query 模板</Label>
           <Textarea
             rows={3}
             placeholder={'text: {{title}} {{content}}\ntag: reminder'}

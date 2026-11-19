@@ -30,7 +30,7 @@ import {
 import { formatReminderDetail } from '@/lib/utils'
 import { formatInZone, formatNextFireInZone } from '@/lib/datetime'
 import { useSiteTimezone } from '@/contexts/ConfigContext'
-import { SOURCE_BADGE_CLASS, sourceLabel } from '@/lib/constants'
+import { sourceLabel } from '@/lib/constants'
 import { SortIcon } from '@/components/common/SortIcon'
 import { PageHeader } from '@/components/common/PageHeader'
 import { FilterToolbar } from '@/components/common/FilterToolbar'
@@ -317,12 +317,11 @@ export default function RemindersPage() {
                       />
                     </th>
                     <th className="px-4 py-2.5 w-[12rem]">标题</th>
-                    <th className="px-4 py-2.5 w-16">类型</th>
-                    <th className="px-4 py-2.5 w-[12rem]">时间</th>
+                    <th className="px-4 py-2.5 w-[13rem]">规则</th>
                     <th className="px-4 py-2.5 w-40">下次触发</th>
                     <th className="px-4 py-2.5 w-[10rem]">通知渠道</th>
                     <th className="px-4 py-2.5 w-16 text-center">启用</th>
-                    <th className="px-4 py-2.5 w-16 pl-16">来源</th>
+                    <th className="px-4 py-2.5 w-16 text-center">来源</th>
                     <th className="px-4 py-2.5 w-44 whitespace-nowrap cursor-pointer select-none" onClick={() => toggleSort('created_at')}>
                       创建时间<SortIcon active={sortBy === 'created_at'} direction={sortOrder} />
                     </th>
@@ -350,13 +349,13 @@ export default function RemindersPage() {
                             </div>
                           )}
                         </td>
-                        <td className="px-4 py-2.5">
-                          {TYPE_LABEL[r.schedule_type] ?? r.schedule_type}
-                        </td>
-                        <td className="px-4 py-2.5 text-xs text-muted-foreground max-w-[16rem]">
-                          <span className="truncate block" title={formatReminderDetail(r)}>
+                        <td className="px-4 py-2.5 text-xs text-muted-foreground max-w-[13rem]">
+                          <div className="truncate font-medium text-foreground" title={formatReminderDetail(r)}>
                             {formatReminderDetail(r)}
-                          </span>
+                          </div>
+                          <div className="text-[11px] text-muted-foreground/80">
+                            {TYPE_LABEL[r.schedule_type] ?? r.schedule_type}
+                          </div>
                         </td>
                         <td className="px-4 py-2.5 text-xs whitespace-nowrap">
                           {r.enabled ? formatNextFireInZone(r.next_fire_at, tz) : '—'}
@@ -373,13 +372,8 @@ export default function RemindersPage() {
                         <td className="px-4 py-2.5 text-center">
                           <Switch checked={r.enabled} onCheckedChange={() => handleToggle(r)} />
                         </td>
-                        <td className="px-4 py-2.5 pl-14">
-                          <span
-                            className={
-                              'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ' +
-                              (SOURCE_BADGE_CLASS[r.source] ?? 'bg-muted text-muted-foreground')
-                            }
-                          >
+                        <td className="px-4 py-2.5 text-center">
+                          <span className="inline-block rounded px-1.5 py-0.5 text-[11px] text-muted-foreground bg-muted font-normal">
                             {sourceLabel(r.source)}
                           </span>
                         </td>
@@ -456,12 +450,7 @@ export default function RemindersPage() {
                           </span>
                           <span className="shrink-0">·</span>
                           <span className="shrink-0">{TYPE_LABEL[r.schedule_type] ?? r.schedule_type}</span>
-                          <span
-                            className={
-                              'inline-flex shrink-0 items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium ' +
-                              (SOURCE_BADGE_CLASS[r.source] ?? 'bg-muted text-muted-foreground')
-                            }
-                          >
+                          <span className="inline-flex shrink-0 items-center rounded px-1.5 py-0.5 text-[10px] text-muted-foreground bg-muted">
                             {sourceLabel(r.source)}
                           </span>
                         </div>

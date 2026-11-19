@@ -165,17 +165,17 @@ describe('SMTPForm', () => {
 
   it('未指定 security_mode 时默认为 starttls', () => {
     render(<Controlled form={SMTPForm} />)
-    expect(screen.getByText('推荐：加密连接（常见邮箱）')).toBeInTheDocument()
+    expect(screen.getByText('STARTTLS (587)')).toBeInTheDocument()
   })
 
   it('显式 implicit_tls 时显示对应连接方式', () => {
     render(<Controlled form={SMTPForm} initial={{ security_mode: 'implicit_tls' }} />)
-    expect(screen.getByText('465 专用加密连接')).toBeInTheDocument()
+    expect(screen.getByText('SSL / TLS (465)')).toBeInTheDocument()
   })
 
   it('显式 plain 时显示对应连接方式', () => {
     render(<Controlled form={SMTPForm} initial={{ security_mode: 'plain' }} />)
-    expect(screen.getByText('不加密连接（仅特殊服务器）')).toBeInTheDocument()
+    expect(screen.getByText('无加密 (25)')).toBeInTheDocument()
   })
 })
 

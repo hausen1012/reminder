@@ -34,18 +34,17 @@ async function copy(text: string, toast: ReturnType<typeof useToast>['toast']) {
   }
 }
 
-function CurlBlock({ curl, label }: { curl: string; label: string }) {
+function CurlBlock({ curl }: { curl: string }) {
   const { toast } = useToast()
   return (
-    <div className="relative">
-      <div className="mb-2 text-xs text-muted-foreground">{label}</div>
-      <pre className="overflow-x-auto whitespace-pre-wrap break-all rounded-lg border bg-slate-950 p-3 text-xs leading-relaxed text-slate-50 sm:p-4">
+    <div className="relative mt-2">
+      <pre className="overflow-x-auto whitespace-pre-wrap break-all rounded-lg border bg-slate-950 p-3 pr-10 text-xs leading-relaxed text-slate-50 sm:p-4 sm:pr-12">
         <code>{curl}</code>
       </pre>
       <Button
         variant="ghost"
         size="icon"
-        className="absolute right-1 top-7 h-7 w-7 text-slate-400 hover:text-slate-50 sm:right-2 sm:top-8"
+        className="absolute right-1 top-1.5 h-7 w-7 text-slate-400 hover:text-slate-50 sm:right-2 sm:top-2"
         onClick={() => copy(curl, toast)}
         title="复制 curl 命令"
       >
@@ -131,28 +130,16 @@ export function CurlUsageDialog({ token, open, onClose }: Props) {
             <TabsTrigger value="cron" className="text-xs sm:text-sm px-1 sm:px-3 py-1.5">CRON</TabsTrigger>
           </TabsList>
           <TabsContent value="simple">
-            <CurlBlock
-              curl={curlSimple}
-              label="仅包含标题、内容和时间，适合快速测试。"
-            />
+            <CurlBlock curl={curlSimple} />
           </TabsContent>
           <TabsContent value="once">
-            <CurlBlock
-              curl={curlOnce}
-              label="完整的单次提醒，可指定时区、通知渠道等。"
-            />
+            <CurlBlock curl={curlOnce} />
           </TabsContent>
           <TabsContent value="interval">
-            <CurlBlock
-              curl={curlInterval}
-              label="每小时重复提醒，支持自定义间隔和单位。"
-            />
+            <CurlBlock curl={curlInterval} />
           </TabsContent>
           <TabsContent value="cron">
-            <CurlBlock
-              curl={curlCron}
-              label="使用 Cron 表达式，每小时执行一次。"
-            />
+            <CurlBlock curl={curlCron} />
           </TabsContent>
         </Tabs>
       </DialogContent>

@@ -45,13 +45,6 @@ const STATUS_LABEL: Record<string, string> = {
   failed: '执行失败',
 }
 
-const KIND_DESC: Record<string, string> = {
-  create_channel: '确认后会在「通知渠道」页新增该渠道',
-  create_reminder: '确认后会在「提醒」页新增该提醒',
-  update_reminder: '确认后会覆盖该提醒的对应字段',
-  delete_reminder: '确认后该提醒会被永久删除',
-}
-
 function loadHistory(): AIChatMessage[] {
   try {
     const raw = sessionStorage.getItem(STORAGE_KEY)
@@ -491,9 +484,11 @@ function ActionCard({
           <p className="mt-1 truncate text-sm" title={action.summary}>
             {action.summary}
           </p>
-          <p className="mt-0.5 text-[11px] text-muted-foreground break-all">
-            {action.status === 'failed' && action.error ? action.error : KIND_DESC[action.kind] ?? ''}
-          </p>
+          {action.status === 'failed' && action.error && (
+            <p className="mt-0.5 text-[11px] text-destructive break-all">
+              {action.error}
+            </p>
+          )}
         </div>
         {pending && (
           <div className="flex shrink-0 gap-1">

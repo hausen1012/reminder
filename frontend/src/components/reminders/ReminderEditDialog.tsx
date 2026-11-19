@@ -1,6 +1,5 @@
 // ReminderEditDialog 是提醒的新建 / 编辑表单。
 import { useEffect, useState, type FormEvent } from 'react'
-import { Info } from 'lucide-react'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   Dialog,
@@ -22,7 +21,14 @@ import { ScheduleForm, type ScheduleValue } from './ScheduleForm'
 import { createReminder, extractApiError, listChannels, testReminderDryRun, updateReminder } from '@/lib/api'
 import type { Channel, Reminder, ReminderInput } from '@/types'
 import { toContentFormat } from '@/types'
-import { cn } from '@/lib/utils'
+
+const INSERT_PLACEHOLDERS = [
+  { label: '日期', code: '{{now_date}}' },
+  { label: '时间', code: '{{now_time}}' },
+  { label: '农历', code: '{{lunar_date}}' },
+  { label: '星期', code: '{{weekday}}' },
+  { label: '标题', code: '{{title}}' },
+] as const
 
 interface Props {
   reminder: Reminder | null
@@ -59,8 +65,6 @@ export function ReminderEditDialog({ reminder, open, onClose, onSaved }: Props) 
   const [saving, setSaving] = useState(false)
   const [testing, setTesting] = useState(false)
   const [channelOpen, setChannelOpen] = useState(false)
-  // 占位符帮助面板：点击图标开关，移动端没有 hover 只能靠点击
-  const [helpOpen, setHelpOpen] = useState(false)
   const [channels, setChannels] = useState<Channel[]>([])
   const { toast } = useToast()
   const siteTimezone = tz
@@ -186,56 +190,7 @@ export function ReminderEditDialog({ reminder, open, onClose, onSaved }: Props) 
           </div>
           <div className="space-y-2">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="flex items-center gap-1.5">
-                <Label htmlFor="r-content">内容</Label>
-                <div className="group relative inline-flex">
-                  <button
-                    type="button"
-                    onClick={() => setHelpOpen((v) => !v)}
-                    className="rounded-sm p-0.5 text-muted-foreground transition-colors hover:text-foreground"
-                    aria-label="查看可用占位符"
-                    aria-expanded={helpOpen}
-                  >
-                    <Info className="h-3.5 w-3.5" />
-                  </button>
-                  {helpOpen && (
-                    <div className="fixed inset-0 z-40" onClick={() => setHelpOpen(false)} />
-                  )}
-                  <div
-                    className={cn(
-                      'absolute left-0 top-full z-50 mt-1 w-72 max-w-[calc(100vw-3rem)] rounded-md border bg-popover p-3 text-xs text-popover-foreground shadow-md',
-                      'md:left-full md:top-1/2 md:-translate-y-1/2 md:ml-2 md:mt-0',
-                      helpOpen ? 'block' : 'hidden md:group-hover:block',
-                    )}
-                  >
-                    <div className="space-y-1.5">
-                      <p className="font-medium mb-1">可用占位符</p>
-                      <div>
-                        <p className="text-[10px] text-muted-foreground/80 mb-0.5">── 当前时间 ──</p>
-                        <p><code>{'{{now}}'}</code> 当前日期时间</p>
-                        <p><code>{'{{now_date}}'}</code> 当前日期</p>
-                        <p><code>{'{{now_time}}'}</code> 当前时间</p>
-                        <p><code>{'{{lunar_date}}'}</code> 当前农历日期</p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] text-muted-foreground/80 mb-0.5">── 触发时间 ──</p>
-                        <p><code>{'{{fire_at}}'}</code> 计划触发日期时间</p>
-                        <p><code>{'{{trigger_date}}'}</code> 触发日期</p>
-                        <p><code>{'{{trigger_time}}'}</code> 触发时间</p>
-                        <p><code>{'{{weekday}}'}</code> 触发日星期几</p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] text-muted-foreground/80 mb-0.5">── 提醒信息 ──</p>
-                        <p><code>{'{{title}}'}</code> 提醒标题</p>
-                        <p><code>{'{{content}}'}</code> 提醒内容</p>
-                        <p><code>{'{{reminder_id}}'}</code> 提醒 ID</p>
-                        <p><code>{'{{reminder_source}}'}</code> 来源</p>
-                      </div>
-                      <p className="text-[10px] text-muted-foreground/80 pt-1 border-t border-border/50">启用确认提醒后额外支持 <code>{'{{confirm_url}}'}</code></p>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <Label htmlFor="r-content">内容</Label>
               <Tabs
                 value={input.content_format || 'text'}
                 onValueChange={(v) => patch('content_format', toContentFormat(v))}
@@ -252,8 +207,23 @@ export function ReminderEditDialog({ reminder, open, onClose, onSaved }: Props) 
               value={input.content}
               onChange={(e) => patch('content', e.target.value)}
               rows={3}
-              placeholder={'例如：今天是 {{now_date}}，{{lunar_date}}'}
+              placeholder="输入提醒详细内容…"
             />
+            <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+              <span className="text-[11px] text-muted-foreground select-none">插入变量：</span>
+              {INSERT_PLACEHOLDERS.map((p) => (
+                <button
+                  key={p.code}
+                  type="button"
+                  onClick={() => patch('content', (input.content ? input.content + ' ' : '') + p.code)}
+                  className="inline-flex items-center rounded border border-border/60 bg-muted/40 px-1.5 py-0.5 text-[11px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                  title={`点击插入 ${p.code}`}
+                >
+                  {p.label}
+                  <span className="ml-1 text-[10px] text-muted-foreground/70">{p.code}</span>
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className="space-y-1">
