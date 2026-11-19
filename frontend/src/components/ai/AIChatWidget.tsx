@@ -337,7 +337,7 @@ export function AIChatWidget({ onEnabledChange }: AIChatWidgetProps = {}) {
               >
                 <div
                   className={cn(
-                    'max-w-[85%] whitespace-pre-wrap rounded-lg px-3 py-2 text-sm',
+                    'max-w-[85%] whitespace-pre-wrap break-all rounded-lg px-3 py-2 text-sm',
                     m.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-secondary',
                   )}
                 >
@@ -491,7 +491,7 @@ function ActionCard({
           <p className="mt-1 truncate text-sm" title={action.summary}>
             {action.summary}
           </p>
-          <p className="mt-0.5 text-[11px] text-muted-foreground">
+          <p className="mt-0.5 text-[11px] text-muted-foreground break-all">
             {action.status === 'failed' && action.error ? action.error : KIND_DESC[action.kind] ?? ''}
           </p>
         </div>
