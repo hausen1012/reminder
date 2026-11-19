@@ -49,7 +49,8 @@ export function CalendarPopover({ date, hour: initHour, minute: initMin, initial
   // "今天/现在"必须按站点时区取：浏览器时区可能和站点时区不同，
   // 直接用 new Date() 会在跨时区的日子里选错日期。
   const tz = useSiteTimezone()
-  const now = useMemo(() => nowInZone(tz), [tz])
+  // 默认时间取当前时间的整点 + 1 小时
+  const defaultTime = useMemo(() => nowInZone(tz, 60), [tz])
   const popoverRef = useRef<HTMLDivElement>(null)
   const [position, setPosition] = useState<{ top: number; left: number } | null>(null)
   const hourListRef = useRef<HTMLDivElement>(null)
@@ -59,17 +60,17 @@ export function CalendarPopover({ date, hour: initHour, minute: initMin, initial
   const [showLunar, setShowLunar] = useState(initialCalendar === 'lunar')
   const [solarYear, setSolarYear] = useState(() => {
     if (date) return new Date(date).getFullYear()
-    return now.year
+    return defaultTime.year
   })
   const [solarMonth, setSolarMonth] = useState(() => {
     if (date) return new Date(date).getMonth() + 1
-    return now.month
+    return defaultTime.month
   })
   const [selectedDay, setSelectedDay] = useState<number | null>(() => {
     if (date) return new Date(date).getDate()
-    return now.day
+    return defaultTime.day
   })
-  const [hour, setHour] = useState(initHour ?? now.hour)
+  const [hour, setHour] = useState(initHour ?? defaultTime.hour)
   const [minute, setMinute] = useState(initMin ?? 0)
   const [timePanelOpen, setTimePanelOpen] = useState(false)
 
@@ -276,8 +277,8 @@ export function CalendarPopover({ date, hour: initHour, minute: initMin, initial
   }
 
   function goToday() {
-    // same as 上面的 "今天"：按站点时区取当前墙上时间整点
-    const n = nowInZone(tz)
+    // same as 上面的 "今天"：按站点时区取当前墙上时间整点 + 1
+    const n = nowInZone(tz, 60)
     setSolarYear(n.year)
     setSolarMonth(n.month)
     setSelectedDay(n.day)

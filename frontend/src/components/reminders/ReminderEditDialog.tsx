@@ -32,9 +32,9 @@ interface Props {
 }
 
 function defaultInput(siteTimezone: string): ReminderInput {
-  // 默认时间 = 站点时区下的当前时间整点
-  const now = nowInZone(siteTimezone)
-  const at = toWallClockString({ ...now, minute: 0 })
+  // 默认时间 = 站点时区下的当前时间整点 + 1 小时
+  const nextHour = nowInZone(siteTimezone, 60)
+  const at = toWallClockString({ ...nextHour, minute: 0 })
   return {
     title: '',
     content: '',
