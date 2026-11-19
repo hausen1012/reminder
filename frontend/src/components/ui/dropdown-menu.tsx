@@ -39,7 +39,7 @@ const DropdownMenuItem = React.forwardRef<
 ))
 DropdownMenuItem.displayName = DropdownMenuPrimitive.Item.displayName
 
-// 多选下拉里的可勾选项：左侧固定槽位放勾选标记，未选中时保持占位避免文字跳动
+// 多选下拉里的可勾选项：右侧固定槽位放勾选标记，未选中时保持占位保证边距一致
 const DropdownMenuCheckboxItem = React.forwardRef<
   React.ElementRef<typeof DropdownMenuPrimitive.CheckboxItem>,
   React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.CheckboxItem>
@@ -48,17 +48,19 @@ const DropdownMenuCheckboxItem = React.forwardRef<
     ref={ref}
     checked={checked}
     className={cn(
-      'relative flex cursor-default select-none items-center gap-2 rounded-sm py-2 pl-2.5 pr-2.5 text-sm outline-none transition-colors focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50',
+      'relative flex cursor-default select-none items-center justify-between gap-2 rounded-sm py-2 px-2.5 text-sm outline-none transition-colors focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50',
       className,
     )}
     {...props}
   >
-    <span className="flex h-4 w-4 shrink-0 items-center justify-center">
+    <div className="flex min-w-0 flex-1 items-center gap-2">
+      {children}
+    </div>
+    <span className="ml-auto flex h-4 w-4 shrink-0 items-center justify-center text-primary">
       <DropdownMenuPrimitive.ItemIndicator>
         <Check className="h-4 w-4" />
       </DropdownMenuPrimitive.ItemIndicator>
     </span>
-    {children}
   </DropdownMenuPrimitive.CheckboxItem>
 ))
 DropdownMenuCheckboxItem.displayName = DropdownMenuPrimitive.CheckboxItem.displayName

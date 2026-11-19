@@ -67,11 +67,6 @@ export interface ChannelInput {
   config: Record<string, unknown>
 }
 
-export interface ChannelTestResult {
-  success: boolean
-  error?: string
-}
-
 export interface ChannelListResp {
   items: Channel[]
   total: number

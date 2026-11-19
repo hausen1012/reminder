@@ -47,7 +47,7 @@ export function ChannelMultiSelect({
   }
 
   return (
-    <DropdownMenu open={open} onOpenChange={onOpenChange} modal={false}>
+    <DropdownMenu open={open} onOpenChange={onOpenChange}>
       <DropdownMenuTrigger asChild>
         <button
           type="button"
@@ -71,7 +71,7 @@ export function ChannelMultiSelect({
             onCheckedChange={() => toggleChannel(id)}
           >
             <span className="truncate">#{id}</span>
-            <span className="ml-auto shrink-0 text-xs text-muted-foreground">未知</span>
+            <span className="shrink-0 text-xs text-muted-foreground">未知</span>
           </DropdownMenuCheckboxItem>
         ))}
         {channels.map((ch) => (
@@ -82,7 +82,7 @@ export function ChannelMultiSelect({
             onCheckedChange={() => toggleChannel(ch.id)}
           >
             <span className="truncate">{ch.name}</span>
-            <span className="ml-auto shrink-0 text-xs text-muted-foreground">{labelOf(specs, ch.type)}</span>
+            <span className="shrink-0 text-xs text-muted-foreground">{labelOf(specs, ch.type)}</span>
           </DropdownMenuCheckboxItem>
         ))}
       </DropdownMenuContent>
