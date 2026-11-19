@@ -1449,6 +1449,12 @@ func TestRenderMarkdownToHTML(t *testing.T) {
 	if got := renderMarkdownToHTML(""); strings.TrimSpace(got) != "" {
 		t.Fatalf("空输入应产出空串，实际 %q", got)
 	}
+
+	// 软换行应转为 <br>
+	wrapped := renderMarkdownToHTML("第一行\n第二行")
+	if !strings.Contains(wrapped, "<br") {
+		t.Fatalf("软换行应转换为 <br>，实际 %q", wrapped)
+	}
 }
 
 // resolveSMTPSecurityMode 的补充用例：逐一确认每个分支的返回值。

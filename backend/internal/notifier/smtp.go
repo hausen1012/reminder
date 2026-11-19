@@ -14,6 +14,8 @@ import (
 	"time"
 
 	"github.com/yuin/goldmark"
+	"github.com/yuin/goldmark/extension"
+	gmhtml "github.com/yuin/goldmark/renderer/html"
 )
 
 // SMTPConfig 是 Channel.Config 解密后对应的 SMTP 参数 schema。
@@ -163,7 +165,11 @@ func buildMIME(cfg SMTPConfig, msg Message) string {
 	switch msg.Format {
 	case "html":
 		contentType = "text/html; charset=UTF-8"
-		body = msg.Body
+		if strings.Contains(strings.ToLower(msg.Body), "<html") {
+			body = msg.Body
+		} else {
+			body = `<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; line-height: 1.6; white-space: pre-wrap; word-break: break-word; color: #1f2937;">` + msg.Body + `</div>`
+		}
 	case "markdown":
 		contentType = "text/html; charset=UTF-8"
 		body = renderMarkdownToHTML(msg.Body)
@@ -184,12 +190,21 @@ func buildMIME(cfg SMTPConfig, msg Message) string {
 	}, "\r\n")
 }
 
-var mdRenderer = goldmark.New()
+var mdRenderer = goldmark.New(
+	goldmark.WithExtensions(extension.GFM),
+	goldmark.WithRendererOptions(
+		gmhtml.WithUnsafe(),
+		gmhtml.WithHardWraps(),
+	),
+)
 
 func renderMarkdownToHTML(src string) string {
+	if strings.TrimSpace(src) == "" {
+		return ""
+	}
 	var buf bytes.Buffer
 	if err := mdRenderer.Convert([]byte(src), &buf); err != nil {
 		return src // 降级返回原文
 	}
-	return buf.String()
+	return `<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; line-height: 1.6; color: #1f2937;">` + buf.String() + `</div>`
 }

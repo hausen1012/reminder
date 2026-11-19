@@ -76,7 +76,7 @@ export function ReminderEditDialog({ reminder, open, onClose, onSaved }: Props) 
       setInput({
         title: reminder.title,
         content: reminder.content,
-        content_format: reminder.content_format || 'text',
+        content_format: reminder.content_format === 'html' ? 'markdown' : (reminder.content_format || 'text'),
         calendar: reminder.calendar,
         schedule_type: reminder.schedule_type,
         schedule_spec: reminder.schedule_spec,
@@ -244,7 +244,6 @@ export function ReminderEditDialog({ reminder, open, onClose, onSaved }: Props) 
                 <TabsList className="h-8">
                   <TabsTrigger value="text" className="text-xs px-3">纯文本</TabsTrigger>
                   <TabsTrigger value="markdown" className="text-xs px-3">Markdown</TabsTrigger>
-                  <TabsTrigger value="html" className="text-xs px-3">HTML</TabsTrigger>
                 </TabsList>
               </Tabs>
             </div>
