@@ -418,7 +418,7 @@ export default function RemindersPage() {
                     <Checkbox
                       checked={selectedIds.has(r.id)}
                       onCheckedChange={() => toggleSelect(r.id)}
-                      className="mt-1 shrink-0"
+                      className="mt-0.5 shrink-0"
                       aria-label={`选择提醒 ${r.title}`}
                     />
                     <div className="min-w-0 flex-1">

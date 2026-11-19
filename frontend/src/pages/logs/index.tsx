@@ -21,6 +21,7 @@ import {
   Share2,
   Inbox,
   SearchX,
+  CornerDownRight,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -448,8 +449,11 @@ export default function LogsPage() {
                         return (
                         <tr key={sub.id} className="border-b bg-muted/20 text-xs">
                           <td />
-                          <td className="px-4 py-2 pl-12 text-muted-foreground">
-                            重发 #{sub.retry_round}
+                          <td className="px-4 py-2 text-muted-foreground">
+                            <div className="flex items-center gap-1.5 pl-2">
+                              <CornerDownRight className="h-3.5 w-3.5 text-muted-foreground/60 shrink-0" />
+                              <span>重发 #{sub.retry_round}</span>
+                            </div>
                           </td>
                           <td className="px-4 py-2">{formatInZone(sub.fired_at, tz)}</td>
                           <td className="px-4 py-2">
@@ -488,7 +492,7 @@ export default function LogsPage() {
                       <Checkbox
                         checked={selectedIds.has(main.id)}
                         onCheckedChange={() => toggleSelect(main.id)}
-                        className="mt-1 shrink-0"
+                        className="mt-0.5 shrink-0"
                         aria-label={`选择日志 ${main.reminder_title || main.title}`}
                       />
                       <div className="min-w-0 flex-1">
