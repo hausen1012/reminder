@@ -94,8 +94,6 @@ export default function Profile() {
   // 用户点开链接的通常是手机，所以这个地址必须是手机能访问到的，不能是 localhost。
   const [siteUrl, setSiteUrl] = useState('')
   const [saving, setSaving] = useState(false)
-  const [savingTz, setSavingTz] = useState(false)
-  const [savingSiteUrl, setSavingSiteUrl] = useState(false)
 
   useEffect(() => {
     setAppName(config.app_name ?? '')
@@ -104,48 +102,21 @@ export default function Profile() {
     setSiteUrl(config.site_url ?? '')
   }, [config])
 
-  async function handleBrandSave(e: FormEvent) {
+  async function handleGeneralSave(e: FormEvent) {
     e.preventDefault()
     setSaving(true)
     try {
       await updateConfig({
         app_name: appName,
         logo_svg: logoSvg,
+        site_url: siteUrl,
+        timezone,
       })
-      toast({ title: '保存成功' })
-    } catch {
-      toast({ title: '保存失败', variant: 'destructive' })
+      toast({ title: '基础设置已保存' })
+    } catch (err) {
+      toast({ title: '保存失败', description: extractApiError(err), variant: 'destructive' })
     } finally {
       setSaving(false)
-    }
-  }
-
-  async function handleSiteUrlSave(e: FormEvent) {
-    e.preventDefault()
-    setSavingSiteUrl(true)
-    try {
-      await updateConfig({ site_url: siteUrl })
-      toast({
-        title: '站点地址已更新',
-        description: '之后发送的提醒会用新地址拼接确认链接',
-      })
-    } catch (err) {
-      toast({ title: '保存失败', description: extractApiError(err), variant: 'destructive' })
-    } finally {
-      setSavingSiteUrl(false)
-    }
-  }
-
-  async function handleTimezoneSave(e: FormEvent) {
-    e.preventDefault()
-    setSavingTz(true)
-    try {
-      await updateConfig({ timezone })
-      toast({ title: '时区已更新', description: '所有提醒将按新时区重新计算下次触发时间' })
-    } catch (err) {
-      toast({ title: '保存失败', description: extractApiError(err), variant: 'destructive' })
-    } finally {
-      setSavingTz(false)
     }
   }
 
@@ -304,116 +275,82 @@ export default function Profile() {
 
               {/* 基础设置 */}
               {section.id === 'general' && (
-                <div className="space-y-6">
-                  {/* 站点信息 */}
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-base font-medium">站点信息</CardTitle>
-                      <CardDescription>配置站点名称和浏览器标签图标</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <form onSubmit={handleBrandSave} className="space-y-5 max-w-xl">
-                        <div className="space-y-2">
-                          <Label htmlFor="app-name">站点名称</Label>
-                          <Input id="app-name" value={appName} onChange={(e) => setAppName(e.target.value)} placeholder="Reminder" />
-                        </div>
-                        <div className="space-y-2">
-                          <Label>浏览器图标</Label>
-                          <div className="flex items-center gap-3">
-                            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border bg-background">
-                              {logoSvg ? (
-                                <AppLogo svg={logoSvg} className="h-8 w-8 object-contain" alt="图标" />
-                              ) : (
-                                <span className="text-xs text-muted-foreground">无</span>
-                              )}
-                            </div>
-                            <div className="flex gap-2">
-                              <Button type="button" variant="outline" size="sm" onClick={() => document.getElementById('logo-upload')?.click()}>
-                                上传
-                              </Button>
-                              {logoSvg && (
-                                <Button type="button" variant="outline" size="sm" onClick={clearLogoSvg}>
-                                  清除
-                                </Button>
-                              )}
-                              <input id="logo-upload" type="file" accept="image/*,.svg" className="hidden" onChange={handleLogoUpload} />
-                            </div>
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base font-medium">基础设置</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <form onSubmit={handleGeneralSave} className="space-y-6 max-w-xl">
+                      <div className="space-y-2">
+                        <Label htmlFor="app-name">站点名称</Label>
+                        <Input id="app-name" value={appName} onChange={(e) => setAppName(e.target.value)} placeholder="Reminder" />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>浏览器图标</Label>
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border bg-background">
+                            {logoSvg ? (
+                              <AppLogo svg={logoSvg} className="h-8 w-8 object-contain" alt="图标" />
+                            ) : (
+                              <span className="text-xs text-muted-foreground">无</span>
+                            )}
                           </div>
-                          <p className="text-xs text-muted-foreground">支持 PNG、JPG、SVG，将显示在浏览器标签和侧边栏</p>
+                          <div className="flex gap-2">
+                            <Button type="button" variant="outline" size="sm" onClick={() => document.getElementById('logo-upload')?.click()}>
+                              上传
+                            </Button>
+                            {logoSvg && (
+                              <Button type="button" variant="outline" size="sm" onClick={clearLogoSvg}>
+                                清除
+                              </Button>
+                            )}
+                            <input id="logo-upload" type="file" accept="image/*,.svg" className="hidden" onChange={handleLogoUpload} />
+                          </div>
                         </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="site-url">对外访问地址</Label>
+                        <Input
+                          id="site-url"
+                          value={siteUrl}
+                          onChange={(e) => setSiteUrl(e.target.value)}
+                          placeholder="https://reminder.example.com"
+                          inputMode="url"
+                        />
+                        {siteUrl && (
+                          <p className="text-xs text-muted-foreground break-all">
+                            确认链接预览：{siteUrl.replace(/\/+$/, '')}/c/example-token
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="site-tz">站点时区</Label>
+                        <Select value={timezone} onValueChange={setTimezone}>
+                          <SelectTrigger id="site-tz">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {COMMON_TIMEZONES.map((tz) => (
+                              <SelectItem key={tz} value={tz}>
+                                {tz}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="pt-2">
                         <Button type="submit" size="sm" disabled={saving}>
-                          {saving ? '保存中...' : '保存'}
+                          {saving && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
+                          {saving ? '保存中…' : '保存设置'}
                         </Button>
-                      </form>
-                    </CardContent>
-                  </Card>
-
-                  {/* 站点地址 */}
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-base font-medium">站点地址</CardTitle>
-                      <CardDescription>确认链接使用这个地址，必须能在手机上打开</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <form onSubmit={handleSiteUrlSave} className="space-y-5 max-w-xl">
-                        <div className="space-y-2">
-                          <Label htmlFor="site-url">对外访问地址</Label>
-                          <Input
-                            id="site-url"
-                            value={siteUrl}
-                            onChange={(e) => setSiteUrl(e.target.value)}
-                            placeholder="https://reminder.example.com"
-                            inputMode="url"
-                          />
-                          <p className="text-xs text-muted-foreground">
-                            用于生成确认提醒的访问链接，请填写设备可访问的地址或域名。
-                          </p>
-                          {siteUrl && (
-                            <p className="text-xs text-muted-foreground break-all">
-                              预览：{siteUrl.replace(/\/+$/, '')}/c/example-token
-                            </p>
-                          )}
-                        </div>
-                        <Button type="submit" size="sm" disabled={savingSiteUrl}>
-                          {savingSiteUrl ? '保存中...' : '保存'}
-                        </Button>
-                      </form>
-                    </CardContent>
-                  </Card>
-
-                  {/* 时区设置 */}
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-base font-medium">时区设置</CardTitle>
-                      <CardDescription>决定所有提醒的时间如何解释与展示</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <form onSubmit={handleTimezoneSave} className="space-y-5 max-w-xl">
-                        <div className="space-y-2">
-                          <Label htmlFor="site-tz">站点时区</Label>
-                          <Select value={timezone} onValueChange={setTimezone}>
-                            <SelectTrigger id="site-tz">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {COMMON_TIMEZONES.map((tz) => (
-                                <SelectItem key={tz} value={tz}>
-                                  {tz}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <p className="text-xs text-muted-foreground">
-                            所有提醒均按此时区计算，修改后立即生效。
-                          </p>
-                        </div>
-                        <Button type="submit" size="sm" disabled={savingTz}>
-                          {savingTz ? '保存中...' : '保存'}
-                        </Button>
-                      </form>
-                    </CardContent>
-                  </Card>
-                </div>
+                      </div>
+                    </form>
+                  </CardContent>
+                </Card>
               )}
 
               {/* AI 助手 */}

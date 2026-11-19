@@ -251,7 +251,7 @@ describe('WeComForm', () => {
 describe('WebhookForm', () => {
   it('默认 POST 时显示 Content-Type 与 Body 模板', () => {
     render(<Controlled form={WebhookForm} />)
-    expect(screen.getByText('请求方法')).toBeInTheDocument()
+    expect(screen.getByText('请求地址')).toBeInTheDocument()
     expect(screen.getByText('Content-Type')).toBeInTheDocument()
     expect(screen.getByText(/Body 模板/)).toBeInTheDocument()
     // GET 专属字段不显示

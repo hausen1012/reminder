@@ -2,6 +2,13 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
   Dialog,
   DialogContent,
   DialogFooter,
@@ -21,6 +28,7 @@ import { ScheduleForm, type ScheduleValue } from './ScheduleForm'
 import { createReminder, extractApiError, listChannels, testReminderDryRun, updateReminder } from '@/lib/api'
 import type { Channel, Reminder, ReminderInput } from '@/types'
 import { toContentFormat } from '@/types'
+import { cn } from '@/lib/utils'
 
 const INSERT_PLACEHOLDERS = [
   { label: '日期', code: '{{now_date}}' },
@@ -29,6 +37,14 @@ const INSERT_PLACEHOLDERS = [
   { label: '星期', code: '{{weekday}}' },
   { label: '标题', code: '{{title}}' },
 ] as const
+
+const RETRY_INTERVAL_PRESETS = [
+  { label: '30 分钟', sec: 1800 },
+  { label: '1 小时', sec: 3600 },
+  { label: '2 小时', sec: 7200 },
+] as const
+
+const RETRY_MAX_PRESETS = [1, 2, 3, 5] as const
 
 interface Props {
   reminder: Reminder | null
@@ -69,6 +85,15 @@ export function ReminderEditDialog({ reminder, open, onClose, onSaved }: Props) 
   const { toast } = useToast()
   const siteTimezone = tz
 
+  const initialSec = input.confirm_retry_interval_sec || 7200
+  const initialIsHour = initialSec >= 3600 && initialSec % 3600 === 0
+  const [intervalUnit, setIntervalUnit] = useState<'minute' | 'hour'>(initialIsHour ? 'hour' : 'minute')
+  const [intervalValue, setIntervalValue] = useState<number>(
+    initialIsHour ? initialSec / 3600 : Math.max(1, Math.round(initialSec / 60)),
+  )
+  const [customInterval, setCustomInterval] = useState(false)
+  const [customMax, setCustomMax] = useState(false)
+
   useEffect(() => {
     listChannels()
       .then(setChannels)
@@ -77,6 +102,12 @@ export function ReminderEditDialog({ reminder, open, onClose, onSaved }: Props) 
 
   useEffect(() => {
     if (reminder) {
+      const sec = reminder.confirm_retry_interval_sec || 7200
+      const isHour = sec >= 3600 && sec % 3600 === 0
+      setIntervalUnit(isHour ? 'hour' : 'minute')
+      setIntervalValue(isHour ? sec / 3600 : Math.max(1, Math.round(sec / 60)))
+      setCustomInterval(!RETRY_INTERVAL_PRESETS.some((p) => p.sec === sec))
+      setCustomMax(!RETRY_MAX_PRESETS.includes((reminder.confirm_max_retries || 3) as 1 | 2 | 3 | 5))
       setInput({
         title: reminder.title,
         content: reminder.content,
@@ -86,13 +117,25 @@ export function ReminderEditDialog({ reminder, open, onClose, onSaved }: Props) 
         schedule_spec: reminder.schedule_spec,
         channel_ids: reminder.channel_ids,
         require_confirm: reminder.require_confirm,
-        confirm_retry_interval_sec: reminder.confirm_retry_interval_sec || 7200,
+        confirm_retry_interval_sec: sec,
         confirm_max_retries: reminder.confirm_max_retries || 3,
       })
     } else {
-      setInput(defaultInput(tz))
+      const def = defaultInput(tz)
+      setIntervalUnit('hour')
+      setIntervalValue(2)
+      setCustomInterval(false)
+      setCustomMax(false)
+      setInput(def)
     }
   }, [reminder, tz])
+
+  function handleIntervalChange(val: number, unit: 'minute' | 'hour') {
+    setIntervalValue(val)
+    setIntervalUnit(unit)
+    const totalSec = Math.max(60, val * (unit === 'hour' ? 3600 : 60))
+    patch('confirm_retry_interval_sec', totalSec)
+  }
 
   function patch<K extends keyof ReminderInput>(key: K, val: ReminderInput[K]) {
     setInput((prev) => ({ ...prev, [key]: val }))
@@ -253,12 +296,7 @@ export function ReminderEditDialog({ reminder, open, onClose, onSaved }: Props) 
 
           <div className="rounded-md border p-3">
             <div className="flex items-center justify-between">
-              <div>
-                <Label htmlFor="r-confirm" className="cursor-pointer">确认提醒</Label>
-                <p className="text-xs text-muted-foreground mt-1">
-                  消息会附带确认链接；未点击则按下方配置重发。
-                </p>
-              </div>
+              <Label htmlFor="r-confirm" className="cursor-pointer font-medium">确认提醒</Label>
               <Switch
                 id="r-confirm"
                 checked={input.require_confirm}
@@ -266,26 +304,121 @@ export function ReminderEditDialog({ reminder, open, onClose, onSaved }: Props) 
               />
             </div>
             {input.require_confirm && (
-              <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <Label htmlFor="r-retry-interval">重试间隔（秒）</Label>
-                  <Input
-                    id="r-retry-interval"
-                    type="number"
-                    min={60}
-                    value={input.confirm_retry_interval_sec}
-                    onChange={(e) => patch('confirm_retry_interval_sec', Number(e.target.value) || 60)}
-                  />
+              <div className="mt-3 space-y-3 border-t pt-3">
+                <div className="space-y-1.5">
+                  <span className="text-xs font-medium text-muted-foreground">重试间隔</span>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {RETRY_INTERVAL_PRESETS.map((p) => {
+                      const active = !customInterval && input.confirm_retry_interval_sec === p.sec
+                      return (
+                        <button
+                          key={p.sec}
+                          type="button"
+                          onClick={() => {
+                            setCustomInterval(false)
+                            patch('confirm_retry_interval_sec', p.sec)
+                          }}
+                          className={cn(
+                            'rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
+                            active
+                              ? 'bg-primary text-primary-foreground shadow-sm'
+                              : 'border border-border/80 bg-background text-muted-foreground hover:bg-muted hover:text-foreground',
+                          )}
+                        >
+                          {p.label}
+                        </button>
+                      )
+                    })}
+                    <button
+                      type="button"
+                      onClick={() => setCustomInterval(true)}
+                      className={cn(
+                        'rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
+                        customInterval || !RETRY_INTERVAL_PRESETS.some((p) => p.sec === input.confirm_retry_interval_sec)
+                          ? 'bg-primary text-primary-foreground shadow-sm'
+                          : 'border border-border/80 bg-background text-muted-foreground hover:bg-muted hover:text-foreground',
+                      )}
+                    >
+                      自定义…
+                    </button>
+                  </div>
+                  {(customInterval || !RETRY_INTERVAL_PRESETS.some((p) => p.sec === input.confirm_retry_interval_sec)) && (
+                    <div className="flex items-center gap-2 pt-1">
+                      <Input
+                        type="number"
+                        min={1}
+                        value={intervalValue}
+                        onChange={(e) => handleIntervalChange(Number(e.target.value) || 1, intervalUnit)}
+                        className="h-8 w-20 text-center text-xs"
+                        aria-label="重试间隔数值"
+                      />
+                      <Select
+                        value={intervalUnit}
+                        onValueChange={(u) => handleIntervalChange(intervalValue, u as 'minute' | 'hour')}
+                      >
+                        <SelectTrigger className="h-8 w-24 text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="minute" className="text-xs">分钟</SelectItem>
+                          <SelectItem value="hour" className="text-xs">小时</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="r-retry-max">最大重试次数</Label>
-                  <Input
-                    id="r-retry-max"
-                    type="number"
-                    min={1}
-                    value={input.confirm_max_retries}
-                    onChange={(e) => patch('confirm_max_retries', Number(e.target.value) || 1)}
-                  />
+
+                <div className="space-y-1.5">
+                  <span className="text-xs font-medium text-muted-foreground">最多重试</span>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {RETRY_MAX_PRESETS.map((count) => {
+                      const active = !customMax && input.confirm_max_retries === count
+                      return (
+                        <button
+                          key={count}
+                          type="button"
+                          onClick={() => {
+                            setCustomMax(false)
+                            patch('confirm_max_retries', count)
+                          }}
+                          className={cn(
+                            'rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
+                            active
+                              ? 'bg-primary text-primary-foreground shadow-sm'
+                              : 'border border-border/80 bg-background text-muted-foreground hover:bg-muted hover:text-foreground',
+                          )}
+                        >
+                          {count} 次
+                        </button>
+                      )
+                    })}
+                    <button
+                      type="button"
+                      onClick={() => setCustomMax(true)}
+                      className={cn(
+                        'rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
+                        customMax || !RETRY_MAX_PRESETS.includes(input.confirm_max_retries as 1 | 2 | 3 | 5)
+                          ? 'bg-primary text-primary-foreground shadow-sm'
+                          : 'border border-border/80 bg-background text-muted-foreground hover:bg-muted hover:text-foreground',
+                      )}
+                    >
+                      自定义…
+                    </button>
+                  </div>
+                  {(customMax || !RETRY_MAX_PRESETS.includes(input.confirm_max_retries as 1 | 2 | 3 | 5)) && (
+                    <div className="flex items-center gap-2 pt-1">
+                      <Input
+                        type="number"
+                        min={1}
+                        max={100}
+                        value={input.confirm_max_retries}
+                        onChange={(e) => patch('confirm_max_retries', Number(e.target.value) || 1)}
+                        className="h-8 w-20 text-center text-xs"
+                        aria-label="最大重试次数"
+                      />
+                      <span className="text-xs text-muted-foreground">次</span>
+                    </div>
+                  )}
                 </div>
               </div>
             )}

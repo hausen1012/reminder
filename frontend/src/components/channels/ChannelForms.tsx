@@ -279,22 +279,20 @@ export function WebhookForm({ config, onChange, isEdit }: SubFormProps) {
 
   return (
     <div className="space-y-3 rounded-md border bg-card/30 p-4">
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <div className="space-y-2 sm:col-span-1">
-          <Label>请求方法</Label>
+      <div className="space-y-2">
+        <Label>请求地址</Label>
+        <div className="flex">
           <Select value={method} onValueChange={(v) => updateField(onChange, 'method', v)}>
-            <SelectTrigger>
+            <SelectTrigger className="w-28 rounded-r-none border-r-0 font-medium">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="GET">GET</SelectItem>
               <SelectItem value="POST">POST</SelectItem>
+              <SelectItem value="GET">GET</SelectItem>
             </SelectContent>
           </Select>
-        </div>
-        <div className="space-y-2 sm:col-span-2">
-          <Label>URL</Label>
           <Input
+            className="rounded-l-none"
             placeholder="https://example.com/notify"
             value={cfgStr(config, 'url')}
             onChange={(e) => updateField(onChange, 'url', e.target.value)}

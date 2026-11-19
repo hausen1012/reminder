@@ -1,5 +1,6 @@
 // ScheduleForm 使用 Select 下拉框选择提醒类型 + CalendarPopover 选择日期时间
 import { useState, useRef } from 'react'
+import { cn } from '@/lib/utils'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
@@ -40,13 +41,25 @@ const INTERVAL_UNITS = [
 ]
 
 const LUNAR_INTERVAL_UNITS = [
-  { value: 'day', label: '天' },
   { value: 'month', label: '月' },
   { value: 'year', label: '年' },
 ]
 
+const SOLAR_INTERVAL_PRESETS = [
+  { label: '每天', every: 1, unit: 'day' },
+  { label: '每周', every: 7, unit: 'day' },
+  { label: '每月', every: 1, unit: 'month' },
+  { label: '每年', every: 1, unit: 'year' },
+] as const
+
+const LUNAR_INTERVAL_PRESETS = [
+  { label: '每月', every: 1, unit: 'month' },
+  { label: '每年', every: 1, unit: 'year' },
+] as const
+
 export function ScheduleForm({ value, onChange }: Props) {
   const [calendarOpen, setCalendarOpen] = useState(false)
+  const [customInterval, setCustomInterval] = useState(false)
   const triggerRef = useRef<HTMLDivElement>(null)
   const spec = value.schedule_spec ?? {}
 
@@ -126,35 +139,81 @@ export function ScheduleForm({ value, onChange }: Props) {
             <SelectItem value="cron">Cron</SelectItem>
           </SelectContent>
         </Select>
-        {value.schedule_type === 'interval' && (
-          <div className="space-y-2 pt-2">
-            <Label>间隔</Label>
-            <div className="flex gap-2">
-              <Input
-                type="number"
-                min={1}
-                value={Number(spec.every ?? 1)}
-                onChange={(e) => patchSpec({ every: Number(e.target.value) || 1 })}
-                className="flex-1"
-              />
-              <Select
-                value={String(spec.unit ?? (value.calendar === 'lunar' ? 'month' : 'day'))}
-                onValueChange={(v) => patchSpec({ unit: v })}
-              >
-                <SelectTrigger className="flex-1">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {(value.calendar === 'lunar' ? LUNAR_INTERVAL_UNITS : INTERVAL_UNITS).map((u) => (
-                    <SelectItem key={u.value} value={u.value}>
-                      {u.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+        {value.schedule_type === 'interval' && (() => {
+          const every = Number(spec.every ?? 1)
+          const rawUnit = String(spec.unit ?? (value.calendar === 'lunar' ? 'month' : 'day'))
+          const unit = value.calendar === 'lunar' && rawUnit !== 'month' && rawUnit !== 'year' ? 'month' : rawUnit
+          const presets = value.calendar === 'lunar' ? LUNAR_INTERVAL_PRESETS : SOLAR_INTERVAL_PRESETS
+          const matched = presets.find((p) => p.every === every && p.unit === unit)
+          const isCustom = customInterval || !matched
+
+          return (
+            <div className="space-y-2 pt-1">
+              <div className="flex flex-wrap items-center gap-1.5">
+                {presets.map((p) => {
+                  const active = !customInterval && matched?.every === p.every && matched?.unit === p.unit
+                  return (
+                    <button
+                      key={`${p.every}-${p.unit}`}
+                      type="button"
+                      onClick={() => {
+                        setCustomInterval(false)
+                        patchSpec({ every: p.every, unit: p.unit })
+                      }}
+                      className={cn(
+                        'rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
+                        active
+                          ? 'bg-primary text-primary-foreground shadow-sm'
+                          : 'border border-border/80 bg-background text-muted-foreground hover:bg-muted hover:text-foreground',
+                      )}
+                    >
+                      {p.label}
+                    </button>
+                  )
+                })}
+                <button
+                  type="button"
+                  onClick={() => setCustomInterval(true)}
+                  className={cn(
+                    'rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
+                    isCustom
+                      ? 'bg-primary text-primary-foreground shadow-sm'
+                      : 'border border-border/80 bg-background text-muted-foreground hover:bg-muted hover:text-foreground',
+                  )}
+                >
+                  自定义…
+                </button>
+              </div>
+
+              {isCustom && (
+                <div className="flex items-center gap-2 pt-1">
+                  <span className="text-xs text-muted-foreground">每隔</span>
+                  <Input
+                    type="number"
+                    min={1}
+                    value={every}
+                    onChange={(e) => patchSpec({ every: Number(e.target.value) || 1 })}
+                    className="h-8 w-20 text-center text-xs"
+                    aria-label="周期数值"
+                  />
+                  <Select value={unit} onValueChange={(v) => patchSpec({ unit: v })}>
+                    <SelectTrigger className="h-8 w-24 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(value.calendar === 'lunar' ? LUNAR_INTERVAL_UNITS : INTERVAL_UNITS).map((u) => (
+                        <SelectItem key={u.value} value={u.value} className="text-xs">
+                          {u.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <span className="text-xs text-muted-foreground">重复</span>
+                </div>
+              )}
             </div>
-          </div>
-        )}
+          )
+        })()}
       </div>
 
       {value.schedule_type === 'cron' && (
