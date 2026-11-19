@@ -72,10 +72,29 @@ func appendConfirmLink(body, confirmURL, contentFormat string) (string, bool) {
 	return notifier.AppendLink(body, contentFormat, confirmURL, "点击确认提醒"), true
 }
 
-// formatLunar 把公历时间转成「农历二〇二六年五月十七」形式的中文串。
+var lunarMonths = []string{
+	"", "一", "二", "三", "四", "五", "六", "七", "八", "九", "十", "十一", "十二",
+}
+
+// formatLunar 把公历时间转成「二零二六年五月十七」形式的中文串（不带农历前缀，采用数字月与汉字“零”纪年）。
 func formatLunar(t time.Time) string {
 	sol := calendar.NewSolarFromYmd(t.Year(), int(t.Month()), t.Day())
 	lun := calendar.NewLunarFromSolar(sol)
-	return fmt.Sprintf("农历%s年%s月%s",
-		lun.GetYearInChinese(), lun.GetMonthInChinese(), lun.GetDayInChinese())
+	year := strings.ReplaceAll(lun.GetYearInChinese(), "〇", "零")
+
+	m := lun.GetMonth()
+	prefix := ""
+	if m < 0 {
+		prefix = "闰"
+		m = -m
+	}
+	monthName := ""
+	if m >= 1 && m <= 12 {
+		monthName = lunarMonths[m]
+	} else {
+		monthName = lun.GetMonthInChinese()
+	}
+
+	return fmt.Sprintf("%s年%s%s月%s",
+		year, prefix, monthName, lun.GetDayInChinese())
 }

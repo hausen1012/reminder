@@ -14,10 +14,14 @@ export function formatChineseLunarYear(year: number): string {
 }
 
 export function formatChineseLunarMonth(month: number): string {
-  if (month >= 1 && month <= 9) return CHINESE_DIGITS[month] + '月'
-  if (month === 10) return '十月'
-  if (month === 11) return '十一月'
-  return '十二月'
+  if (!Number.isFinite(month)) return ''
+  const prefix = month < 0 ? '闰' : ''
+  const m = Math.abs(month)
+  if (m >= 1 && m <= 9) return `${prefix}${CHINESE_DIGITS[m]}月`
+  if (m === 10) return `${prefix}十月`
+  if (m === 11) return `${prefix}十一月`
+  if (m === 12) return `${prefix}十二月`
+  return ''
 }
 
 export function formatChineseLunarDay(day: number): string {

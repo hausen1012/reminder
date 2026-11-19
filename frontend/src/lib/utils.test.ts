@@ -20,6 +20,9 @@ describe('农历中文格式化', () => {
     expect(formatChineseLunarMonth(10)).toBe('十月')
     expect(formatChineseLunarMonth(11)).toBe('十一月')
     expect(formatChineseLunarMonth(12)).toBe('十二月')
+    expect(formatChineseLunarMonth(-4)).toBe('闰四月')
+    expect(formatChineseLunarMonth(0)).toBe('')
+    expect(formatChineseLunarMonth(13)).toBe('')
   })
 
   it('日期 1-30 全覆盖且不抛错', () => {

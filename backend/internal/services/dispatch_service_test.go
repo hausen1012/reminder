@@ -472,12 +472,28 @@ func TestBuildVars(t *testing.T) {
 	if vars["weekday"] != "周五" {
 		t.Fatalf("weekday = %q，期望 周五", vars["weekday"])
 	}
-	// lunar_date 应含"农历"，年份为中文数字
-	if !containsSub(vars["lunar_date"], "农历") {
-		t.Fatalf("lunar_date = %q", vars["lunar_date"])
+	// lunar_date 不含"农历"前缀，年份为中文数字（使用汉字"零"），月份统一为数字月
+	if containsSub(vars["lunar_date"], "农历") {
+		t.Fatalf("lunar_date = %q，不应包含'农历'前缀", vars["lunar_date"])
 	}
-	if vars["lunar_date"] != "农历二〇二六年四月二十" {
+	if vars["lunar_date"] != "二零二六年四月二十" {
 		t.Fatalf("lunar_date = %q，期望中文数字纪年", vars["lunar_date"])
+	}
+
+	// 验证 1/11/12 月份采用数字月命名（一月/十一月/十二月，而非传统正月/冬月/腊月）
+	monthCases := []struct {
+		solar time.Time
+		want  string
+	}{
+		{time.Date(2026, 2, 17, 9, 0, 0, 0, loc), "二零二六年一月初一"},
+		{time.Date(2026, 12, 9, 9, 0, 0, 0, loc), "二零二六年十一月初一"},
+		{time.Date(2027, 1, 8, 9, 0, 0, 0, loc), "二零二六年十二月初一"},
+	}
+	for _, tc := range monthCases {
+		got := formatLunar(tc.solar)
+		if got != tc.want {
+			t.Fatalf("formatLunar(%s) = %q, want %q", tc.solar.Format("2006-01-02"), got, tc.want)
+		}
 	}
 }
 
