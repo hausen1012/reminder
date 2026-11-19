@@ -69,8 +69,8 @@ func TestEngineFire_WritesLogAndAdvances(t *testing.T) {
 		t.Fatalf("next_fire_at 未推进: %v", after.NextFireAt)
 	}
 
-	if disp.count() != 1 {
-		t.Fatalf("dispatcher 调用 %d 次，期望 1 次", disp.count())
+	if n := disp.waitCount(1, 2*time.Second); n != 1 {
+		t.Fatalf("dispatcher 调用 %d 次，期望 1 次", n)
 	}
 }
 
@@ -1660,4 +1660,15 @@ func (f *fakeDispatcher) count() int {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return len(f.runs)
+}
+
+func (f *fakeDispatcher) waitCount(expected int, timeout time.Duration) int {
+	deadline := time.Now().Add(timeout)
+	for {
+		c := f.count()
+		if c >= expected || time.Now().After(deadline) {
+			return c
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
 }
