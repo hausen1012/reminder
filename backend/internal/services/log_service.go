@@ -180,7 +180,7 @@ func (s *LogService) GetDetail(id uint) (*LogView, error) {
 	var confirmURL string
 	if dl.ConfirmChainID != nil && *dl.ConfirmChainID != "" {
 		if tok, err := tokenByChain(s.DB, *dl.ConfirmChainID); err == nil {
-			confirmURL = s.confirmURL(tok.Token)
+			confirmURL = buildConfirmURL(s.DB, s.SiteURL, tok.Token)
 		}
 	}
 
@@ -282,9 +282,4 @@ func (s *LogService) PurgeCount(olderThan time.Duration, all bool) (int64, error
 		return 0, err
 	}
 	return count, nil
-}
-
-// confirmURL 拼接确认链接，同样以库里的站点地址为准。
-func (s *LogService) confirmURL(token string) string {
-	return siteURL(s.DB, s.SiteURL) + "/c/" + token
 }

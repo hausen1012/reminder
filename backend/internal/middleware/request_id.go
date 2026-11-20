@@ -3,6 +3,7 @@ package middleware
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"strconv"
 	"strings"
 	"sync/atomic"
 
@@ -53,20 +54,5 @@ func newRequestID() string {
 	if _, err := rand.Read(b); err == nil {
 		return hex.EncodeToString(b)
 	}
-	return "req-" + itoaUint(requestIDSeq.Add(1))
-}
-
-// itoaUint 将 uint64 格式化为十进制字符串。
-func itoaUint(v uint64) string {
-	if v == 0 {
-		return "0"
-	}
-	var buf [20]byte
-	i := len(buf)
-	for v > 0 {
-		i--
-		buf[i] = byte('0' + v%10)
-		v /= 10
-	}
-	return string(buf[i:])
+	return "req-" + strconv.FormatUint(requestIDSeq.Add(1), 10)
 }

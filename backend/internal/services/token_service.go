@@ -77,6 +77,7 @@ func (s *TokenService) Create(name string, defaultChannelIDs []uint) (string, *m
 
 // List 分页查询令牌，支持名称搜索与启用状态过滤（enabled 为 nil 时不过滤）。
 func (s *TokenService) List(limit, offset int, search string, enabled *bool) ([]*models.Token, int64, error) {
+	limit, offset = normalizePage(limit, offset)
 	var rows []models.Token
 	query := s.DB.Model(&models.Token{})
 	if search != "" {

@@ -201,7 +201,7 @@ func (s *AIService) SaveSettings(in AISettingsInput) (*AISettings, error) {
 	modelsJSON, _ := json.Marshal(cleanedModels)
 
 	updates := map[string]string{
-		KeyAIEnabled:    boolString(in.Enabled),
+		KeyAIEnabled:    strconv.FormatBool(in.Enabled),
 		KeyAIProvider:   provider,
 		KeyAIBaseURL:    baseURL,
 		KeyAIModel:      model,
@@ -1013,12 +1013,4 @@ func (s *AIService) configMap() (map[string]string, error) {
 // upsertConfig 写入单个配置项；空值表示删除。
 func (s *AIService) upsertConfig(key, value string) error {
 	return (configStore{s.DB}).set(key, value)
-}
-
-// boolString 把布尔转成配置表里的字符串形式。
-func boolString(b bool) string {
-	if b {
-		return "true"
-	}
-	return "false"
 }

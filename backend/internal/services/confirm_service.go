@@ -136,13 +136,18 @@ func (s *ConfirmService) ConsumeToken(token string) (*models.DeliveryLog, error)
 	return &dl, nil
 }
 
+// buildConfirmURL 拼接完整的确认 URL，域名取设置页的站点地址（现读库，改完即时生效）。
+func buildConfirmURL(db *gorm.DB, fallback, token string) string {
+	return siteURL(db, fallback) + "/c/" + token
+}
+
 // BuildURL 拼接完整的确认 URL，域名取设置页的站点地址（现读库，改完即时生效）。
 func (s *ConfirmService) BuildURL(token string) string {
 	fallback := ""
 	if s.Cfg != nil {
 		fallback = s.Cfg.SiteURL
 	}
-	return siteURL(s.DB, fallback) + "/c/" + token
+	return buildConfirmURL(s.DB, fallback, token)
 }
 
 // loadToken 查询令牌及其关联的投递日志。

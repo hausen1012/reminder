@@ -6,6 +6,7 @@ package handlers
 import (
 	"errors"
 	"fmt"
+	"html"
 	"net/http"
 	"strings"
 	"time"
@@ -240,11 +241,11 @@ p.meta{font-size:12px;color:var(--text-muted);margin-bottom:16px}
 </div>
 </body>
 </html>`,
-		escapeHTML(pageTitle),
+		html.EscapeString(pageTitle),
 		iconType,
 		iconSVG,
 		titleClass,
-		escapeHTML(heading),
+		html.EscapeString(heading),
 		descHTML,
 		metaHTML,
 		actionsHTML,
@@ -264,14 +265,14 @@ func confirmPromptPage(token string, dl *models.DeliveryLog, loc *time.Location)
 		title = dl.Title
 	}
 
-	descHTML := fmt.Sprintf(`<p class="desc">请确认你已收到「%s」提醒，确认后将停止后续重发。</p>`, escapeHTML(title))
+	descHTML := fmt.Sprintf(`<p class="desc">请确认你已收到「%s」提醒，确认后将停止后续重发。</p>`, html.EscapeString(title))
 	metaHTML := ""
 
 	actionsHTML := fmt.Sprintf(`
 <form method="POST" action="/c/%s" onsubmit="var b=document.getElementById('confirm-btn');if(b){b.disabled=true;b.innerText='正在确认...'};">
   <button type="submit" id="confirm-btn" class="btn btn-primary">确认完成</button>
 </form>
-<a href="/" class="btn btn-secondary">返回后台</a>`, escapeHTML(token))
+<a href="/" class="btn btn-secondary">返回后台</a>`, html.EscapeString(token))
 
 	return confirmPageBase("提醒确认", "prompt", iconSVGBell, "prompt", "提醒确认", descHTML, metaHTML, actionsHTML)
 }
@@ -287,7 +288,7 @@ func confirmSuccessPage(dl *models.DeliveryLog, loc *time.Location) string {
 		confirmedAt = formatInZone(*dl.ConfirmedAt, loc)
 	}
 
-	descHTML := fmt.Sprintf(`<p class="desc">你已确认「%s」提醒，不再重复发送。</p>`, escapeHTML(title))
+	descHTML := fmt.Sprintf(`<p class="desc">你已确认「%s」提醒，不再重复发送。</p>`, html.EscapeString(title))
 	metaHTML := fmt.Sprintf(`<p class="meta">确认时间：%s</p>`, confirmedAt)
 	actionsHTML := `<a href="/" class="btn btn-primary">返回后台</a>`
 
@@ -305,7 +306,7 @@ func confirmAlreadyPage(dl *models.DeliveryLog, loc *time.Location) string {
 		confirmedAt = formatInZone(*dl.ConfirmedAt, loc)
 	}
 
-	descHTML := fmt.Sprintf(`<p class="desc">「%s」提醒此前已确认过了，不会重复发送。</p>`, escapeHTML(title))
+	descHTML := fmt.Sprintf(`<p class="desc">「%s」提醒此前已确认过了，不会重复发送。</p>`, html.EscapeString(title))
 	metaHTML := fmt.Sprintf(`<p class="meta">确认时间：%s</p>`, confirmedAt)
 	actionsHTML := `<a href="/" class="btn btn-primary">返回后台</a>`
 
@@ -314,30 +315,9 @@ func confirmAlreadyPage(dl *models.DeliveryLog, loc *time.Location) string {
 
 // confirmErrorPage 确认失败页
 func confirmErrorPage(msg string) string {
-	descHTML := fmt.Sprintf(`<p class="desc">%s</p>`, escapeHTML(msg))
+	descHTML := fmt.Sprintf(`<p class="desc">%s</p>`, html.EscapeString(msg))
 	metaHTML := ""
 	actionsHTML := `<a href="/" class="btn btn-secondary">返回后台</a>`
 
 	return confirmPageBase("确认失败", "danger", iconSVGCross, "danger", "确认失败", descHTML, metaHTML, actionsHTML)
-}
-
-func escapeHTML(s string) string {
-	out := make([]byte, 0, len(s))
-	for i := 0; i < len(s); i++ {
-		switch s[i] {
-		case '&':
-			out = append(out, "&amp;"...)
-		case '<':
-			out = append(out, "&lt;"...)
-		case '>':
-			out = append(out, "&gt;"...)
-		case '"':
-			out = append(out, "&quot;"...)
-		case '\'':
-			out = append(out, "&#39;"...)
-		default:
-			out = append(out, s[i])
-		}
-	}
-	return string(out)
 }

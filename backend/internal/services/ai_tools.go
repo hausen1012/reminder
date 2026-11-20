@@ -284,9 +284,9 @@ func (s *AIService) toolUpdateReminder(_ context.Context, raw json.RawMessage) (
 	if err := json.Unmarshal(raw, &patch); err != nil {
 		return "", fmt.Errorf("参数解析失败: %w", err)
 	}
-	id, err := jsonInt(patch, "id")
-	if err != nil {
-		return "", err
+	id := asPositiveInt(patch["id"])
+	if id <= 0 {
+		return "", middleware.NewAppError(middleware.CodeValidationFailed, "缺少或非法的提醒 ID").WithField("id")
 	}
 	cur, err := s.ReminderSvc.Get(uint(id))
 	if err != nil {
@@ -411,23 +411,6 @@ func confirmSummarySuffix(in ReminderInput) string {
 	}
 	return fmt.Sprintf("（需确认，未确认每 %d 秒重发，共 %d 次）",
 		in.ConfirmRetryIntervalSec, in.ConfirmMaxRetries)
-}
-
-// jsonInt 从 JSON 对象里取整数。
-func jsonInt(m map[string]any, key string) (int64, error) {
-	v, ok := m[key]
-	if !ok {
-		return 0, middleware.NewAppError(middleware.CodeValidationFailed, "缺少参数: "+key).WithField(key)
-	}
-	switch n := v.(type) {
-	case float64:
-		return int64(n), nil
-	case int64:
-		return n, nil
-	case int:
-		return int64(n), nil
-	}
-	return 0, middleware.NewAppError(middleware.CodeValidationFailed, "参数类型错误: "+key).WithField(key)
 }
 
 // toJSONString 把任意值序列化为紧凑 JSON 字符串（工具结果）。
