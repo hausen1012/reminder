@@ -224,8 +224,7 @@ func (s *ReminderService) List(f ListFilter) ([]*ReminderView, int64, error) {
 	}
 	f.Limit, f.Offset = normalizePage(f.Limit, f.Offset)
 
-	orderClause := buildOrderClause(f.SortBy, f.SortOrder, "created_at DESC",
-		[]string{"id", "created_at", "next_fire_at", "title"})
+	orderClause := buildReminderOrderClause(f.SortBy, f.SortOrder)
 	// next_fire_at 是整数毫秒列，直接排序即为时间序
 	var rows []models.Reminder
 	if err := q.Order(orderClause).Limit(f.Limit).Offset(f.Offset).Find(&rows).Error; err != nil {
@@ -236,6 +235,35 @@ func (s *ReminderService) List(f ListFilter) ([]*ReminderView, int64, error) {
 		return nil, 0, err
 	}
 	return views, total, nil
+}
+
+// buildReminderOrderClause 构建提醒列表排序子句：默认按下次触发时间升序且未启用项排在最后。
+func buildReminderOrderClause(sortBy, sortOrder string) string {
+	field := strings.ToLower(strings.TrimSpace(sortBy))
+	order := strings.ToLower(strings.TrimSpace(sortOrder))
+	if field == "" {
+		field = "next_fire_at"
+		order = "asc"
+	}
+	if order != "asc" && order != "desc" {
+		if field == "next_fire_at" {
+			order = "asc"
+		} else {
+			order = "desc"
+		}
+	}
+
+	if field == "next_fire_at" {
+		return "enabled DESC, (next_fire_at IS NULL) ASC, next_fire_at " + strings.ToUpper(order) + ", id DESC"
+	}
+
+	allowed := []string{"id", "created_at", "title"}
+	for _, a := range allowed {
+		if field == a {
+			return field + " " + strings.ToUpper(order)
+		}
+	}
+	return "enabled DESC, (next_fire_at IS NULL) ASC, next_fire_at ASC, id DESC"
 }
 
 // Upcoming 返回未来 within 时间内待触发的 enabled 提醒。

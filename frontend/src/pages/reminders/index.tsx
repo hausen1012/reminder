@@ -58,8 +58,8 @@ export default function RemindersPage() {
   const [search, setSearch] = useState('')
   const [limit, setLimit] = useState(10)
   const [offset, setOffset] = useState(0)
-  const [sortBy, setSortBy] = useState('created_at')
-  const [sortOrder, setSortOrder] = useState('desc')
+  const [sortBy, setSortBy] = useState('next_fire_at')
+  const [sortOrder, setSortOrder] = useState('asc')
 
   const [channels, setChannels] = useState<Channel[]>([])
 
@@ -70,7 +70,7 @@ export default function RemindersPage() {
       setSortOrder((o) => (o === 'desc' ? 'asc' : 'desc'))
     } else {
       setSortBy(field)
-      setSortOrder('desc')
+      setSortOrder(field === 'next_fire_at' ? 'asc' : 'desc')
     }
     setOffset(0)
   }
@@ -306,9 +306,13 @@ export default function RemindersPage() {
                         onCheckedChange={toggleSelectAll}
                       />
                     </th>
-                    <th className="px-4 py-2.5 w-[12rem]">标题</th>
+                    <th className="px-4 py-2.5 w-[12rem] cursor-pointer select-none" onClick={() => toggleSort('title')}>
+                      标题<SortIcon active={sortBy === 'title'} direction={sortOrder} />
+                    </th>
                     <th className="px-4 py-2.5 w-[13rem]">规则</th>
-                    <th className="px-4 py-2.5 w-40">下次触发</th>
+                    <th className="px-4 py-2.5 w-40 cursor-pointer select-none" onClick={() => toggleSort('next_fire_at')}>
+                      下次触发<SortIcon active={sortBy === 'next_fire_at'} direction={sortOrder} />
+                    </th>
                     <th className="px-4 py-2.5 w-[10rem]">通知渠道</th>
                     <th className="px-4 py-2.5 w-16 text-center">启用</th>
                     <th className="px-4 py-2.5 w-16 text-center">来源</th>

@@ -511,6 +511,48 @@ func TestReminderList_RejectsInjectedSort(t *testing.T) {
 	}
 }
 
+// 验证默认排序为下次触发时间升序且未启用项始终排在最后。
+func TestReminderList_DefaultSortAndDisabledAtEnd(t *testing.T) {
+	db := openTestDB(t)
+	svc := newReminderStack(t, db)
+
+	now := time.Now().UTC()
+	// 插入 3 条数据：
+	// r1: 启用，触发时间更晚 (+2h)
+	// r2: 启用，触发时间更早 (+1h)
+	// r3: 未启用，触发时间虽然最早 (+30m)，但由于未启用应排在最后
+	t1 := models.TimeOf(now.Add(2 * time.Hour))
+	t2 := models.TimeOf(now.Add(1 * time.Hour))
+	t3 := models.TimeOf(now.Add(30 * time.Minute))
+
+	db.Create(&models.Reminder{Title: "晚一些触发", Enabled: true, NextFireAt: &t1, Calendar: "solar", ScheduleType: "once"})
+	db.Create(&models.Reminder{Title: "早一些触发", Enabled: true, NextFireAt: &t2, Calendar: "solar", ScheduleType: "once"})
+	db.Create(&models.Reminder{Title: "已禁用事项", Enabled: false, NextFireAt: &t3, Calendar: "solar", ScheduleType: "once"})
+
+	// 1. 默认无参数排序
+	items, total, err := svc.List(ListFilter{})
+	if err != nil {
+		t.Fatalf("List 失败: %v", err)
+	}
+	if total != 3 || len(items) != 3 {
+		t.Fatalf("返回条数错误，期望 3 条，实际 total=%d, len=%d", total, len(items))
+	}
+	if items[0].Title != "早一些触发" || items[1].Title != "晚一些触发" || items[2].Title != "已禁用事项" {
+		t.Fatalf("默认排序未满足「下次触发升序 + 未启用排最后」: 实际顺序 [%s, %s, %s]",
+			items[0].Title, items[1].Title, items[2].Title)
+	}
+
+	// 2. 显式按 next_fire_at desc 排序
+	itemsDesc, _, err := svc.List(ListFilter{SortBy: "next_fire_at", SortOrder: "desc"})
+	if err != nil {
+		t.Fatalf("List desc 失败: %v", err)
+	}
+	if itemsDesc[0].Title != "晚一些触发" || itemsDesc[1].Title != "早一些触发" || itemsDesc[2].Title != "已禁用事项" {
+		t.Fatalf("倒序时未满足「下次触发降序 + 未启用排最后」: 实际顺序 [%s, %s, %s]",
+			itemsDesc[0].Title, itemsDesc[1].Title, itemsDesc[2].Title)
+	}
+}
+
 // seedReminderForUpcoming 插入一条带 next_fire_at 的启用提醒。
 func seedReminderForUpcoming(t *testing.T, db *gorm.DB, title string, next time.Time, enabled bool) *models.Reminder {
 	t.Helper()
