@@ -71,97 +71,12 @@ func (d *DispatchService) Run(ctx context.Context, r *models.Reminder, deliveryL
 	// 中间步骤都用 Debug，真正需要看的是最后那条汇总与出错分支
 	slog.Debug("已加载通道", "reminder", r.ID, "channels", chNames)
 
-	planned := r.NextFireAt
-	if planned == nil {
-		fresh := models.TimeNow()
-		planned = &fresh
-	}
-	vars := buildVars(r, time.Now(), planned.Std(), d.TZ.Get())
-	// 不打印 vars 内容：confirm_url 带确认令牌，记长度即可
-	slog.Debug("变量构建完成", "reminder", r.ID, "vars_count", len(vars))
+	vars := d.buildTemplateVars(r)
+	confirmChainID := d.setupConfirmChain(r, deliveryLogID, vars)
+	rendered := d.renderMessageWithConfirm(r, vars)
 
-	// 需要确认时，首发生成 chain_id + token；重发复用已有 chain_id + token
-	var confirmChainID string
-	if r.RequireConfirm && d.ConfirmMgr != nil {
-		slog.Debug("提醒需要确认", "reminder", r.ID)
-		var currentLog models.DeliveryLog
-		if err := d.DB.First(&currentLog, deliveryLogID).Error; err != nil {
-			slog.Warn("加载确认日志失败，无法复用已有确认链", "log", deliveryLogID, "error", err)
-		} else if currentLog.ConfirmChainID != nil && *currentLog.ConfirmChainID != "" {
-			confirmChainID = *currentLog.ConfirmChainID
-			tok, err := tokenByChain(d.DB, confirmChainID)
-			if err != nil {
-				slog.Warn("复用确认 token 失败，本轮将不带确认链接", "chain", confirmChainID, "log", deliveryLogID, "error", err)
-			} else {
-				vars["confirm_url"] = d.ConfirmMgr.ConfirmSvc.BuildURL(tok.Token)
-			}
-		} else {
-			// 新触发：取消该提醒此前的确认重发链
-			if d.ConfirmMgr != nil {
-				d.ConfirmMgr.CancelByReminderID(r.ID)
-			}
-			confirmChainID = uuid.New().String()
-			token, err := d.ConfirmMgr.ConfirmSvc.CreateToken(deliveryLogID, ConfirmTokenTTL)
-			if err == nil {
-				vars["confirm_url"] = d.ConfirmMgr.ConfirmSvc.BuildURL(token)
-				d.DB.Model(&models.DeliveryLog{}).Where("id = ?", deliveryLogID).
-					Update("confirm_chain_id", confirmChainID)
-				slog.Debug("创建确认链", "chain", confirmChainID, "reminder", r.ID, "log", deliveryLogID)
-			} else {
-				slog.Error("创建确认 token 失败，本次发送将不含确认链接", "reminder", r.ID, "log", deliveryLogID, "error", err)
-				confirmChainID = ""
-			}
-		}
-	}
+	successCnt, failCnt := d.broadcast(ctx, channels, deliveryLogID, rendered)
 
-	// 先注入 confirm_url，再统一渲染标题与正文；正文渲染后按格式补上确认链接
-	rendered := buildRenderedMessageWith(r.Title, r.Content, r.ContentFormat, vars, func(body string) string {
-		next, appended := appendConfirmLink(body, vars["confirm_url"], r.ContentFormat)
-		if appended {
-			slog.Debug("自动追加确认链接", "reminder", r.ID)
-		}
-		return next
-	})
-	slog.Debug("内容渲染完成", "reminder", r.ID, "body_len", len(rendered.Body), "confirm", confirmChainID != "")
-	type result struct {
-		channelID   uint
-		channelType string
-		channelName string
-		ok          bool
-	}
-
-	var wg sync.WaitGroup
-	results := make([]result, len(channels))
-	for i := range channels {
-		i := i
-		ch := channels[i]
-		wg.Add(1)
-		go func() {
-			defer func() {
-				if r := recover(); r != nil {
-					slog.Error("投递协程 panic", "recover", r, "log", deliveryLogID)
-				}
-			}()
-			defer wg.Done()
-			ok := d.sendWithRetry(ctx, ch, deliveryLogID, rendered)
-			results[i] = result{
-				channelID:   ch.ID,
-				channelType: ch.Type,
-				channelName: ch.Name,
-				ok:          ok,
-			}
-		}()
-	}
-	wg.Wait()
-
-	successCnt, failCnt := 0, 0
-	for _, r := range results {
-		if r.ok {
-			successCnt++
-		} else {
-			failCnt++
-		}
-	}
 	status := "success"
 	switch {
 	case successCnt == 0:
@@ -175,23 +90,124 @@ func (d *DispatchService) Run(ctx context.Context, r *models.Reminder, deliveryL
 		"elapsed_ms", time.Since(started).Milliseconds())
 	d.finalize(deliveryLogID, status, rendered.Subject, rendered.Body)
 
-	// 仅首发在成功进入确认链后调度重发；重发轮次由 ConfirmRetryManager 继续串联
-	if confirmChainID != "" && d.ConfirmMgr != nil {
-		var currentLog models.DeliveryLog
-		if err := d.DB.First(&currentLog, deliveryLogID).Error; err != nil {
-			slog.Warn("读取当前日志失败，跳过首发调度", "log", deliveryLogID, "error", err)
-		} else if currentLog.RetryRound != 0 {
-			slog.Debug("跳过首发调度", "chain", confirmChainID, "retry_round", currentLog.RetryRound)
+	d.scheduleConfirmRetryIfNeeded(r, deliveryLogID, confirmChainID)
+}
+
+// buildTemplateVars 构建提醒渲染所需的上下文变量。
+func (d *DispatchService) buildTemplateVars(r *models.Reminder) map[string]string {
+	planned := r.NextFireAt
+	if planned == nil {
+		fresh := models.TimeNow()
+		planned = &fresh
+	}
+	vars := buildVars(r, time.Now(), planned.Std(), d.TZ.Get())
+	// 不打印 vars 内容：confirm_url 带确认令牌，记长度即可
+	slog.Debug("变量构建完成", "reminder", r.ID, "vars_count", len(vars))
+	return vars
+}
+
+// setupConfirmChain 准备确认链：需要确认时首发创建新链或重发复用已有链，并注入 confirm_url 变量。
+func (d *DispatchService) setupConfirmChain(r *models.Reminder, deliveryLogID uint, vars map[string]string) string {
+	if !r.RequireConfirm || d.ConfirmMgr == nil {
+		return ""
+	}
+	slog.Debug("提醒需要确认", "reminder", r.ID)
+	var currentLog models.DeliveryLog
+	if err := d.DB.First(&currentLog, deliveryLogID).Error; err != nil {
+		slog.Warn("加载确认日志失败，无法复用已有确认链", "log", deliveryLogID, "error", err)
+		return ""
+	}
+	if currentLog.ConfirmChainID != nil && *currentLog.ConfirmChainID != "" {
+		chainID := *currentLog.ConfirmChainID
+		tok, err := tokenByChain(d.DB, chainID)
+		if err != nil {
+			slog.Warn("复用确认 token 失败，本轮将不带确认链接", "chain", chainID, "log", deliveryLogID, "error", err)
 		} else {
-			var refreshed models.Reminder
-			if err := d.DB.First(&refreshed, r.ID).Error; err != nil {
-				slog.Error("重读提醒失败，无法调度确认重发", "reminder", r.ID, "chain", confirmChainID, "error", err)
-			} else {
-				slog.Debug("调度确认重发", "chain", confirmChainID, "reminder", refreshed.ID, "interval_sec", refreshed.ConfirmRetryIntervalSec, "max_retries", refreshed.ConfirmMaxRetries)
-				d.ConfirmMgr.Schedule(&refreshed, confirmChainID, 0)
-			}
+			vars["confirm_url"] = d.ConfirmMgr.ConfirmSvc.BuildURL(tok.Token)
+		}
+		return chainID
+	}
+
+	// 新触发：取消该提醒此前的确认重发链
+	d.ConfirmMgr.CancelByReminderID(r.ID)
+	chainID := uuid.New().String()
+	token, err := d.ConfirmMgr.ConfirmSvc.CreateToken(deliveryLogID, ConfirmTokenTTL)
+	if err != nil {
+		slog.Error("创建确认 token 失败，本次发送将不含确认链接", "reminder", r.ID, "log", deliveryLogID, "error", err)
+		return ""
+	}
+	vars["confirm_url"] = d.ConfirmMgr.ConfirmSvc.BuildURL(token)
+	d.DB.Model(&models.DeliveryLog{}).Where("id = ?", deliveryLogID).Update("confirm_chain_id", chainID)
+	slog.Debug("创建确认链", "chain", chainID, "reminder", r.ID, "log", deliveryLogID)
+	return chainID
+}
+
+// renderMessageWithConfirm 渲染标题与正文，并在正文末尾追加确认链接（若有）。
+func (d *DispatchService) renderMessageWithConfirm(r *models.Reminder, vars map[string]string) notifier.Message {
+	confirmURL := vars["confirm_url"]
+	rendered := buildRenderedMessageWith(r.Title, r.Content, r.ContentFormat, vars, func(body string) string {
+		next, appended := appendConfirmLink(body, confirmURL, r.ContentFormat)
+		if appended {
+			slog.Debug("自动追加确认链接", "reminder", r.ID)
+		}
+		return next
+	})
+	slog.Debug("内容渲染完成", "reminder", r.ID, "body_len", len(rendered.Body), "confirm", confirmURL != "")
+	return rendered
+}
+
+// broadcast 并发向所有通道投递消息，并返回成功与失败数量。
+func (d *DispatchService) broadcast(ctx context.Context, channels []*models.Channel, deliveryLogID uint, rendered notifier.Message) (successCnt, failCnt int) {
+	var wg sync.WaitGroup
+	results := make([]bool, len(channels))
+	for i := range channels {
+		i := i
+		ch := channels[i]
+		wg.Add(1)
+		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					slog.Error("投递协程 panic", "recover", r, "log", deliveryLogID)
+				}
+			}()
+			defer wg.Done()
+			results[i] = d.sendWithRetry(ctx, ch, deliveryLogID, rendered)
+		}()
+	}
+	wg.Wait()
+
+	for _, ok := range results {
+		if ok {
+			successCnt++
+		} else {
+			failCnt++
 		}
 	}
+	return successCnt, failCnt
+}
+
+// scheduleConfirmRetryIfNeeded 在首发成功进入确认链后调度首次确认重发。
+func (d *DispatchService) scheduleConfirmRetryIfNeeded(r *models.Reminder, deliveryLogID uint, confirmChainID string) {
+	if confirmChainID == "" || d.ConfirmMgr == nil {
+		return
+	}
+	var currentLog models.DeliveryLog
+	if err := d.DB.First(&currentLog, deliveryLogID).Error; err != nil {
+		slog.Warn("读取当前日志失败，跳过首发调度", "log", deliveryLogID, "error", err)
+		return
+	}
+	if currentLog.RetryRound != 0 {
+		slog.Debug("跳过首发调度", "chain", confirmChainID, "retry_round", currentLog.RetryRound)
+		return
+	}
+	var refreshed models.Reminder
+	if err := d.DB.First(&refreshed, r.ID).Error; err != nil {
+		slog.Error("重读提醒失败，无法调度确认重发", "reminder", r.ID, "chain", confirmChainID, "error", err)
+		return
+	}
+	slog.Debug("调度确认重发", "chain", confirmChainID, "reminder", refreshed.ID,
+		"interval_sec", refreshed.ConfirmRetryIntervalSec, "max_retries", refreshed.ConfirmMaxRetries)
+	d.ConfirmMgr.Schedule(&refreshed, confirmChainID, 0)
 }
 
 // sendPlan 是单通道发送前的准备结果：通知器、按通道上限截断后的消息与解密后的配置。

@@ -465,34 +465,14 @@ func (s *AIService) ChatStream(ctx context.Context, in ChatInput, sink ChatEvent
 		return nil, middleware.NewAppError(middleware.CodeValidationFailed, "消息过长（最多 4000 字）").WithField("message")
 	}
 
-	// 本文件里的日志统一走 logger.FromContext：一条对话的多轮工具调用、
-	// 每次重试都带同一个 request_id，能和访问日志串起来看。
-	log := logger.FromContext(ctx)
-	log.Info("AI 对话开始", "msg_len", len([]rune(message)),
+	logger.FromContext(ctx).Info("AI 对话开始", "msg_len", len([]rune(message)),
 		"history_turns", len(in.History), "requested_model", in.Model)
 
-	cfg, err := s.resolveConfig(AISettingsInput{Model: strings.TrimSpace(in.Model)})
+	cfg, p, log, err := s.prepareChatProvider(ctx, in.Model)
 	if err != nil {
-		log.Warn("AI 对话结束：读取设置失败", "error", err)
 		return nil, err
 	}
-	if !cfg.Enabled {
-		log.Warn("AI 对话结束：助手未启用")
-		return nil, middleware.NewAppError(middleware.CodeValidationFailed, "AI 助手未启用，请先到设置页开启")
-	}
-	p := s.providerOverride
-	if p == nil {
-		created, err := newProvider(cfg)
-		if err != nil {
-			log.Warn("AI 对话结束：构造 Provider 失败",
-				"provider", cfg.Provider, "base_url", cfg.BaseURL, "error", err)
-			return nil, middleware.NewAppError(middleware.CodeValidationFailed, err.Error())
-		}
-		p = created
-	}
-	log = log.With("provider", cfg.Provider, "model", cfg.Model)
 
-	// 提示词每轮请求只解析一次：库里的自定义内容在本次对话内保持一致
 	system, err := s.SystemPrompt()
 	if err != nil {
 		return nil, err
@@ -501,22 +481,13 @@ func (s *AIService) ChatStream(ctx context.Context, in ChatInput, sink ChatEvent
 	turns := historyTurns(in.History)
 	turns = append(turns, llm.Turn{Role: "user", Text: message})
 
-	defs := s.toolDefinitions()
-	tools := make([]llm.Tool, 0, len(defs))
-	byName := make(map[string]toolDefinition, len(defs))
-	for _, d := range defs {
-		tools = append(tools, d.spec)
-		byName[d.spec.Name] = d
-	}
+	tools, byName := s.prepareChatTools()
 
 	var createdIDs []string
 	var success bool
 	defer func() {
-		if !success && len(createdIDs) > 0 {
-			// 对话异常结束，清理本轮草稿，避免留下孤儿待确认记录
-			if delErr := s.DB.Where("id IN ?", createdIDs).Delete(&models.AIAction{}).Error; delErr != nil {
-				logger.FromContext(ctx).Error("清理未完成对话的 AI 草稿失败", "error", delErr, "ids", createdIDs)
-			}
+		if !success {
+			s.cleanupUnfinishedDrafts(ctx, createdIDs)
 		}
 	}()
 
@@ -552,11 +523,10 @@ func (s *AIService) ChatStream(ctx context.Context, in ChatInput, sink ChatEvent
 				"user_message", textutil.TruncateRunes(message, 500))...)
 			return nil, middleware.NewAppError(middleware.CodeValidationFailed, "AI 调用失败: "+err.Error())
 		}
-		replyText = strings.TrimSpace(reply.Text)
+		replyText = reply.Text
 		if len(reply.ToolCalls) == 0 {
 			break
 		}
-		// 达到输出上限时结束工具循环，返回已生成的草稿。
 		if reply.Truncated {
 			truncated = true
 			break
@@ -572,45 +542,113 @@ func (s *AIService) ChatStream(ctx context.Context, in ChatInput, sink ChatEvent
 			ToolCalls: reply.ToolCalls,
 			Raw:       reply.Raw,
 		})
-		results := make([]llm.ToolResult, 0, len(reply.ToolCalls))
-		toolNames := make([]string, 0, len(reply.ToolCalls))
-		var toolErrs []any
-		for _, call := range reply.ToolCalls {
-			toolNames = append(toolNames, call.Name)
-			def, ok := byName[call.Name]
-			if !ok {
-				results = append(results, llm.ToolResult{
-					CallID: call.ID, Name: call.Name, Content: "未知工具: " + call.Name, IsError: true,
-				})
-				toolErrs = append(toolErrs, call.Name+": 未知工具")
-				continue
-			}
-			out, runErr := def.run(ctx, call.Input)
-			results = append(results, llm.ToolResult{
-				CallID:  call.ID,
-				Name:    call.Name,
-				Content: out,
-				IsError: runErr != nil,
-			})
-			if runErr != nil {
-				results[len(results)-1].Content = runErr.Error()
-				// 工具失败是「AI 回答了但不能用」的主要原因，必须能在日志里看到
-				toolErrs = append(toolErrs, call.Name+": "+runErr.Error())
-				continue
-			}
-			// 写工具会在结果里带上 draft_id，记下来用于本轮回传草稿
-			if id := draftIDOf(out); id != "" {
-				createdIDs = append(createdIDs, id)
-			}
-		}
-		// 工具轮次明细属于 Debug：一次对话可能跑好几轮，每轮一条 Info 会刷满日志。
+
+		exec := s.executeToolCalls(ctx, reply.ToolCalls, byName)
+		createdIDs = append(createdIDs, exec.draftIDs...)
 		log.Debug("AI 工具轮次完成",
-			"round", rounds, "tools", toolNames, "errors", toolErrs,
+			"round", rounds, "tools", exec.toolNames, "errors", exec.toolErrors,
 			"drafts", len(createdIDs))
-		turns = append(turns, llm.Turn{Role: "user", ToolResults: results})
+		turns = append(turns, llm.Turn{Role: "user", ToolResults: exec.results})
 	}
+
+	replyText = formatChatReply(replyText, truncated)
+
+	actions, err := s.actionsByIDs(createdIDs)
+	if err != nil {
+		log.Warn("AI 对话结束：读取草稿失败", "drafts", createdIDs, "error", err)
+		return nil, err
+	}
+	success = true
+	log.Info("AI 对话完成",
+		"rounds", rounds, "retries", retries, "drafts", len(createdIDs),
+		"truncated", truncated, "reply_len", len([]rune(replyText)),
+		"user_message", textutil.TruncateRunes(message, 500))
+	return &ChatResult{Reply: replyText, Actions: actions, Retries: retries}, nil
+}
+
+// prepareChatProvider 读取配置、验证启用状态并构造或复用 Provider。
+func (s *AIService) prepareChatProvider(ctx context.Context, requestedModel string) (*aiConfig, llm.Provider, *slog.Logger, error) {
+	log := logger.FromContext(ctx)
+	cfg, err := s.resolveConfig(AISettingsInput{Model: strings.TrimSpace(requestedModel)})
+	if err != nil {
+		log.Warn("AI 对话结束：读取设置失败", "error", err)
+		return nil, nil, log, err
+	}
+	if !cfg.Enabled {
+		log.Warn("AI 对话结束：助手未启用")
+		return nil, nil, log, middleware.NewAppError(middleware.CodeValidationFailed, "AI 助手未启用，请先到设置页开启")
+	}
+	p := s.providerOverride
+	if p == nil {
+		created, err := newProvider(cfg)
+		if err != nil {
+			log.Warn("AI 对话结束：构造 Provider 失败",
+				"provider", cfg.Provider, "base_url", cfg.BaseURL, "error", err)
+			return nil, nil, log, middleware.NewAppError(middleware.CodeValidationFailed, err.Error())
+		}
+		p = created
+	}
+	return cfg, p, log.With("provider", cfg.Provider, "model", cfg.Model), nil
+}
+
+// prepareChatTools 获取所有可用工具定义并构建工具索引。
+func (s *AIService) prepareChatTools() ([]llm.Tool, map[string]toolDefinition) {
+	defs := s.toolDefinitions()
+	tools := make([]llm.Tool, 0, len(defs))
+	byName := make(map[string]toolDefinition, len(defs))
+	for _, d := range defs {
+		tools = append(tools, d.spec)
+		byName[d.spec.Name] = d
+	}
+	return tools, byName
+}
+
+type toolExecutionResult struct {
+	results    []llm.ToolResult
+	toolNames  []string
+	draftIDs   []string
+	toolErrors []any
+}
+
+// executeToolCalls 执行模型返回的一组工具调用并收集结果与草稿。
+func (s *AIService) executeToolCalls(ctx context.Context, calls []llm.ToolCall, byName map[string]toolDefinition) toolExecutionResult {
+	out := toolExecutionResult{
+		results:   make([]llm.ToolResult, 0, len(calls)),
+		toolNames: make([]string, 0, len(calls)),
+	}
+	for _, call := range calls {
+		out.toolNames = append(out.toolNames, call.Name)
+		def, ok := byName[call.Name]
+		if !ok {
+			out.results = append(out.results, llm.ToolResult{
+				CallID: call.ID, Name: call.Name, Content: "未知工具: " + call.Name, IsError: true,
+			})
+			out.toolErrors = append(out.toolErrors, call.Name+": 未知工具")
+			continue
+		}
+		resContent, runErr := def.run(ctx, call.Input)
+		out.results = append(out.results, llm.ToolResult{
+			CallID:  call.ID,
+			Name:    call.Name,
+			Content: resContent,
+			IsError: runErr != nil,
+		})
+		if runErr != nil {
+			out.results[len(out.results)-1].Content = runErr.Error()
+			out.toolErrors = append(out.toolErrors, call.Name+": "+runErr.Error())
+			continue
+		}
+		if id := draftIDOf(resContent); id != "" {
+			out.draftIDs = append(out.draftIDs, id)
+		}
+	}
+	return out
+}
+
+// formatChatReply 格式化最终返回文本：处理超长截断提示与空回复回退。
+func formatChatReply(replyText string, truncated bool) string {
+	replyText = strings.TrimSpace(replyText)
 	if truncated {
-		// 明确告诉用户「到此为止」的原因：工具参数被截断时继续执行会写坏数据。
 		note := fmt.Sprintf("（回复达到单次输出上限 %d Token 已停止，请精简提问或分多次操作）", chatMaxTokens)
 		if replyText == "" {
 			replyText = note
@@ -621,19 +659,17 @@ func (s *AIService) ChatStream(ctx context.Context, in ChatInput, sink ChatEvent
 	if replyText == "" {
 		replyText = "（助手没有返回文本，请重试或换个说法）"
 	}
+	return replyText
+}
 
-	actions, err := s.actionsByIDs(createdIDs)
-	if err != nil {
-		log.Warn("AI 对话结束：读取草稿失败", "drafts", createdIDs, "error", err)
-		return nil, err
+// cleanupUnfinishedDrafts 在对话异常中断时清理本轮产生的未完成草稿。
+func (s *AIService) cleanupUnfinishedDrafts(ctx context.Context, ids []string) {
+	if len(ids) == 0 {
+		return
 	}
-	success = true
-	// 每次对话一条汇总，排查「AI 没按要求干活」时先看这条。
-	log.Info("AI 对话完成",
-		"rounds", rounds, "retries", retries, "drafts", len(createdIDs),
-		"truncated", truncated, "reply_len", len([]rune(replyText)),
-		"user_message", textutil.TruncateRunes(message, 500))
-	return &ChatResult{Reply: replyText, Actions: actions, Retries: retries}, nil
+	if delErr := s.DB.Where("id IN ?", ids).Delete(&models.AIAction{}).Error; delErr != nil {
+		logger.FromContext(ctx).Error("清理未完成对话的 AI 草稿失败", "error", delErr, "ids", ids)
+	}
 }
 
 // ListActions 按状态列出草稿；status 为空时返回全部（最多 50 条，按时间倒序）。
