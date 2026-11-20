@@ -288,7 +288,7 @@ export default function ChannelsPage() {
           {/* 移动端卡片列表：首行名称，次行类型文本 + 快捷操作 */}
           <div className="divide-y md:hidden">
             {items.map((ch) => (
-              <div key={ch.id} className="px-3 py-2.5">
+              <div key={ch.id} className="px-3 py-2">
                 <div className="flex items-start gap-2.5">
                   <Checkbox
                     checked={selectedIds.has(ch.id)}
@@ -300,7 +300,7 @@ export default function ChannelsPage() {
                     <p className="truncate text-sm font-medium" title={ch.name}>
                       {ch.name}
                     </p>
-                    <div className="mt-1.5 flex items-center justify-between gap-2">
+                    <div className="mt-0.5 flex items-center justify-between gap-2">
                       <span className="truncate text-xs text-muted-foreground" title={labelOf(specs, ch.type)}>
                         {labelOf(specs, ch.type)}
                       </span>
