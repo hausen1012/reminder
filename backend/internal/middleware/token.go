@@ -109,3 +109,19 @@ func TokenAuth(verify TokenVerifier, toucher TokenToucher, limiter *RateLimiter)
 		c.Next()
 	}
 }
+
+// TokenIDOf 从上下文中获取外部 API 鉴权注入的 token_id；未注入或非法时返回 0, false。
+func TokenIDOf(c *gin.Context) (uint, bool) {
+	if c == nil {
+		return 0, false
+	}
+	v, ok := c.Get("token_id")
+	if !ok {
+		return 0, false
+	}
+	id, ok := v.(uint)
+	if !ok || id == 0 {
+		return 0, false
+	}
+	return id, true
+}

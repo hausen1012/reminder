@@ -56,6 +56,22 @@ func JWTAuth(secret string) gin.HandlerFunc {
 	}
 }
 
+// UserIDOf 从上下文中获取 JWT 鉴权注入的 user_id；未注入或非法时返回 0, false。
+func UserIDOf(c *gin.Context) (uint, bool) {
+	if c == nil {
+		return 0, false
+	}
+	v, ok := c.Get("user_id")
+	if !ok {
+		return 0, false
+	}
+	id, ok := v.(uint)
+	if !ok || id == 0 {
+		return 0, false
+	}
+	return id, true
+}
+
 // abortUnauthorized 以统一错误格式结束请求。
 func abortUnauthorized(c *gin.Context, message string) {
 	c.AbortWithStatusJSON(http.StatusUnauthorized,

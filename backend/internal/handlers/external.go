@@ -26,8 +26,7 @@ func (h *ExternalHandler) CreateReminder(c *gin.Context) {
 	in.Source = "api"
 
 	// 未指定通道时回退到令牌默认通道
-	tokenID, _ := c.Get("token_id")
-	if keyID, ok := tokenID.(uint); ok {
+	if keyID, ok := middleware.TokenIDOf(c); ok {
 		in.TokenID = &keyID
 		if len(in.ChannelIDs) == 0 {
 			in.ChannelIDs = h.TokenSvc.DefaultChannelIDs(keyID)
@@ -64,13 +63,12 @@ func (h *ExternalHandler) GetReminder(c *gin.Context) {
 
 // ListReminders GET /api/external/v1/reminders
 func (h *ExternalHandler) ListReminders(c *gin.Context) {
-	tokenID, _ := c.Get("token_id")
 	f := services.ListFilter{
 		Search: c.Query("search"),
 		Limit:  queryInt(c, "limit", 0),
 		Offset: queryInt(c, "offset", 0),
 	}
-	if keyID, ok := tokenID.(uint); ok {
+	if keyID, ok := middleware.TokenIDOf(c); ok {
 		f.TokenID = &keyID
 	}
 
@@ -133,8 +131,7 @@ func (h *ExternalHandler) UpdateReminder(c *gin.Context) {
 
 	// 强制 source=api，保留原 token
 	in.Source = "api"
-	tokenID, _ := c.Get("token_id")
-	if keyID, ok := tokenID.(uint); ok {
+	if keyID, ok := middleware.TokenIDOf(c); ok {
 		in.TokenID = &keyID
 	}
 
@@ -159,15 +156,8 @@ func (h *ExternalHandler) ListChannels(c *gin.Context) {
 }
 
 func (h *ExternalHandler) belongsToKey(reminderKeyID *uint, c *gin.Context) bool {
-	tokenID, exists := c.Get("token_id")
-	if !exists {
-		return false
-	}
-	keyID, ok := tokenID.(uint)
-	if !ok {
-		return false
-	}
-	if reminderKeyID == nil {
+	keyID, ok := middleware.TokenIDOf(c)
+	if !ok || reminderKeyID == nil {
 		return false
 	}
 	return *reminderKeyID == keyID

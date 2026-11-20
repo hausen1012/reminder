@@ -310,7 +310,11 @@ func TestTokenAuth_InjectsTokenID(t *testing.T) {
 
 	var touched uint
 	r.GET("/x", TokenAuth(verify, func(id uint) { touched = id }, nil), func(c *gin.Context) {
-		id, _ := c.Get("token_id")
+		id, ok := TokenIDOf(c)
+		if !ok {
+			c.AbortWithStatus(http.StatusInternalServerError)
+			return
+		}
 		c.JSON(http.StatusOK, gin.H{"token_id": id})
 	})
 
@@ -323,6 +327,46 @@ func TestTokenAuth_InjectsTokenID(t *testing.T) {
 	}
 	if touched != 42 {
 		t.Fatalf("toucher 收到 %d, 期望 42", touched)
+	}
+}
+
+// UserIDOf 与 TokenIDOf 上下文提取防护测试。
+func TestAuthContextHelpers(t *testing.T) {
+	// nil 上下文应安全返回 0, false
+	if id, ok := UserIDOf(nil); ok || id != 0 {
+		t.Fatalf("UserIDOf(nil) = (%d, %v)，期望 (0, false)", id, ok)
+	}
+	if id, ok := TokenIDOf(nil); ok || id != 0 {
+		t.Fatalf("TokenIDOf(nil) = (%d, %v)，期望 (0, false)", id, ok)
+	}
+
+	c, _ := gin.CreateTestContext(httptest.NewRecorder())
+	// 未注入值
+	if id, ok := UserIDOf(c); ok || id != 0 {
+		t.Fatalf("UserIDOf(未注入) = (%d, %v)，期望 (0, false)", id, ok)
+	}
+	if id, ok := TokenIDOf(c); ok || id != 0 {
+		t.Fatalf("TokenIDOf(未注入) = (%d, %v)，期望 (0, false)", id, ok)
+	}
+
+	// 注入类型错误或 0 值
+	c.Set("user_id", "invalid")
+	c.Set("token_id", uint(0))
+	if id, ok := UserIDOf(c); ok || id != 0 {
+		t.Fatalf("UserIDOf(类型错误) = (%d, %v)，期望 (0, false)", id, ok)
+	}
+	if id, ok := TokenIDOf(c); ok || id != 0 {
+		t.Fatalf("TokenIDOf(0) = (%d, %v)，期望 (0, false)", id, ok)
+	}
+
+	// 正常注入有效 uint
+	c.Set("user_id", uint(123))
+	c.Set("token_id", uint(456))
+	if id, ok := UserIDOf(c); !ok || id != 123 {
+		t.Fatalf("UserIDOf(123) = (%d, %v)，期望 (123, true)", id, ok)
+	}
+	if id, ok := TokenIDOf(c); !ok || id != 456 {
+		t.Fatalf("TokenIDOf(456) = (%d, %v)，期望 (456, true)", id, ok)
 	}
 }
 

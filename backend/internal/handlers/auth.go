@@ -104,7 +104,7 @@ func RetryAfterSeconds(d time.Duration) int {
 
 // Me GET /api/auth/me
 func (h *AuthHandler) Me(c *gin.Context) {
-	userID, ok := currentUserID(c)
+	userID, ok := middleware.UserIDOf(c)
 	if !ok {
 		abortErr(c, middleware.NewAppError(middleware.CodeUnauthorized, "未授权"))
 		return
@@ -124,17 +124,4 @@ func (h *AuthHandler) Me(c *gin.Context) {
 // Logout POST /api/auth/logout
 func (h *AuthHandler) Logout(c *gin.Context) {
 	successJSON(c, nil)
-}
-
-// currentUserID 从 gin.Context 中取 JWT 中间件注入的用户 ID。
-func currentUserID(c *gin.Context) (uint, bool) {
-	v, exists := c.Get("user_id")
-	if !exists {
-		return 0, false
-	}
-	id, ok := v.(uint)
-	if !ok || id == 0 {
-		return 0, false
-	}
-	return id, true
 }

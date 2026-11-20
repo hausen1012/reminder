@@ -26,7 +26,7 @@ func (h *UserHandler) UpdatePassword(c *gin.Context) {
 		return
 	}
 
-	userID, ok := currentUserID(c)
+	userID, ok := middleware.UserIDOf(c)
 	if !ok {
 		abortErr(c, middleware.NewAppError(middleware.CodeUnauthorized, "未授权"))
 		return

@@ -51,10 +51,10 @@ func SlogLogger() gin.HandlerFunc {
 		if requestID := RequestIDOf(c); requestID != "" {
 			attrs = append(attrs, slog.String("request_id", requestID))
 		}
-		if userID, ok := c.Get("user_id"); ok {
+		if userID, ok := UserIDOf(c); ok {
 			attrs = append(attrs, slog.Any("user_id", userID))
 		}
-		if tokenID, ok := c.Get("token_id"); ok {
+		if tokenID, ok := TokenIDOf(c); ok {
 			attrs = append(attrs, slog.Any("token_id", tokenID))
 		}
 		if query != "" {
