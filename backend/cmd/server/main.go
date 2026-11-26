@@ -20,7 +20,6 @@ import (
 var staticFS embed.FS
 
 func main() {
-	// 先解析配置再装配日志，确保日志使用配置的站点时区。
 	cfg := config.Load()
 
 	logger.Init()
@@ -28,12 +27,8 @@ func main() {
 	slog.Info("启动配置",
 		"port", cfg.Port,
 		"db_path", cfg.DBPath,
-		"site_url", cfg.SiteURL,
-		"timezone", cfg.Timezone,
 		"log_format", getEnv("LOG_FORMAT", "text"),
 		"log_level", getEnv("LOG_LEVEL", "info"),
-		"sweep_interval_sec", cfg.SweepIntervalSec,
-		"miss_tolerance_minutes", cfg.MissToleranceMinutes,
 		"log_auto_purge_days", cfg.LogAutoPurgeDays,
 	)
 

@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	"github.com/reminder/backend/internal/config"
 	"github.com/reminder/backend/internal/middleware"
 )
 
@@ -112,11 +111,11 @@ func TestInitGinMode(t *testing.T) {
 }
 
 // newMiddlewareOrderEngine 用真实的中间件装配构造最小引擎。
-func newMiddlewareOrderEngine(t *testing.T, maxBodyMB int64) *gin.Engine {
+func newMiddlewareOrderEngine(t *testing.T) *gin.Engine {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	applyMiddleware(r, &config.Config{MaxBodyMB: maxBodyMB})
+	applyMiddleware(r)
 	r.POST("/api/echo", func(c *gin.Context) {
 		var in map[string]any
 		if err := c.ShouldBindJSON(&in); err != nil {
@@ -135,7 +134,7 @@ func newMiddlewareOrderEngine(t *testing.T, maxBodyMB int64) *gin.Engine {
 
 // 已声明长度超限：BodyLimit 在 CORS 之后执行，413 必须带跨域头。
 func TestMiddlewareOrder_DeclaredOversizeKeepsCORS(t *testing.T) {
-	r := newMiddlewareOrderEngine(t, 1)
+	r := newMiddlewareOrderEngine(t)
 
 	body := strings.NewReader(`{"title":"` + strings.Repeat("a", 2<<20) + `"}`)
 	req := httptest.NewRequest(http.MethodPost, "/api/echo", body)
@@ -155,7 +154,7 @@ func TestMiddlewareOrder_DeclaredOversizeKeepsCORS(t *testing.T) {
 
 // 未声明长度（chunked）超限：同样要带跨域头。
 func TestMiddlewareOrder_ChunkedOversizeKeepsCORS(t *testing.T) {
-	r := newMiddlewareOrderEngine(t, 1)
+	r := newMiddlewareOrderEngine(t)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/echo",
 		strings.NewReader(`{"title":"`+strings.Repeat("a", 2<<20)+`"}`))
@@ -178,7 +177,7 @@ func TestMiddlewareOrder_ChunkedOversizeKeepsCORS(t *testing.T) {
 func TestMiddlewareOrder_BusinessErrorKeepsCORS(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	applyMiddleware(r, &config.Config{MaxBodyMB: 1})
+	applyMiddleware(r)
 	r.GET("/api/boom", func(c *gin.Context) {
 		c.AbortWithStatusJSON(http.StatusBadRequest,
 			map[string]any{"error": map[string]any{"code": "validation_failed", "message": "x"}})
@@ -196,7 +195,7 @@ func TestMiddlewareOrder_BusinessErrorKeepsCORS(t *testing.T) {
 
 // 预检请求仍应被 CORS 自己直接应答。
 func TestMiddlewareOrder_PreflightAnswered(t *testing.T) {
-	r := newMiddlewareOrderEngine(t, 1)
+	r := newMiddlewareOrderEngine(t)
 	req := httptest.NewRequest(http.MethodOptions, "/api/echo", nil)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)

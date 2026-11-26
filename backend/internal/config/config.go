@@ -8,12 +8,9 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"time"
 )
 
 // Config 汇总所有运行时配置。
-//
-// 站点时区由 internal/timezone.Provider 持有；这里的 Timezone 只是首次启动的默认值。
 type Config struct {
 	// 基础配置
 	Port      string
@@ -22,17 +19,10 @@ type Config struct {
 	Username  string
 	Password  string
 
-	// 提醒助手相关新增配置
-	EncryptionKey        string // base64 编码的 32 字节 AES-256 密钥；为空则使用内置 fallback（不安全）
-	SiteURL              string // 站点对外地址（来自环境变量 SITE_URL），用于拼接确认链接
-	Timezone             string // 站点时区的环境变量默认值，例如 Asia/Shanghai
-	SweepIntervalSec     int    // 补漏扫描间隔，单位秒
-	MissToleranceMinutes int    // 漏触发容忍上限，超过则标记为 expired 不发送
-	LogAutoPurgeDays     int    // 投递日志自动清理保留天数；0 表示不自动清理
-
-	// 安全相关
-	MaxBodyMB      int64    // 单个请求体上限（MB），超出返回 413
-	TrustedProxies []string // 可信反向代理 CIDR 列表；为空表示不信任任何代理头
+	// 安全与存储配置
+	EncryptionKey    string   // base64 编码的 32 字节 AES-256 密钥；为空则使用内置 fallback（不安全）
+	LogAutoPurgeDays int      // 投递日志自动清理保留天数；0 表示不自动清理
+	TrustedProxies   []string // 可信反向代理 CIDR 列表；为空表示不信任任何代理头
 }
 
 func Load() *Config {
@@ -43,33 +33,15 @@ func Load() *Config {
 		Username:  getEnv("USERNAME", "admin"),
 		Password:  getEnv("PASSWORD", "admin123"),
 
-		EncryptionKey:        getEnv("ENCRYPTION_KEY", ""),
-		SiteURL:              getEnv("SITE_URL", "http://localhost:8765"),
-		Timezone:             getEnv("TIMEZONE", "Asia/Shanghai"),
-		SweepIntervalSec:     getEnvInt("SWEEP_INTERVAL_SEC", 60),
-		MissToleranceMinutes: getEnvInt("MISS_TOLERANCE_MINUTES", 60),
-		LogAutoPurgeDays:     getEnvInt("LOG_AUTO_PURGE_DAYS", 0),
-
-		MaxBodyMB:      int64(getEnvInt("MAX_BODY_MB", 1)),
-		TrustedProxies: splitCSV(getEnv("TRUSTED_PROXIES", "")),
-	}
-	if cfg.MaxBodyMB <= 0 {
-		// 0 或负数会让所有请求被拒，按未配置处理
-		slog.Warn("MAX_BODY_MB 非法，回退为 1 MB", "value", cfg.MaxBodyMB)
-		cfg.MaxBodyMB = 1
+		EncryptionKey:    getEnv("ENCRYPTION_KEY", ""),
+		LogAutoPurgeDays: getEnvInt("LOG_AUTO_PURGE_DAYS", 0),
+		TrustedProxies:   splitCSV(getEnv("TRUSTED_PROXIES", "")),
 	}
 
 	// JWTSecret 如果留空就自动生成
 	if cfg.JWTSecret == "" {
 		cfg.JWTSecret = randomSecret()
 		slog.Warn("JWT_SECRET 未配置，已自动生成")
-	}
-
-	// 启动配置在读到库里的时区之前就会用到 time.Local
-	if loc, err := time.LoadLocation(cfg.Timezone); err != nil {
-		slog.Warn("TIMEZONE 解析失败，保持进程默认时区", "timezone", cfg.Timezone, "error", err)
-	} else {
-		time.Local = loc
 	}
 
 	return cfg

@@ -16,6 +16,9 @@ const KeyTimezone = "timezone"
 // KeySiteURL 是站点对外地址在 config 表中的 key，决定确认链接用哪个域名拼接。
 const KeySiteURL = "site_url"
 
+// DefaultSiteURL 是未配置站点地址时的默认回退地址。
+const DefaultSiteURL = "http://localhost:8765"
+
 // 站点配置允许通过 /api/config 修改的白名单键。
 var allowedConfigKeys = map[string]struct{}{
 	"app_name":  {},
@@ -28,7 +31,7 @@ var allowedConfigKeys = map[string]struct{}{
 type ConfigService struct {
 	DB *gorm.DB
 	TZ *timezone.Provider
-	// SiteURLFallback 是环境变量 SITE_URL 的初始值，库里没有 site_url 时生效。
+	// SiteURLFallback 是库里未配置 site_url 时的回退值，为空时取 DefaultSiteURL。
 	SiteURLFallback string
 	// OnTimezoneChanged 在站点时区变更后回调，用于重建调度器里的 cron 实例。
 	OnTimezoneChanged func()
@@ -36,7 +39,7 @@ type ConfigService struct {
 
 // NewConfigService 构造服务。
 func NewConfigService(db *gorm.DB, tz *timezone.Provider) *ConfigService {
-	return &ConfigService{DB: db, TZ: tz}
+	return &ConfigService{DB: db, TZ: tz, SiteURLFallback: DefaultSiteURL}
 }
 
 // GetAll 读取白名单内的站点配置；时区与站点地址未落库时回显当前生效值。
@@ -55,9 +58,13 @@ func (s *ConfigService) GetAll() (map[string]string, error) {
 	if _, ok := out[KeyTimezone]; !ok && s.TZ != nil {
 		out[KeyTimezone] = s.TZ.Name()
 	}
-	// 对外地址同理：库里没设置过时回显环境变量初始值
-	if _, ok := out[KeySiteURL]; !ok && s.SiteURLFallback != "" {
-		out[KeySiteURL] = s.SiteURLFallback
+	// 对外地址同理：库里没设置过时回显回退值
+	if _, ok := out[KeySiteURL]; !ok {
+		fb := s.SiteURLFallback
+		if fb == "" {
+			fb = DefaultSiteURL
+		}
+		out[KeySiteURL] = fb
 	}
 	return out, nil
 }
@@ -111,7 +118,7 @@ func normalizeSiteURL(raw string) (string, error) {
 	return strings.TrimRight(v, "/"), nil
 }
 
-// siteURL 返回拼接确认链接用的站点地址：库里优先，其次环境变量，最后默认值。
+// siteURL 返回拼接确认链接用的站点地址：库里优先，其次 fallback，最后默认值。
 // 每次现读库，改完站点地址立即对之后的发送生效。
 func siteURL(db *gorm.DB, fallback string) string {
 	if v, ok, err := (configStore{db}).get(KeySiteURL); err == nil && ok && v != "" {
@@ -120,7 +127,7 @@ func siteURL(db *gorm.DB, fallback string) string {
 	}
 	base := strings.TrimRight(strings.TrimSpace(fallback), "/")
 	if base == "" {
-		return "http://localhost:8765"
+		return DefaultSiteURL
 	}
 	return base
 }

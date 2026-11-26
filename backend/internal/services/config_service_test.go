@@ -220,7 +220,7 @@ func TestConfigService_ClearTimezoneFallsBack(t *testing.T) {
 	}
 }
 
-// 站点地址：库里没有时回显环境变量给的初始值，写入后以库为准并被规整，
+// 站点地址：库里没有时回显默认回退值，写入后以库为准并被规整，
 // 非法地址整批拒绝，清空则删除 key 回到回退值。
 func TestConfigService_SiteURL(t *testing.T) {
 	db := openTestDB(t)
@@ -232,7 +232,7 @@ func TestConfigService_SiteURL(t *testing.T) {
 		t.Fatalf("读取失败: %v", err)
 	}
 	if got[KeySiteURL] != "http://localhost:8765" {
-		t.Fatalf("未设置时应回显环境变量值，实际 %q", got[KeySiteURL])
+		t.Fatalf("未设置时应回显回退值，实际 %q", got[KeySiteURL])
 	}
 
 	// 结尾斜杠与首尾空白被规整掉，否则会拼出 https://a.com//c/token

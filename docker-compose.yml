@@ -15,15 +15,10 @@ services:
       - JWT_SECRET=${JWT_SECRET:-}
       # 留空时使用内置 fallback（等同于不加密），生产环境务必配置
       - ENCRYPTION_KEY=${ENCRYPTION_KEY:-}
-      - SITE_URL=${SITE_URL:-http://localhost:8765}
-      - TIMEZONE=${TIMEZONE:-Asia/Shanghai}
-      - SWEEP_INTERVAL_SEC=${SWEEP_INTERVAL_SEC:-60}
-      - MISS_TOLERANCE_MINUTES=${MISS_TOLERANCE_MINUTES:-60}
       - LOG_AUTO_PURGE_DAYS=${LOG_AUTO_PURGE_DAYS:-0}
       - LOG_FORMAT=${LOG_FORMAT:-text}
       - LOG_LEVEL=${LOG_LEVEL:-info}
       - GIN_MODE=${GIN_MODE:-release}
-      - MAX_BODY_MB=${MAX_BODY_MB:-1}
       - TRUSTED_PROXIES=${TRUSTED_PROXIES:-}
       # 访问外部服务（如 Telegram）时的代理；留空表示直连
       - HTTPS_PROXY=${HTTPS_PROXY:-}

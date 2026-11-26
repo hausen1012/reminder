@@ -57,7 +57,6 @@ docker run -d \
   --restart unless-stopped \
   -p 8765:8765 \
   -v ./reminder/db:/data/db \
-  -e SITE_URL=http://localhost:8765 \
   hausen1012/reminder:latest
 ```
 
@@ -79,7 +78,7 @@ make docker        # 本地构建镜像并运行 Docker
 ### 配置
 
 全部通过环境变量配置，可用项见 `.env.example`。生产环境至少应设置
-管理员账号、`SITE_URL`（确认链接的域名，也可登录后到「设置 → 站点地址」修改）、`JWT_SECRET` 与 `ENCRYPTION_KEY`。
+管理员账号、`JWT_SECRET` 与 `ENCRYPTION_KEY`；站点地址与时区可在登录后到「设置」页面直接修改。
 
 ## 技术栈
 

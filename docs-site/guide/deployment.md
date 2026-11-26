@@ -24,7 +24,6 @@ make build-windows      # windows/amd64
 ```bash
 PORT=8765 \
 DB_PATH=/var/lib/reminder/reminder.db \
-SITE_URL=https://reminder.example.com \
 JWT_SECRET='随机串' \
 ENCRYPTION_KEY='base64编码的32字节' \
 ./server
@@ -49,7 +48,6 @@ docker run -d \
   --restart unless-stopped \
   -p 8765:8765 \
   -v ./reminder/db:/data/db \
-  -e SITE_URL=http://localhost:8765 \
   hausen1012/reminder:latest
 ```
 
@@ -71,8 +69,6 @@ services:
       - "8765:8765"
     volumes:
       - ./reminder/db:/data/db
-    environment:
-      - SITE_URL=http://localhost:8765
 ```
 
 启动容器：
@@ -111,8 +107,7 @@ location / {
 }
 ```
 
-然后把站点地址改成外部可访问的域名：可以改环境变量 `SITE_URL`（需重启），
-也可以在面板**设置 → 基础设置 → 站点地址**里改（立即生效，推荐）。
+然后把站点地址改成外部可访问的域名：在面板**设置 → 基础设置 → 站点地址**里改（立即生效）。
 系统本身不生成绝对路径跳转，因此不需要额外配置。
 
 ::: warning 反向代理下要配置 TRUSTED_PROXIES

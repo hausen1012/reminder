@@ -15,7 +15,7 @@ import (
 // LogService 负责 DeliveryLog 的查询与清理。
 type LogService struct {
 	DB *gorm.DB
-	// SiteURL 是环境变量 SITE_URL 给出的回退地址，库里有站点地址时以库为准
+	// SiteURL 是回退站点地址，库里有配置时以库为准
 	SiteURL string
 }
 

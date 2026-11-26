@@ -38,14 +38,23 @@ type SetupResult struct {
 	Handles *SchedulerHandles
 }
 
+// maxBodyBytes 是单次 HTTP 请求体上限（1 MB），超出由 BodyLimit 拦截返回 413。
+const maxBodyBytes = 1 << 20
+
+// 调度兜底扫描内部常量
+const (
+	defaultSweepInterval = 60 * time.Second
+	defaultMissTolerance = 60 * time.Minute
+)
+
 // applyMiddleware 按序装配全局中间件：
 // Recovery -> RequestID -> CORS -> SlogLogger -> BodyLimit -> ErrorHandler。
-func applyMiddleware(r *gin.Engine, cfg *config.Config) {
+func applyMiddleware(r *gin.Engine) {
 	r.Use(gin.Recovery())
 	r.Use(middleware.RequestID())
 	r.Use(middleware.CORS())
 	r.Use(middleware.SlogLogger())
-	r.Use(middleware.BodyLimit(cfg.MaxBodyMB << 20))
+	r.Use(middleware.BodyLimit(maxBodyBytes))
 	r.Use(middleware.ErrorHandler())
 }
 
@@ -64,7 +73,7 @@ func initGinMode() {
 func Setup(staticFS embed.FS, cfg *config.Config) (*SetupResult, error) {
 	initGinMode()
 	r := gin.New()
-	applyMiddleware(r, cfg)
+	applyMiddleware(r)
 
 	// gin 默认信任所有代理头。只有显式配置 TRUSTED_PROXIES 才信任，否则用 TCP 对端地址。
 	if err := r.SetTrustedProxies(cfg.TrustedProxies); err != nil {
@@ -84,22 +93,20 @@ func Setup(staticFS embed.FS, cfg *config.Config) (*SetupResult, error) {
 		slog.Warn("ENCRYPTION_KEY 未配置，敏感字段使用内置固定密钥加密，等同于明文；生产环境请显式配置")
 	}
 
-	// 站点时区：先用环境变量默认值，随后由库里的设置覆盖；可变引用，改设置后立即生效
-	tz := timezone.New(cfg.Timezone)
+	// 站点时区：初始为 Asia/Shanghai，随后由库里的设置覆盖；可变引用，改设置后立即生效
+	tz := timezone.New("")
 
 	channelSvc := services.NewChannelService(database.DB, box, tz)
 	dispatchSvc := services.NewDispatchService(database.DB, channelSvc, tz)
 	engine := scheduler.NewEngine(database.DB, dispatchSvc, tz)
 
 	// 确认机制
-	confirmSvc := services.NewConfirmService(database.DB, cfg)
+	confirmSvc := services.NewConfirmService(database.DB)
 	confirmMgr := services.NewConfirmRetryManager(database.DB, dispatchSvc, confirmSvc, tz)
 	dispatchSvc.ConfirmMgr = confirmMgr
 	reminderSvc := services.NewReminderService(database.DB, engine, tz, dispatchSvc, confirmMgr)
 
 	configSvc := services.NewConfigService(database.DB, tz)
-	// 站点地址的回退值来自环境变量 SITE_URL；库里配置了就以库为准（读取在各处拼接时现做）。
-	configSvc.SiteURLFallback = cfg.SiteURL
 	configSvc.OnTimezoneChanged = engine.ReloadTimezone
 	// 读库里的站点时区（若存在）并应用，必须早于调度器注册
 	configSvc.LoadTimezone()
@@ -121,14 +128,14 @@ func Setup(staticFS embed.FS, cfg *config.Config) (*SetupResult, error) {
 	// 启动 sweeper
 	sweeper := scheduler.NewSweeper(
 		database.DB, engine, tz,
-		time.Duration(cfg.SweepIntervalSec)*time.Second,
-		time.Duration(cfg.MissToleranceMinutes)*time.Minute,
+		defaultSweepInterval,
+		defaultMissTolerance,
 		30*time.Second,
 	)
 	sweeper.Start()
 
 	// 自动清理日志（每天凌晨 3 点）
-	logSvc := services.NewLogService(database.DB, cfg.SiteURL)
+	logSvc := services.NewLogService(database.DB)
 	if cfg.LogAutoPurgeDays > 0 {
 		purgeAfter := time.Duration(cfg.LogAutoPurgeDays) * 24 * time.Hour
 		if _, err := engine.AddPurgeCron(logSvc, purgeAfter); err != nil {

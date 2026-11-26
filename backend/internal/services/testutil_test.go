@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/reminder/backend/internal/config"
 	"github.com/reminder/backend/internal/crypto/secretbox"
 	"github.com/reminder/backend/internal/models"
 	"github.com/reminder/backend/internal/notifier"
@@ -46,11 +45,6 @@ func testTZ(loc *time.Location) *timezone.Provider {
 // cstZone 是测试默认时区（东八区），与生产默认值一致。
 func cstZone() *time.Location {
 	return testutil.CST()
-}
-
-// testCfg 返回测试用配置。
-func testCfg() *config.Config {
-	return &config.Config{SiteURL: "http://example.test"}
 }
 
 // containsSub 判断字符串是否包含子串。
@@ -91,7 +85,7 @@ func newConfirmTestStack(t *testing.T, db *gorm.DB) *confirmTestStack {
 	channelSvc := &ChannelService{DB: db, TZ: tz}
 	dispatch := NewDispatchService(db, channelSvc, tz)
 	dispatch.RetryDelays = []time.Duration{0}
-	confirmSvc := NewConfirmService(db, &config.Config{SiteURL: "http://example.test"})
+	confirmSvc := NewConfirmService(db, "http://example.test")
 	confirmMgr := NewConfirmRetryManager(db, dispatch, confirmSvc, tz)
 	dispatch.ConfirmMgr = confirmMgr
 	reminderSvc := NewReminderService(db, noopEngine{}, tz, dispatch, confirmMgr)

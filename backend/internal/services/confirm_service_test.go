@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/reminder/backend/internal/config"
 	"github.com/reminder/backend/internal/models"
 	"gorm.io/gorm"
 )
@@ -16,7 +15,7 @@ import (
 func newConfirmSvc(t *testing.T, siteURL string) (*ConfirmService, *gorm.DB) {
 	t.Helper()
 	db := openTestDB(t)
-	return NewConfirmService(db, &config.Config{SiteURL: siteURL}), db
+	return NewConfirmService(db, siteURL), db
 }
 
 // seedLogWithChain 插入一条可用于确认的投递日志。
@@ -279,24 +278,24 @@ func TestConfirmConsumeToken_ConcurrentOnlyOneWins(t *testing.T) {
 func TestConfirmBuildURL(t *testing.T) {
 	db := openTestDB(t)
 
-	svc := NewConfirmService(db, &config.Config{SiteURL: "https://example.com"})
+	svc := NewConfirmService(db, "https://example.com")
 	if got := svc.BuildURL("abc"); got != "https://example.com/c/abc" {
 		t.Fatalf("BuildURL = %q", got)
 	}
 
-	empty := NewConfirmService(db, &config.Config{SiteURL: ""})
+	empty := NewConfirmService(db, "")
 	if got := empty.BuildURL("abc"); got == "" || !containsSub(got, "/c/abc") {
 		t.Fatalf("base 为空时应使用默认值，实际 %q", got)
 	}
 }
 
-// 库里配置的站点地址优先于环境变量，且改完立刻对之后的拼接生效（无需重启）。
+// 库里配置的站点地址优先于回退值，且改完立刻对之后的拼接生效（无需重启）。
 func TestConfirmBuildURL_DBOverridesEnv(t *testing.T) {
 	db := openTestDB(t)
-	svc := NewConfirmService(db, &config.Config{SiteURL: "https://from-env.example"})
+	svc := NewConfirmService(db, "https://from-env.example")
 
 	if got := svc.BuildURL("t1"); got != "https://from-env.example/c/t1" {
-		t.Fatalf("未落库时应回退环境变量，实际 %q", got)
+		t.Fatalf("未落库时应回退默认值，实际 %q", got)
 	}
 
 	if err := db.Exec("INSERT INTO configs (key, value) VALUES (?, ?)", KeySiteURL, "https://from-db.example/").Error; err != nil {
@@ -1112,7 +1111,7 @@ func TestConfirmRetryStopAll(t *testing.T) {
 
 func TestConfirmConsumeToken_DBError(t *testing.T) {
 	db := openTestDB(t)
-	svc := NewConfirmService(db, testCfg())
+	svc := NewConfirmService(db)
 
 	sqlDB, err := db.DB()
 	if err != nil {

@@ -8,7 +8,6 @@ import (
 	"errors"
 	"time"
 
-	"github.com/reminder/backend/internal/config"
 	"github.com/reminder/backend/internal/models"
 	"gorm.io/gorm"
 )
@@ -31,13 +30,17 @@ var (
 
 // ConfirmService 提供令牌的创建、消费与 URL 拼接。
 type ConfirmService struct {
-	DB  *gorm.DB
-	Cfg *config.Config
+	DB      *gorm.DB
+	SiteURL string
 }
 
 // NewConfirmService 构造确认服务。
-func NewConfirmService(db *gorm.DB, cfg *config.Config) *ConfirmService {
-	return &ConfirmService{DB: db, Cfg: cfg}
+func NewConfirmService(db *gorm.DB, fallback ...string) *ConfirmService {
+	url := "http://localhost:8765"
+	if len(fallback) > 0 && fallback[0] != "" {
+		url = fallback[0]
+	}
+	return &ConfirmService{DB: db, SiteURL: url}
 }
 
 // CreateToken 生成一个 32 字节 hex 令牌并落库，ttl 为有效期。
@@ -143,11 +146,7 @@ func buildConfirmURL(db *gorm.DB, fallback, token string) string {
 
 // BuildURL 拼接完整的确认 URL，域名取设置页的站点地址（现读库，改完即时生效）。
 func (s *ConfirmService) BuildURL(token string) string {
-	fallback := ""
-	if s.Cfg != nil {
-		fallback = s.Cfg.SiteURL
-	}
-	return buildConfirmURL(s.DB, fallback, token)
+	return buildConfirmURL(s.DB, s.SiteURL, token)
 }
 
 // loadToken 查询令牌及其关联的投递日志。

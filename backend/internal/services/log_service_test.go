@@ -54,7 +54,7 @@ func TestLogGetDetail(t *testing.T) {
 	db.Create(&models.DeliveryAttempt{
 		DeliveryLogID: dl.ID, ChannelID: 1, ChannelType: "webhook", ChannelName: "c", Attempt: 1, Status: "success",
 	})
-	if _, err := NewConfirmService(db, testCfg()).CreateToken(dl.ID, time.Hour); err != nil {
+	if _, err := NewConfirmService(db).CreateToken(dl.ID, time.Hour); err != nil {
 		t.Fatalf("创建确认令牌失败: %v", err)
 	}
 
@@ -246,7 +246,7 @@ func TestLogBatchDelete(t *testing.T) {
 	db.Create(&models.DeliveryAttempt{
 		DeliveryLogID: dl.ID, ChannelID: 1, ChannelType: "webhook", ChannelName: "c", Attempt: 1, Status: "success",
 	})
-	if _, err := NewConfirmService(db, testCfg()).CreateToken(dl.ID, time.Hour); err != nil {
+	if _, err := NewConfirmService(db).CreateToken(dl.ID, time.Hour); err != nil {
 		t.Fatalf("创建确认令牌失败: %v", err)
 	}
 
@@ -347,7 +347,7 @@ func TestLogPurge_AllClearsTokens(t *testing.T) {
 	svc, db := newLogSvc(t, "")
 
 	dl := seedDeliveryLog(t, db, "待清", "success", 0, nil)
-	if _, err := NewConfirmService(db, testCfg()).CreateToken(dl.ID, time.Hour); err != nil {
+	if _, err := NewConfirmService(db).CreateToken(dl.ID, time.Hour); err != nil {
 		t.Fatalf("创建确认令牌失败: %v", err)
 	}
 
