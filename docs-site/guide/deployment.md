@@ -27,9 +27,10 @@ DB_PATH=/var/lib/reminder/reminder.db \
 SITE_URL=https://reminder.example.com \
 JWT_SECRET='随机串' \
 ENCRYPTION_KEY='base64编码的32字节' \
-LOG_FILE=/var/log/reminder \
 ./server
 ```
+
+应用日志仅输出到启动进程的控制台，不写入文件。
 
 跨平台构建需要交叉编译。由于 SQLite 驱动使用 CGO，交叉编译时**构建机器**上需要有目标平台的 C 交叉工具链；
 对于树莓派或 ARM NAS 等非 x86 设备，推荐直接使用官方多架构 Docker 镜像。
@@ -48,10 +49,11 @@ docker run -d \
   --restart unless-stopped \
   -p 8765:8765 \
   -v ./reminder/db:/data/db \
-  -v ./reminder/log:/var/log/reminder \
   -e SITE_URL=http://localhost:8765 \
   hausen1012/reminder:latest
 ```
+
+应用日志输出到容器控制台，可用 `docker logs -f reminder` 查看。
 
 ### 方式二：Docker Compose
 
@@ -69,7 +71,6 @@ services:
       - "8765:8765"
     volumes:
       - ./reminder/db:/data/db
-      - ./reminder/log:/var/log/reminder
     environment:
       - SITE_URL=http://localhost:8765
 ```
@@ -80,8 +81,9 @@ services:
 docker compose up -d
 ```
 
-`docker-compose.yml` 已经把数据库与日志挂到宿主机目录（`./reminder/db`、`./reminder/log`），
-容器重建不会丢数据。所有环境变量都可以通过宿主机环境或 `.env` 文件覆盖。
+`docker-compose.yml` 已经把数据库挂到宿主机目录（`./reminder/db`），容器重建不会丢数据。
+应用日志输出到容器控制台，可用 `docker compose logs -f` 查看，无需挂载日志目录。
+所有环境变量都可以通过宿主机环境或 `.env` 文件覆盖。
 
 ### 本地源码构建
 

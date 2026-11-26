@@ -6,7 +6,6 @@ services:
       - "${PORT:-8765}:8765"
     volumes:
       - ./reminder/db:/data/db
-      - ./reminder/log:/var/log/reminder
     environment:
       - PORT=8765
       - USERNAME=${USERNAME:-admin}
@@ -21,7 +20,6 @@ services:
       - SWEEP_INTERVAL_SEC=${SWEEP_INTERVAL_SEC:-60}
       - MISS_TOLERANCE_MINUTES=${MISS_TOLERANCE_MINUTES:-60}
       - LOG_AUTO_PURGE_DAYS=${LOG_AUTO_PURGE_DAYS:-0}
-      - LOG_FILE=${LOG_FILE:-/var/log/reminder}
       - LOG_FORMAT=${LOG_FORMAT:-text}
       - LOG_LEVEL=${LOG_LEVEL:-info}
       - GIN_MODE=${GIN_MODE:-release}

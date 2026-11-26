@@ -8,7 +8,7 @@
 docker compose up -d
 ```
 
-容器会监听 `8765` 端口，数据与日志挂载在仓库目录下的 `reminder/db` 与 `reminder/log`。
+容器会监听 `8765` 端口，数据挂载在仓库目录下的 `reminder/db`。应用日志输出到容器控制台，可用 `docker compose logs -f` 查看。
 打开 `http://localhost:8765`，用初始账号登录即可（默认 `admin` / `admin123`，见[配置项](/guide/configuration)）。
 
 生产环境请务必通过环境变量覆盖初始账号与密钥，参考[部署](/guide/deployment)。

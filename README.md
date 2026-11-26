@@ -57,10 +57,11 @@ docker run -d \
   --restart unless-stopped \
   -p 8765:8765 \
   -v ./reminder/db:/data/db \
-  -v ./reminder/log:/var/log/reminder \
   -e SITE_URL=http://localhost:8765 \
   hausen1012/reminder:latest
 ```
+
+应用日志输出到容器控制台，可用 `docker logs -f reminder` 查看。
 
 或使用 Docker Compose 启动：
 

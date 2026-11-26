@@ -77,10 +77,11 @@ $b = New-Object byte[] 32
 |---|---|---|
 | `SWEEP_INTERVAL_SEC` | `60` | 兜底扫描间隔（秒）。扫描用于补发进程重启期间错过的触发 |
 | `MISS_TOLERANCE_MINUTES` | `60` | 漏触发容忍窗口（分钟）。早于该窗口的漏触发直接标记为 `expired`，不再补发 |
-| `LOG_AUTO_PURGE_DAYS` | `0` | 日志自动清理保留天数；`0` 表示不自动清理。大于 0 时每天凌晨 3 点清理一次 |
-| `LOG_FILE` | `/var/log/reminder` | 日志目录。日志总是同时写标准错误，目录创建失败时只剩标准错误 |
+| `LOG_AUTO_PURGE_DAYS` | `0` | 投递日志自动清理保留天数；`0` 表示不自动清理。大于 0 时每天凌晨 3 点清理一次 |
 | `LOG_FORMAT` | `text` | 日志输出格式。`text` 是 `[INFO] 时间 \| request_id \| 消息 k=v` 的一行制式，便于人工排查；`json` 便于接入日志采集（Loki / ELK 等） |
 | `LOG_LEVEL` | `info` | 最低日志级别：`debug` / `info` / `warn` / `error`。默认级别下**成功请求的访问日志不输出**（降到 `debug`）；`debug` 会额外打印每条 SQL、访问日志与通道发送细节 |
+
+应用运行日志仅输出到控制台（标准错误），不写入文件；`LOG_AUTO_PURGE_DAYS` 只清理数据库中的投递记录。
 
 ### 请求与访问控制
 
@@ -175,7 +176,6 @@ services:
       - "8765:8765"
     volumes:
       - ./reminder/db:/data/db
-      - ./reminder/log:/var/log/reminder
     environment:
       - USERNAME=admin
       - PASSWORD=换一个强密码

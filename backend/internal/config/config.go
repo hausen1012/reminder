@@ -11,9 +11,6 @@ import (
 	"time"
 )
 
-// 日志目录的默认值，供测试等引用同一份默认值。
-const DefaultLogFile = "/var/log/reminder"
-
 // Config 汇总所有运行时配置。
 //
 // 站点时区由 internal/timezone.Provider 持有；这里的 Timezone 只是首次启动的默认值。
@@ -31,8 +28,7 @@ type Config struct {
 	Timezone             string // 站点时区的环境变量默认值，例如 Asia/Shanghai
 	SweepIntervalSec     int    // 补漏扫描间隔，单位秒
 	MissToleranceMinutes int    // 漏触发容忍上限，超过则标记为 expired 不发送
-	LogAutoPurgeDays     int    // 自动清理日志的保留天数；0 表示不自动清理
-	LogFile              string // 日志目录；默认 /var/log/reminder，创建失败时仅输出到 stderr
+	LogAutoPurgeDays     int    // 投递日志自动清理保留天数；0 表示不自动清理
 
 	// 安全相关
 	MaxBodyMB        int64    // 单个请求体上限（MB），超出返回 413
@@ -55,7 +51,6 @@ func Load() *Config {
 		SweepIntervalSec:     getEnvInt("SWEEP_INTERVAL_SEC", 60),
 		MissToleranceMinutes: getEnvInt("MISS_TOLERANCE_MINUTES", 60),
 		LogAutoPurgeDays:     getEnvInt("LOG_AUTO_PURGE_DAYS", 0),
-		LogFile:              getEnv("LOG_FILE", DefaultLogFile),
 
 		MaxBodyMB:        int64(getEnvInt("MAX_BODY_MB", 1)),
 		TrustedProxies:   splitCSV(getEnv("TRUSTED_PROXIES", "")),
@@ -80,7 +75,7 @@ func Load() *Config {
 		slog.Warn("JWT_SECRET 未配置，已自动生成")
 	}
 
-	// 启动期逻辑（日志按天切分等）在读到库里的时区之前就会用到 time.Local
+	// 启动配置在读到库里的时区之前就会用到 time.Local
 	if loc, err := time.LoadLocation(cfg.Timezone); err != nil {
 		slog.Warn("TIMEZONE 解析失败，保持进程默认时区", "timezone", cfg.Timezone, "error", err)
 	} else {

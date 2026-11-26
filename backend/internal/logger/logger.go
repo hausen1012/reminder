@@ -1,26 +1,13 @@
-// Package logger 提供全局 slog 初始化与按日滚动日志配置。
+// Package logger 提供全局 slog 初始化。
 package logger
 
 import (
 	"fmt"
-	"io"
 	"log/slog"
 	"os"
-	"path/filepath"
 	"strings"
-	"sync"
 	"sync/atomic"
-	"time"
 )
-
-// 文件级别的日志目录写失败时，重复告警会淹没有用信息；只提示一次。
-var writerWarnOnce sync.Once
-
-// activeCloser 记录当前打开的文件 writer，供重新 Init 时释放资源。
-var activeCloser struct {
-	mu sync.Mutex
-	c  io.Closer
-}
 
 // activeLevel 保存 Init 时确定的级别，供 Level() 读取（atomic：GORM 适配会并发读）。
 var activeLevel atomic.Int32
@@ -34,33 +21,8 @@ func Level() slog.Level {
 	return slog.Level(activeLevel.Load())
 }
 
-// Init 配置全局 slog logger；logDir 非空时同时写入按日滚动的文件，可重复调用。
-func Init(logDir string) {
-	// 关闭上一次 Init 打开的文件：全局 logger 只保留最新一份
-	activeCloser.mu.Lock()
-	if activeCloser.c != nil {
-		_ = activeCloser.c.Close()
-		activeCloser.c = nil
-	}
-	activeCloser.mu.Unlock()
-
-	var writers []io.Writer
-	writers = append(writers, os.Stderr)
-
-	if logDir != "" {
-		dw, err := newDailyWriter(logDir, time.Now)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "日志目录不可用，仅输出到标准错误: %v\n", err)
-		} else {
-			writers = append(writers, dw)
-			activeCloser.mu.Lock()
-			activeCloser.c = dw
-			activeCloser.mu.Unlock()
-		}
-	}
-
-	multi := io.MultiWriter(writers...)
-
+// Init 配置全局 slog logger，所有日志仅输出到标准错误。
+func Init() {
 	// 统一时间格式与源码位置：JSON 走 ReplaceAttr，text 由 textHandler 自行排版
 	replace := func(_ []string, a slog.Attr) slog.Attr {
 		switch a.Key {
@@ -86,9 +48,9 @@ func Init(logDir string) {
 	var h slog.Handler
 	switch strings.ToLower(strings.TrimSpace(os.Getenv("LOG_FORMAT"))) {
 	case "json":
-		h = slog.NewJSONHandler(multi, opts)
+		h = slog.NewJSONHandler(os.Stderr, opts)
 	default:
-		h = newTextHandler(multi, opts)
+		h = newTextHandler(os.Stderr, opts)
 	}
 
 	slog.SetDefault(slog.New(h))
@@ -109,74 +71,4 @@ func parseLevel(v string) slog.Level {
 		fmt.Fprintf(os.Stderr, "未知的 LOG_LEVEL=%q，已回退为 info\n", v)
 		return slog.LevelInfo
 	}
-}
-
-// dailyWriter 是按自然日滚动的文件 writer；打开或写入失败时静默降级到标准错误（只提示一次）。
-type dailyWriter struct {
-	mu   sync.Mutex
-	dir  string
-	now  func() time.Time
-	file *os.File
-	day  string
-}
-
-func newDailyWriter(dir string, now func() time.Time) (*dailyWriter, error) {
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return nil, err
-	}
-	w := &dailyWriter{dir: dir, now: now}
-	if err := w.rotateLocked(w.now()); err != nil {
-		return nil, err
-	}
-	return w, nil
-}
-
-func (w *dailyWriter) Write(p []byte) (int, error) {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-
-	if err := w.rotateLocked(w.now()); err != nil {
-		writerWarnOnce.Do(func() {
-			fmt.Fprintf(os.Stderr, "日志文件不可写，后续仅输出到标准错误: %v\n", err)
-		})
-		return len(p), nil
-	}
-	if _, err := w.file.Write(p); err != nil {
-		writerWarnOnce.Do(func() {
-			fmt.Fprintf(os.Stderr, "写日志文件失败，后续仅输出到标准错误: %v\n", err)
-		})
-		return len(p), nil
-	}
-	return len(p), nil
-}
-
-// rotateLocked 在日期变化时切换文件；调用方必须持有 w.mu。
-func (w *dailyWriter) rotateLocked(now time.Time) error {
-	day := now.Format("2006-01-02")
-	if w.file != nil && w.day == day {
-		return nil
-	}
-	if w.file != nil {
-		_ = w.file.Close()
-		w.file = nil
-		w.day = ""
-	}
-	f, err := os.OpenFile(filepath.Join(w.dir, day+".log"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
-	if err != nil {
-		return err
-	}
-	w.file, w.day = f, day
-	return nil
-}
-
-// Close 关闭当前打开的文件，供重复 Init 时释放句柄。
-func (w *dailyWriter) Close() error {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-	if w.file == nil {
-		return nil
-	}
-	err := w.file.Close()
-	w.file, w.day = nil, ""
-	return err
 }

@@ -74,7 +74,7 @@
 
 ## 服务端日志
 
-应用日志默认同时写到标准错误与 `LOG_FILE` 目录下按日期命名的文件（如 `2026-11-03.log`）。
+应用日志仅输出到控制台（标准错误），不写入文件。直接运行时显示在终端，Docker 部署时可通过容器日志查看。
 
 ### 格式
 
@@ -108,15 +108,17 @@
 临时把 `LOG_LEVEL` 调成 `debug` 即可。成功但超过 1 秒的请求仍会以 `warn` 出现。
 :::
 
-排查线上问题时常用的两种做法：
+排查线上问题时，先从控制台或容器日志中筛选：
 
 ```bash
 # 只看真正的问题
-grep -E '^\[(WARN|ERR)\]' /var/log/reminder/2026-11-03.log
+docker logs reminder 2>&1 | grep -E '^\[(WARN|ERR)\]'
 
 # 追一次请求的完整过程（访问日志 + 业务日志 + AI 上游报错）
-grep '7bc69bc7850af4d0' /var/log/reminder/2026-11-03.log
+docker logs reminder 2>&1 | grep '7bc69bc7850af4d0'
 ```
+
+使用 Docker Compose 时，把 `docker logs reminder` 换成 `docker compose logs`；直接运行时在启动进程的终端查看，或由进程管理工具收集标准错误。
 
 ### 字段
 
