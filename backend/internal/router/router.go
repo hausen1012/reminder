@@ -75,15 +75,6 @@ func Setup(staticFS embed.FS, cfg *config.Config) (*SetupResult, error) {
 	r := gin.New()
 	applyMiddleware(r)
 
-	// gin 默认信任所有代理头。只有显式配置 TRUSTED_PROXIES 才信任，否则用 TCP 对端地址。
-	if err := r.SetTrustedProxies(cfg.TrustedProxies); err != nil {
-		slog.Warn("TRUSTED_PROXIES 配置非法，已忽略全部代理头", "value", cfg.TrustedProxies, "error", err)
-		_ = r.SetTrustedProxies(nil)
-	}
-	if len(cfg.TrustedProxies) == 0 {
-		slog.Info("未配置 TRUSTED_PROXIES，客户端 IP 取 TCP 对端地址（反向代理后需配置）")
-	}
-
 	box, err := secretbox.New(cfg.EncryptionKey)
 	if err != nil {
 		return nil, fmt.Errorf("初始化 secretbox 失败: %w", err)

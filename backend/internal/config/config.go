@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"os"
 	"strconv"
-	"strings"
 )
 
 // Config 汇总所有运行时配置。
@@ -20,9 +19,8 @@ type Config struct {
 	Password  string
 
 	// 安全与存储配置
-	EncryptionKey    string   // base64 编码的 32 字节 AES-256 密钥；为空则使用内置 fallback（不安全）
-	LogAutoPurgeDays int      // 投递日志自动清理保留天数；0 表示不自动清理
-	TrustedProxies   []string // 可信反向代理 CIDR 列表；为空表示不信任任何代理头
+	EncryptionKey    string // base64 编码的 32 字节 AES-256 密钥；为空则使用内置 fallback（不安全）
+	LogAutoPurgeDays int    // 投递日志自动清理保留天数；0 表示不自动清理
 }
 
 func Load() *Config {
@@ -35,7 +33,6 @@ func Load() *Config {
 
 		EncryptionKey:    getEnv("ENCRYPTION_KEY", ""),
 		LogAutoPurgeDays: getEnvInt("LOG_AUTO_PURGE_DAYS", 0),
-		TrustedProxies:   splitCSV(getEnv("TRUSTED_PROXIES", "")),
 	}
 
 	// JWTSecret 如果留空就自动生成
@@ -67,21 +64,6 @@ func getEnvInt(key string, fallback int) int {
 		return fallback
 	}
 	return n
-}
-
-// splitCSV 把逗号分隔的列表拆成切片，忽略空白项（用于 TRUSTED_PROXIES 等多项配置）。
-func splitCSV(v string) []string {
-	if strings.TrimSpace(v) == "" {
-		return nil
-	}
-	parts := strings.Split(v, ",")
-	out := make([]string, 0, len(parts))
-	for _, p := range parts {
-		if p = strings.TrimSpace(p); p != "" {
-			out = append(out, p)
-		}
-	}
-	return out
 }
 
 // randomSecret 生成 32 字节随机串作为 JWT 密钥。
