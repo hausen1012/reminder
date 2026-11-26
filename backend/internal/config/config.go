@@ -31,10 +31,8 @@ type Config struct {
 	LogAutoPurgeDays     int    // 投递日志自动清理保留天数；0 表示不自动清理
 
 	// 安全相关
-	MaxBodyMB        int64    // 单个请求体上限（MB），超出返回 413
-	TrustedProxies   []string // 可信反向代理 CIDR 列表；为空表示不信任任何代理头
-	LoginMaxAttempts int      // 登录连续失败多少次后锁定，0 表示关闭登录限流
-	LoginLockoutMin  int      // 登录锁定时长（分钟）
+	MaxBodyMB      int64    // 单个请求体上限（MB），超出返回 413
+	TrustedProxies []string // 可信反向代理 CIDR 列表；为空表示不信任任何代理头
 }
 
 func Load() *Config {
@@ -52,21 +50,13 @@ func Load() *Config {
 		MissToleranceMinutes: getEnvInt("MISS_TOLERANCE_MINUTES", 60),
 		LogAutoPurgeDays:     getEnvInt("LOG_AUTO_PURGE_DAYS", 0),
 
-		MaxBodyMB:        int64(getEnvInt("MAX_BODY_MB", 1)),
-		TrustedProxies:   splitCSV(getEnv("TRUSTED_PROXIES", "")),
-		LoginMaxAttempts: getEnvInt("LOGIN_MAX_ATTEMPTS", 5),
-		LoginLockoutMin:  getEnvInt("LOGIN_LOCKOUT_MINUTES", 15),
+		MaxBodyMB:      int64(getEnvInt("MAX_BODY_MB", 1)),
+		TrustedProxies: splitCSV(getEnv("TRUSTED_PROXIES", "")),
 	}
 	if cfg.MaxBodyMB <= 0 {
 		// 0 或负数会让所有请求被拒，按未配置处理
 		slog.Warn("MAX_BODY_MB 非法，回退为 1 MB", "value", cfg.MaxBodyMB)
 		cfg.MaxBodyMB = 1
-	}
-	if cfg.LoginMaxAttempts < 0 {
-		cfg.LoginMaxAttempts = 0
-	}
-	if cfg.LoginLockoutMin <= 0 {
-		cfg.LoginLockoutMin = 15
 	}
 
 	// JWTSecret 如果留空就自动生成

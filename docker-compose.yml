@@ -25,7 +25,5 @@ services:
       - GIN_MODE=${GIN_MODE:-release}
       - MAX_BODY_MB=${MAX_BODY_MB:-1}
       - TRUSTED_PROXIES=${TRUSTED_PROXIES:-}
-      - LOGIN_MAX_ATTEMPTS=${LOGIN_MAX_ATTEMPTS:-5}
-      - LOGIN_LOCKOUT_MINUTES=${LOGIN_LOCKOUT_MINUTES:-15}
       # 访问外部服务（如 Telegram）时的代理；留空表示直连
       - HTTPS_PROXY=${HTTPS_PROXY:-}

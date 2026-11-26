@@ -164,11 +164,7 @@ func Setup(staticFS embed.FS, cfg *config.Config) (*SetupResult, error) {
 	// 启动后异步检查更新
 	go aboutSvc.AutoCheck(context.Background())
 
-	loginLimiter := middleware.NewLoginLimiter(
-		cfg.LoginMaxAttempts,
-		time.Duration(cfg.LoginLockoutMin)*time.Minute,
-	)
-	authHandler := &handlers.AuthHandler{JWTSecret: cfg.JWTSecret, UserSvc: userSvc, Limiter: loginLimiter}
+	authHandler := &handlers.AuthHandler{JWTSecret: cfg.JWTSecret, UserSvc: userSvc}
 	userHandler := &handlers.UserHandler{Svc: userSvc}
 	channelHandler := &handlers.ChannelHandler{Svc: channelSvc}
 	reminderHandler := &handlers.ReminderHandler{Svc: reminderSvc}
