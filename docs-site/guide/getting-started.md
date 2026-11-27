@@ -38,15 +38,14 @@ make dev
 也可以分开启动，便于单独调试：
 
 ```bash
-make dev-backend    # 后端，监听 8765
-make dev-frontend   # 前端 Vite dev server，监听 5173
+make dev-backend    # 后端，监听 8766
+make dev-frontend   # 前端 Vite dev server，监听 8765（反向代理 API 到 8766）
 ```
 
-开发模式下打开 `http://localhost:5173`，前端会把 `/api` 请求代理到后端。
+开发模式下打开 `http://localhost:8765`，前端会把 `/api` 与 `/c` 请求反向代理到后端（监听 8766）。
 
 ::: tip Windows 用户
-`make dev` 依赖 bash。在 Windows 图形终端里可直接运行仓库根目录的 `dev.ps1`，
-它会打开两个独立窗口分别启动后端与前端。
+`make dev` 依赖 bash。在 Windows 终端中可直接运行仓库根目录的 `dev.ps1`，在当前终端同屏启动前后端，按 Ctrl+C 即可安全退出并清理后台进程。
 :::
 
 ## 登录并完成第一次提醒

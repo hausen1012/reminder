@@ -3,6 +3,9 @@ import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 import path from 'path'
 
+const backendPort = process.env.PORT || '8766'
+const backend = `http://127.0.0.1:${backendPort}`
+
 export default defineConfig({
   plugins: [
     react(),
@@ -66,14 +69,16 @@ export default defineConfig({
     },
   },
   server: {
+    host: process.env.WEB_HOST || '0.0.0.0',
+    port: Number(process.env.WEB_PORT) || 8765,
     allowedHosts: true,
     proxy: {
       '/api': {
-        target: 'http://localhost:8765',
+        target: backend,
         changeOrigin: true,
       },
       '/c': {
-        target: 'http://localhost:8765',
+        target: backend,
         changeOrigin: true,
       },
     },

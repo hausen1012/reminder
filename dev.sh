@@ -43,12 +43,13 @@ cd "$ROOT_DIR/backend"
 # 开发默认开 debug：本地只看得到 SQL、访问日志与投递中间步骤才方便排查。
 # 想临时降噪就 `LOG_LEVEL=info ./dev.sh`（外部值优先于这里的默认值）。
 LOG_LEVEL="${LOG_LEVEL:-debug}" \
+PORT="${PORT:-8766}" \
 DB_PATH="$ROOT_DIR/data/reminder.db" go run ./cmd/server/ &
 BACKEND_PID=$!
 
 echo "Waiting for backend..."
 for i in $(seq 1 30); do
-  if curl -s http://localhost:8765/api/health >/dev/null 2>&1; then
+  if curl -s "http://localhost:${PORT:-8766}/api/health" >/dev/null 2>&1; then
     echo "Backend ready (PID: $BACKEND_PID)"
     break
   fi

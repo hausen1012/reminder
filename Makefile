@@ -8,7 +8,7 @@ dev:
 # 开发默认开 debug：本地只看得到 SQL、访问日志与投递中间步骤才方便排查。
 # 想临时降噪：make dev-backend LOG_LEVEL=info
 dev-backend:
-	cd backend && LOG_LEVEL=$${LOG_LEVEL:-debug} DB_PATH=../data/reminder.db go run ./cmd/server/
+	cd backend && LOG_LEVEL=$${LOG_LEVEL:-debug} DB_PATH=../data/reminder.db PORT=$${PORT:-8766} go run ./cmd/server/
 
 dev-frontend:
 	cd frontend && npm run dev
