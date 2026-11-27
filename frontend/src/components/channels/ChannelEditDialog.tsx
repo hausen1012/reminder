@@ -18,8 +18,10 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useToast } from '@/components/ui/use-toast'
+import { useConfig } from '@/contexts/ConfigContext'
 import { SMTPForm, DingTalkForm, WeComForm, WebhookForm } from './ChannelForms'
 import { ChannelGenericForm } from './ChannelGenericForm'
+import { ChannelProxyField } from './ChannelProxyField'
 import type { Channel, ChannelType, ChannelTypeSpec } from '@/types'
 import { createChannel, extractApiError, testChannelDryRun, updateChannel } from '@/lib/api'
 import { defaultConfigOf, findSpec, useChannelTypes } from '@/lib/channelSpec'
@@ -77,6 +79,7 @@ function buildDefaultConfig(
 
 export function ChannelEditDialog({ channel, open, onClose, onSaved }: Props) {
   const { specs } = useChannelTypes()
+  const { config: siteConfig } = useConfig()
   const isEdit = Boolean(channel)
   const initialType = channel?.type ?? 'smtp'
   // 类型元数据晚到时只影响下拉框渲染；重置表单要用最新元数据，但不能因此覆盖用户输入，
@@ -90,10 +93,13 @@ export function ChannelEditDialog({ channel, open, onClose, onSaved }: Props) {
   )
   const [saving, setSaving] = useState(false)
   const [testing, setTesting] = useState(false)
+  const [proxyValid, setProxyValid] = useState(true)
+  const [proxySubmitted, setProxySubmitted] = useState(false)
   const { toast } = useToast()
 
   // 只在切换编辑对象时重置表单；类型元数据晚到不应覆盖用户已输入的内容。
   useEffect(() => {
+    setProxySubmitted(false)
     if (channel) {
       setName(channel.name)
       setType(channel.type)
@@ -115,6 +121,11 @@ export function ChannelEditDialog({ channel, open, onClose, onSaved }: Props) {
   const CustomForm = CUSTOM_FORMS[type as keyof typeof CUSTOM_FORMS]
 
   async function handleTest() {
+    if (!proxyValid) {
+      setProxySubmitted(true)
+      toast({ title: '自定义代理地址不能为空', variant: 'destructive' })
+      return
+    }
     setTesting(true)
     try {
       await testChannelDryRun({
@@ -134,6 +145,11 @@ export function ChannelEditDialog({ channel, open, onClose, onSaved }: Props) {
     e.preventDefault()
     if (!name.trim()) {
       toast({ title: '渠道名称必填', variant: 'destructive' })
+      return
+    }
+    if (!proxyValid) {
+      setProxySubmitted(true)
+      toast({ title: '自定义代理地址不能为空', variant: 'destructive' })
       return
     }
     setSaving(true)
@@ -192,18 +208,13 @@ export function ChannelEditDialog({ channel, open, onClose, onSaved }: Props) {
             <ChannelGenericForm spec={spec} config={config} onChange={setConfig} isEdit={isEdit} />
           ) : null}
 
-          <div className="space-y-2 pt-2 border-t">
-            <Label htmlFor="channel-proxy">网络代理</Label>
-            <Input
-              id="channel-proxy"
-              value={(config.proxy_url as string) ?? ''}
-              onChange={(e) => setConfig({ ...config, proxy_url: e.target.value })}
-              placeholder="留空跟随全局系统代理；填 direct 强制直连"
-            />
-            <p className="text-xs text-muted-foreground">
-              留空默认跟随全局代理；填 direct 强制直连；亦可填 http:// 或 socks5:// 独立代理。
-            </p>
-          </div>
+          <ChannelProxyField
+            value={(config.proxy_url as string) ?? ''}
+            onChange={(proxy_url) => setConfig({ ...config, proxy_url })}
+            globalProxy={siteConfig.proxy_url}
+            onValidityChange={setProxyValid}
+            showError={proxySubmitted}
+          />
 
           <DialogFooter>
             <Button type="button" variant="secondary" onClick={handleTest} disabled={testing} title="向该通知发送一条测试消息">
