@@ -187,7 +187,7 @@ func TestGormConfig_IgnoresRecordNotFound(t *testing.T) {
 // Init 对全新库正常执行 AutoMigrate，并自动创建默认管理员。
 func TestInit_FreshDatabase(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "fresh.db")
-	cfg := &config.Config{DBPath: path, Username: "admin", Password: "admin123"}
+	cfg := &config.Config{DBPath: path, AdminUsername: "admin", AdminPassword: "admin123"}
 	if err := Init(cfg); err != nil {
 		t.Fatalf("Init 失败: %v", err)
 	}
@@ -221,7 +221,7 @@ func TestInit_FreshDatabase(t *testing.T) {
 // Init 遇到含有历史 enabled 列的 channels 表时应平滑删除该列。
 func TestInit_DropsLegacyEnabledColumn(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "legacy.db")
-	cfg := &config.Config{DBPath: path, Username: "admin", Password: "admin123"}
+	cfg := &config.Config{DBPath: path, AdminUsername: "admin", AdminPassword: "admin123"}
 
 	preDB, err := gorm.Open(sqlite.Open(buildDSN(path)), gormConfig())
 	if err != nil {

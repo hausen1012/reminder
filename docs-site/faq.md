@@ -29,7 +29,7 @@ sqlite3 /path/to/reminder.db \
   "UPDATE users SET password = '<刚生成的哈希>' WHERE username = 'admin';"
 ```
 
-### 改了 USERNAME / PASSWORD 但没生效
+### 改了 ADMIN_USERNAME / ADMIN_PASSWORD 但没生效
 
 这两个变量只在 `users` 表为空时用于创建第一个账号，之后请到**设置**页改密码。
 

@@ -12,11 +12,11 @@
 |---|---|---|
 | `PORT` | `8765` | 监听端口 |
 | `DB_PATH` | `/data/db/reminder.db` | SQLite 数据库文件路径，目录不存在会自动创建 |
-| `USERNAME` | `admin` | 初始管理员用户名 |
-| `PASSWORD` | `admin123` | 初始管理员密码 |
+| `ADMIN_USERNAME` | `admin` | 初始管理员用户名 |
+| `ADMIN_PASSWORD` | `admin123` | 初始管理员密码 |
 
 ::: warning 初始账号只在空库时使用
-`USERNAME` / `PASSWORD` 仅在 `users` 表为空时用于创建第一个账号。库中已有账号后改这两个变量
+`ADMIN_USERNAME` / `ADMIN_PASSWORD` 仅在 `users` 表为空时用于创建第一个账号。库中已有账号后改这两个变量
 不会有任何效果，请到面板的**设置**页修改密码。
 :::
 
@@ -136,8 +136,8 @@ services:
     volumes:
       - ./reminder/db:/data/db
     environment:
-      - USERNAME=admin
-      - PASSWORD=换一个强密码
+      - ADMIN_USERNAME=admin
+      - ADMIN_PASSWORD=换一个强密码
       - JWT_SECRET=换一个随机串
       - ENCRYPTION_KEY=base64编码的32字节
 ```

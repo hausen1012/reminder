@@ -8,8 +8,8 @@ services:
       - ./reminder/db:/data/db
     environment:
       - PORT=8765
-      - USERNAME=${USERNAME:-admin}
-      - PASSWORD=${PASSWORD:-admin123}
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin123}
       - DB_PATH=/data/db/reminder.db
       # JWT_SECRET 留空时由程序随机生成；不要填 changeme 之类的弱值
       - JWT_SECRET=${JWT_SECRET:-}

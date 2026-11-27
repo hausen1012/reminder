@@ -12,11 +12,11 @@ import (
 // Config 汇总所有运行时配置。
 type Config struct {
 	// 基础配置
-	Port      string
-	DBPath    string
-	JWTSecret string
-	Username  string
-	Password  string
+	Port          string
+	DBPath        string
+	JWTSecret     string
+	AdminUsername string
+	AdminPassword string
 
 	// 安全与存储配置
 	EncryptionKey    string // base64 编码的 32 字节 AES-256 密钥；为空则使用内置 fallback（不安全）
@@ -25,11 +25,11 @@ type Config struct {
 
 func Load() *Config {
 	cfg := &Config{
-		Port:      getEnv("PORT", "8765"),
-		DBPath:    getEnv("DB_PATH", "/data/db/reminder.db"),
-		JWTSecret: getEnv("JWT_SECRET", ""),
-		Username:  getEnv("USERNAME", "admin"),
-		Password:  getEnv("PASSWORD", "admin123"),
+		Port:          getEnv("PORT", "8765"),
+		DBPath:        getEnv("DB_PATH", "/data/db/reminder.db"),
+		JWTSecret:     getEnv("JWT_SECRET", ""),
+		AdminUsername: getEnv("ADMIN_USERNAME", "admin"),
+		AdminPassword: getEnv("ADMIN_PASSWORD", "admin123"),
 
 		EncryptionKey:    getEnv("ENCRYPTION_KEY", ""),
 		LogAutoPurgeDays: getEnvInt("LOG_AUTO_PURGE_DAYS", 0),
