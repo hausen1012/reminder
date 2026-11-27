@@ -3,6 +3,7 @@ package services
 import (
 	"errors"
 	"log/slog"
+	"net/url"
 	"strings"
 
 	"github.com/reminder/backend/internal/middleware"
@@ -16,6 +17,9 @@ const KeyTimezone = "timezone"
 // KeySiteURL 是站点对外地址在 config 表中的 key，决定确认链接用哪个域名拼接。
 const KeySiteURL = "site_url"
 
+// KeyProxyURL 是全局系统网络代理在 config 表中的 key。
+const KeyProxyURL = "proxy_url"
+
 // DefaultSiteURL 是未配置站点地址时的默认回退地址。
 const DefaultSiteURL = "http://localhost:8765"
 
@@ -25,6 +29,7 @@ var allowedConfigKeys = map[string]struct{}{
 	"logo_svg":  {},
 	KeyTimezone: {},
 	KeySiteURL:  {},
+	KeyProxyURL: {},
 }
 
 // ConfigService 管理站点配置。
@@ -93,6 +98,13 @@ func (s *ConfigService) UpsertMap(cfg map[string]string) error {
 		}
 		toWrite[KeySiteURL] = normalized
 	}
+	if v, ok := toWrite[KeyProxyURL]; ok && v != "" {
+		normalized, err := normalizeProxyURL(v)
+		if err != nil {
+			return middleware.NewAppError(middleware.CodeValidationFailed, err.Error()).WithField(KeyProxyURL)
+		}
+		toWrite[KeyProxyURL] = normalized
+	}
 
 	for k, v := range toWrite {
 		if err := (configStore{s.DB}).set(k, v); err != nil {
@@ -116,6 +128,31 @@ func normalizeSiteURL(raw string) (string, error) {
 		return "", errors.New("站点地址必须以 http:// 或 https:// 开头")
 	}
 	return strings.TrimRight(v, "/"), nil
+}
+
+// normalizeProxyURL 校验代理地址必须以 http://、https:// 或 socks5:// 开头，
+// 且为有效 URL，并去掉首尾空白与结尾斜杠。
+func normalizeProxyURL(raw string) (string, error) {
+	v := strings.TrimSpace(raw)
+	lower := strings.ToLower(v)
+	if !strings.HasPrefix(lower, "http://") && !strings.HasPrefix(lower, "https://") && !strings.HasPrefix(lower, "socks5://") {
+		return "", errors.New("代理地址必须以 http://、https:// 或 socks5:// 开头")
+	}
+	if _, err := url.Parse(v); err != nil {
+		return "", errors.New("代理地址格式无效")
+	}
+	return strings.TrimRight(v, "/"), nil
+}
+
+// GetGlobalProxy 从数据库中获取全局系统网络代理配置，未配置返回空字符串。
+func GetGlobalProxy(db *gorm.DB) string {
+	if db == nil {
+		return ""
+	}
+	if v, ok, err := (configStore{db}).get(KeyProxyURL); err == nil && ok && v != "" {
+		return strings.TrimRight(strings.TrimSpace(v), "/")
+	}
+	return ""
 }
 
 // siteURL 返回拼接确认链接用的站点地址：库里优先，其次 fallback，最后默认值。

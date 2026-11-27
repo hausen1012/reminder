@@ -247,18 +247,23 @@ func (d *DispatchService) buildPlan(ch *models.Channel, n notifier.Notifier, msg
 // stage 只用于日志文案（「发送」/「试发」），record 为 nil 时不落 attempt。
 // 返回 nil 表示某次尝试成功，否则返回最后一次错误。
 func (d *DispatchService) runRetries(ctx context.Context, ch *models.Channel, plan *sendPlan, stage string, record sendAttempt) error {
+	globalProxy := GetGlobalProxy(d.DB)
+	chProxy := notifier.ExtractChannelProxy(plan.config)
+	effectiveProxy := notifier.ResolveProxy(chProxy, globalProxy)
+	sendCtx := notifier.WithProxyURL(ctx, effectiveProxy)
+
 	var lastErr error
 	for i, delay := range d.RetryDelays {
 		if delay > 0 {
 			select {
-			case <-ctx.Done():
-				slog.Warn("投递上下文已取消，停止重试", "channel", ch.ID, "attempt", i+1, "error", ctx.Err())
-				return ctx.Err()
+			case <-sendCtx.Done():
+				slog.Warn("投递上下文已取消，停止重试", "channel", ch.ID, "attempt", i+1, "error", sendCtx.Err())
+				return sendCtx.Err()
 			case <-time.After(delay):
 			}
 		}
 		started := time.Now()
-		err := plan.notifier.Send(ctx, plan.config, plan.msg)
+		err := plan.notifier.Send(sendCtx, plan.config, plan.msg)
 		latency := int(time.Since(started).Milliseconds())
 		if err == nil {
 			// 单次成功属于高频细节，只在 debug 级别输出

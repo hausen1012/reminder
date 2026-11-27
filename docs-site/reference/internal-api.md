@@ -142,8 +142,9 @@ JWT 有效期为 72 小时。改密码后旧 JWT 仍然有效直到过期——�
 | `logo_svg` | 自定义 Logo：SVG 源码，或图片的 `data:image/...` URL |
 | `timezone` | 站点时区 |
 | `site_url` | 站点对外地址，用于拼接确认链接 `/c/:token` 与日志详情里的确认地址 |
+| `proxy_url` | 全局系统代理，用于通知通道与检查更新 |
 
-`GET /api/config` 同样只返回这四个键；`timezone` 与 `site_url` 在该键还没有落库时，
+`GET /api/config` 同样只返回这五个键；`timezone` 与 `site_url` 在该键还没有落库时，
 会回显当前生效值（默认值 `Asia/Shanghai` 与 `http://localhost:8765`），便于设置页展示可编辑的初始值。
 
 `site_url` 必须以 `http://` 或 `https://` 开头，结尾斜杠会被自动去掉；

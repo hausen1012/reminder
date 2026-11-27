@@ -369,3 +369,48 @@ func TestConfigStore_PrefixAndBool(t *testing.T) {
 		t.Fatal("空值写入后应删除该 key")
 	}
 }
+
+// 代理地址：校验 http/https/socks5，规整首尾空白与结尾斜杠，非法整批拒绝，清空则删除。
+func TestConfigService_ProxyURL(t *testing.T) {
+	db := openTestDB(t)
+	svc := NewConfigService(db, testTZ(time.FixedZone("CST", 8*3600)))
+
+	// 1. 合法 http 地址写入与规范化
+	if err := svc.UpsertMap(map[string]string{KeyProxyURL: "  http://127.0.0.1:7890/  "}); err != nil {
+		t.Fatalf("写入 http 代理失败: %v", err)
+	}
+	got, _ := svc.GetAll()
+	if got[KeyProxyURL] != "http://127.0.0.1:7890" {
+		t.Fatalf("落库值 = %q，期望去掉空格与斜杠", got[KeyProxyURL])
+	}
+	if GetGlobalProxy(db) != "http://127.0.0.1:7890" {
+		t.Fatalf("GetGlobalProxy = %q", GetGlobalProxy(db))
+	}
+
+	// 2. 合法 socks5 地址
+	if err := svc.UpsertMap(map[string]string{KeyProxyURL: "socks5://localhost:1080"}); err != nil {
+		t.Fatalf("写入 socks5 代理失败: %v", err)
+	}
+	got, _ = svc.GetAll()
+	if got[KeyProxyURL] != "socks5://localhost:1080" {
+		t.Fatalf("落库值 = %q", got[KeyProxyURL])
+	}
+
+	// 3. 非法协议头整批拒绝
+	err := svc.UpsertMap(map[string]string{"app_name": "新名称", KeyProxyURL: "ftp://127.0.0.1:21"})
+	if err == nil {
+		t.Fatal("非法协议头应报错")
+	}
+	appErr, ok := err.(*middleware.AppError)
+	if !ok || appErr.Code != middleware.CodeValidationFailed || appErr.Field != KeyProxyURL {
+		t.Fatalf("应为 proxy_url 校验错误，实际 %v", err)
+	}
+
+	// 4. 清空代理配置
+	if err := svc.UpsertMap(map[string]string{KeyProxyURL: ""}); err != nil {
+		t.Fatalf("清空失败: %v", err)
+	}
+	if GetGlobalProxy(db) != "" {
+		t.Fatal("清空后 GetGlobalProxy 应为空串")
+	}
+}

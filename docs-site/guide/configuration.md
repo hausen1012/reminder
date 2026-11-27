@@ -73,6 +73,7 @@ $b = New-Object byte[] 32
 | `logo_svg` | 自定义 Logo：SVG 源码，或上传图片后得到的 `data:image/...` URL |
 | `timezone` | 站点时区（默认 `Asia/Shanghai`）。保存后立即生效，所有启用提醒按新时区重算下次触发时间并写回数据库。值未变化时不触发重建 |
 | `site_url` | 站点对外地址（默认 `http://localhost:8765`），用于拼接确认链接。改完立即生效 |
+| `proxy_url` | 全局系统代理（如 `http://127.0.0.1:7890` 或 `socks5://127.0.0.1:1080`），通知渠道与检查更新默认使用，通道可单独覆盖 |
 
 值为空字符串时表示删除该配置项，回退到内置默认值（`timezone` 回退到 `Asia/Shanghai`，`site_url` 回退到 `http://localhost:8765`）。
 
@@ -82,6 +83,8 @@ $b = New-Object byte[] 32
 
 `site_url`（设置页里的「站点地址」）必须填**用户手机上能访问到的地址**：
 填 `localhost` 的话手机点开是空的。地址必须以 `http://` 或 `https://` 开头，结尾斜杠会被去掉。
+
+`proxy_url`（设置页里的「全局系统代理」）必须以 `http://`、`https://` 或 `socks5://` 开头，用于访问 Telegram、Webhook 等外部通道与检查更新；通道亦可在自身配置中填写独立代理或填 `direct` 强制直连。
 
 值为空字符串时表示删除该配置项，回退到内置默认（`timezone` 回退到 `Asia/Shanghai`）。
 

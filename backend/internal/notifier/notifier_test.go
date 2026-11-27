@@ -441,3 +441,40 @@ func TestLimitBody_UnknownType(t *testing.T) {
 		t.Fatal("未知类型不应截断")
 	}
 }
+
+func TestProxyResolution(t *testing.T) {
+	// 1. 显式 direct 强制直连
+	if got := ResolveProxy("direct", "http://global:7890"); got != "" {
+		t.Fatalf("direct 应强制直连，实际得到 %q", got)
+	}
+	if got := ResolveProxy("DIRECT", "http://global:7890"); got != "" {
+		t.Fatalf("DIRECT 不区分大小写，实际得到 %q", got)
+	}
+
+	// 2. 通道单独配置优先
+	if got := ResolveProxy("http://custom:1080", "http://global:7890"); got != "http://custom:1080" {
+		t.Fatalf("通道代理应优先，实际得到 %q", got)
+	}
+
+	// 3. 通道未配时跟随全局代理
+	if got := ResolveProxy("", "socks5://global:1080"); got != "socks5://global:1080" {
+		t.Fatalf("通道为空应回退全局代理，实际得到 %q", got)
+	}
+
+	// 4. 两者皆空
+	if got := ResolveProxy("", ""); got != "" {
+		t.Fatalf("均未配置应返回空串，实际得到 %q", got)
+	}
+
+	// 5. 提取 JSON 中的 proxy_url
+	cfgJSON := []byte(`{"url":"https://example.com","proxy_url":"http://127.0.0.1:8888"}`)
+	if got := ExtractChannelProxy(cfgJSON); got != "http://127.0.0.1:8888" {
+		t.Fatalf("提取 channel 代理失败: %q", got)
+	}
+	if got := ExtractChannelProxy([]byte(`{}`)); got != "" {
+		t.Fatalf("无 proxy_url 字段应返回空串，实际 %q", got)
+	}
+	if got := ExtractChannelProxy(nil); got != "" {
+		t.Fatalf("nil 应返回空串，实际 %q", got)
+	}
+}

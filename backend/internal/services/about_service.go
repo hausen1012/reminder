@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"sort"
 	"strings"
 	"sync"
@@ -197,7 +198,16 @@ func (s *AboutService) logSummary(ctx context.Context, latest, releaseURL string
 func (s *AboutService) fetchLatest(ctx context.Context) (string, string, error) {
 	client := s.Client
 	if client == nil {
-		client = &http.Client{Timeout: updateCheckTimeout}
+		transport := &http.Transport{}
+		if proxyURL := GetGlobalProxy(s.DB); proxyURL != "" {
+			if u, err := url.Parse(proxyURL); err == nil {
+				transport.Proxy = http.ProxyURL(u)
+			}
+		}
+		client = &http.Client{
+			Transport: transport,
+			Timeout:   updateCheckTimeout,
+		}
 	}
 	url := fmt.Sprintf("%s?per_page=%d", s.APIURL, tagListLimit)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)

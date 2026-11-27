@@ -73,6 +73,7 @@ export default function Profile() {
   // 站点对外地址：决定确认链接（/c/:token）用哪个域名拼接。
   // 用户点开链接的通常是手机，所以这个地址必须是手机能访问到的，不能是 localhost。
   const [siteUrl, setSiteUrl] = useState('')
+  const [proxyUrl, setProxyUrl] = useState('')
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
@@ -80,6 +81,7 @@ export default function Profile() {
     setLogoSvg(config.logo_svg ?? '')
     setTimezone(config.timezone ?? 'Asia/Shanghai')
     setSiteUrl(config.site_url ?? '')
+    setProxyUrl(config.proxy_url ?? '')
   }, [config])
 
   // 与已保存的配置比较，用于提示存在未提交的修改
@@ -87,7 +89,8 @@ export default function Profile() {
     appName !== (config.app_name ?? '') ||
     logoSvg !== (config.logo_svg ?? '') ||
     timezone !== (config.timezone ?? 'Asia/Shanghai') ||
-    siteUrl !== (config.site_url ?? '')
+    siteUrl !== (config.site_url ?? '') ||
+    proxyUrl !== (config.proxy_url ?? '')
 
   async function handleGeneralSave(e: FormEvent) {
     e.preventDefault()
@@ -98,6 +101,7 @@ export default function Profile() {
         logo_svg: logoSvg,
         site_url: siteUrl,
         timezone,
+        proxy_url: proxyUrl,
       })
       toast({ title: '基础设置已保存' })
     } catch (err) {
@@ -299,6 +303,19 @@ export default function Profile() {
                             确认链接预览：{siteUrl.replace(/\/+$/, '')}/c/example-token
                           </p>
                         )}
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="global-proxy">全局系统代理</Label>
+                        <Input
+                          id="global-proxy"
+                          value={proxyUrl}
+                          onChange={(e) => setProxyUrl(e.target.value)}
+                          placeholder="例如：http://127.0.0.1:7890 或 socks5://127.0.0.1:1080"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          通知渠道默认使用的网络代理；留空表示直连，通道亦可单独覆盖。
+                        </p>
                       </div>
 
                       <div className="space-y-2">

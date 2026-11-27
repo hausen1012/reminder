@@ -7,7 +7,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
+	"net/url"
+	"strings"
+	"sync"
 	"time"
 )
 
@@ -16,6 +20,96 @@ const sendTimeout = 10 * time.Second
 
 // responseLimit 是读取响应体的上限，避免对端返回超大内容。
 const responseLimit = 8192
+
+type proxyContextKey struct{}
+
+// WithProxyURL 将决议后的生效代理地址存入 context。
+func WithProxyURL(ctx context.Context, proxyURL string) context.Context {
+	return context.WithValue(ctx, proxyContextKey{}, proxyURL)
+}
+
+// ProxyURLFromContext 从 context 中取出代理地址。
+func ProxyURLFromContext(ctx context.Context) string {
+	if ctx == nil {
+		return ""
+	}
+	if v, ok := ctx.Value(proxyContextKey{}).(string); ok {
+		return v
+	}
+	return ""
+}
+
+// ResolveProxy 决议最终生效的代理 URL：
+// 1. channelProxy 为 direct（不区分大小写）-> 强制直连，返回 ""
+// 2. channelProxy 不为空 -> 通道单独配置优先
+// 3. 否则回退使用 globalProxy；若也为空则返回 ""（直连）
+func ResolveProxy(channelProxy, globalProxy string) string {
+	cp := strings.TrimSpace(channelProxy)
+	if strings.EqualFold(cp, "direct") {
+		return ""
+	}
+	if cp != "" {
+		return cp
+	}
+	return strings.TrimSpace(globalProxy)
+}
+
+// ExtractChannelProxy 从通道的明文 JSON 配置中快速提取 proxy_url 字段。
+func ExtractChannelProxy(configJSON []byte) string {
+	if len(configJSON) == 0 {
+		return ""
+	}
+	var c struct {
+		ProxyURL string `json:"proxy_url"`
+	}
+	_ = json.Unmarshal(configJSON, &c)
+	return strings.TrimSpace(c.ProxyURL)
+}
+
+var (
+	proxyClientsMu sync.RWMutex
+	proxyClients   = make(map[string]*http.Client)
+)
+
+// httpClientFor 返回当前 context 对应的 HTTP Client。
+func httpClientFor(ctx context.Context) *http.Client {
+	proxyURL := ProxyURLFromContext(ctx)
+	if proxyURL == "" {
+		return http.DefaultClient
+	}
+
+	proxyClientsMu.RLock()
+	client, ok := proxyClients[proxyURL]
+	proxyClientsMu.RUnlock()
+	if ok {
+		return client
+	}
+
+	proxyClientsMu.Lock()
+	defer proxyClientsMu.Unlock()
+	if client, ok := proxyClients[proxyURL]; ok {
+		return client
+	}
+
+	u, err := url.Parse(proxyURL)
+	if err != nil {
+		slog.Warn("解析代理地址失败，回退默认客户端", "proxy_url", proxyURL, "error", err)
+		return http.DefaultClient
+	}
+
+	transport := &http.Transport{
+		Proxy:                 http.ProxyURL(u),
+		MaxIdleConns:          100,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+	}
+	newClient := &http.Client{
+		Transport: transport,
+	}
+	proxyClients[proxyURL] = newClient
+	return newClient
+}
 
 // httpResult 是一次请求的结果。
 type httpResult struct {
@@ -47,7 +141,8 @@ func doRequestTimeout(ctx context.Context, timeout time.Duration, method, endpoi
 		req.Header.Set(k, v)
 	}
 
-	resp, err := http.DefaultClient.Do(req)
+	client := httpClientFor(reqCtx)
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("请求失败: %w", err)
 	}

@@ -192,6 +192,19 @@ export function ChannelEditDialog({ channel, open, onClose, onSaved }: Props) {
             <ChannelGenericForm spec={spec} config={config} onChange={setConfig} isEdit={isEdit} />
           ) : null}
 
+          <div className="space-y-2 pt-2 border-t">
+            <Label htmlFor="channel-proxy">网络代理</Label>
+            <Input
+              id="channel-proxy"
+              value={(config.proxy_url as string) ?? ''}
+              onChange={(e) => setConfig({ ...config, proxy_url: e.target.value })}
+              placeholder="留空跟随全局系统代理；填 direct 强制直连"
+            />
+            <p className="text-xs text-muted-foreground">
+              留空默认跟随全局代理；填 direct 强制直连；亦可填 http:// 或 socks5:// 独立代理。
+            </p>
+          </div>
+
           <DialogFooter>
             <Button type="button" variant="secondary" onClick={handleTest} disabled={testing} title="向该通知发送一条测试消息">
               {testing ? '试发中…' : '测试通知'}

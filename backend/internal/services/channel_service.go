@@ -259,7 +259,13 @@ func (s *ChannelService) DryRun(ctx context.Context, chType string, config map[s
 	}
 	// 与正式投递一致：展开后的标题与正文回写 vars，Webhook 模板引用时不残留占位符
 	rendered := buildRenderedMessage(subject, body, "text", vars)
-	if err := n.Send(ctx, plainConfig, rendered); err != nil {
+
+	globalProxy := GetGlobalProxy(s.DB)
+	chProxy := notifier.ExtractChannelProxy(plainConfig)
+	effectiveProxy := notifier.ResolveProxy(chProxy, globalProxy)
+	sendCtx := notifier.WithProxyURL(ctx, effectiveProxy)
+
+	if err := n.Send(sendCtx, plainConfig, rendered); err != nil {
 		logger.FromContext(ctx).Warn("通道试发失败", "type", chType, "error", err)
 		// 试发失败通常是配置问题，返回 400 + 原文案而不是 500
 		return middleware.NewAppError(middleware.CodeValidationFailed, "试发失败: "+err.Error())
