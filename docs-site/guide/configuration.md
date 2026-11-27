@@ -59,12 +59,6 @@ $b = New-Object byte[] 32
 
 应用运行日志仅输出到控制台（标准错误），不写入文件；`LOG_AUTO_PURGE_DAYS` 只清理数据库中的投递记录。
 
-### 网络代理
-
-| 变量 | 默认值 | 说明 |
-|---|---|---|
-| `HTTPS_PROXY` | 空 | 访问外部服务时的 HTTP 代理，作用于 Telegram 等需要代理的网络环境 |
-
 ### 日志级别
 
 `LOG_LEVEL` 决定输出到哪一级，默认 `info`；各级的典型内容与排查方式见[日志与监控](/guide/logs-and-monitoring)。

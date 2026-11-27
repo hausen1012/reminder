@@ -18,5 +18,3 @@ services:
       - LOG_AUTO_PURGE_DAYS=${LOG_AUTO_PURGE_DAYS:-0}
       - LOG_FORMAT=${LOG_FORMAT:-text}
       - LOG_LEVEL=${LOG_LEVEL:-info}
-      # 访问外部服务（如 Telegram）时的代理；留空表示直连
-      - HTTPS_PROXY=${HTTPS_PROXY:-}
